@@ -35,7 +35,9 @@ namespace jrc
             EQUIPINVENTORY,
             ITEMINVENTORY,
             SKILLBOOK,
-            SHOP
+            SHOP,
+            MINIMAP,
+            WORLDMAP
         };
 
         virtual ~Tooltip() = default;
