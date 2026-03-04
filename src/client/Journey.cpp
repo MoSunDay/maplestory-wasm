@@ -39,6 +39,33 @@ namespace jrc
 {
     Error init()
     {
+#ifdef MS_PLATFORM_WASM
+        auto loadConfigString = [](const char* key, auto& setting) {
+            char* val = (char*)EM_ASM_INT({
+                var k = UTF8ToString($0);
+                if (typeof Module !== 'undefined' && Module.LazyFS && Module.LazyFS[k] !== undefined && Module.LazyFS[k] !== null) {
+                    var str = Module.LazyFS[k].toString();
+                    var lengthBytes = lengthBytesUTF8(str) + 1;
+                    var stringOnWasmHeap = _malloc(lengthBytes);
+                    stringToUTF8(str, stringOnWasmHeap, lengthBytes);
+                    return stringOnWasmHeap;
+                }
+                return 0;
+            }, key);
+            
+            if (val) {
+                setting.save(std::string(val));
+                free(val);
+            }
+        };
+
+        loadConfigString("MapleStoryServerIp", Setting<MapleStoryServerIp>::get());
+        loadConfigString("MapleStoryServerPort", Setting<MapleStoryServerPort>::get());
+        loadConfigString("ProxyIP", Setting<ProxyIP>::get());
+        loadConfigString("ProxyPort", Setting<ProxyPort>::get());
+        loadConfigString("AssetsServerProtocol", Setting<AssetsServerProtocol>::get());
+#endif
+
         if (Error error = Session::get().init())
         {
             return error;

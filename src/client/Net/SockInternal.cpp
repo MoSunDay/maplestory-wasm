@@ -1,6 +1,7 @@
 
 #include "SockInternal.h"
 #include "../Console.h"
+#include "../Configuration.h"
 #include "../Journey.h"
 #include "Template/Singleton.h"
 #include "Util/Misc.h"
@@ -115,10 +116,24 @@ namespace
 	  public:
 		int connect(const std::string& address, const std::string& port)
 		{
-			std::string ws_url = "ws://";
-			ws_url += jrc::getBrowserHostname(); // Dynamic hostname from browser
+			std::string ws_url = jrc::Setting<jrc::AssetsServerProtocol>::get().load() + "://";
+			
+			std::string proxy_ip = jrc::Setting<jrc::ProxyIP>::get().load();
+			std::string proxy_port = jrc::Setting<jrc::ProxyPort>::get().load();
+			
+			if (!proxy_ip.empty()) {
+				ws_url += proxy_ip;
+			} else {
+				ws_url += jrc::getBrowserHostname(); // Dynamic hostname from browser
+			}
+			
 			ws_url += ":";
-			ws_url += WEB_SOCK_PORT; // Proxy server port
+			
+			if (!proxy_port.empty()) {
+				ws_url += proxy_port;
+			} else {
+				ws_url += WEB_SOCK_PORT; // Proxy server port fallback
+			}
 
 			jrc::Console::get().print("Connecting to WebSocket proxy: " + ws_url);
 

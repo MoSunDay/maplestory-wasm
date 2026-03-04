@@ -164,6 +164,20 @@ maplestory-wasm/
 ```
 ## ⚙️ Configuration
 
+### Web Client Configuration (`web/config.json`)
+
+The `web/config.json` file controls how the browser connects to backend services. If values are missing or `null`, the client will attempt to auto-detect them or fall back to `localhost` defaults.
+
+| Variable | Description |
+|----------|-------------|
+| `AssetsServerProtocol` | Protocol for the LazyFS assets WebSocket (`ws` or `wss`). |
+| `AssetsServerIP`       | IP/Hostname of the LazyFS Assets Server. |
+| `AssetsServerPort`     | Port of the LazyFS Assets Server (defaults to `8765`). |
+| `ProxyIP`              | IP/Hostname of the WebSocket Proxy for game traffic. |
+| `ProxyPort`            | Port of the WebSocket Proxy (defaults to `8080`). |
+| `MapleStoryServerIp`   | IP address of the target Cosmic Server (forwarded by proxy). |
+| `MapleStoryServerPort` | Port of the target Cosmic Server (defaults to `8484`). |
+
 ### Docker Environment
 
 The `docker-compose.yml` provides sensible defaults. Key environment variables:

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,13 +39,14 @@
         }
     </style>
 </head>
+
 <body>
     <div id="container">
         <canvas id="canvas" tabindex="-1"></canvas>
     </div>
 
     <script>
-        (function() {
+        (function () {
             const GAME_WIDTH = 800;
             const GAME_HEIGHT = 600;
 
@@ -102,65 +104,109 @@
         })();
 
         Module = {
-            canvas: (function() {
+            canvas: (function () {
                 let canvas = document.getElementById('canvas');
-                canvas.addEventListener("webglcontextlost", function(e) {
+                canvas.addEventListener("webglcontextlost", function (e) {
                     alert('WebGL context lost. You will need to reload the page.');
                     e.preventDefault();
                 }, false);
-                canvas.addEventListener("click", function() {
+                canvas.addEventListener("click", function () {
                     canvas.focus();
                 });
                 return canvas;
             })(),
-            
+
             // Disable stdin to prevent annoying prompt() popups
-            preRun: [function() {
+            preRun: [function () {
                 function stdin() {
                     return null; // Return null for EOF
                 }
                 FS.init(stdin, null, null);
             }],
-            
-            print: function(text) {
+
+            print: function (text) {
                 console.log('[stdout]', text);
             },
-            
-            printErr: function(text) {
+
+            printErr: function (text) {
                 console.error('[stderr]', text);
             },
-            
-            setStatus: function(text) {
+
+            setStatus: function (text) {
                 if (text) {
                     console.log('[status]', text);
                 }
             },
-            
-            monitorRunDependencies: function(left) {
+
+            monitorRunDependencies: function (left) {
                 console.log('[dependencies]', left, 'remaining');
             },
-            
-            onRuntimeInitialized: function() {
+
+            onRuntimeInitialized: function () {
                 console.log('[runtime] Initialized');
                 if (window.MapleWasmUI && window.MapleWasmUI.applyScale) {
                     window.MapleWasmUI.applyScale();
                 }
             },
-            
+
             // Function to add C++ logs - now just console
-            addCppLog: function(level, message) {
+            addCppLog: function (level, message) {
                 let timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
                 console.log('[' + timestamp + '] [' + level + '] ' + message);
             }
         };
-        
+
         console.log('[status] Downloading...');
-        
-        window.onerror = function(event) {
+
+        window.onerror = function (event) {
             console.error('[post-exception status] Exception thrown, see JavaScript console');
         };
+
+        // Fetch configuration before loading the client
+        fetch('/web/config.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(config => {
+                if (config) {
+                    let hasConfig = false;
+                    const lazyConfig = {};
+
+                    const lazyConfigKeys = [
+                        'AssetsServerIP', 'AssetsServerPort',
+                        'MapleStoryServerIp', 'MapleStoryServerPort',
+                        'ProxyIP', 'ProxyPort', 'AssetsServerProtocol'
+                    ];
+
+                    lazyConfigKeys.forEach(key => {
+                        if (config[key] !== undefined && config[key] !== null) {
+                            lazyConfig[key] = config[key];
+                            console.log(`[config] Set ${key} from config.json:`, config[key]);
+                            hasConfig = true;
+                        }
+                    });
+
+                    if (hasConfig) {
+                        Module.LazyFS = Object.assign(Module.LazyFS || {}, lazyConfig);
+                    }
+                }
+                loadWasmClient();
+            })
+            .catch(err => {
+                console.warn('[config] Could not load /web/config.json, proceeding with defaults. Error:', err.message);
+                loadWasmClient();
+            });
+
+        function loadWasmClient() {
+            const script = document.createElement('script');
+            script.src = '/build/JourneyClient.js';
+            script.async = true;
+            document.body.appendChild(script);
+        }
     </script>
-    
-    <script async type="text/javascript" src="/build/JourneyClient.js"></script>
 </body>
+
 </html>
