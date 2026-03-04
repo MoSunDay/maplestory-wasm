@@ -620,4 +620,8 @@ var LazyFS = {
 if (typeof Module === 'undefined') {
 	Module = {};
 }
+// Merge existing configuration if it was defined in index.html before this script loaded
+if (Module.LazyFS) {
+	Object.assign(LazyFS, Module.LazyFS);
+}
 Module.LazyFS = LazyFS;

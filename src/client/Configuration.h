@@ -150,9 +150,33 @@ namespace jrc
     };
 
     // IP Adress which the client will connect to.
-    struct ServerIP : public Configuration::StringEntry
+    struct MapleStoryServerIp : public Configuration::StringEntry
     {
-        ServerIP() : StringEntry("ServerIP", "127.0.0.1") {}
+        MapleStoryServerIp() : StringEntry("MapleStoryServerIp", "127.0.0.1") {}
+    };
+
+    // Port which the client will connect to.
+    struct MapleStoryServerPort : public Configuration::StringEntry
+    {
+        MapleStoryServerPort() : StringEntry("MapleStoryServerPort", "8484") {}
+    };
+
+    // WebSocket Proxy IP
+    struct ProxyIP : public Configuration::StringEntry
+    {
+        ProxyIP() : StringEntry("ProxyIP", "") {}
+    };
+
+    // WebSocket Proxy Port
+    struct ProxyPort : public Configuration::StringEntry
+    {
+        ProxyPort() : StringEntry("ProxyPort", "8080") {}
+    };
+
+    // WebSocket / WSS protocol
+    struct AssetsServerProtocol : public Configuration::StringEntry
+    {
+        AssetsServerProtocol() : StringEntry("AssetsServerProtocol", "ws") {}
     };
 
     // Wether to start in fullscreen mode.
