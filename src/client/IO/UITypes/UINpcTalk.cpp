@@ -20,7 +20,9 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
+#include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
@@ -37,9 +39,33 @@ namespace jrc
         constexpr int16_t TEXT_VERTICAL_PADDING = 16;
         constexpr int16_t BUTTON_MARGIN = 20;
         constexpr int16_t BUTTON_GAP = 6;
+        constexpr int16_t DIALOG_TEXT_X = 156;
+        constexpr int16_t DIALOG_TEXT_Y_OFFSET = 16;
+        constexpr int16_t OPTION_VERTICAL_GAP = 2;
+        constexpr int16_t HOVER_UNDERLINE_THICKNESS = 1;
+        constexpr int8_t SELECTION_DIALOGUE_TYPE = 4;
+
+        bool try_parse_int32(const std::string& token, int32_t& value)
+        {
+            if (token.empty())
+            {
+                return false;
+            }
+
+            try
+            {
+                value = std::stoi(token);
+            }
+            catch (...)
+            {
+                return false;
+            }
+
+            return true;
+        }
     }
 
-    UINpcTalk::UINpcTalk() : selected(0)
+    UINpcTalk::UINpcTalk() : selected(0), hovered_selection(-1)
     {
         nl::node src = nl::nx::ui["UIWindow2.img"]["UtilDlgEx"];
 
@@ -72,13 +98,52 @@ namespace jrc
         speaker.draw({ position + Point<int16_t>(80, 100), true });
         nametag.draw(position + Point<int16_t>(25, 100));
         name.draw(position + Point<int16_t>(80, 99));
-        text.draw(position + Point<int16_t>(156, 16 + ((vtile * fill.height() - text.height()) / 2)));
+        int16_t text_y = get_dialogue_text_y();
+        text.draw(position + Point<int16_t>(DIALOG_TEXT_X, text_y));
+
+        if (!selection_labels.empty())
+        {
+            int16_t option_y = get_options_start_y();
+            for (size_t i = 0; i < selection_labels.size(); ++i)
+            {
+                const Text& option_label = selection_labels[i];
+                option_label.draw(position + Point<int16_t>(DIALOG_TEXT_X, option_y));
+
+                if (static_cast<int32_t>(i) == hovered_selection)
+                {
+                    int16_t underline_width = std::min<int16_t>(
+                        TEXT_WIDTH,
+                        std::max<int16_t>(1, option_label.width())
+                    );
+                    GraphicsGL::get().drawrectangle(
+                        static_cast<int16_t>(position.x() + DIALOG_TEXT_X),
+                        static_cast<int16_t>(position.y() + option_y + option_label.height()),
+                        underline_width,
+                        HOVER_UNDERLINE_THICKNESS,
+                        1.0f, 0.5f, 0.0f, 1.0f
+                    );
+                }
+
+                option_y += option_label.height();
+                if (i + 1 < selection_labels.size())
+                    option_y += OPTION_VERTICAL_GAP;
+            }
+        }
     }
 
     bool UINpcTalk::is_in_range(Point<int16_t> cursorpos) const
     {
         if (UIElement::is_in_range(cursorpos))
             return true;
+
+        if (active && type == SELECTION_DIALOGUE_TYPE && !selection_labels.empty())
+        {
+            Point<int16_t> relative = cursorpos - position;
+            int16_t text_y = get_dialogue_text_y();
+            Point<int16_t> rect_tl(DIALOG_TEXT_X, text_y);
+            Point<int16_t> rect_br(DIALOG_TEXT_X + TEXT_WIDTH, text_y + get_dialogue_content_height());
+            if (Rectangle<int16_t>(rect_tl, rect_br).contains(relative)) return true;
+        }
 
         for (const auto& button : buttons)
         {
@@ -94,7 +159,7 @@ namespace jrc
         switch (buttonid)
         {
         case OK:
-            if (type == 4)
+            if (type == SELECTION_DIALOGUE_TYPE)
             {
                 int32_t selection = selections.empty() ? 0 : selections[selected];
                 NpcTalkMorePacket(selection).dispatch();
@@ -107,12 +172,12 @@ namespace jrc
             }
             break;
         case NEXT:
-            if (type == 4)
+            if (type == SELECTION_DIALOGUE_TYPE)
             {
                 if (!selections.empty())
                 {
                     selected = (selected + 1) % static_cast<int32_t>(selections.size());
-                    text.change_text(format_selectable_text());
+                    refresh_selection_styles();
                 }
             }
             else if (type == 0)
@@ -122,13 +187,13 @@ namespace jrc
             }
             break;
         case PREV:
-            if (type == 4)
+            if (type == SELECTION_DIALOGUE_TYPE)
             {
                 if (!selections.empty())
                 {
                     selected = (selected + static_cast<int32_t>(selections.size()) - 1)
                         % static_cast<int32_t>(selections.size());
-                    text.change_text(format_selectable_text());
+                    refresh_selection_styles();
                 }
             }
             else if (type == 0)
@@ -161,18 +226,28 @@ namespace jrc
 
     void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string& tx)
     {
+        std::string processed_tx = replace_macros(tx);
+
         selections.clear();
         selection_texts.clear();
+        selection_labels.clear();
         selected = 0;
+        hovered_selection = -1;
 
-        if (msgtype == 4)
+        if (msgtype == SELECTION_DIALOGUE_TYPE)
         {
-            parse_selections(tx, prompttext);
-            text = { Text::A12M, Text::LEFT, Text::DARKGREY, format_selectable_text(), TEXT_WIDTH, false };
+            parse_selections(processed_tx, prompttext);
+            text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
+            selection_labels.reserve(selection_texts.size());
+            for (const std::string& option_text : selection_texts)
+            {
+                selection_labels.emplace_back(Text::A12M, Text::LEFT, Text::BLUE, option_text, TEXT_WIDTH, false);
+            }
+            refresh_selection_styles();
         }
         else
         {
-            prompttext = strip_npc_tokens(tx);
+            prompttext = strip_npc_tokens(processed_tx);
             text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
         }
 
@@ -194,7 +269,7 @@ namespace jrc
         int16_t minimum_fill_height = MIN_DIALOGUE_TILES * fill.height();
         int16_t required_fill_height = std::max<int16_t>(
             minimum_fill_height,
-            static_cast<int16_t>(text.height() + TEXT_VERTICAL_PADDING * 2)
+            static_cast<int16_t>(get_dialogue_content_height() + TEXT_VERTICAL_PADDING * 2)
         );
         vtile = std::max<int16_t>(
             MIN_DIALOGUE_TILES,
@@ -244,7 +319,7 @@ namespace jrc
             place_button_from_right(NO);
             place_button_from_right(YES);
             break;
-        case 4:
+        case SELECTION_DIALOGUE_TYPE:
             place_button_from_right(OK);
             place_button_from_right(NEXT);
             place_button_from_right(PREV);
@@ -273,6 +348,44 @@ namespace jrc
 
         active = false;
         NpcTalkMorePacket(type, 0).dispatch();
+    }
+
+    UIElement::CursorResult UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
+    {
+        if (active && type == SELECTION_DIALOGUE_TYPE && !selection_labels.empty())
+        {
+            Point<int16_t> relative = cursorpos - position;
+            int32_t hovered_option = get_option_at(relative);
+
+            bool style_changed = false;
+            if (hovered_selection != hovered_option)
+            {
+                hovered_selection = hovered_option;
+                style_changed = true;
+            }
+
+            if (hovered_option >= 0 && selected != hovered_option)
+            {
+                selected = hovered_option;
+                style_changed = true;
+            }
+
+            if (style_changed)
+            {
+                refresh_selection_styles();
+            }
+
+            if (hovered_option >= 0)
+            {
+                if (clicked)
+                {
+                    button_pressed(OK);
+                }
+                return { clicked ? Cursor::CLICKING : Cursor::CANCLICK, true };
+            }
+        }
+
+        return UIElement::send_cursor(clicked, cursorpos);
     }
 
     void UINpcTalk::parse_selections(const std::string& source, std::string& rendered_text)
@@ -319,7 +432,15 @@ namespace jrc
                 continue;
             }
 
-            selections.push_back(std::stoi(source.substr(id_start, id_end - id_start)));
+            int32_t selection_id = 0;
+            if (!try_parse_int32(source.substr(id_start, id_end - id_start), selection_id))
+            {
+                rendered_text += source.substr(begin, option_end + 2 - begin);
+                cursor = option_end + 2;
+                continue;
+            }
+
+            selections.push_back(selection_id);
             selection_texts.push_back(strip_npc_tokens(source.substr(option_start, option_end - option_start)));
             cursor = option_end + 2;
         }
@@ -327,28 +448,89 @@ namespace jrc
         rendered_text = strip_npc_tokens(rendered_text);
     }
 
-    std::string UINpcTalk::format_selectable_text() const
+    void UINpcTalk::refresh_selection_styles()
     {
-        if (selections.empty())
-            return prompttext;
+        for (size_t i = 0; i < selection_labels.size(); ++i)
+        {
+            Text::Color option_color = Text::BLUE;
+            if (static_cast<int32_t>(i) == selected)
+            {
+                option_color = Text::MEDIUMBLUE;
+            }
+            if (static_cast<int32_t>(i) == hovered_selection)
+            {
+                option_color = Text::ORANGE;
+            }
+            selection_labels[i].change_color(option_color);
+        }
+    }
 
-        std::string output;
+    int16_t UINpcTalk::get_selection_text_height() const
+    {
+        int16_t selection_height = 0;
+        for (size_t i = 0; i < selection_labels.size(); ++i)
+        {
+            selection_height += selection_labels[i].height();
+            if (i + 1 < selection_labels.size())
+            {
+                selection_height += OPTION_VERTICAL_GAP;
+            }
+        }
+        return selection_height;
+    }
+
+    int16_t UINpcTalk::get_dialogue_content_height() const
+    {
+        int16_t content_height = text.height();
+        if (!selection_labels.empty())
+        {
+            if (!prompttext.empty())
+            {
+                content_height += OPTION_VERTICAL_GAP;
+            }
+            content_height += get_selection_text_height();
+        }
+        return content_height;
+    }
+
+    int16_t UINpcTalk::get_dialogue_text_y() const
+    {
+        return DIALOG_TEXT_Y_OFFSET + ((vtile * fill.height() - get_dialogue_content_height()) / 2);
+    }
+
+    int16_t UINpcTalk::get_options_start_y() const
+    {
+        int16_t options_y = get_dialogue_text_y() + text.height();
         if (!prompttext.empty())
         {
-            output += prompttext;
-            if (prompttext.back() != '\n')
-                output.push_back('\n');
+            options_y += OPTION_VERTICAL_GAP;
         }
+        return options_y;
+    }
 
-        for (size_t i = 0; i < selection_texts.size(); i++)
+    int32_t UINpcTalk::get_option_at(Point<int16_t> relative) const
+    {
+        int16_t options_y = get_options_start_y();
+        for (size_t i = 0; i < selection_labels.size(); ++i)
         {
-            output += (static_cast<int32_t>(i) == selected) ? "> " : "  ";
-            output += selection_texts[i];
-            if (i + 1 < selection_texts.size())
-                output.push_back('\n');
+            int16_t option_height = selection_labels[i].height();
+            Rectangle<int16_t> option_rect(
+                Point<int16_t>(DIALOG_TEXT_X, options_y),
+                Point<int16_t>(DIALOG_TEXT_X + TEXT_WIDTH, options_y + option_height)
+            );
+            if (option_rect.contains(relative))
+            {
+                return static_cast<int32_t>(i);
+            }
+
+            options_y += option_height;
+            if (i + 1 < selection_labels.size())
+            {
+                options_y += OPTION_VERTICAL_GAP;
+            }
         }
 
-        return output;
+        return -1;
     }
 
     std::string UINpcTalk::strip_npc_tokens(const std::string& source)
@@ -372,5 +554,57 @@ namespace jrc
         }
 
         return stripped;
+    }
+
+    std::string UINpcTalk::replace_macros(const std::string& source)
+    {
+        std::string result;
+        result.reserve(source.size());
+
+        size_t cursor = 0;
+        while (cursor < source.size())
+        {
+            size_t begin = source.find("#m", cursor);
+            if (begin == std::string::npos)
+            {
+                result += source.substr(cursor);
+                break;
+            }
+
+            result += source.substr(cursor, begin - cursor);
+
+            size_t id_start = begin + 2;
+            size_t id_end = id_start;
+            while (id_end < source.size() && std::isdigit(static_cast<unsigned char>(source[id_end])))
+                id_end++;
+
+            if (id_end == id_start || id_end >= source.size() || source[id_end] != '#')
+            {
+                result += source.substr(begin);
+                break;
+            }
+
+            int32_t mapid = 0;
+            if (!try_parse_int32(source.substr(id_start, id_end - id_start), mapid))
+            {
+                result += source.substr(begin, id_end + 1 - begin);
+                cursor = id_end + 1;
+                continue;
+            }
+
+            const NxHelper::Map::MapInfo map_info = NxHelper::Map::get_map_info_by_id(mapid);
+            if (!map_info.name.empty())
+            {
+                result += map_info.name;
+            }
+            else
+            {
+                result += source.substr(begin, id_end + 1 - begin);
+            }
+
+            cursor = id_end + 1;
+        }
+
+        return result;
     }
 }
