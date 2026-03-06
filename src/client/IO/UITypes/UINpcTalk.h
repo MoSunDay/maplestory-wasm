@@ -37,6 +37,7 @@ namespace jrc
         void draw(float inter) const override;
         bool is_in_range(Point<int16_t> cursorpos) const override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
+        CursorResult send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
         void change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speaker, const std::string& text);
 
@@ -45,8 +46,14 @@ namespace jrc
 
     private:
         void parse_selections(const std::string& text, std::string& rendered_text);
-        std::string format_selectable_text() const;
         static std::string strip_npc_tokens(const std::string& text);
+        static std::string replace_macros(const std::string& source);
+        void refresh_selection_styles();
+        int16_t get_selection_text_height() const;
+        int16_t get_dialogue_content_height() const;
+        int16_t get_dialogue_text_y() const;
+        int16_t get_options_start_y() const;
+        int32_t get_option_at(Point<int16_t> relative) const;
 
         enum Buttons
         {
@@ -73,7 +80,9 @@ namespace jrc
         int8_t type;
         std::string prompttext;
         std::vector<std::string> selection_texts;
+        std::vector<Text> selection_labels;
         std::vector<int32_t> selections;
         int32_t selected;
+        int32_t hovered_selection;
     };
 }

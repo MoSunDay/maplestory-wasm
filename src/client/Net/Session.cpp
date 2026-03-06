@@ -28,6 +28,35 @@
 
 namespace jrc
 {
+    namespace
+    {
+        bool is_local_channel_address(const std::string& address)
+        {
+            return address == "127.0.0.1" || address == "0.0.0.0" || address == "localhost";
+        }
+
+        std::string resolve_channel_address(const char* address)
+        {
+            std::string target_address = (address != nullptr) ? address : "";
+            if (!is_local_channel_address(target_address))
+            {
+                return target_address;
+            }
+
+            std::string configured_server_ip = Setting<MapleStoryServerIp>::get().load();
+            if (configured_server_ip.empty())
+            {
+                return target_address;
+            }
+
+            Console::get().print(
+                "Intercepted local channel IP " + target_address +
+                ", substituting with " + configured_server_ip
+            );
+            return configured_server_ip;
+        }
+    }
+
     Session::Session()
     {
         connected = false;
@@ -94,7 +123,9 @@ namespace jrc
 
         if (success)
         {
-            init(address, port);
+            std::string target_address = resolve_channel_address(address);
+            const char* target_port = (port != nullptr) ? port : "";
+            init(target_address.c_str(), target_port);
         }
         else
         {
