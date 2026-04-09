@@ -28,6 +28,8 @@
 #include "../Template/Singleton.h"
 #include "../Template/Optional.h"
 
+#include <cstddef>
+#include <string>
 #include <unordered_map>
 
 namespace jrc
@@ -70,6 +72,10 @@ namespace jrc
         void focus_textfield(Textfield* textfield);
         void blur_textfield(Textfield* textfield);
         void remove_textfield();
+        void sync_focused_textfield();
+        void sync_focused_textfield(const std::string& text, size_t caret);
+        void submit_focused_textfield();
+        void blur_focused_textfield_from_js();
         void drag_icon(Icon* icon);
         Keyboard& get_keyboard();
         uint64_t get_cursor_press_id() const;

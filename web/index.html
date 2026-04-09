@@ -45,6 +45,7 @@
         <canvas id="canvas" tabindex="-1"></canvas>
     </div>
 
+    <script src="/web/mobile.js"></script>
     <script>
         (function () {
             const GAME_WIDTH = 800;
@@ -79,9 +80,17 @@
                 };
             }
 
-            function fitCanvas() {
+            function fitCanvas(options) {
                 const canvas = document.getElementById('canvas');
                 if (!canvas) {
+                    return;
+                }
+
+                const force = options === true || (options && options.force === true);
+                if (!force && window.MapleWasmMobile && window.MapleWasmMobile.shouldFreezeCanvasFit && window.MapleWasmMobile.shouldFreezeCanvasFit()) {
+                    if (window.MapleWasmMobile.refreshLayouts) {
+                        window.MapleWasmMobile.refreshLayouts();
+                    }
                     return;
                 }
 
@@ -92,6 +101,10 @@
 
                 canvas.style.width = width + 'px';
                 canvas.style.height = height + 'px';
+
+                if (window.MapleWasmMobile && window.MapleWasmMobile.refreshLayouts) {
+                    window.MapleWasmMobile.refreshLayouts();
+                }
             }
 
             window.MapleWasmUI = {
@@ -99,7 +112,12 @@
             };
 
             window.addEventListener('resize', fitCanvas);
-            document.addEventListener('fullscreenchange', fitCanvas);
+            window.addEventListener('orientationchange', function () {
+                fitCanvas({ force: true });
+            });
+            document.addEventListener('fullscreenchange', function () {
+                fitCanvas({ force: true });
+            });
             fitCanvas();
         })();
 
@@ -144,6 +162,9 @@
 
             onRuntimeInitialized: function () {
                 console.log('[runtime] Initialized');
+                if (window.MapleWasmMobile && window.MapleWasmMobile.bindRuntime) {
+                    window.MapleWasmMobile.bindRuntime(Module);
+                }
                 if (window.MapleWasmUI && window.MapleWasmUI.applyScale) {
                     window.MapleWasmUI.applyScale();
                 }
@@ -192,11 +213,18 @@
                     if (hasConfig) {
                         Module.LazyFS = Object.assign(Module.LazyFS || {}, lazyConfig);
                     }
+
+                    if (window.MapleWasmMobile && window.MapleWasmMobile.configure) {
+                        window.MapleWasmMobile.configure(config.MobileControls || {});
+                    }
                 }
                 loadWasmClient();
             })
             .catch(err => {
                 console.warn('[config] Could not load /web/config.json, proceeding with defaults. Error:', err.message);
+                if (window.MapleWasmMobile && window.MapleWasmMobile.configure) {
+                    window.MapleWasmMobile.configure({});
+                }
                 loadWasmClient();
             });
 

@@ -50,6 +50,7 @@ namespace jrc
         void update(Point<int16_t> parentpos);
         void send_key(KeyType::Id type, int32_t code, bool down);
         void add_string(const std::string& str);
+        void sync_external_text(const std::string& text, size_t caret);
 
         void set_state(State state);
         void change_text(const std::string& text);
@@ -64,6 +65,9 @@ namespace jrc
         State get_state() const;
         Rectangle<int16_t> get_bounds() const;
         const std::string& get_text() const;
+        size_t get_markerpos() const;
+        size_t get_limit() const;
+        bool is_masked() const;
 
     private:
         void modifytext(const std::string&);
@@ -85,4 +89,3 @@ namespace jrc
         std::function<void(std::string)> onreturn;
     };
 }
-

@@ -19,6 +19,7 @@
 
 #include "UIStateLogin.h"
 #include "UIStateGame.h"
+#include "MobileInput.h"
 #include "UITypes/UIWorldMap.h"
 #include "Window.h"
 #include "../Audio/Audio.h"
@@ -72,6 +73,8 @@ namespace jrc
 
     void UI::change_state(State id)
     {
+        remove_textfield();
+
         switch (id)
         {
         case LOGIN:
@@ -287,12 +290,13 @@ namespace jrc
 
     void UI::focus_textfield(Textfield* tofocus)
     {
-        if (focusedtextfield)
+        if (focusedtextfield && focusedtextfield.get() != tofocus)
         {
             focusedtextfield->set_state(Textfield::NORMAL);
         }
 
         focusedtextfield = tofocus;
+        sync_focused_textfield();
     }
 
     void UI::blur_textfield(Textfield* textfield)
@@ -300,6 +304,7 @@ namespace jrc
         if (focusedtextfield && focusedtextfield.get() == textfield)
         {
             focusedtextfield = {};
+            sync_focused_textfield();
         }
     }
 
@@ -307,10 +312,45 @@ namespace jrc
     {
         if (focusedtextfield)
         {
-            focusedtextfield->set_state(Textfield::NORMAL);
+            Textfield* active_textfield = focusedtextfield.get();
+            focusedtextfield = {};
+            active_textfield->set_state(Textfield::NORMAL);
         }
 
-        focusedtextfield = {};
+        sync_focused_textfield();
+    }
+
+    void UI::sync_focused_textfield()
+    {
+        if (focusedtextfield)
+        {
+            mobile::sync_textfield(*focusedtextfield);
+        }
+        else
+        {
+            mobile::clear_textfield();
+        }
+    }
+
+    void UI::sync_focused_textfield(const std::string& text, size_t caret)
+    {
+        if (focusedtextfield)
+        {
+            focusedtextfield->sync_external_text(text, caret);
+        }
+    }
+
+    void UI::submit_focused_textfield()
+    {
+        if (focusedtextfield)
+        {
+            focusedtextfield->send_key(KeyType::ACTION, KeyAction::RETURN, true);
+        }
+    }
+
+    void UI::blur_focused_textfield_from_js()
+    {
+        remove_textfield();
     }
 
     void UI::drag_icon(Icon* icon)

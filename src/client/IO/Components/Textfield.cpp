@@ -21,6 +21,8 @@
 
 #include "../../Constants.h"
 
+#include <algorithm>
+
 
 namespace jrc
 {
@@ -30,9 +32,11 @@ namespace jrc
                          Rectangle<int16_t> bnd,
                          size_t lim)
         : textlabel(font, alignment, color, "", 0, false), text(),
-          marker(font, alignment, color, "|"),             markerpos(0),
-          bounds(bnd),                                     limit(lim),
-          crypt(0),                                        state(NORMAL)
+          marker(font, alignment, color, "|"),             showmarker(true),
+          elapsed(0),                                      markerpos(0),
+          bounds(bnd),                                     parentpos(),
+          limit(lim),                                      crypt(0),
+          state(NORMAL)
         {}
 
     Textfield::Textfield() = default;
@@ -74,6 +78,11 @@ namespace jrc
             showmarker = !showmarker;
             elapsed = 0;
         }
+
+        if (state == FOCUSED)
+        {
+            UI::get().sync_focused_textfield();
+        }
     }
 
     void Textfield::set_state(State st)
@@ -93,6 +102,8 @@ namespace jrc
             {
                 UI::get().blur_textfield(this);
             }
+
+            UI::get().sync_focused_textfield();
         }
     }
 
@@ -181,6 +192,11 @@ namespace jrc
         default:
             break;
         }
+
+        if (state == FOCUSED)
+        {
+            UI::get().sync_focused_textfield();
+        }
     }
 
     void Textfield::add_string(const std::string& str)
@@ -193,6 +209,41 @@ namespace jrc
                 markerpos++;
                 modifytext(text);
             }
+        }
+
+        if (state == FOCUSED)
+        {
+            UI::get().sync_focused_textfield();
+        }
+    }
+
+    void Textfield::sync_external_text(const std::string& incoming, size_t caret)
+    {
+        std::string next;
+        next.reserve(incoming.size());
+
+        modifytext("");
+        markerpos = 0;
+
+        for (char c : incoming)
+        {
+            if (c == '\r' || c == '\n')
+            {
+                continue;
+            }
+
+            if (belowlimit())
+            {
+                next.push_back(c);
+                modifytext(next);
+            }
+        }
+
+        markerpos = std::min(caret, text.size());
+
+        if (state == FOCUSED)
+        {
+            UI::get().sync_focused_textfield();
         }
     }
 
@@ -260,11 +311,21 @@ namespace jrc
     {
         modifytext(t);
         markerpos = text.size();
+
+        if (state == FOCUSED)
+        {
+            UI::get().sync_focused_textfield();
+        }
     }
 
     void Textfield::set_cryptchar(int8_t c)
     {
         crypt = c;
+
+        if (state == FOCUSED)
+        {
+            UI::get().sync_focused_textfield();
+        }
     }
 
     bool Textfield::belowlimit() const
@@ -283,6 +344,21 @@ namespace jrc
     const std::string& Textfield::get_text() const
     {
         return text;
+    }
+
+    size_t Textfield::get_markerpos() const
+    {
+        return markerpos;
+    }
+
+    size_t Textfield::get_limit() const
+    {
+        return limit;
+    }
+
+    bool Textfield::is_masked() const
+    {
+        return crypt > 0;
     }
 
     bool Textfield::empty() const
