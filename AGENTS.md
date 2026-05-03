@@ -124,3 +124,32 @@ To stop everything:
 
 ## Documentation
 * Check `docs/ms-network-protocol.md` for the network protocol.
+
+---
+
+## 本地记忆 - 逻辑结构
+
+Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+
+### 模块索引
+
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| [WASM 客户端](agents/client/index.md) | `src/client/` | 核心 C++ 客户端，编译为 WASM |
+| [NoLifeNx 库](agents/nlnx/index.md) | `src/nlnx/` | NX 文件格式读取库 |
+| [Web 基础设施](agents/web/index.md) | `web/` | Python Web 服务：HTTP 服务器、WebSocket 代理、资源流 |
+
+### 客户端子模块
+
+| 子模块 | 路径 | 职责 |
+|--------|------|------|
+| [网络层](agents/client/Net/index.md) | `src/client/Net/` | 会话管理、加密、封包收发与路由 |
+| [游戏世界](agents/client/Gameplay/index.md) | `src/client/Gameplay/` | 地图、战斗、物理、实体管理 |
+| [角色系统](agents/client/Character/index.md) | `src/client/Character/` | 玩家角色、属性、技能、装备、外观 |
+| [UI 系统](agents/client/IO/index.md) | `src/client/IO/` | 输入、UI状态、界面组件 |
+| [图形渲染](agents/client/Graphics/index.md) | `src/client/Graphics/` | OpenGL 渲染、纹理、精灵、文字 |
+| [按需文件系统](agents/client/LazyFS/index.md) | `src/client/LazyFS/` | 运行时按需加载游戏资源 |
+
+### 功能概览
+
+详见 [功能索引](features/index.md)
