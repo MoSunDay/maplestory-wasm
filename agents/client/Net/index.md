@@ -19,10 +19,17 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 - `init()`: 从配置获取 host/port 并建立连接
 - `write(bytes, length)`: 发送加密封包
 - `read()`: 帧循环中轮询接收，解密后分发
-- `reconnect(address, port)`: 断开旧连接并建立新连接（用于登录→频道切换）
+- `reconnect(address, port)`: 断开旧连接并建立新连接（用于登录→频道切换）。内部经 `resolve_channel_address` 对本地频道地址做配置 IP 替换；末尾置位 `connection_changed` 标志
 - `is_connected()`: 连接状态
 
-内部维护接收缓冲区、位置指针和连接状态。使用 ASIO (非 WASM) 或 Winsock 作为底层 socket 实现。
+内部维护接收缓冲区、位置指针、连接状态，以及 `connection_changed` 标志：`reconnect()` 末尾置位，`process()` 在解出一个封包后检查，若已置位则丢弃缓冲区剩余字节并复位——防止在 `forward()` 期间触发重连后，用新加密上下文继续解密旧连接的尾部字节（跨连接污染）。使用 ASIO (非 WASM) 或 Winsock 作为底层 socket 实现。
+
+### 重连路径与 UI 恢复契约
+
+登录服到频道服的切换是必经的 `reconnect()` 点（两条独立 TCP 连接）。该路径的失败/竞态必须恢复 UI（`UI::enable()`），否则角色选择界面会卡在 `disable()` 禁用态：
+
+- `ServerIPHandler`（`Handlers/LoginHandlers.cpp`）：收到 `SERVER_IP` → `reconnect()` 到下发的频道地址 → 仅当 `is_connected()` 才 `PlayerLoginPacket().dispatch()`，否则 `Console` 诊断 + `UI::enable()`。WASM 握手 `ws_recv` 有 15s 超时（替代原先无限等待），频道不可达时 `open()` 返回 false 触发此恢复分支
+- `SetfieldHandler::set_field`（`Handlers/SetfieldHandlers.cpp`）：进入游戏前若角色选择界面已消失（重连竞态）或本地无该 cid，两处早退分支均 `Console` 诊断 + `UI::enable()`，而非静默 return
 
 ### Cryptography (`Cryptography.h`)
 

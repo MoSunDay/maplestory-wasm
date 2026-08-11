@@ -37,7 +37,7 @@ namespace jrc
 #ifdef MS_PLATFORM_WASM
         Console::get().print("Opening connection: " + std::string(iaddr) + ":" + std::string(port));
         sock = ws_connect(std::string(iaddr), std::string(port));
-        int result = ws_recv(sock, (char*)buffer, 32, (size_t)-1);
+        int result = ws_recv(sock, (char*)buffer, 32, 15000);
         return result == HANDSHAKE_LEN;
 #else
         WSADATA wsa_info;
