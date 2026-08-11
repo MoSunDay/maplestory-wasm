@@ -1,6 +1,6 @@
 # Web 基础设施
 
-Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
 
 ## 职责
 
@@ -42,21 +42,25 @@ WebSocket-TCP 桥接代理，绑定 8080 端口。负责:
 
 LazyFS WebSocket 资源服务器，绑定 8765 端口。负责:
 - 接收 LazyFS 客户端的按需文件请求
-- 通过 HTTP Range 请求返回 .nx 文件片段
+- 按 WebSocket 分块协议返回 .nx 文件块（`get_size` 查询大小，`get_chunks` 批量取块，二进制帧传输）
 - 支持 `--port` 和 `--directory` 参数配置端口和资源目录
+
+### server_fast.py
+
+`server.py` 的可选替代实现，基于 aiohttp 的异步 HTTP 服务器，同样绑定 8000 端口并支持 Range 请求与 WASM 所需的跨域隔离头。用于大文件分发性能更好的场景，二者只启动其一。
 
 ## 配置
 
-`web/config.json` 提供客户端连接参数。所有字段为 `null` 时表示自动检测为 `localhost` 默认值:
+`web/config.json` 提供客户端连接参数。由 `index.html` 在加载 WASM 前读取，仅注入非 `null` 字段；`null` 字段回落到客户端默认值（定义于 `src/client/Configuration.h`）或按页面地址自动探测:
 
-| 字段 | 说明 | 默认值 |
+| 字段 | 说明 | 客户端默认值 |
 |------|------|--------|
-| `AssetsServerIP` | 资源服务器地址 | localhost |
+| `AssetsServerIP` | 资源服务器地址 | 页面所在主机 |
 | `AssetsServerPort` | 资源服务器端口 | 8765 |
-| `AssetsServerProtocol` | 资源协议 (ws/wss) | ws |
-| `ProxyIP` | 代理地址 | localhost |
+| `AssetsServerProtocol` | 资源协议 (ws/wss) | ws (https 页面为 wss) |
+| `ProxyIP` | 代理地址 | 页面所在主机 |
 | `ProxyPort` | 代理端口 | 8080 |
-| `MapleStoryServerIp` | 目标 Cosmic 服务端 IP | localhost |
+| `MapleStoryServerIp` | 目标 Cosmic 服务端 IP | 127.0.0.1 |
 | `MapleStoryServerPort` | 目标 Cosmic 服务端端口 | 8484 |
 
 ## 依赖关系
