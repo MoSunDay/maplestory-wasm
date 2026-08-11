@@ -83,10 +83,18 @@ UI 状态接口。两个具体实现:
 | `Button` / `MapleButton` / `TwoSpriteButton` / `AreaButton` | 各种按钮 |
 | `Icon` / `IconCover` | 图标显示 |
 | `Gauge` / `Slider` | 进度条/滑块 |
-| `Textfield` | 文本输入框 |
+| `Textfield` | 文本输入框（UTF-8 按码点编辑，限长按字节以兼容协议） |
 | `ChatBalloon` / `Nametag` | 聊天气泡/名字标签 |
 | `Tooltip` / `EquipTooltip` / `ItemTooltip` / `SkillTooltip` / `MapTooltip` | 各种悬浮提示 |
 | `ScrollingNotice` | 滚动公告 |
+
+### IME 桥接 (`ImeBridge.h`)
+
+WASM 下把文本输入委托给浏览器隐藏 textarea（`web/index.html` 的
+`#ime-input`），由浏览器原生输入法提供候选词窗口。C++ 通过
+`EM_ASM` 调 JS 的 `MapleWasmIME.onFocus/onBlur/onText`，JS 通过导出函数
+`msime_input`（整段文本 + UTF-16 光标）与 `msime_key`（白名单控制键）回传。
+密码字段（`crypt > 0`）不走桥接，保持纯键盘路径。非 WASM 平台为空实现。
 
 ## 依赖关系
 

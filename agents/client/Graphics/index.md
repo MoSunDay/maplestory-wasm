@@ -30,14 +30,25 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 - 图集空间由 `QuadTree<Leftover>` 管理，按需分配/回收
 - 当图集空间不足时调用 `clear()` 清空
 
+### FontCache (`FontCache.h`)
+
+字形缓存单例，负责 UTF-8/Unicode 文字的字形供给:
+- 每个字号一个主 face（Regular/Bold Arial，保持原版观感）+ 共享的
+  DroidSansFallback face（覆盖 CJK 等主 face 缺失的文字）
+- 按需光栅化：字形首次使用时才渲染进图集（ASCII 32-127 启动时预烘焙）
+- 所有 face 都缺字时写入占位字形（有前进量、不可见），保证排版稳定
+
 ### Text (`Text.h`)
 
 文字渲染系统:
-- `Text::Layout`: 文字排版结果，由 `LayoutBuilder` 构建
+- `Text::Layout`: 文字排版结果，由 `LayoutBuilder` 构建；按码点切分，
+  `advances` 为字节索引（延续字节复用引导字节的 advance）
 - 支持格式化文本（颜色/字体切换标记）
 - 支持左对齐/右对齐/居中
 
-通过 FreeType 加载字体，渲染字形到图集，支持 Regular 和 Bold 两种字体。
+字形经 FontCache 光栅化后放入图集：字体区从图集底边向上分配
+（`fontborder` 自底向上推进，着色器按 `texpos.y >= fontregion` 区分字体/位图区），
+位图区则从第 1 行向下增长，两区互不侵占。
 
 ### 辅助类
 

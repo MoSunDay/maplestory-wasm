@@ -19,6 +19,10 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 相关模块: [网络层](agents/client/Net/index.md), [UI 系统](agents/client/IO/index.md)
 
+### 输入与本地化
+
+- **中文/Unicode 输入与渲染**: 文本字段支持中文等 Unicode 文本的输入、编辑与渲染（CJK 回退字体 + UTF-8 排版；WASM 下经浏览器原生输入法候选窗输入，密码字段除外）
+
 ### 游戏世界
 
 - **地图加载与渲染**: 加载 .nx 地图数据，渲染背景、图块、对象
