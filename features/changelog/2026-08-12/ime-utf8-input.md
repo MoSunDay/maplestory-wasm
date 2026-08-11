@@ -5,7 +5,7 @@
 ## 范围
 
 - **字体**: 内嵌 `DroidSansFallbackFull.ttf`（Apache-2.0，`src/client/fonts/DroidSansFallback/`，随 `--embed-file` 进 WASM）；新增 `Graphics/FontCache`：主 face（Arial）+ 共享回退 face 的按码点惰性光栅化，ASCII 32-127 仍启动预烘焙，缺字写占位字形（有 advance、不可见）
-- **排版/渲染**: `GraphicsGL` 移除按字节固定表，改为码点感知的 `createlayout`/`drawtext`；`Layout::advances` 保持字节索引（延续字节复用引导字节 advance），Textfield 光标语义不变；字体区改为自图集底边向上分配，着色器条件翻转为 `texpos.y >= fontregion`，`fontregion` 随 `upload_glyph` 动态更新
+- **排版/渲染**: `GraphicsGL` 移除按字节固定表，改为码点感知的 `createlayout`/`drawtext`；`Layout::advances` 保持字节索引（延续字节复用引导字节 advance），Textfield 光标语义不变；字体区改为自图集底边向上分配，着色器条件翻转为 `texpos.y >= fontregion`，`fontregion` 随 `upload_glyph` 动态更新；排版/绘制实现拆于 `Graphics/GraphicsGLText.cpp`（满足文件行数限制）
 - **工具**: 新增 `Util/Utf8.h`（decode/序列长/UTF-16↔字节偏移/CJK 判断）
 - **编辑**: `Textfield` 左移/右移/退格/粘贴按码点处理；限长仍按字节（login/account/password 12 字节、角色名 12 字节、聊天按宽度），保证协议安全
 - **IME 桥**: 新增 `IO/ImeBridge`（WASM 真实现 + 其他平台空实现）。焦点字段时经 `EM_ASM` 驱动 `web/index.html` 的隐藏 textarea `#ime-input`，浏览器原生 IME 候选窗随字段定位；JS 经导出函数 `msime_input`（整段文本 + UTF-16 光标）与 `msime_key`（Enter/Tab/Esc/Up/Down 白名单）回传；`Window::key_callback` 在桥激活时让位，`MapleWasmInputGuard` 跳过 `#ime-input` 事件；密码字段（crypt>0）不走桥接
@@ -26,7 +26,7 @@
 |---|---|
 | 隔离目录全量构建（emcmake + emmake，Release，-Werror 生效） | PASS，零代码警告（仅 clang `-Wgcc-install-dir-libstdcxx` 工具链提示，与本仓库历次构建一致） |
 | 产物取证 | `JourneyClient.wasm` 增大 ~4MB（内嵌字体）；二进制含 `msime_input`/`msime_key` 导出与 `DroidSansFallback` 路径；`JourneyClient.js` 含 `msime_input` |
-| headless Chrome + CDP E2E（web 栈 :8000/:8765/:8080 + Cosmic :8484 实运行） | 12/12 PASS |
+| headless Chrome + CDP E2E（`scripts/e2e_ime.mjs`，web 栈 :8000/:8765/:8080 + Cosmic :8484 实运行） | 12/12 PASS |
 | — 点击账号框 | IME 桥激活、隐藏 textarea 获得焦点 ✅ |
 | — 模拟输入法提交「中文测试」 | C++ 接受并经 `sync_field` 回写 textarea ✅ |
 | — 超限提交 8 个汉字（24 字节） | 按 12 字节限长截断 ✅ |
