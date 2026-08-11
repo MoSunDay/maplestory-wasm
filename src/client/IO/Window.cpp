@@ -21,6 +21,7 @@
 #include <emscripten.h>
 #endif
 
+#include "ImeBridge.h"
 #include "UI.h"
 
 #include "../Console.h"
@@ -89,6 +90,14 @@ namespace jrc
 
     void key_callback(GLFWwindow*, int key, int, int action, int)
     {
+#ifdef MS_PLATFORM_WASM
+        // While the hidden IME textarea has focus, GLFW still observes every
+        // key at the window level; ImeBridge owns that keyboard stream.
+        if (ImeBridge::is_active())
+        {
+            return;
+        }
+#endif
         UI::get().send_key(key, action != GLFW_RELEASE);
     }
 
@@ -295,6 +304,9 @@ namespace jrc
 
             if (!guard.installed) {
                 var preventKeyDefaults = function(event) {
+                    if (event.target && event.target.id === "ime-input") {
+                        return;
+                    }
                     if (guard.preventedKeys.indexOf(event.key) !== -1) {
                         event.preventDefault();
                     }

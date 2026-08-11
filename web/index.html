@@ -37,12 +37,34 @@
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
+
+        /* Invisible but focusable: the browser attaches its IME (pinyin, etc.)
+           to this textarea and shows the candidate window next to it. */
+        #ime-input {
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 10;
+            opacity: 0;
+            border: none;
+            outline: none;
+            resize: none;
+            overflow: hidden;
+            background: transparent;
+            color: transparent;
+            caret-color: transparent;
+            padding: 0;
+            margin: 0;
+            white-space: nowrap;
+        }
     </style>
 </head>
 
 <body>
     <div id="container">
         <canvas id="canvas" tabindex="-1"></canvas>
+        <textarea id="ime-input" wrap="off" autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false" tabindex="-1"></textarea>
     </div>
 
     <script>
@@ -103,6 +125,177 @@
             fitCanvas();
         })();
 
+        (function () {
+            const GAME_WIDTH = 800;
+            const GAME_HEIGHT = 600;
+
+            const ta = document.getElementById('ime-input');
+            let active = false;
+            let composing = false;
+            let lastCompositionEnd = 0;
+
+            // Control keys forwarded to the game instead of editing the textarea.
+            const FORWARD_KEYS = { 13: true, 9: true, 27: true, 38: true, 40: true };
+
+            function moduleReady() {
+                return typeof Module !== 'undefined' && typeof Module.ccall === 'function';
+            }
+
+            function syncToGame() {
+                if (!active || !moduleReady()) {
+                    return;
+                }
+                Module.ccall('msime_input', null, ['string', 'number'], [ta.value, ta.selectionStart]);
+            }
+
+            function placeTextarea(x, y, w, h) {
+                const canvas = document.getElementById('canvas');
+                if (!canvas) {
+                    return;
+                }
+                // Map game coordinates (800x600) onto the CSS-scaled canvas so
+                // the IME candidate window pops up next to the in-game field.
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = rect.width / GAME_WIDTH;
+                const scaleY = rect.height / GAME_HEIGHT;
+                ta.style.left = (rect.left + x * scaleX) + 'px';
+                ta.style.top = (rect.top + y * scaleY) + 'px';
+                ta.style.width = Math.max(40, w * scaleX) + 'px';
+                ta.style.height = Math.max(24, h * scaleY) + 'px';
+                ta.style.fontSize = Math.max(12, h * scaleY * 0.8) + 'px';
+            }
+
+            function caretFromUtf16(caretUtf16) {
+                const caret = typeof caretUtf16 === 'number' ? caretUtf16 : ta.value.length;
+                return Math.max(0, Math.min(caret, ta.value.length));
+            }
+
+            window.MapleWasmIME = {
+                get active() {
+                    return active;
+                },
+                onFocus: function (x, y, w, h, text, caretUtf16) {
+                    placeTextarea(x, y, w, h);
+                    active = true;
+                    composing = false;
+                    ta.value = text || '';
+                    const caret = caretFromUtf16(caretUtf16);
+                    ta.setSelectionRange(caret, caret);
+                    ta.focus({ preventScroll: true });
+                },
+                onBlur: function () {
+                    active = false;
+                    composing = false;
+                    ta.value = '';
+                    const canvas = document.getElementById('canvas');
+                    if (canvas) {
+                        canvas.focus({ preventScroll: true });
+                    }
+                },
+                onText: function (text, caretUtf16) {
+                    if (!active) {
+                        return;
+                    }
+                    ta.value = text || '';
+                    const caret = caretFromUtf16(caretUtf16);
+                    ta.setSelectionRange(caret, caret);
+                }
+            };
+
+            ta.addEventListener('compositionstart', function () {
+                composing = true;
+            });
+
+            ta.addEventListener('compositionend', function () {
+                composing = false;
+                lastCompositionEnd = Date.now();
+                syncToGame();
+            });
+
+            ta.addEventListener('input', function () {
+                // Intermediate preedit states are synced once composition ends;
+                // acting on them would insert the raw pinyin letters as well.
+                if (!composing) {
+                    syncToGame();
+                }
+            });
+
+            // Keep the game-side caret in sync when only the selection moves.
+            document.addEventListener('selectionchange', function () {
+                if (active && document.activeElement === ta) {
+                    syncToGame();
+                }
+            });
+
+            ta.addEventListener('keydown', function (event) {
+                if (!active) {
+                    return;
+                }
+                // Keys consumed by the IME (candidate choice, preedit editing)
+                // must never reach the game.
+                if (event.isComposing || event.keyCode === 229) {
+                    return;
+                }
+
+                if (event.keyCode === 8) {
+                    // GLFW's window-level handler already prevented the default
+                    // backspace action, so delete the preceding codepoint here.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const start = ta.selectionStart;
+                    const end = ta.selectionEnd;
+                    if (start === end) {
+                        if (start === 0) {
+                            return;
+                        }
+                        let prev = start - 1;
+                        const trail = ta.value.charCodeAt(prev);
+                        if (trail >= 0xDC00 && trail <= 0xDFFF && prev > 0) {
+                            const lead = ta.value.charCodeAt(prev - 1);
+                            if (lead >= 0xD800 && lead <= 0xDBFF) {
+                                prev--;
+                            }
+                        }
+                        ta.value = ta.value.slice(0, prev) + ta.value.slice(start);
+                        ta.setSelectionRange(prev, prev);
+                    } else {
+                        ta.value = ta.value.slice(0, start) + ta.value.slice(end);
+                        ta.setSelectionRange(start, start);
+                    }
+                    syncToGame();
+                    return;
+                }
+
+                if (FORWARD_KEYS[event.keyCode]) {
+                    // Some browsers fire a plain Enter keydown right after the
+                    // IME used Enter to confirm a candidate; swallow it so the
+                    // confirmation does not also submit the text.
+                    if (event.keyCode === 13 && Date.now() - lastCompositionEnd < 100) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (moduleReady()) {
+                        Module.ccall('msime_key', null, ['number', 'number'], [event.keyCode, 1]);
+                    }
+                }
+            }, true);
+
+            // If the canvas click handler or the browser steals focus while the
+            // game still considers the field focused, reclaim it.
+            ta.addEventListener('blur', function () {
+                if (active) {
+                    setTimeout(function () {
+                        if (active) {
+                            ta.focus({ preventScroll: true });
+                        }
+                    }, 0);
+                }
+            });
+        })();
+
         Module = {
             canvas: (function () {
                 let canvas = document.getElementById('canvas');
@@ -111,6 +304,9 @@
                     e.preventDefault();
                 }, false);
                 canvas.addEventListener("click", function () {
+                    if (window.MapleWasmIME && window.MapleWasmIME.active) {
+                        return;
+                    }
                     canvas.focus();
                 });
                 return canvas;
