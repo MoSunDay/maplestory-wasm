@@ -1,0 +1,19 @@
+[package]
+name = "web-server"
+description = "HTTP static file server for the WASM client with Range and COOP/COEP support"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+clap = { workspace = true }
+httparse = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[test]]
+name = "http"
+path = "tests/http.rs"

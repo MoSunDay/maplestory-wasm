@@ -3,3 +3,6 @@
 /assets/
 /serverAssets/
 __pycache__
+link_repos
+/target/
+*.nx

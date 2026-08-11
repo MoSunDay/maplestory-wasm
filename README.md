@@ -13,8 +13,8 @@ MapleStory WASM brings the classic MapleStory v83 client to modern web browsers 
 
 ```
 ┌───────────────────────────┐       ┌──────────────────────────────────────┐
-│     Web Server (Python)   │       │            Browser (Client)          │
-│     web/server.py         │──────▶│     MapleStory WASM Client Runtime   │
+│   Web Server (Rust)       │       │            Browser (Client)          │
+│   web-server              │──────▶│     MapleStory WASM Client Runtime   │
 │     http://localhost:8000 │ HTTP  │        (JS + WASM in browser)        │
 └───────────────────────────┘       └───────────────┬──────────────┬───────┘
                                                     │              │
@@ -23,8 +23,8 @@ MapleStory WASM brings the classic MapleStory v83 client to modern web browsers 
                                                     │ Packets)     │ Requests)
                                                     ▼              ▼
                                           ┌────────────────┐  ┌───────────────────────────┐
-                                          │ WS Proxy       │  │   Assets Server (Python)  │
-                                          │ web/ws_proxy.py│  │   ws://localhost:8765     │
+                                          │ WS Proxy       │  │   Assets Server (Rust)    │
+                                          │ ws-proxy       │  │   ws://localhost:8765     │
                                           │ :8080          │  └───────────────────────────┘
                                           └───────┬────────┘
                                                   │ TCP
@@ -36,8 +36,8 @@ MapleStory WASM brings the classic MapleStory v83 client to modern web browsers 
 
 ### How It Works
 
-1. **WASM Client** - The original C++ MapleStory client is compiled to WebAssembly using Emscripten, and `web/server.py` serves the generated JS/WASM bundle to the browser.
-2. **WebSocket Proxy** - Browsers cannot make raw TCP connections, so a Python proxy bridges WebSocket connections to Cosmic server over TCP.
+1. **WASM Client** - The original C++ MapleStory client is compiled to WebAssembly using Emscripten, and the Rust `web-server` serves the generated JS/WASM bundle to the browser.
+2. **WebSocket Proxy** - Browsers cannot make raw TCP connections, so the Rust `ws-proxy` bridges WebSocket connections to Cosmic server over TCP.
 3. **LazyFS** - A dynamic file system technology that streams game assets (`.nx` files) on-demand via WebSocket and caches them locally in your browser. Assets are only fetched from the network once, providing native loading times on subsequent loads.
 4. **Containerized Tooling** - Docker can be used both for serving the project and as a fallback way to build the WASM client.
 
@@ -103,23 +103,23 @@ Requirements:
 
 | Requirement | Version | Purpose |
 |-------------|---------|---------|
-| **Python** | 3.9+ | Local web services |
+| **Rust** | stable | Local web services |
 | **Emscripten** | 3.1+ | WASM compilation |
 | **CMake** | 3.16+ | Build system |
 
 1. Build the client with `./scripts/build_wasm.sh`.
-2. Install the local Python dependency:
+2. Build the Rust web services:
 
 ```bash
-pip install -r web/requirements.txt
+cargo build --release -p web-server -p ws-proxy -p assets-server
 ```
 
 3. Start the web services from the repository root:
 
 ```bash
-python3 web/server.py
-python3 web/ws_proxy.py --ws-port 8080
-python3 web/assets_server.py --port 8765 --directory .
+./target/release/web-server --port 8000 --directory .
+./target/release/ws-proxy --ws-port 8080
+./target/release/assets-server --port 8765 --directory .
 ```
 
 4. Open **http://localhost:8000**.
@@ -166,10 +166,13 @@ maplestory-wasm/
 ├── 📁 src/
 │   ├── client/            # C++ MapleStory Client
 │   └── nlnx/              # Shared NX loading library
-├── 📁 web/                # Web infrastructure
-│   ├── server.py          # HTTP server
-│   ├── ws_proxy.py        # WebSocket-TCP proxy
-│   └── assets_server.py   # NX asset streaming
+├── 📁 web/                # Web entrypoint (static files)
+│   ├── config.json        # Client connection config
+│   └── index.html         # Client entry page
+├── 📁 web-server/         # Rust HTTP server for the client bundle
+├── 📁 ws-proxy/           # Rust WebSocket-to-TCP game proxy
+├── 📁 assets-server/      # Rust LazyFS asset streaming server
+├── 📄 Cargo.toml          # Rust workspace for the web services
 ├── 📄 docker-compose.yml  # Docker orchestration
 ├── 📄 LICENSE             # AGPL-3.0 License
 └── 📄 README.md           # You are here
@@ -204,7 +207,7 @@ The `docker-compose.yml` provides sensible defaults. Key environment variables:
 
 ### Making Changes
 
-1. Edit files under `src/client/`, `src/nlnx/`, `web/`, `scripts/`, or `docker/`
+1. Edit files under `src/client/`, `src/nlnx/`, the web service crates (`web-server/`, `ws-proxy/`, `assets-server/`), `web/`, `scripts/`, or `docker/`
 2. Keep `assets/` unchanged
 3. Rebuild the client with `./scripts/build_wasm.sh`
 4. If the local build is unavailable, use `./scripts/docker_build_wasm.sh`
@@ -241,7 +244,7 @@ Contributions are welcome! Please read the guidelines below before submitting.
 
 ### Code Guidelines
 
-- Follow the existing code style in each project (C++, Python, shell scripts)
+- Follow the existing code style in each project (C++, Rust, shell scripts)
 - Keep changes focused and well-documented
 - Test across multiple browsers when modifying client code
 - Update documentation for user-facing changes
