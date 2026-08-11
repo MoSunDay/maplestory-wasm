@@ -1,6 +1,6 @@
 # WASM 客户端
 
-Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
 
 ## 职责
 
@@ -34,7 +34,7 @@ Journey.cpp (入口)
 - **单例模式**: 所有核心子系统（`GraphicsGL`, `UI`, `Stage`, `Session`, `Configuration`）均为单例，通过 `Singleton<T>` 模板实现
 - **UI 状态机**: `UI` 通过 `UIState` 多态在 `LOGIN` 和 `GAME` 两态之间切换，每态包含各自的 `UIElement` 集合
 - **封包路由**: `PacketSwitch` 维护 500 个槽位的 `PacketHandler` 数组，按 opcode 索引分发封包
-- **LazyFS 拦截层**: 在 Emscripten 文件系统层拦截 `fopen`/`fseek`/`fread` 调用，通过 HTTP Range 请求按需读取 .nx 文件
+- **LazyFS 拦截层**: 在 Emscripten 文件系统层拦截 `fopen`/`fseek`/`fread` 调用，通过 WebSocket 分块请求按需读取 .nx 文件
 
 ## 依赖关系
 
