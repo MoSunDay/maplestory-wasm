@@ -22,6 +22,9 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 - `drawrectangle()` / `drawscreenfill()`: 矩形/全屏填充
 - `flush(opacity)`: 批量提交所有四边形到 GPU
 
+文字排版与绘制成员（`createlayout`/`LayoutBuilder`/`drawtext`）定义在
+`GraphicsGLText.cpp`（自 `GraphicsGL.cpp` 拆出以满足文件行数限制，行为不变）。
+
 内部使用一个 8192x8192 的纹理图集 (`GLuint atlas`) 管理所有位图，通过 QuadTree 分配图集空间。渲染时通过 VBO/IBO 批量提交四边形。
 
 ### 纹理图集 (`GraphicsGL::addbitmap`)
