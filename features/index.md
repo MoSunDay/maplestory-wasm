@@ -15,6 +15,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **角色创建/删除**: 创建新角色或删除已有角色
 - **角色选择**: 选择角色进入游戏世界
 - **PIC 认证**: 二次密码验证
+- **注册入口**: 登录界面注册按钮跳转可配置外部注册页（`RegisterUrl`，空则弹游戏内提示）
 
 相关模块: [网络层](agents/client/Net/index.md), [UI 系统](agents/client/IO/index.md)
 

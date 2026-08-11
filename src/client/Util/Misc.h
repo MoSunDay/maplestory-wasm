@@ -116,4 +116,22 @@ namespace jrc
         return "127.0.0.1";
     }
 #endif
+
+#ifdef MS_PLATFORM_WASM
+    // Opens a URL in a new browser tab. Must be called synchronously from a
+    // user input event handler, otherwise the browser popup blocker will
+    // suppress the window.
+    inline void open_url(const std::string& url)
+    {
+        EM_ASM({
+            window.open(UTF8ToString($0), '_blank', 'noopener');
+        }, url.c_str());
+    }
+#else
+    // Desktop builds have no browser, so just log the URL to the console.
+    inline void open_url(const std::string& url)
+    {
+        Console::get().print("[open_url] " + url);
+    }
+#endif
 }
