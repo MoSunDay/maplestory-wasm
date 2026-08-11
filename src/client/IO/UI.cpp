@@ -116,9 +116,18 @@ namespace jrc
             Cursor::CLICKING :
             Cursor::IDLE;
         Point<int16_t> cursorpos = cursor.get_position();
+
+        // A button handler invoked by this click may focus a textfield (for
+        // example a screen whose constructor auto-focuses a name field).
+        // Remember the previous focus so the click position is only routed
+        // to the field that was focused beforehand; otherwise the same press
+        // that created the focus would immediately drop it again because the
+        // click landed outside the new field.
+        Textfield* previousfield = focusedtextfield.get();
+
         send_cursor(cursorpos, cursorstate);
 
-        if (focusedtextfield && pressed)
+        if (pressed && focusedtextfield && focusedtextfield.get() == previousfield)
         {
             Cursor::State tstate = focusedtextfield->send_cursor(cursorpos, pressed);
             switch (tstate)
