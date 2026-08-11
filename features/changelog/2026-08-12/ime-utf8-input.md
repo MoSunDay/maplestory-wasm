@@ -26,12 +26,12 @@
 |---|---|
 | 隔离目录全量构建（emcmake + emmake，Release，-Werror 生效） | PASS，零代码警告（仅 clang `-Wgcc-install-dir-libstdcxx` 工具链提示，与本仓库历次构建一致） |
 | 产物取证 | `JourneyClient.wasm` 增大 ~4MB（内嵌字体）；二进制含 `msime_input`/`msime_key` 导出与 `DroidSansFallback` 路径；`JourneyClient.js` 含 `msime_input` |
-| headless Chrome + CDP E2E（`scripts/e2e_ime.mjs`，web 栈 :8000/:8765/:8080 + Cosmic :8484 实运行） | 12/12 PASS |
+| headless Chrome + CDP E2E（`scripts/e2e_ime.mjs`，web 栈 :8000/:8765/:8080 + Cosmic :8484 实运行） | 12/12 PASS ×5 连续轮次（backspace 项前置状态固定后；固定前该项间歇 flaky） |
 | — 点击账号框 | IME 桥激活、隐藏 textarea 获得焦点 ✅ |
 | — 模拟输入法提交「中文测试」 | C++ 接受并经 `sync_field` 回写 textarea ✅ |
 | — 超限提交 8 个汉字（24 字节） | 按 12 字节限长截断 ✅ |
 | — 字段区域像素对比 | 2686 像素变化（远超光标量级）= CJK 字形真实渲染 ✅ |
-| — CDP rawKeyDown Backspace | 删除一个码点 ✅ |
+| — CDP rawKeyDown Backspace | 删除一个码点 ✅（测试前置固定焦点+caret 于文末，隔离胶水回显竞态；失败时打印桥接全状态取证） |
 | — Tab 到密码框 | IME 桥不激活（crypt 路径保持） ✅ |
 | — 点击他处 | 桥正确失活 ✅ |
 
@@ -40,3 +40,4 @@
 - 排版核心重写：ASCII 文本走相同预烘焙字形，观感不变；`advances` 字节索引语义保留，依赖 `belowlimit`/光标的既有调用不受影响
 - 图集字体区改为自底向上分配并与位图区互查边界（`upload_glyph` 与位图 wrap 都检查 `fontregion`）；极端大量缺字可能耗尽字体区，此时打占位字形并一次性告警
 - `web/index.html` 仅增量改动；`RegisterUrl` 相关改动属并行任务，未随本提交
+- 已知遗留（非本提交引入）：`syncToGame`（selectionchange 触发）与 `onText` 回显在 Asyncify 挂起下存在 caret 竞态（13b70ae 胶水遗留），E2E 经前置固定规避；胶水侧串行化留待独立跟进
