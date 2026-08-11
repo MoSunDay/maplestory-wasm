@@ -19,6 +19,7 @@
 
 #include "../Configuration.h"
 #include "../Console.h"
+#include "../Util/Utf8.h"
 
 #include <algorithm>
 #include <vector>
@@ -41,6 +42,8 @@ namespace jrc
         {
             return Error::FREETYPE;
         }
+
+        FontCache::get().init(ftlibrary);
 
         GLint result = GL_FALSE;
 
@@ -84,7 +87,7 @@ namespace jrc
             "void main(void) {"
             "    if (texpos.y == 0.0) {"
             "        gl_FragColor = colormod;"
-            "    } else if (texpos.y <= float(fontregion)) {"
+            "    } else if (texpos.y >= float(fontregion)) {"
             "        gl_FragColor = vec4(1.0, 1.0, 1.0, texture2D(texture, texpos / atlassize).r) * colormod;"
             "    } else {"
             "        gl_FragColor = texture2D(texture, texpos / atlassize) * colormod;"
@@ -142,7 +145,9 @@ namespace jrc
             GL_RGBA, GL_UNSIGNED_BYTE, nullptr
         );
 
-        fontborder.set_y(1);
+        fontborder.set_y(ATLASH);
+        fontbandheight = 0;
+        fontregion = ATLASH;
 
         std::string font_normal = Setting<FontPathNormal>().get().load();
         std::string font_bold = Setting<FontPathBold>().get().load();
@@ -170,13 +175,13 @@ namespace jrc
                              Text::Font id,
                              FT_UInt pixelw,
                              FT_UInt pixelh) {
-            if (addfont(configured_path.c_str(), id, pixelw, pixelh))
+            if (FontCache::get().addfont(configured_path.c_str(), id, pixelw, pixelh))
             {
                 return;
             }
 
             if (configured_path != fallback_path &&
-                addfont(fallback_path, id, pixelw, pixelh))
+                FontCache::get().addfont(fallback_path, id, pixelw, pixelh))
             {
                 Console::get().print(
                     "Failed to load font '" + configured_path +
@@ -199,8 +204,6 @@ namespace jrc
         load_font(font_normal, FALLBACK_FONT_NORMAL, Text::A13M, 0, 13);
         load_font(font_bold,   FALLBACK_FONT_BOLD,   Text::A13B, 0, 13);
         load_font(font_normal, FALLBACK_FONT_NORMAL, Text::A18M, 0, 18);
-
-        fontymax += fontborder.y();
 
         leftovers = QuadTree<size_t, Leftover>([](const Leftover& first, const Leftover& second) {
             bool wcomp = first.width() >= second.width();
@@ -226,102 +229,87 @@ namespace jrc
         return Error::NONE;
     }
 
-    bool GraphicsGL::addfont(const char* name, Text::Font id, FT_UInt pixelw, FT_UInt pixelh)
+    bool GraphicsGL::upload_glyph(GLshort w, GLshort h, GLshort pitch, const uint8_t* bitmap, GLshort& x, GLshort& y)
     {
-        FT_Face face;
-        if (FT_New_Face(ftlibrary, name, 0, &face))
+        if (w <= 0 || h <= 0)
         {
             return false;
         }
 
-        if (FT_Set_Pixel_Sizes(face, pixelw, pixelh))
+        if (fontborder.x() + w > ATLASW)
         {
-            return false;
-        }
-
-        FT_GlyphSlot g = face->glyph;
-
-        GLshort width  = 0;
-        GLshort height = 0;
-        for (uint8_t c = 32; c < 128; ++c)
-        {
-            if (FT_Load_Char(face, c, FT_LOAD_RENDER))
-                continue;
-
-            GLshort w = static_cast<GLshort>(g->bitmap.width);
-            GLshort h = static_cast<GLshort>(g->bitmap.rows);
-
-            width += w;
-            if (h > height)
-            {
-                height = h;
-            }
-        }
-
-        if (fontborder.x() + width > ATLASW)
-        {
+            // The current band is full: open a new one above it.
             fontborder.set_x(0);
-            fontborder.set_y(fontymax);
-            fontymax = 0;
+            fontborder.set_y(fontborder.y() - fontbandheight);
+            fontbandheight = 0;
         }
 
-        GLshort x = fontborder.x();
-        GLshort y = fontborder.y();
+        // Glyphs are anchored to the band bottom so that the band's top edge
+        // can still grow when a taller glyph joins the band later.
+        x = fontborder.x();
+        y = fontborder.y() - h;
 
-        fontborder.shift_x(width);
-        if (height > fontymax)
+        // Do not claim rows the bitmap allocator may still hand out.
+        if (y < border.y() + yrange.second())
         {
-            fontymax = height;
+            return false;
         }
 
-        fonts[id] = Font(width, height);
-
-        GLshort ox = x;
-        GLshort oy = y;
-        for (uint8_t c = 32; c < 128; ++c)
+        fontborder.shift_x(w);
+        if (h > fontbandheight)
         {
-            if (FT_Load_Char(face, c, FT_LOAD_RENDER))
-            {
-                continue;
-            }
+            fontbandheight = h;
+        }
 
-            GLshort ax = static_cast<GLshort>(g->advance.x >> 6);
-            GLshort ay = static_cast<GLshort>(g->advance.y >> 6);
-            GLshort l  = static_cast<GLshort>(g->bitmap_left);
-            GLshort t  = static_cast<GLshort>(g->bitmap_top);
-            GLshort w  = static_cast<GLshort>(g->bitmap.width);
-            GLshort h  = static_cast<GLshort>(g->bitmap.rows);
+        if (y < fontregion)
+        {
+            fontregion = y;
+            glUseProgram(program);
+            glUniform1i(uniform_fontregion, fontregion);
+        }
 
-            if (w > 0 && h > 0)
-            {
+        glBindTexture(GL_TEXTURE_2D, atlas);
+
 #ifdef MS_PLATFORM_WASM
-                // WebGL path: expand single-channel glyph bitmap to RGBA.
-                std::vector<uint8_t> rgba_buffer(static_cast<size_t>(w) * h * 4);
-                for (int32_t i = 0; i < static_cast<int32_t>(w) * h; ++i)
-                {
-                    uint8_t val = g->bitmap.buffer[i];
-                    rgba_buffer[static_cast<size_t>(i) * 4 + 0] = val;
-                    rgba_buffer[static_cast<size_t>(i) * 4 + 1] = val;
-                    rgba_buffer[static_cast<size_t>(i) * 4 + 2] = val;
-                    rgba_buffer[static_cast<size_t>(i) * 4 + 3] = val;
-                }
-                glTexSubImage2D(
-                    GL_TEXTURE_2D, 0, ox, oy, w, h,
-                    GL_RGBA, GL_UNSIGNED_BYTE, rgba_buffer.data()
-                );
-#else
-                glTexSubImage2D(
-                    GL_TEXTURE_2D, 0, ox, oy, w, h,
-                    GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer
-                );
-#endif
+        // WebGL path: expand the single-channel glyph bitmap to RGBA.
+        std::vector<uint8_t> rgba_buffer(static_cast<size_t>(w) * h * 4);
+        for (GLshort row = 0; row < h; ++row)
+        {
+            const uint8_t* src = bitmap + static_cast<size_t>(row) * pitch;
+            uint8_t* dst = rgba_buffer.data() + static_cast<size_t>(row) * w * 4;
+            for (GLshort col = 0; col < w; ++col)
+            {
+                uint8_t val = src[col];
+                dst[static_cast<size_t>(col) * 4 + 0] = val;
+                dst[static_cast<size_t>(col) * 4 + 1] = val;
+                dst[static_cast<size_t>(col) * 4 + 2] = val;
+                dst[static_cast<size_t>(col) * 4 + 3] = val;
             }
-
-            Offset offset = Offset(ox, oy, w, h);
-            fonts[id].chars[c] = { ax, ay, w, h, l, t, offset };
-
-            ox += w;
         }
+        glTexSubImage2D(
+            GL_TEXTURE_2D, 0, x, y, w, h,
+            GL_RGBA, GL_UNSIGNED_BYTE, rgba_buffer.data()
+        );
+#else
+        if (pitch == w)
+        {
+            glTexSubImage2D(
+                GL_TEXTURE_2D, 0, x, y, w, h,
+                GL_RED, GL_UNSIGNED_BYTE, bitmap
+            );
+        }
+        else
+        {
+            // FreeType rows may be padded, upload them one at a time.
+            for (GLshort row = 0; row < h; ++row)
+            {
+                glTexSubImage2D(
+                    GL_TEXTURE_2D, 0, x, y + row, w, 1,
+                    GL_RED, GL_UNSIGNED_BYTE, bitmap + static_cast<size_t>(row) * pitch
+                );
+            }
+        }
+#endif
 
         return true;
     }
@@ -331,7 +319,7 @@ namespace jrc
         glUseProgram(program);
 
         glUniform1i(uniform_yoffset, Constants::VIEWYOFFSET);
-        glUniform1i(uniform_fontregion, fontymax);
+        glUniform1i(uniform_fontregion, fontregion);
         glUniform2f(uniform_atlassize, ATLASW, ATLASH);
         glUniform2f(uniform_screensize, Constants::viewwidth(), Constants::viewheight());
 
@@ -368,7 +356,7 @@ namespace jrc
 
     void GraphicsGL::clearinternal()
     {
-        border = Point<GLshort>(0, fontymax);
+        border = Point<GLshort>(0, 1);
         yrange = Range<GLshort>();
 
         offsets.clear();
@@ -380,7 +368,7 @@ namespace jrc
     void GraphicsGL::clear()
     {
         size_t used = ATLASW * border.y() + border.x() * yrange.second();
-        double usedpercent = static_cast<double>(used) / (ATLASW * ATLASH);
+        double usedpercent = static_cast<double>(used) / (ATLASW * fontregion);
         if (usedpercent > 80.0)
         {
             clearinternal();
@@ -469,7 +457,7 @@ namespace jrc
             {
                 border.set_x(0);
                 border.shift_y(yrange.second());
-                if (border.y() + h > ATLASH)
+                if (border.y() + h > fontregion)
                 {
                     clearinternal();
                 }
@@ -509,7 +497,7 @@ namespace jrc
 
         /*
         size_t used = ATLASW * border.y() + border.x() * yrange.second();
-        double usedpercent = static_cast<double>(used) / (ATLASW * ATLASH);
+        double usedpercent = static_cast<double>(used) / (ATLASW * fontregion);
         double wastedpercent = static_cast<double>(wasted) / used;
         Console::get().print("Used: " + std::to_string(usedpercent) + ", wasted: " + std::to_string(wastedpercent));
         */
@@ -559,6 +547,43 @@ namespace jrc
         quads.emplace_back(rect.l(), rect.r(), rect.t(), rect.b(), getoffset(bmp), color, angle);
     }
 
+    namespace
+    {
+        // End of the next lay-outable token starting at offset. Tokens are runs
+        // of non-CJK characters up to the next delimiter, except that every CJK
+        // codepoint forms its own token: CJK scripts have no spaces, so each
+        // ideograph must be an independent line-break opportunity.
+        size_t next_token(const char* text, size_t offset, size_t length)
+        {
+            size_t seqlen = Utf8::sequence_length(text[offset]);
+            if (offset + seqlen > length)
+            {
+                seqlen = length - offset;
+            }
+
+            if (Utf8::is_cjk(Utf8::decode(text + offset, length - offset)))
+            {
+                return offset + seqlen;
+            }
+
+            size_t pos = offset + seqlen;
+            while (pos < length)
+            {
+                char c = text[pos];
+                if (c == ' ' || c == '\\' || c == '#')
+                {
+                    return pos;
+                }
+                if (Utf8::is_cjk(Utf8::decode(text + pos, length - pos)))
+                {
+                    return pos;
+                }
+                pos += Utf8::sequence_length(c);
+            }
+            return length;
+        }
+    }
+
     Text::Layout GraphicsGL::createlayout(const std::string& text, Text::Font id,
         Text::Alignment alignment, int16_t maxwidth, bool formatted) {
 
@@ -568,7 +593,7 @@ namespace jrc
             return {};
         }
 
-        LayoutBuilder builder(fonts[id], alignment, maxwidth, formatted);
+        LayoutBuilder builder(FontCache::get(), id, alignment, maxwidth, formatted);
 
         const char* p_text = text.c_str();
 
@@ -576,9 +601,7 @@ namespace jrc
         size_t offset = 0;
         while (offset < length)
         {
-            size_t last = text.find_first_of(" \\#", offset + 1);
-            if (last == std::string::npos)
-                last = length;
+            size_t last = next_token(p_text, offset, length);
 
             first = builder.add(p_text, first, offset, last);
             offset = last;
@@ -588,14 +611,13 @@ namespace jrc
     }
 
 
-    GraphicsGL::LayoutBuilder::LayoutBuilder(const Font& f, Text::Alignment a, int16_t mw, bool fm)
-        : font(f), alignment(a), maxwidth(mw), formatted(fm)
+    GraphicsGL::LayoutBuilder::LayoutBuilder(FontCache& fc, Text::Font f, Text::Alignment a, int16_t mw, bool fm)
+        : fontcache(fc), alignment(a), fontid(f), maxwidth(mw), formatted(fm)
     {
 
-        fontid = Text::NUM_FONTS;
         color  = Text::NUM_COLORS;
         ax     = 0;
-        ay     = font.linespace();
+        ay     = fontcache.linespace(fontid);
         width  = 0;
         endy   = 0;
         if (maxwidth == 0)
@@ -663,23 +685,30 @@ namespace jrc
         int16_t wordwidth = 0;
         if (!linebreak)
         {
-            for (size_t i = first; i < last; ++i)
+            for (size_t i = first; i < last; )
             {
-                char c = text[i];
-                wordwidth += font.chars[c].ax;
+                size_t seqlen = Utf8::sequence_length(text[i]);
+                if (i + seqlen > last)
+                {
+                    seqlen = last - i;
+                }
+                wordwidth += fontcache.getglyph(fontid, Utf8::decode(text + i, last - i)).ax;
 
                 if (wordwidth > maxwidth)
                 {
-                    if (last - first == 1)
+                    if (i == first)
                     {
-                        return last;
+                        // A single codepoint already exceeds the limit (only
+                        // possible for extremely narrow layouts): emit the
+                        // token as-is instead of recursing forever.
+                        break;
                     }
-                    else
-                    {
-                        prev = add(text, prev, first, i);
-                        return add(text, prev, i, last);
-                    }
+                    // Split at the codepoint boundary that overflowed.
+                    prev = add(text, prev, first, i);
+                    return add(text, prev, i, last);
                 }
+
+                i += seqlen;
             }
         }
 
@@ -695,17 +724,29 @@ namespace jrc
 
             endy = ay;
             ax = 0;
-            ay += font.linespace();
+            ay += fontcache.linespace(fontid);
         }
 
-        for (size_t pos = first; pos < last; ++pos)
+        for (size_t pos = first; pos < last; )
         {
-            char c = text[pos];
-            const Font::Char& ch = font.chars[c];
+            size_t seqlen = Utf8::sequence_length(text[pos]);
+            if (pos + seqlen > last)
+            {
+                seqlen = last - pos;
+            }
+            char32_t codepoint = Utf8::decode(text + pos, last - pos);
+            const FontCache::Char& ch = fontcache.getglyph(fontid, codepoint);
 
-            advances.push_back(ax);
+            // One advance entry per byte keeps all callers byte-indexed;
+            // continuation bytes repeat their leader's advance.
+            for (size_t byte = 0; byte < seqlen; ++byte)
+            {
+                advances.push_back(ax);
+            }
 
-            if (pos < first + skip || (newline && c == ' '))
+            bool skipped = pos < first + skip || (newline && codepoint == U' ');
+            pos += seqlen;
+            if (skipped)
                 continue;
 
             ax += ch.ax;
@@ -781,7 +822,7 @@ namespace jrc
             return;
         }
 
-        const Font& font = fonts[id];
+        FontCache& fontcache = FontCache::get();
 
         GLshort x = args.getpos().x();
         GLshort y = args.getpos().y();
@@ -797,7 +838,7 @@ namespace jrc
             {
                 GLshort left = x + line.position.x() - 2;
                 GLshort right = left + w + 3;
-                GLshort top = y + line.position.y() - font.linespace() + 5;
+                GLshort top = y + line.position.y() - fontcache.linespace(id) + 5;
                 GLshort bottom = top + h - 2;
                 Color ntcolor{ 0.0f, 0.0f, 0.0f, 0.6f };
 
@@ -846,29 +887,36 @@ namespace jrc
                 }
                 Color abscolor = color * Color{ wordcolor[0], wordcolor[1], wordcolor[2], 1.0f };
 
-                for (size_t pos = word.first; pos < word.last; ++pos)
+                for (size_t pos = word.first; pos < word.last; )
                 {
-                    const char c = text[pos];
-                    const Font::Char &ch = font.chars[c];
+                    size_t seqlen = Utf8::sequence_length(text[pos]);
+                    if (pos + seqlen > word.last)
+                    {
+                        seqlen = word.last - pos;
+                    }
+                    char32_t codepoint = Utf8::decode(text.data() + pos, word.last - pos);
+                    const FontCache::Char& ch = fontcache.getglyph(id, codepoint);
+
+                    if (ax == 0 && codepoint == U' ')
+                    {
+                        pos += seqlen;
+                        continue;
+                    }
 
                     GLshort chx = x + ax + ch.bl;
                     GLshort chy = y + ay - ch.bt;
                     GLshort chw = ch.bw;
                     GLshort chh = ch.bh;
 
-                    if (ax == 0 && c == ' ')
-                    {
-                        continue;
-                    }
-
                     ax += ch.ax;
+                    pos += seqlen;
 
                     if (chw <= 0 || chh <= 0)
                     {
                         continue;
                     }
 
-                    quads.emplace_back(chx, chx + chw, chy, chy + chh, ch.offset, abscolor, 0.0f);
+                    quads.emplace_back(chx, chx + chw, chy, chy + chh, Offset(ch.ox, ch.oy, chw, chh), abscolor, 0.0f);
                 }
             }
         }

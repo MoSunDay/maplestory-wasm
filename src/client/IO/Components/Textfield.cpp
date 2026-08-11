@@ -17,9 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "Textfield.h"
 
+#include "../ImeBridge.h"
 #include "../UI.h"
 
 #include "../../Constants.h"
+#include "../../Util/Utf8.h"
 
 
 namespace jrc
@@ -88,10 +90,12 @@ namespace jrc
             if (state == FOCUSED)
             {
                 UI::get().focus_textfield(this);
+                ImeBridge::focus_field(this);
             }
             else if (previous == FOCUSED)
             {
                 UI::get().blur_textfield(this);
+                ImeBridge::blur_field();
             }
         }
     }
@@ -118,20 +122,36 @@ namespace jrc
                 case KeyAction::LEFT:
                     if (markerpos > 0)
                     {
+                        // Step over the whole preceding codepoint, not just one
+                        // byte of a multi-byte sequence.
                         markerpos--;
+                        while (markerpos > 0 && Utf8::is_continuation(text[markerpos]))
+                        {
+                            markerpos--;
+                        }
                     }
                     break;
                 case KeyAction::RIGHT:
                     if (markerpos < text.size())
                     {
                         markerpos++;
+                        while (markerpos < text.size() && Utf8::is_continuation(text[markerpos]))
+                        {
+                            markerpos++;
+                        }
                     }
                     break;
                 case KeyAction::BACK:
                     if (text.size() > 0 && markerpos > 0)
                     {
-                        text.erase(markerpos - 1, 1);
-                        markerpos--;
+                        // Delete the entire codepoint before the caret.
+                        size_t start = markerpos - 1;
+                        while (start > 0 && Utf8::is_continuation(text[start]))
+                        {
+                            start--;
+                        }
+                        text.erase(start, markerpos - start);
+                        markerpos = start;
                         modifytext(text);
                     }
                     break;
@@ -185,14 +205,24 @@ namespace jrc
 
     void Textfield::add_string(const std::string& str)
     {
-        for (char c : str)
+        for (size_t i = 0; i < str.size(); )
         {
-            if (belowlimit())
+            size_t seqlen = Utf8::sequence_length(str[i]);
+            if (i + seqlen > str.size())
             {
-                text.insert(markerpos, 1, c);
-                markerpos++;
-                modifytext(text);
+                seqlen = str.size() - i;
             }
+
+            if (!belowlimit(seqlen))
+            {
+                break;
+            }
+
+            text.insert(markerpos, str, i, seqlen);
+            markerpos += seqlen;
+            modifytext(text);
+
+            i += seqlen;
         }
     }
 
@@ -210,6 +240,8 @@ namespace jrc
         }
 
         text = t;
+
+        ImeBridge::sync_field(this);
     }
 
     Cursor::State Textfield::send_cursor(Point<int16_t> cursorpos, bool clicked)
@@ -262,16 +294,58 @@ namespace jrc
         markerpos = text.size();
     }
 
+    void Textfield::set_text_with_caret(const std::string& newtext, size_t caret_utf16)
+    {
+        std::string value = newtext;
+
+        // Fixed-limit fields are bounded by the protocol in bytes, so trim at
+        // the largest codepoint boundary that still fits.
+        if (limit > 0 && value.size() > limit)
+        {
+            size_t cut = limit;
+            while (cut > 0 && Utf8::is_continuation(value[cut]))
+            {
+                cut--;
+            }
+            value.resize(cut);
+        }
+
+        size_t caret = Utf8::utf16_to_byte_offset(value, caret_utf16);
+
+        modifytext(value);
+
+        if (limit == 0)
+        {
+            // Width-limited field: drop trailing codepoints until it fits.
+            while (!text.empty() && !belowlimit(0))
+            {
+                size_t last = text.size() - 1;
+                while (last > 0 && Utf8::is_continuation(text[last]))
+                {
+                    last--;
+                }
+                text.erase(last);
+                modifytext(text);
+            }
+        }
+
+        if (caret > text.size())
+        {
+            caret = text.size();
+        }
+        markerpos = caret;
+    }
+
     void Textfield::set_cryptchar(int8_t c)
     {
         crypt = c;
     }
 
-    bool Textfield::belowlimit() const
+    bool Textfield::belowlimit(size_t extra) const
     {
         if (limit > 0)
         {
-            return text.size() < limit;
+            return text.size() + extra <= limit;
         }
         else
         {
@@ -283,6 +357,16 @@ namespace jrc
     const std::string& Textfield::get_text() const
     {
         return text;
+    }
+
+    bool Textfield::is_crypted() const
+    {
+        return crypt > 0;
+    }
+
+    size_t Textfield::caret_utf16() const
+    {
+        return Utf8::byte_to_utf16_offset(text, markerpos);
     }
 
     bool Textfield::empty() const

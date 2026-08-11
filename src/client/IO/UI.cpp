@@ -285,6 +285,14 @@ namespace jrc
         scrollingnotice.setnotice(notice);
     }
 
+    void UI::ime_input(const std::string& text, size_t caret_utf16)
+    {
+        if (focusedtextfield)
+        {
+            focusedtextfield->set_text_with_caret(text, caret_utf16);
+        }
+    }
+
     void UI::focus_textfield(Textfield* tofocus)
     {
         if (focusedtextfield)

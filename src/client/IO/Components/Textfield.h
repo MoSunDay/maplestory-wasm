@@ -53,6 +53,9 @@ namespace jrc
 
         void set_state(State state);
         void change_text(const std::string& text);
+        // Replace text and caret in one step (used by the browser IME bridge,
+        // where the caret is a UTF-16 offset).
+        void set_text_with_caret(const std::string& text, size_t caret_utf16);
         void set_cryptchar(int8_t character);
 
         void set_enter_callback(std::function<void(std::string)> onreturn);
@@ -61,13 +64,16 @@ namespace jrc
         Cursor::State send_cursor(Point<int16_t> cursorpos, bool clicked);
 
         bool empty() const;
+        bool is_crypted() const;
         State get_state() const;
         Rectangle<int16_t> get_bounds() const;
         const std::string& get_text() const;
+        // Caret position expressed in UTF-16 code units (browser convention).
+        size_t caret_utf16() const;
 
     private:
         void modifytext(const std::string&);
-        bool belowlimit() const;
+        bool belowlimit(size_t extra = 1) const;
 
         Text textlabel;
         std::string text;

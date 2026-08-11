@@ -64,6 +64,8 @@ namespace jrc
         void rightclick();
         void doubleclick();
         void send_key(int32_t keycode, bool pressed);
+        // Replace the focused textfield's content from the browser IME bridge.
+        void ime_input(const std::string& text, size_t caret_utf16);
         void send_menu(KeyAction::Id action);
 
         void set_scrollnotice(const std::string& notice);
