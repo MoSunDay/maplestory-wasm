@@ -1,69 +1,46 @@
-# WebSocket Proxy for MapleStory WASM Client
+# Web Services for the MapleStory WASM Client
 
-This directory contains the WebSocket-to-TCP proxy needed for the MapleStory WASM client to connect to regular MapleStory servers.
+The browser cannot open raw TCP connections, and the game data files are too
+large to download up front. The Rust services in this repository's workspace
+solve both problems:
 
-## Why is this needed?
+| Crate | Default port | Role |
+|---|---|---|
+| `web-server` | 8000 | Serves the client (`index.html`, `.js`, `.wasm`, `.css`) with the COOP/COEP headers required for `SharedArrayBuffer`, supports HTTP Range requests |
+| `ws-proxy` | 8080 | Bridges the client's WebSocket game connection to the TCP port of a regular MapleStory server |
+| `assets-server` | 8765 | Streams on-demand game data (LazyFS protocol) so only the chunks the client actually reads are transferred |
 
-Browsers cannot make direct TCP connections due to security restrictions. The WASM client uses WebSockets instead, which need to be bridged to the TCP protocol used by MapleStory servers.
+## Running locally
 
-## Running the Proxy
-
-### Prerequisites
-
-Install the `websockets` library:
-
-```bash
-pip install websockets
-```
-
-### Start the Proxy
+Build once from the repository root:
 
 ```bash
-python web/ws_proxy.py
+cargo build --release -p web-server -p ws-proxy -p assets-server
 ```
 
-By default, the proxy:
-- Listens for WebSocket connections on `ws://0.0.0.0:8485`
-- Connects to the MapleStory server at `127.0.0.1:8484`
-
-### Custom Configuration
-
-You can customize the ports and target server:
+Then start the three services in separate terminals:
 
 ```bash
-python web/ws_proxy.py --ws-port 8485 --tcp-host 127.0.0.1 --tcp-port 8484
+./target/release/web-server --port 8000 --directory .
+./target/release/ws-proxy --ws-port 8080
+./target/release/assets-server --port 8765 --directory .
 ```
 
-## Complete Setup
+All binaries accept `--bind` (default `0.0.0.0`); pass `--port 0`
+(`--ws-port 0` for `ws-proxy`) for a random free port. Open `http://localhost:8000` once they are running.
 
-To run the WASM client, you need to start both servers:
-
-**Terminal 1 - HTTP Server (for WASM files):**
-```bash
-python web/server.py
-```
-
-**Terminal 2 - WebSocket Proxy (for networking):**
-```bash
-python web/ws_proxy.py
-```
-
-**Terminal 3 - MapleStory Server (if running locally):**
-```bash
-# Your MapleStory server startup command
-```
-
-Then open your browser to `http://localhost:8000`
-
-## How it Works
+The game connection works like this:
 
 ```
-Browser (WASM Client) <--WebSocket--> Proxy <--TCP--> MapleStory Server
-     ws://localhost:8485                    127.0.0.1:8484
+Browser (WASM client) <--WebSocket--> ws-proxy <--TCP--> MapleStory server
 ```
 
-The proxy is a transparent bridge that:
-1. Accepts WebSocket connections from the browser
-2. Establishes a TCP connection to the MapleStory server
-3. Forwards all data bidirectionally between the two connections
-4. Handles connection lifecycle and cleanup
+The client sends the target as the first WebSocket message (`host:port`, e.g.
+`127.0.0.1:8484`); the proxy connects there and forwards bytes in both
+directions. Set `WS_PROXY_LOCALHOST_TARGET=<host>` to remap `127.0.0.1` /
+`localhost` targets (needed when the proxy runs in Docker and the game server
+on the host is reachable via `host.docker.internal`).
+
+`assets-server` speaks the LazyFS protocol used by `src/client/LazyFS`:
+`get_size` / `get_chunks` / `get_chunk` requests answered with binary chunk
+frames, which the client reassembles into a virtual filesystem.

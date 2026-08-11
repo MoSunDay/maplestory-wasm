@@ -118,7 +118,10 @@ namespace jrc
             statsentry.petids.push_back(recv.read_long());
         }
 
-        statsentry.stats[Maplestat::LEVEL] = recv.read_byte();
+        // The server in custom-client mode writes level as a short (see
+        // addCharStats); reading a byte here shifts every following field
+        // and breaks CHARLIST / ADD_NEW_CHAR_ENTRY / SET_FIELD parsing.
+        statsentry.stats[Maplestat::LEVEL] = recv.read_short();
         statsentry.stats[Maplestat::JOB]   = recv.read_short();
         statsentry.stats[Maplestat::STR]   = recv.read_short();
         statsentry.stats[Maplestat::DEX]   = recv.read_short();

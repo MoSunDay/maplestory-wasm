@@ -441,10 +441,9 @@ Server responds with `CHAR_NAME_RESPONSE` (0x0D).
 ```
 Field      Type    Notes
 name       string  Character name (3–12 chars)
-job        int     Job ID (see Job enum). 0=Explorer, 1000=Cygnus, 2000=Aran
+job        int     Job ID. Running server (custom-client mode): 0=Cygnus, 1=Explorer, 2=Aran
 face       int     Face ID (cosmetic)
-hair       int     Hair ID (cosmetic)
-hairColor  int     Hair color ID
+hair       int     Hair ID (cosmetic) combined with hair color: write_int(hairStyle + hairColor)
 skin       int     Skin tone ID
 top        int     Item ID for top equip
 bottom     int     Item ID for bottom equip
@@ -3723,7 +3722,7 @@ hair         int          Hair cosmetic ID
 pet1UniqueId long         Pet unique ID (0 if no pet)
 pet2UniqueId long
 pet3UniqueId long
-level        byte
+level        short        Running server (custom-client mode) writes level as short
 job          short        Job ID (see §13)
 str          short
 dex          short
