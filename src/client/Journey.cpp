@@ -64,6 +64,7 @@ namespace jrc
         loadConfigString("ProxyIP", Setting<ProxyIP>::get());
         loadConfigString("ProxyPort", Setting<ProxyPort>::get());
         loadConfigString("AssetsServerProtocol", Setting<AssetsServerProtocol>::get());
+        loadConfigString("RegisterUrl", Setting<RegisterUrl>::get());
 #endif
 
         if (Error error = Session::get().init())

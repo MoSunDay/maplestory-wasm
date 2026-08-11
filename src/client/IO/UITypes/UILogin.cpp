@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UILogin.h"
 #include "UILoginWait.h"
+#include "UILoginNotice.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -26,6 +27,7 @@
 #include "../../Console.h"
 #include "../../Graphics/Sprite.h"
 #include "../../Net/Packets/LoginPackets.h"
+#include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
 
@@ -221,6 +223,21 @@ namespace jrc
             saveid = !saveid;
             Setting<SaveLogin>::get().save(saveid);
             return Button::MOUSEOVER;
+        case BT_REGISTER:
+        {
+            std::string register_url = Setting<RegisterUrl>::get().load();
+            if (!register_url.empty())
+            {
+                // Open the registration page synchronously so popup blockers allow it.
+                open_url(register_url);
+            }
+            else
+            {
+                // No registration URL configured; show a notice instead of failing silently.
+                UI::get().emplace<UILoginNotice>(UILoginNotice::PLEASE_SIGN_UP);
+            }
+            return Button::NORMAL;
+        }
         default:
             return Button::PRESSED;
         }
