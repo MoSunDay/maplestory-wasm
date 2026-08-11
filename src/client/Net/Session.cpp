@@ -56,9 +56,10 @@ namespace jrc
 
     Session::Session()
     {
-        connected = false;
-        length    = 0;
-        pos       = 0;
+        connected         = false;
+        connection_changed = false;
+        length            = 0;
+        pos               = 0;
     }
 
     Session::~Session()
@@ -115,19 +116,27 @@ namespace jrc
 
     void Session::reconnect(const char* address, const char* port)
     {
+        std::string target_address = resolve_channel_address(address);
+        const char* target_port = (port != nullptr) ? port : "";
+        Console::get().print(
+            "Reconnecting to channel server " + target_address + ":" + target_port
+        );
+
         // Close the current connection and open a new one.
         bool success = socket.close();
 
         if (success)
         {
-            std::string target_address = resolve_channel_address(address);
-            const char* target_port = (port != nullptr) ? port : "";
             init(target_address.c_str(), target_port);
         }
         else
         {
             connected = false;
         }
+
+        // Signal that the socket/crypto were swapped so process() can stop
+        // consuming bytes that belonged to the old connection.
+        connection_changed = true;
     }
 
     void Session::process(const int8_t* bytes, size_t available)
@@ -170,6 +179,15 @@ namespace jrc
 
             pos    = 0;
             length = 0;
+
+            // If reconnect() swapped the connection during forward(), the
+            // remaining bytes belong to the old stream and the new crypto
+            // would misread them. Discard and reset.
+            if (connection_changed)
+            {
+                connection_changed = false;
+                return;
+            }
 
             // Check if there is more available.
             size_t remaining = available - towrite;
