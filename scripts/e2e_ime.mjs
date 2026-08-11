@@ -144,7 +144,28 @@ fs.writeFileSync(path.join(ARTIFACT_DIR, 'e2e_field_after.png'), Buffer.from(aft
 check('render: field pixels changed after CJK input', baseline !== afterText);
 
 // --- 5. backspace via real key event ---
-console.log('  activeElement before backspace:', await js(`document.activeElement ? document.activeElement.id : 'none'`));
+// Establish a deterministic precondition: textarea focused with the caret at
+// the end of the value. The glue echoes field state back through an async
+// msime_input round trip that can race the caret position, so pin the caret
+// and wait until the echo settles before asserting the product behavior
+// (backspace deletes one codepoint).
+for (let i = 0; i < 10; i++) {
+  await js(`(() => {
+    const ta = document.getElementById('ime-input');
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    return 'pinned'; })()`);
+  await sleep(200);
+  if (await js(`(() => {
+    const ta = document.getElementById('ime-input');
+    return ta.selectionStart === ta.value.length && ta.selectionEnd === ta.value.length
+      && document.activeElement === ta; })()`)) break;
+}
+console.log('  state before backspace:', await js(`(() => {
+  const ta = document.getElementById('ime-input');
+  return JSON.stringify({ active: window.MapleWasmIME.active, value: ta.value,
+    sel: [ta.selectionStart, ta.selectionEnd],
+    activeElement: document.activeElement ? document.activeElement.id : null }); })()`));
 const beforeLen = (await js(`document.getElementById('ime-input').value`)).length;
 await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 });
 await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 });
@@ -153,14 +174,25 @@ let afterLen = (await js(`document.getElementById('ime-input').value`)).length;
 console.log(`  CDP backspace: ${beforeLen} -> ${afterLen}`);
 if (afterLen !== beforeLen - 1) {
   // Fallback probe: dispatch a synthetic keydown straight at the textarea to
-  // verify the handler logic itself, independent of CDP routing.
+  // verify the handler logic itself, independent of CDP routing. Re-pin the
+  // caret in the same synchronous step so the handler sees a stable state.
   await js(`(() => {
     const ta = document.getElementById('ime-input');
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
     ta.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Backspace', keyCode: 8 }));
     return 'dispatched'; })()`);
   await sleep(500);
   afterLen = (await js(`document.getElementById('ime-input').value`)).length;
   console.log(`  synthetic backspace: -> ${afterLen}`);
+}
+if (afterLen !== beforeLen - 1) {
+  // Dump the full bridge state so a remaining failure is diagnosable.
+  console.log('  backspace failure state:', await js(`(() => {
+    const ta = document.getElementById('ime-input');
+    return JSON.stringify({ active: window.MapleWasmIME.active, value: ta.value,
+      selectionStart: ta.selectionStart, selectionEnd: ta.selectionEnd,
+      activeElement: document.activeElement ? document.activeElement.id : null }); })()`));
 }
 check('edit: backspace removed one codepoint', afterLen === beforeLen - 1, `before=${beforeLen} after=${afterLen}`);
 
