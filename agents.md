@@ -1,10 +1,10 @@
 # 逻辑结构
 
-Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
+Commit: b141e14a762f6dd1d94e31c5130cc856b9b1c75a
 
 ## 概述
 
-MapleStory WASM 是 MapleStory v83 客户端的 WebAssembly 移植。C++ 客户端经 Emscripten 编译为 WASM，在浏览器中完成游戏渲染、交互与协议通信；Python Web 服务层负责分发 WASM 产物、桥接游戏封包（WebSocket → TCP）并按需流式提供 `.nx` 游戏资源。客户端设计为与 Cosmic 服务端配合运行。
+MapleStory WASM 是 MapleStory v83 客户端的 WebAssembly 移植。C++ 客户端经 Emscripten 编译为 WASM，在浏览器中完成游戏渲染、交互与协议通信；Rust Web 服务层负责分发 WASM 产物、桥接游戏封包（WebSocket → TCP）并按需流式提供 `.nx` 游戏资源。客户端设计为与 Cosmic 服务端配合运行。
 
 构建、部署与环境约定见根目录 [AGENTS.md](AGENTS.md)（构建/运行入口），网络协议细节见 [docs/ms-network-protocol.md](docs/ms-network-protocol.md)。
 
@@ -14,7 +14,7 @@ MapleStory WASM 是 MapleStory v83 客户端的 WebAssembly 移植。C++ 客户�
 |------|------|------|
 | [WASM 客户端](agents/client/index.md) | `src/client/` | 核心 C++ 客户端，编译为 WASM |
 | [NoLifeNx 库](agents/nlnx/index.md) | `src/nlnx/` | NX 文件格式读取库 |
-| [Web 基础设施](agents/web/index.md) | `web/` | Python Web 服务：HTTP 服务器、WebSocket 代理、资源流 |
+| [Web 基础设施](agents/web/index.md) | `web-server/` `ws-proxy/` `assets-server/` `web/` | Rust Web 服务：HTTP 服务器、WebSocket 代理、资源流 |
 
 ## 客户端子模块
 

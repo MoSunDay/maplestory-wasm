@@ -1,10 +1,10 @@
 # Web 基础设施
 
-Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
+Commit: b141e14a762f6dd1d94e31c5130cc856b9b1c75a
 
 ## 职责
 
-提供浏览器运行 WASM 客户端所需的全部 Web 服务层。三个 Python 服务通过 WebSocket/HTTP 桥接浏览器与 Cosmic 服务端和本地资源。
+提供浏览器运行 WASM 客户端所需的全部 Web 服务层。三个 Rust 二进制（Cargo workspace crate）通过 WebSocket/HTTP 桥接浏览器与 Cosmic 服务端和本地资源；`web/` 目录仅存放静态页面与配置。
 
 ## 边界
 
@@ -15,39 +15,34 @@ Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
 
 ```
 浏览器
-  ├── HTTP ──► server.py :8000         (WASM/JS/HTML 分发)
-  ├── WebSocket ──► ws_proxy.py :8080   (游戏封包 → TCP → Cosmic 服务端)
-  └── WebSocket ──► assets_server.py :8765 (按需 .nx 资源流)
+  ├── HTTP ──► web-server :8000         (WASM/JS/HTML 分发)
+  ├── WebSocket ──► ws-proxy :8080       (游戏封包 → TCP → Cosmic 服务端)
+  └── WebSocket ──► assets-server :8765  (按需 .nx 资源流)
 ```
+
+三个 crate 共享根 `Cargo.toml` workspace；Docker 侧由 `docker/rust-web.Dockerfile` 多阶段构建同一镜像，`docker-compose.yml` 以不同 command 启动三个服务。
 
 ## 关键服务
 
-### server.py
+### web-server (`web-server/`)
 
-HTTP 服务器，绑定 8000 端口。负责:
-- 提供 `index.html` 入口页面
-- 提供 `build/JourneyClient.js` 和 `build/JourneyClient.wasm` 
-- 提供 `web/config.json` 客户端配置
-- 提供字体文件等其他静态资源
+HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可配）。负责:
+- 提供 `index.html` 入口页面、`build/JourneyClient.js`/`.wasm`、`web/config.json`、字体等静态资源
+- 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`
+- 支持 HTTP Range 请求（单区间），目录自动索引
 
-### ws_proxy.py
+### ws-proxy (`ws-proxy/`)
 
-WebSocket-TCP 桥接代理，绑定 8080 端口。负责:
-- 接收浏览器 WebSocket 连接
-- 将 WebSocket 消息转发为 TCP 连接至 Cosmic 服务端
-- 将 Cosmic 服务端响应转发回浏览器
-- 支持 `--ws-port` 参数自定义端口
+WebSocket-TCP 桥接代理，默认绑定 8080 端口（`--ws-port`/`--bind` 可配）。负责:
+- 接收浏览器 WebSocket 连接，首帧二进制消息为目标地址 `host:port`
+- 与目标建立 TCP 连接并双向转发字节（WS 二进制帧 ↔ TCP）
+- `WS_PROXY_LOCALHOST_TARGET` 环境变量可将 `127.0.0.1`/`localhost` 目标重映射为其他主机（Docker 场景下为 `host.docker.internal`）
 
-### assets_server.py
+### assets-server (`assets-server/`)
 
-LazyFS WebSocket 资源服务器，绑定 8765 端口。负责:
-- 接收 LazyFS 客户端的按需文件请求
-- 按 WebSocket 分块协议返回 .nx 文件块（`get_size` 查询大小，`get_chunks` 批量取块，二进制帧传输）
-- 支持 `--port` 和 `--directory` 参数配置端口和资源目录
-
-### server_fast.py
-
-`server.py` 的可选替代实现，基于 aiohttp 的异步 HTTP 服务器，同样绑定 8000 端口并支持 Range 请求与 WASM 所需的跨域隔离头。用于大文件分发性能更好的场景，二者只启动其一。
+LazyFS WebSocket 资源服务器，默认绑定 8765 端口（`--port`/`--bind`/`--directory` 可配）。负责:
+- 接收 LazyFS 客户端的按需文件请求（`get_size` 查询大小、`get_chunks` 批量取块、`get_chunk` 单块）
+- 以二进制帧 `[u32 块号][u8 文件名长度][文件名][数据]` 返回 .nx 文件块，`chunks_done` 结束批量请求
 
 ## 配置
 
@@ -65,6 +60,6 @@ LazyFS WebSocket 资源服务器，绑定 8765 端口。负责:
 
 ## 依赖关系
 
-- **运行依赖**: Python 3.9+, `websockets` 库
+- **运行依赖**: Rust 工具链（本地构建）或 Docker（`docker/rust-web.Dockerfile`）
 - **上游依赖**: Cosmic 服务端 (TCP)
 - **下游使用者**: 浏览器 WASM 客户端

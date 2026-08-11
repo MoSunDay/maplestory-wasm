@@ -42,8 +42,7 @@ namespace jrc
             write_string(name);
             write_int(job);
             write_int(face);
-            write_int(hair);
-            write_int(hairc);
+            write_int(hair + hairc);
             write_int(skin);
             write_int(top);
             write_int(bot);

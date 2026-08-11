@@ -22,7 +22,7 @@ Any issues or new features should utilize server existing infra and modify the c
 - WASM client source: `src/client`
 - Shared NX library: `src/nlnx`
 - Client build output: `build/JourneyClient.js`, `build/JourneyClient.wasm`, and optionally `build/JourneyClient.wasm.map`
-- Local web entrypoints: `web/server.py`, `web/ws_proxy.py`, `web/assets_server.py`
+- Local web entrypoints: Rust binaries `web-server`, `ws-proxy`, `assets-server` (workspace crates of the same names)
 - Docker web stack: root `docker-compose.yml`
 - The client is designed to run with Cosmic server
 
@@ -60,18 +60,18 @@ Use local deployment when the local toolchain and local services are available.
 
 1. Build the client with `./scripts/build_wasm.sh`.
 2. If that is not possible, build the client with `./scripts/docker_build_wasm.sh`.
-3. Install the local Python dependency if needed:
+3. Build the Rust web services from the repository root:
 
 ```bash
-pip install -r web/requirements.txt
+cargo build --release -p web-server -p ws-proxy -p assets-server
 ```
 
 4. Start the web services from the repository root in separate terminals:
 
 ```bash
-python3 web/server.py
-python3 web/ws_proxy.py --ws-port 8080
-python3 web/assets_server.py --port 8765 --directory .
+./target/release/web-server --port 8000 --directory .
+./target/release/ws-proxy --ws-port 8080
+./target/release/assets-server --port 8765 --directory .
 ```
 
 5. Open `http://localhost:8000`.
@@ -129,7 +129,7 @@ To stop everything:
 
 ## 本地记忆 - 逻辑结构
 
-Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+Commit: b141e14a762f6dd1d94e31c5130cc856b9b1c75a
 
 ### 模块索引
 
@@ -137,7 +137,7 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 |------|------|------|
 | [WASM 客户端](agents/client/index.md) | `src/client/` | 核心 C++ 客户端，编译为 WASM |
 | [NoLifeNx 库](agents/nlnx/index.md) | `src/nlnx/` | NX 文件格式读取库 |
-| [Web 基础设施](agents/web/index.md) | `web/` | Python Web 服务：HTTP 服务器、WebSocket 代理、资源流 |
+| [Web 基础设施](agents/web/index.md) | `web-server/` `ws-proxy/` `assets-server/` `web/` | Rust Web 服务：HTTP 服务器、WebSocket 代理、资源流 |
 
 ### 客户端子模块
 

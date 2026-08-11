@@ -24,7 +24,7 @@ Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
 1. 游戏启动时调用 `Initialize()`，与 JavaScript 层同步配置
 2. `RegisterFile()` 注册所有 .nx 文件（如 `Base.nx`），并经 WebSocket 获取文件大小
 3. 拦截 `fopen`/`fseek`/`fread` 调用，按块读取:
-   - 首次访问某块时，通过 WebSocket 发送 `get_chunks` 批量请求到 assets_server.py
+   - 首次访问某块时，通过 WebSocket 发送 `get_chunks` 批量请求到 assets-server
    - 服务端以二进制帧返回块数据（4 字节块索引 + 文件名 + 原始数据），`chunks_done` 标记批次结束
    - 返回的块写入内存缓存与 IndexedDB，后续访问直接命中缓存
 4. 浏览器端的 WebSocket 连接、批量请求合并与缓存由 JavaScript 层 (`lazyfs.js`) 处理
@@ -47,4 +47,4 @@ Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
 ## 依赖关系
 
 - **内部依赖**: Emscripten 文件系统 API (虚拟 FS)、Asyncify (异步等待 WebSocket 响应)
-- **外部依赖**: assets_server.py (WebSocket 资源服务), 浏览器 IndexedDB API
+- **外部依赖**: assets-server (WebSocket 资源服务), 浏览器 IndexedDB API

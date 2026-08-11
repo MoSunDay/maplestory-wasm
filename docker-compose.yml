@@ -1,11 +1,10 @@
 services:
-  # Serves the static files (HTML, WASM, Assets)
+  # Serves the client (index.html, .js, .wasm, .css) with cross-origin isolation headers
   html-server:
-    container_name: html-server
     build:
       context: .
-      dockerfile: docker/web.Dockerfile
-    command: python web/server.py
+      dockerfile: docker/rust-web.Dockerfile
+    command: ["web-server", "--port", "8000", "--directory", "."]
     ports:
       - "8000:8000"
     volumes:
@@ -16,33 +15,27 @@ services:
 
   # Proxies WebSocket connections to the TCP Game Server
   ws-proxy:
-    container_name: ws-proxy
     build:
       context: .
-      dockerfile: docker/web.Dockerfile
-    # to ensure the client connects to 'host.docker.internal' or configure
-    # this proxy to route correctly.
-    command: python -u web/ws_proxy.py --ws-port 8080
+      dockerfile: docker/rust-web.Dockerfile
+    command: ["ws-proxy", "--ws-port", "8080"]
+    ports:
+      - "8080:8080"
     environment:
       - IS_DOCKER=true
       - WS_PROXY_LOCALHOST_TARGET=host.docker.internal
-    ports:
-      - "8080:8080"
-    volumes:
-      - .:/app
-    networks:
-      - maplestory-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - maplestory-network
     restart: unless-stopped
 
-  # Serves assets via WebSocket for LazyFS
+  # Serves on-demand game data (LazyFS) over WebSocket
   assets-server:
-    container_name: assets-server
     build:
       context: .
-      dockerfile: docker/web.Dockerfile
-    command: python web/assets_server.py --port 8765 --directory .
+      dockerfile: docker/rust-web.Dockerfile
+    command: ["assets-server", "--port", "8765", "--directory", "."]
     ports:
       - "8765:8765"
     volumes:
