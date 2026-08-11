@@ -20,6 +20,7 @@
 #include "Helpers/LoginParser.h"
 
 #include "../Session.h"
+#include "../../Console.h"
 #include "../Packets/LoginPackets.h"
 
 #include "../../Configuration.h"
@@ -268,8 +269,21 @@ namespace jrc
 
         int32_t cid = recv.read_int();
 
-        // Attempt to reconnect to the server and if successfull, login to the game.
+        // Attempt to reconnect to the channel server. Only proceed with the
+        // login packet if the new connection is actually live; otherwise
+        // re-enable the UI so the player is not left with a frozen screen.
         Session::get().reconnect(addrstr.c_str(), portstr.c_str());
-        PlayerLoginPacket(cid).dispatch();
+        if (Session::get().is_connected())
+        {
+            PlayerLoginPacket(cid).dispatch();
+        }
+        else
+        {
+            Console::get().print(
+                "Reconnect to channel server failed (" +
+                addrstr + ":" + portstr + ")"
+            );
+            UI::get().enable();
+        }
     }
 }

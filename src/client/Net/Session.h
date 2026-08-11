@@ -60,6 +60,10 @@ namespace jrc
         size_t length;
         size_t pos;
         bool connected;
+        // Set when reconnect() swaps out the socket/crypto mid-forward().
+        // process() checks this to avoid decrypting leftover bytes from the
+        // old connection with the new cryptography.
+        bool connection_changed;
 
 #ifdef JOURNEY_USE_ASIO
         SocketAsio socket;

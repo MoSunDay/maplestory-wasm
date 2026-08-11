@@ -87,12 +87,19 @@ namespace jrc
         auto charselect = UI::get().get_element<UICharSelect>();
         if (!charselect)
         {
+            // The character-select screen is gone (e.g. after a reconnect
+            // race). Re-enable the UI rather than leaving it frozen.
+            Console::get().print("set_field: character-select UI not found");
+            UI::get().enable();
             return;
         }
 
         const CharEntry& playerentry = charselect->get_character(cid);
         if (playerentry.cid != cid)
         {
+            // The server sent a cid we do not have locally. Recover the UI.
+            Console::get().print("set_field: cid mismatch, cannot enter game");
+            UI::get().enable();
             return;
         }
 
