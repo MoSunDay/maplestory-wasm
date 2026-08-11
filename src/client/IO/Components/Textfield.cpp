@@ -312,6 +312,11 @@ namespace jrc
 
         size_t caret = Utf8::utf16_to_byte_offset(value, caret_utf16);
 
+        // Update the caret before modifytext() echoes the field to the IME
+        // bridge: echoing the stale caret makes the browser re-sync the same
+        // text with the other caret, which ping-pongs forever.
+        markerpos = caret;
+
         modifytext(value);
 
         if (limit == 0)

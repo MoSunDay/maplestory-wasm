@@ -187,6 +187,11 @@
                     active = false;
                     composing = false;
                     ta.value = '';
+                    // Park the textarea off-screen while inactive. Leaving it
+                    // over the previously focused field would silently swallow
+                    // mouse clicks meant for the canvas.
+                    ta.style.left = '-9999px';
+                    ta.style.top = '-9999px';
                     const canvas = document.getElementById('canvas');
                     if (canvas) {
                         canvas.focus({ preventScroll: true });
@@ -196,8 +201,15 @@
                     if (!active) {
                         return;
                     }
-                    ta.value = text || '';
+                    const value = text || '';
                     const caret = caretFromUtf16(caretUtf16);
+                    // Skip no-op echoes: assigning the selection fires
+                    // selectionchange, which would re-sync the identical text
+                    // back to the game and loop forever.
+                    if (ta.value === value && ta.selectionStart === caret && ta.selectionEnd === caret) {
+                        return;
+                    }
+                    ta.value = value;
                     ta.setSelectionRange(caret, caret);
                 }
             };
