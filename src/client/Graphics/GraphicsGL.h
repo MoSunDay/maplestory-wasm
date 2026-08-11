@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "DrawArgument.h"
+#include "FontCache.h"
 #include "Text.h"
 
 #include "../Constants.h"
@@ -32,6 +33,7 @@
 #include "ft2build.h"
 #include FT_FREETYPE_H
 
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -81,9 +83,13 @@ namespace jrc
         // Clear the buffer contents.
         void clearscene();
 
+        // Allocate space for a w by h glyph in the font region of the atlas and
+        // upload its single-channel bitmap. Fills the region origin on success.
+        // Returns false when the atlas cannot fit another glyph.
+        bool upload_glyph(GLshort w, GLshort h, GLshort pitch, const uint8_t* bitmap, GLshort& x, GLshort& y);
+
     private:
         void clearinternal();
-        bool addfont(const char* name, Text::Font id, FT_UInt width, FT_UInt height);
 
         struct Offset
         {
@@ -188,45 +194,10 @@ namespace jrc
             }
         };
 
-        struct Font
-        {
-            struct Char
-            {
-                GLshort ax;
-                GLshort ay;
-                GLshort bw;
-                GLshort bh;
-                GLshort bl;
-                GLshort bt;
-                Offset offset;
-            };
-
-            GLshort width;
-            GLshort height;
-            Char chars[128];
-
-            Font(GLshort w, GLshort h)
-            {
-                width = w;
-                height = h;
-            }
-
-            Font()
-            {
-                width = 0;
-                height = 0;
-            }
-
-            int16_t linespace() const
-            {
-                return static_cast<int16_t>(height * 1.35 + 1);
-            }
-        };
-
         class LayoutBuilder
         {
         public:
-            LayoutBuilder(const Font& font, Text::Alignment alignment, int16_t maxwidth, bool formatted);
+            LayoutBuilder(FontCache& fontcache, Text::Font font, Text::Alignment alignment, int16_t maxwidth, bool formatted);
 
             size_t add(const char* text, size_t prev, size_t first, size_t last);
             Text::Layout finish(size_t first, size_t last);
@@ -235,7 +206,7 @@ namespace jrc
             void add_word(size_t first, size_t last, Text::Font font, Text::Color color);
             void add_line();
 
-            const Font& font;
+            FontCache& fontcache;
 
             Text::Alignment alignment;
             Text::Font fontid;
@@ -285,9 +256,12 @@ namespace jrc
         Range<GLshort> yrange;
 
         FT_Library ftlibrary;
-        Font fonts[Text::NUM_FONTS];
-        Point<GLshort> fontborder;
-        GLshort fontymax;
+        // Font glyphs are packed into bands that grow upward from the bottom of
+        // the atlas while bitmaps grow downward from the top, so the two
+        // allocators only need to check against each other's frontier.
+        Point<GLshort> fontborder; // x: band cursor, y: bottom row of the current band
+        GLshort fontbandheight;    // tallest glyph in the current band
+        GLshort fontregion;        // topmost row used by any glyph (shader boundary)
     };
 
     //constexpr Rectangle<int16_t> GraphicsGL::SCREEN;
