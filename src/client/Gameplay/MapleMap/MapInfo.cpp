@@ -18,6 +18,7 @@
 #include "MapInfo.h"
 
 #include "../../Constants.h"
+#include "../../Util/Misc.h"
 
 namespace jrc
 {
@@ -49,6 +50,7 @@ namespace jrc
         mapmark = info["mapMark"].get_string();
         swim = info["swim"].get_bool();
         town = info["town"].get_bool();
+        recovery = static_cast<float>(info["recovery"].get_real(1.0));
 
         for (auto seat : src["seat"])
         {
@@ -66,6 +68,11 @@ namespace jrc
     bool MapInfo::is_underwater() const
     {
         return swim;
+    }
+
+    float MapInfo::get_recovery_rate() const
+    {
+        return recovery;
     }
 
     std::string MapInfo::get_bgm() const
@@ -106,6 +113,7 @@ namespace jrc
 
     Seat::Seat(nl::node src)
     {
+        id = string_conversion::or_default<int16_t>(src.name(), -1);
         pos = src;
     }
 
@@ -119,6 +127,11 @@ namespace jrc
     Point<int16_t> Seat::getpos() const
     {
         return pos;
+    }
+
+    int16_t Seat::get_id() const
+    {
+        return id;
     }
 
 

@@ -2,6 +2,7 @@
 #include "CharEffect.h"
 #include "Buff.h"
 #include "Effects/DeathTomb.h"
+#include "Effects/Chair.h"
 #include "Inventory/Weapon.h"
 #include "Look/Afterimage.h"
 #include "Look/CharLook.h"
@@ -105,6 +106,8 @@ namespace jrc
         void set_state(uint8_t statebyte);
         /// Change the character's face expression by id.
         void set_expression(int32_t expression);
+        /// Change the item-chair visual; zero clears it.
+        void set_chair(int32_t item_id);
 
         /// Add a pet with the specified stats.
         void add_pet(
@@ -126,6 +129,8 @@ namespace jrc
 
         /// Return if the char is in the Char::SIT state.
         bool is_sitting() const;
+        /// Return whether an item chair currently owns the sitting stance.
+        bool is_in_item_chair() const;
         /// Return if the char is in the Char::LADDER or Char::ROPE state.
         bool is_climbing() const;
         /// Return wether the character sprite uses stances for two-handed weapons.
@@ -168,6 +173,7 @@ namespace jrc
         TimedBool invincible;
         TimedBool ironbody;
         DeathTomb death_tomb;
+        Chair chair;
         std::list<DamageNumber> damagenumbers;
         PartyHpBar partyhpbar;
         int32_t partyhp;

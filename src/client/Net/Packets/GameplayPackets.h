@@ -50,6 +50,40 @@ namespace jrc
         }
     };
 
+    /// Selects a map seat, or stops sitting when seat_id is -1.
+    class CancelChairPacket : public OutPacket
+    {
+    public:
+        explicit CancelChairPacket(int16_t seat_id = -1) : OutPacket(CANCEL_CHAIR)
+        {
+            write_short(seat_id);
+        }
+    };
+
+    /// Requests sitting in an owned SETUP inventory chair.
+    class UseChairPacket : public OutPacket
+    {
+    public:
+        explicit UseChairPacket(int32_t item_id) : OutPacket(USE_CHAIR)
+        {
+            write_int(item_id);
+        }
+    };
+
+    /// Reports the v83 client's natural HP/MP recovery tick.
+    class HealOverTimePacket : public OutPacket
+    {
+    public:
+        HealOverTimePacket(int16_t hp_gain, int16_t mp_gain)
+            : OutPacket(HEAL_OVER_TIME)
+        {
+            // Cosmic consumes two legacy client integers before the gains.
+            write_time();
+            skip(4);
+            write_short(hp_gain);
+            write_short(mp_gain);
+        }
+    };
 
     /// Requests various party-related things.
     /// Opcode: PARTY_OPERATION(124)

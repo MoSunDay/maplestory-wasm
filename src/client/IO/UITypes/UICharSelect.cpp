@@ -39,7 +39,7 @@ namespace jrc
     namespace
     {
         constexpr const char* AUTO_PIC = "1010";
-        constexpr Point<int16_t> CHARACTER_DATA_OFFSET{ -3, -3 };
+        constexpr Point<int16_t> CHARACTER_DATA_OFFSET{ -3, -6 };
     }
 
     UICharSelect::UICharSelect(std::vector<CharEntry> cs,

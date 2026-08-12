@@ -1,6 +1,6 @@
 # Web 基础设施
 
-Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
+Commit: 5059b422f9f2a19252e7536d09e173a4b69dfd7b
 
 ## 职责
 
@@ -30,6 +30,7 @@ Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
 
 HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可配）。负责:
 - 提供 `index.html` 入口页面、`build/JourneyClient.js`/`.wasm`、`web/config.json`、字体等静态资源
+- `web/index.html` 以页面目录为基准使用相对资源路径；部署在反向代理路径前缀下时，配置、字体和 WASM 产物请求会保留该前缀
 - 页面在 WASM 和 NX 素材初始化期间显示加载动画及阶段提示，首帧绘制完成后再淡出；初始化失败时原位显示错误
 - 运行时前台素材网络缺块会显示玻璃化遮罩“素材加载中...”，以请求键覆盖并发和共享读取；失败后遮罩保留错误信息及重试按钮，静默后台预取不触发遮罩
 - 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`

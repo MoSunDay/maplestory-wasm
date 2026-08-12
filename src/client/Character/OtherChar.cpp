@@ -56,7 +56,7 @@ namespace jrc
             }
         }
 
-        if (!attacking)
+        if (!attacking && !is_in_item_chair())
         {
             uint8_t laststate = lastmove.newstate;
             set_state(laststate);

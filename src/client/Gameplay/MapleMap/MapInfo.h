@@ -32,9 +32,11 @@ namespace jrc
         Seat(nl::node source);
 
         bool inrange(Point<int16_t> position) const;
+        int16_t get_id() const;
         Point<int16_t> getpos() const;
 
     private:
+        int16_t id = -1;
         Point<int16_t> pos;
     };
 
@@ -64,6 +66,7 @@ namespace jrc
         MapInfo();
 
         bool is_underwater() const;
+        float get_recovery_rate() const;
         std::string get_bgm() const;
         Range<int16_t> get_walls() const;
         Range<int16_t> get_borders() const;
@@ -84,6 +87,7 @@ namespace jrc
         bool swim;
         bool town;
         bool hideminimap;
+        float recovery = 1.0f;
         Range<int16_t> mapwalls;
         Range<int16_t> mapborders;
         std::vector<Seat> seats;

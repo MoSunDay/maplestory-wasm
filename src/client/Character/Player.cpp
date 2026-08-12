@@ -20,6 +20,8 @@
 
 #include "../Constants.h"
 #include "../Data/WeaponData.h"
+#include "../Data/ItemData.h"
+#include "../Data/SkillData.h"
 #include "../IO/UI.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UIStatsInfo.h"
@@ -91,6 +93,10 @@ namespace jrc
         phobj.hacc = 0.0;
         phobj.vacc = 0.0;
         nullstate.update_state(*this);
+        recovery_state = {};
+        chair_id = 0;
+        map_seat_id = -1;
+        set_chair(0);
     }
 
     void Player::send_action(KeyAction::Id action, bool down)
@@ -170,6 +176,13 @@ namespace jrc
             case InventoryType::USE:
                 UseItemPacket(slot, itemid).dispatch();
                 break;
+            case InventoryType::SETUP:
+                if (itemid / 10000 == 301)
+                {
+                    UseChairPacket(itemid).dispatch();
+                    set_item_chair(itemid);
+                }
+                break;
             default:
                 return;
             }
@@ -236,6 +249,58 @@ namespace jrc
             lastmove = newmove;
         }
 
+        natural_recovery::Posture posture = natural_recovery::Posture::OTHER;
+        if (state == DIED)
+            posture = natural_recovery::Posture::DEAD;
+        else if (state == STAND && !attacking)
+            posture = natural_recovery::Posture::STANDING;
+        else if (state == SIT)
+            posture = natural_recovery::Posture::SITTING;
+        else if (state == LADDER || state == ROPE)
+            posture = natural_recovery::Posture::CLIMBING;
+
+        int32_t hp_skill_level = skillbook.get_level(SkillId::IMPROVED_HP_RECOVERY);
+        int32_t mp_skill_level = skillbook.get_level(SkillId::IMPROVED_MP_RECOVERY_CRUSADER);
+        int32_t mage_skill_level = skillbook.get_level(SkillId::IMPROVE_HP_RECOVERY);
+        int32_t endure_level = skillbook.get_level(SkillId::IMPROVED_LADDER_RECOVERY);
+
+        const SkillData::Stats& hp_skill =
+            SkillData::get(SkillId::IMPROVED_HP_RECOVERY).get_stats(hp_skill_level);
+        const SkillData::Stats& mp_skill =
+            SkillData::get(SkillId::IMPROVED_MP_RECOVERY_CRUSADER).get_stats(mp_skill_level);
+        const SkillData::Stats& endure =
+            SkillData::get(SkillId::IMPROVED_LADDER_RECOVERY).get_stats(endure_level);
+
+        int32_t chair_hp = 0;
+        int32_t chair_mp = 0;
+        if (chair_id > 0)
+        {
+            const ItemData& chair = ItemData::get(chair_id);
+            chair_hp = chair.get_recovery_hp();
+            chair_mp = chair.get_recovery_mp();
+        }
+
+        natural_recovery::Context recovery{
+            posture,
+            stats.get_stat(Maplestat::HP),
+            stats.get_total(Equipstat::HP),
+            stats.get_stat(Maplestat::MP),
+            stats.get_total(Equipstat::MP),
+            get_level(),
+            hp_skill.hprecovery,
+            mp_skill.mprecovery,
+            mage_skill_level,
+            endure.recoverytime,
+            chair_hp,
+            chair_mp,
+            recovery_rate
+        };
+        natural_recovery::Tick recovery_tick = natural_recovery::advance(
+            recovery_state, recovery, Constants::TIMESTEP);
+        recovery_state = recovery_tick.state;
+        if (recovery_tick.hp_gain > 0 || recovery_tick.mp_gain > 0)
+            HealOverTimePacket(recovery_tick.hp_gain, recovery_tick.mp_gain).dispatch();
+
         return get_layer();
     }
 
@@ -266,6 +331,13 @@ namespace jrc
     {
         if (!attacking)
         {
+            if ((chair_id > 0 || map_seat_id >= 0) && state == SIT && st != SIT)
+            {
+                CancelChairPacket().dispatch();
+                chair_id = 0;
+                map_seat_id = -1;
+                set_chair(0);
+            }
             Char::set_state(st);
 
             const PlayerState* pst = get_state(st);
@@ -552,9 +624,38 @@ namespace jrc
     {
         if (seat)
         {
+            CancelChairPacket(seat->get_id()).dispatch();
+            chair_id = 0;
+            map_seat_id = seat->get_id();
+            set_chair(0);
             set_position(seat->getpos());
             set_state(Char::SIT);
         }
+    }
+
+    void Player::set_recovery_rate(float rate)
+    {
+        recovery_rate = rate >= 0.0f ? rate : 0.0f;
+        recovery_state = {};
+    }
+
+    void Player::set_item_chair(int32_t item_id)
+    {
+        chair_id = item_id;
+        map_seat_id = -1;
+        set_chair(item_id);
+        set_state(Char::SIT);
+    }
+
+    void Player::apply_server_chair_state(bool sitting)
+    {
+        if (!sitting)
+        {
+            chair_id = 0;
+            map_seat_id = -1;
+            set_chair(0);
+        }
+        Char::set_state(sitting ? Char::SIT : Char::STAND);
     }
 
     void Player::set_ladder(Optional<const Ladder> ldr)

@@ -297,6 +297,16 @@ namespace jrc
         Stage::get().get_chars().update_look(cid, look);
     }
 
+    void ShowChairHandler::handle(InPacket& recv) const
+    {
+        int32_t cid = recv.read_int();
+        int32_t item_id = recv.read_int();
+        if (auto character = Stage::get().get_character(cid))
+        {
+            character->set_chair(item_id);
+            character->set_state(item_id > 0 ? Char::SIT : Char::STAND);
+        }
+    }
 
     void ShowForeignEffectHandler::handle(InPacket& recv) const
     {

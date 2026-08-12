@@ -24,6 +24,7 @@ namespace jrc
         Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
         effects.drawbelow(absp, alpha);
+        chair.draw({ absp, flip }, alpha, true);
 
         Color color;
         if (invincible)
@@ -42,7 +43,9 @@ namespace jrc
         }
         if (state == DIED)
         {
-            Point<int16_t> ghost_position = absp + death_tomb.ghost_offset(alpha);
+            Point<int16_t> tomb_position = death_tomb.get_absolute(viewx, viewy);
+            Point<int16_t> ghost_base = death_tomb.is_landed() ? tomb_position : absp;
+            Point<int16_t> ghost_position = ghost_base + death_tomb.ghost_offset(alpha);
             bool ghost_in_front = death_tomb.ghost_in_front(alpha);
 
             // Split the orbit at its front and back halves so the standard
@@ -51,7 +54,7 @@ namespace jrc
             {
                 look.draw({ ghost_position, color }, alpha);
             }
-            death_tomb.draw(absp, alpha);
+            death_tomb.draw(tomb_position, alpha);
             if (ghost_in_front)
             {
                 look.draw({ ghost_position, color }, alpha);
@@ -60,6 +63,7 @@ namespace jrc
         else
         {
             look.draw({ absp, color }, alpha);
+            chair.draw({ absp, flip }, alpha, false);
 
             afterimage.draw(look.get_frame(), { absp, flip }, alpha);
 
@@ -107,7 +111,8 @@ namespace jrc
         chatballoon.update();
         invincible.update();
         ironbody.update();
-        death_tomb.update();
+        death_tomb.update(physics);
+        chair.update();
 
         for (auto& pet : pets)
         {
@@ -287,6 +292,16 @@ namespace jrc
         look.set_expression(expression);
     }
 
+    void Char::set_chair(int32_t item_id)
+    {
+        chair.set(item_id);
+    }
+
+    bool Char::is_in_item_chair() const
+    {
+        return chair.get_item_id() > 0;
+    }
+
     void Char::attack(const std::string& action)
     {
         look.set_action(action);
@@ -342,7 +357,7 @@ namespace jrc
         {
             if (st == DIED)
             {
-                death_tomb.start();
+                death_tomb.start(phobj.get_position());
             }
             else if (state == DIED)
             {
