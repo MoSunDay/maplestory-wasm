@@ -1,6 +1,6 @@
 # 图形渲染
 
-Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
 
 ## 职责
 
@@ -8,8 +8,8 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 
 ## 边界
 
-- **包含**: OpenGL/WebGL 封装、纹理图集、精灵绘制、文字排版渲染、色彩/几何工具
-- **不包含**: 游戏逻辑、资源加载、UI 布局
+- **包含**: OpenGL/WebGL 封装、纹理异步准备、纹理图集、精灵绘制、文字排版渲染、色彩/几何工具
+- **不包含**: 游戏逻辑、NX 分块传输、UI 布局
 
 ## 关键抽象
 
@@ -29,7 +29,9 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 
 ### 纹理图集 (`GraphicsGL::addbitmap`)
 
-- 位图通过 `addbitmap()` 注册到图集
+- WASM 中 `Texture` 实例化后通过 `queuebitmap()` 静默预取，主循环每帧调用 `preparebitmaps()`；它以 2ms 扫描软预算查找就绪项，并且每帧最多解压、上传一张位图
+- 首次绘制时尚未就绪的纹理跳过当前帧；图集清理后仍在使用的纹理会重新排队，不在绘制路径同步等待网络
+- 非 WASM 平台仍通过 `addbitmap()` 同步注册到图集
 - 图集空间由 `QuadTree<Leftover>` 管理，按需分配/回收
 - 当图集空间不足时调用 `clear()` 清空
 
@@ -68,7 +70,8 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 ## 渲染流程
 
 ```
-GraphicsGL::draw() → 创建 Quad 加入 quads 列表
+GraphicsGL::preparebitmaps() → 按帧预算准备异步位图
+GraphicsGL::draw() → 已就绪位图创建 Quad 加入 quads 列表
 GraphicsGL::drawtext() → 创建 Quad 加入 quads 列表
 ...
 GraphicsGL::flush() → 绑定 atlas 纹理 → 提交 VBO/IBO → glDrawElements
