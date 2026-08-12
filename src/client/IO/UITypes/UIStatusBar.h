@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "UIChatBar.h"
+#include "StatusBar/StatusBarPopup.h"
 
 #include "../UIElement.h"
 #include "../Messages.h"
@@ -67,12 +68,15 @@ namespace jrc
         int32_t get_pending_party_invite_id() const;
         const std::string& get_pending_party_inviter() const;
         const std::vector<UIChatbar::PartyMember>& get_party_members() const;
+        void toggle_menu_popup();
+        void close_popup();
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
 
     private:
         void update_layout_position();
+        void dispatch_popup_action(StatusBarPopup::Action action);
         float getexppercent() const;
         float gethppercent() const;
         float getmppercent() const;
@@ -111,5 +115,6 @@ namespace jrc
         Text joblabel;
         Animation hpanimation;
         Animation mpanimation;
+        StatusBarPopup popup;
     };
 }

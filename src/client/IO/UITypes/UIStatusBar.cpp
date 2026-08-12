@@ -19,6 +19,7 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "UINotice.h"
 
 #include "../../Character/ExpTable.h"
 #include "../../Constants.h"
@@ -122,6 +123,7 @@ namespace jrc
         namelabel.draw(position + Point<int16_t>(-435, -36));
 
         chatbar.draw(alpha);
+        popup.draw(alpha);
     }
 
     void UIStatusbar::update()
@@ -151,22 +153,36 @@ namespace jrc
             static_cast<int16_t>(Constants::viewheight() - Constants::VIEWYOFFSET)
         };
         chatbar.set_position(position);
+        popup.update_anchors(
+            buttons[BT_MENU]->bounds(position),
+            buttons[BT_OPTIONS]->bounds(position)
+        );
     }
 
     Button::State UIStatusbar::button_pressed(uint16_t id)
     {
         switch (id)
         {
+        case BT_MENU:
+            popup.toggle(StatusBarPopup::Panel::MENU);
+            return Button::NORMAL;
+        case BT_OPTIONS:
+            popup.toggle(StatusBarPopup::Panel::SYSTEM);
+            return Button::NORMAL;
         case BT_STATS:
+            popup.close();
             UI::get().send_menu(KeyAction::CHARSTATS);
             return Button::NORMAL;
         case BT_INVENTORY:
+            popup.close();
             UI::get().send_menu(KeyAction::INVENTORY);
             return Button::NORMAL;
         case BT_EQUIPS:
+            popup.close();
             UI::get().send_menu(KeyAction::EQUIPS);
             return Button::NORMAL;
         case BT_SKILL:
+            popup.close();
             UI::get().send_menu(KeyAction::SKILLBOOK);
             return Button::NORMAL;
         default:
@@ -181,11 +197,18 @@ namespace jrc
             position - Point<int16_t>(512, 84) + dimension
         );
 
-        return bounds.contains(cursorpos) || chatbar.is_in_range(cursorpos);
+        return bounds.contains(cursorpos) || chatbar.is_in_range(cursorpos) ||
+            popup.contains(cursorpos);
     }
 
     bool UIStatusbar::remove_cursor(bool clicked, Point<int16_t> cursorpos)
     {
+        popup.remove_cursor();
+        if (clicked && !popup.contains(cursorpos))
+        {
+            popup.close();
+        }
+
         if (chatbar.remove_cursor(clicked, cursorpos))
         {
             return true;
@@ -196,6 +219,24 @@ namespace jrc
 
     UIElement::CursorResult UIStatusbar::send_cursor(bool pressed, Point<int16_t> cursorpos)
     {
+        if (popup.contains(cursorpos))
+        {
+            StatusBarPopup::CursorResult result = popup.send_cursor(pressed, cursorpos);
+            if (result.action != StatusBarPopup::Action::NONE)
+            {
+                dispatch_popup_action(result.action);
+            }
+            return { result.state, true };
+        }
+
+        bool toggles_popup =
+            buttons[BT_MENU]->bounds(position).contains(cursorpos) ||
+            buttons[BT_OPTIONS]->bounds(position).contains(cursorpos);
+        if (pressed && popup.is_open() && !toggles_popup)
+        {
+            popup.close();
+        }
+
         if (chatbar.is_in_range(cursorpos))
         {
             if (CursorResult child_result = chatbar.send_cursor(pressed, cursorpos))
@@ -208,6 +249,52 @@ namespace jrc
 
         chatbar.send_cursor(pressed, cursorpos);
         return UIElement::send_cursor(pressed, cursorpos);
+    }
+
+    void UIStatusbar::toggle_menu_popup()
+    {
+        popup.toggle(StatusBarPopup::Panel::MENU);
+    }
+
+    void UIStatusbar::close_popup()
+    {
+        popup.close();
+    }
+
+    void UIStatusbar::dispatch_popup_action(StatusBarPopup::Action action)
+    {
+        popup.close();
+        switch (action)
+        {
+        case StatusBarPopup::Action::STATS:
+            UI::get().send_menu(KeyAction::CHARSTATS);
+            break;
+        case StatusBarPopup::Action::EQUIPS:
+            UI::get().send_menu(KeyAction::EQUIPS);
+            break;
+        case StatusBarPopup::Action::ITEMS:
+            UI::get().send_menu(KeyAction::INVENTORY);
+            break;
+        case StatusBarPopup::Action::SKILLS:
+            UI::get().send_menu(KeyAction::SKILLBOOK);
+            break;
+        case StatusBarPopup::Action::KEY_CONFIG:
+            UI::get().send_menu(KeyAction::KEYCONFIG);
+            break;
+        case StatusBarPopup::Action::QUIT:
+            UI::get().emplace<UIYesNo>(
+                "确定要退出游戏吗？",
+                [](bool confirmed) {
+                    if (confirmed)
+                    {
+                        UI::get().quit();
+                    }
+                }
+            );
+            break;
+        case StatusBarPopup::Action::NONE:
+            break;
+        }
     }
 
     void UIStatusbar::send_chatline(const std::string& line, UIChatbar::LineType type)
