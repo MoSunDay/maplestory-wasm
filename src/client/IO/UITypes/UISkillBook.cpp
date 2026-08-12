@@ -214,8 +214,8 @@ namespace jrc
             buttons[i] = std::make_unique<MapleButton>(main["BtSpUp"], spup_position);
         }
 
-        booktext = { Text::A12M, Text::CENTER, Text::WHITE,     "", 100 };
-        splabel  = { Text::A11M, Text::RIGHT,  Text::LIGHTGREY          };
+        booktext = { Text::A12M, Text::CENTER, Text::WHITE, "", 100 };
+        splabel  = { Text::A11M, Text::CENTER, Text::LIGHTGREY };
 
         slider = {
             11, { 92, 236 }, 154, ROWS, 1,
@@ -241,8 +241,8 @@ namespace jrc
         draw_sprites(alpha);
 
         bookicon.draw(position + Point<int16_t>(12, 85));
-        booktext.draw(position + Point<int16_t>(100, 49));
-        splabel.draw(position + Point<int16_t>(162, 254));
+        booktext.draw(position + Point<int16_t>(100, 55));
+        splabel.draw(position + Point<int16_t>(97, 265));
 
         auto begin = icons.begin();
         if (icons.size() > offset)
