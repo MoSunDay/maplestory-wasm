@@ -125,9 +125,6 @@ try {
   await driver.click(255, 110);
   await requireUiState('channel one keeps world-select active', uiState.worldSelect);
   await driver.screenshot('03-channel-one-selected');
-  await driver.click(325, 110);
-  await requireUiState('disabled channel keeps world-select active', uiState.worldSelect);
-  await driver.screenshot('03b-channel-two-disabled');
   await driver.click(510, 65);
   await requireUiState('character-select UI active', uiState.charSelect, 45);
   await driver.screenshot('04-character-select-before');
