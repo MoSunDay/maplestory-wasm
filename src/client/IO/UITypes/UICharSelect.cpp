@@ -564,15 +564,15 @@ namespace jrc
         switch (label)
         {
         case JOB:
-            return { 66, -36 };
+            return { 63, -39 };
         case STR:
-            return { -5, -9 };
+            return { -8, -12 };
         case INT:
-            return { 66, -9 };
+            return { 63, -12 };
         case DEX:
-            return { -5, 16 };
+            return { -8, 13 };
         case LUK:
-            return { 66, 16 };
+            return { 63, 13 };
         default:
             return {};
         }
