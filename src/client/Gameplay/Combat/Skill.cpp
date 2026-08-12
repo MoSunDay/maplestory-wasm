@@ -105,6 +105,9 @@ namespace jrc
         {
             attackcount = std::max<uint8_t>(attackcount,
                 static_cast<uint8_t>(level["attackCount"].get_integer(1)));
+            // Ranged skills encode their damage-line count as bulletCount.
+            attackcount = std::max<uint8_t>(attackcount,
+                static_cast<uint8_t>(level["bulletCount"].get_integer(1)));
             mobcount = std::max<uint8_t>(mobcount,
                 static_cast<uint8_t>(level["mobCount"].get_integer(1)));
         }
@@ -116,11 +119,9 @@ namespace jrc
         bool hashit1         = src["hit"]["1"].size() > 0;
         if (bylevelhit)
         {
-            if (hitindex)
-            {
-                hiteffect = std::make_unique<ByLevelIndexedHitEffect>(src, *hitindex);
-            }
-            else if (hashit0 && hashit1)
+            // CharLevel hit branches use the established weapon-handedness
+            // convention; nested numbers are not damage-line indices.
+            if (hashit0 && hashit1)
             {
                 hiteffect = std::make_unique<ByLevelTwoHHitEffect>(src);
             }
