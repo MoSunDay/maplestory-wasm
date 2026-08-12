@@ -68,6 +68,7 @@ int main(int argc, char** argv)
     size_t skills_with_hits = 0;
     size_t indexed_by_hit = 0;
     size_t indexed_by_target = 0;
+    size_t character_level_hit_groups = 0;
     std::set<int> positions;
     std::vector<std::string> failures;
 
@@ -76,17 +77,44 @@ int main(int argc, char** argv)
         for (auto skill : book["skill"])
         {
             auto variants = animation_variants(skill["hit"]);
-            if (variants.empty())
+            size_t nested_variant_count = 0;
+            for (auto character_level : skill["CharLevel"])
+            {
+                auto nested = animation_variants(character_level["hit"]);
+                if (nested.empty())
+                    continue;
+
+                ++character_level_hit_groups;
+                if (!numeric_sequence(nested))
+                {
+                    failures.push_back(
+                        skill.name() + "/CharLevel/" + character_level.name()
+                        + ": hit branches are not contiguous from zero");
+                }
+                if (nested_variant_count != 0 && nested_variant_count != nested.size())
+                {
+                    failures.push_back(
+                        skill.name() + ": CharLevel hit branch counts differ");
+                }
+                nested_variant_count = std::max(nested_variant_count, nested.size());
+            }
+
+            if (variants.empty() && nested_variant_count == 0)
                 continue;
 
             ++skills_with_hits;
-            if (!numeric_sequence(variants))
+            if (!variants.empty() && !numeric_sequence(variants))
                 failures.push_back(skill.name() + ": hit branches are not contiguous from zero");
 
-            uint8_t attack_count = maximum(skill["level"], "attackCount");
+            uint8_t attack_count = std::max(
+                maximum(skill["level"], "attackCount"),
+                maximum(skill["level"], "bulletCount"));
             uint8_t mob_count = maximum(skill["level"], "mobCount");
-            auto indexed = jrc::attack_effect::indexed_hit(
-                variants.size(), attack_count, mob_count);
+            // CharLevel branches follow weapon-handedness semantics in the
+            // client. Only direct hit branches are damage/target indexed.
+            auto indexed = nested_variant_count == 0
+                ? jrc::attack_effect::indexed_hit(variants.size(), attack_count, mob_count)
+                : std::nullopt;
             if (indexed == jrc::attack_effect::HitIndex::HIT)
                 ++indexed_by_hit;
             else if (indexed == jrc::attack_effect::HitIndex::TARGET)
@@ -127,6 +155,7 @@ int main(int argc, char** argv)
     }
 
     std::cout << "skills_with_hits=" << skills_with_hits
+              << " character_level_hit_groups=" << character_level_hit_groups
               << " indexed_by_hit=" << indexed_by_hit
               << " indexed_by_target=" << indexed_by_target
               << " positions=";

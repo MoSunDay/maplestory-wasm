@@ -108,42 +108,6 @@ namespace jrc
         iter->second[user.secondweapon].apply(target, user.flip);
     }
 
-    ByLevelIndexedHitEffect::ByLevelIndexedHitEffect(
-        nl::node src,
-        attack_effect::HitIndex i)
-        : index(i)
-    {
-        for (auto level_node : src["CharLevel"])
-        {
-            uint16_t level = string_conversion::or_zero<uint16_t>(level_node.name());
-            std::vector<Effect> variants;
-            for (auto hit : level_node["hit"])
-            {
-                if (hit["0"].data_type() == nl::node::type::bitmap)
-                    variants.emplace_back(hit);
-            }
-            if (!variants.empty())
-                effects.emplace(level, std::move(variants));
-        }
-    }
-
-    void ByLevelIndexedHitEffect::apply(const AttackUser& user, Mob& target) const
-    {
-        if (effects.empty())
-            return;
-
-        auto iter = effects.upper_bound(user.level);
-        if (iter != effects.begin())
-            --iter;
-
-        const auto& variants = iter->second;
-        size_t requested = index == attack_effect::HitIndex::HIT
-            ? user.hit_index
-            : user.target_index;
-        variants[attack_effect::bounded_variant(requested, variants.size())].apply(target, user.flip);
-    }
-
-
     BySkillLevelHitEffect::BySkillLevelHitEffect(nl::node src)
     {
         for (auto sub : src["level"])
