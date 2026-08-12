@@ -1,6 +1,6 @@
 # 逻辑结构
 
-Commit: b141e14a762f6dd1d94e31c5130cc856b9b1c75a
+Commit: 589b388fb88255db718e2ccd67b1e0a219fdd1f1
 
 ## 概述
 
