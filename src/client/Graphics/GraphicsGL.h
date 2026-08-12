@@ -57,6 +57,8 @@ namespace jrc
 
         // Add a bitmap to the available resources.
         void addbitmap(const nl::bitmap& bmp);
+        // Return whether a bitmap is currently resident in the texture atlas.
+        bool hasbitmap(const nl::bitmap& bmp) const;
         // Draw the bitmap with the given parameters.
         void draw(const nl::bitmap& bmp, const Rectangle<int16_t>& rect,
             const Color& color, float angle);

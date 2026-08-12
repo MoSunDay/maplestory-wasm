@@ -27,7 +27,13 @@ namespace jrc
     class Texture
     {
     public:
-        Texture(nl::node source);
+        enum LoadPolicy
+        {
+            IMMEDIATE,
+            DEFERRED
+        };
+
+        Texture(nl::node source, LoadPolicy policy = IMMEDIATE);
         Texture();
         ~Texture();
 
@@ -44,5 +50,6 @@ namespace jrc
         nl::bitmap bitmap;
         Point<int16_t> origin;
         Point<int16_t> dimensions;
+        LoadPolicy load_policy;
     };
 }

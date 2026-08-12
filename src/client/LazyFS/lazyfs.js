@@ -36,12 +36,17 @@ var LazyFS = {
 	// Pending requests: Map<requestId, {resolve, reject}>
 	pendingRequests: new Map(),
 	requestIdCounter: 0,
+	inFlightBatches: new Map(),
+	inFlightPrefetches: new Map(),
+	pendingCacheWrites: new Set(),
 
 	// In-memory chunk cache: Map<"file:size:chunk", Uint8Array>
 	chunkCache: new Map(),
 
 	// File registry: Map<filepath, { size }>
 	files: new Map(),
+	itemAssetPreloadPromise: null,
+	itemAssetPreloadState: 'idle',
 
 	// ========== FETCH STATISTICS ==========
 	stats: {
@@ -363,7 +368,9 @@ var LazyFS = {
 
 		// Store in cache (persistent)
 		if (versionTag !== 'unknown') {
-			this.setCachedChunk(filename, versionTag, chunkIndex, chunkData);
+			const write = this.setCachedChunk(filename, versionTag, chunkIndex, chunkData);
+			this.pendingCacheWrites.add(write);
+			write.finally(() => this.pendingCacheWrites.delete(write));
 		}
 
 		// Log
@@ -423,8 +430,11 @@ var LazyFS = {
 		await this.connect();
 
 		const key = `batch:${filepath}:${startChunk}:${endChunk}`;
+		if (this.inFlightBatches.has(key)) {
+			return this.inFlightBatches.get(key);
+		}
 
-		return new Promise((resolve, reject) => {
+		const request = new Promise((resolve, reject) => {
 			this.pendingRequests.set(key, { resolve, reject });
 			this.send({
 				type: 'get_chunks',
@@ -442,6 +452,146 @@ var LazyFS = {
 				}
 			}, 60000);
 		});
+		this.inFlightBatches.set(key, request);
+		try {
+			return await request;
+		} finally {
+			this.inFlightBatches.delete(key);
+		}
+	},
+
+	/**
+	 * Keep an NX range resident and persist every missing chunk. Background
+	 * work fetches one chunk at a time and yields so interactive reads are not
+	 * queued behind a large preload batch.
+	 */
+	prefetchFileRange: function (filepath, offset, length) {
+		const key = `${filepath}:${offset}:${length}`;
+		if (this.inFlightPrefetches.has(key)) {
+			return this.inFlightPrefetches.get(key);
+		}
+
+		const request = this.prefetchFileRangeInternal(filepath, offset, length);
+		this.inFlightPrefetches.set(key, request);
+		const clear = () => this.inFlightPrefetches.delete(key);
+		request.then(clear, clear);
+		return request;
+	},
+
+	prefetchFileRangeInternal: async function (filepath, offset, length) {
+		const fileEntry = this.files.get(filepath);
+		if (!fileEntry || !fileEntry.size || length <= 0) {
+			throw new Error(`Cannot preload unregistered file: ${filepath}`);
+		}
+
+		await this.initDB();
+		const rangeEnd = Math.min(fileEntry.size, offset + length);
+		const startChunk = Math.floor(offset / this.CHUNK_SIZE);
+		const endChunk = Math.floor((rangeEnd - 1) / this.CHUNK_SIZE);
+		const versionTag = this.getFileVersionTag(fileEntry);
+
+		for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex++) {
+			const cacheKey = this.getChunkCacheKey(filepath, versionTag, chunkIndex);
+			if (!this.chunkCache.has(cacheKey)) {
+				const cachedData = await this.getCachedChunk(filepath, versionTag, chunkIndex);
+				if (cachedData) {
+					this.chunkCache.set(cacheKey, cachedData);
+					this.logFetch(filepath, chunkIndex, cachedData.length, true);
+				} else {
+					await this.fetchChunks(filepath, chunkIndex, chunkIndex);
+				}
+			}
+
+			await new Promise(resolve => setTimeout(resolve, 0));
+		}
+	},
+
+	isFileRangeResident: function (filepath, offset, length) {
+		const fileEntry = this.files.get(filepath);
+		if (!fileEntry || !fileEntry.size || length <= 0) {
+			return false;
+		}
+
+		const rangeEnd = Math.min(fileEntry.size, offset + length);
+		const startChunk = Math.floor(offset / this.CHUNK_SIZE);
+		const endChunk = Math.floor((rangeEnd - 1) / this.CHUNK_SIZE);
+		const versionTag = this.getFileVersionTag(fileEntry);
+		for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex++) {
+			const cacheKey = this.getChunkCacheKey(filepath, versionTag, chunkIndex);
+			if (!this.chunkCache.has(cacheKey)) {
+				return false;
+			}
+		}
+		return true;
+	},
+
+	requestPersistentStorage: async function () {
+		if (!navigator.storage || !navigator.storage.persist) {
+			console.warn('[LazyFS] Persistent browser storage API is unavailable');
+			return false;
+		}
+
+		try {
+			const granted = await navigator.storage.persist();
+			console.log(`[LazyFS] Persistent browser storage ${granted ? 'granted' : 'not granted'}`);
+			return granted;
+		} catch (error) {
+			console.error('[LazyFS] Persistent storage request failed:', error);
+			return false;
+		}
+	},
+
+	characterMetadataEnd: async function () {
+		const header = await this.readFileData('Character.nx', 0, 40);
+		if (!header || header.length < 40) {
+			throw new Error('Character.nx header is unavailable');
+		}
+
+		const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
+		const bitmapCount = view.getUint32(28, true);
+		const bitmapOffsetLow = view.getUint32(32, true);
+		const bitmapOffsetHigh = view.getUint32(36, true);
+		const bitmapOffset = bitmapOffsetLow + bitmapOffsetHigh * 0x100000000;
+		return bitmapOffset + bitmapCount * 8;
+	},
+
+	/**
+	 * Start once after entering the game. Item and String are retained in full;
+	 * Character metadata is retained up front, and normal LazyFS reads retain
+	 * every encountered equipment image chunk without an expiry timer.
+	 */
+	startItemAssetPreload: function () {
+		if (this.itemAssetPreloadPromise) {
+			return this.itemAssetPreloadPromise;
+		}
+
+		this.itemAssetPreloadState = 'running';
+		this.itemAssetPreloadPromise = new Promise(resolve => setTimeout(resolve, 0))
+			.then(async () => {
+				await this.requestPersistentStorage();
+				const stringEntry = this.files.get('String.nx');
+				const itemEntry = this.files.get('Item.nx');
+				if (!stringEntry || !itemEntry) {
+					throw new Error('Item preload files are not registered');
+				}
+				await this.prefetchFileRange('String.nx', 0, stringEntry.size);
+				await this.prefetchFileRange('Item.nx', 0, itemEntry.size);
+				const metadataEnd = await this.characterMetadataEnd();
+				await this.prefetchFileRange('Character.nx', 0, metadataEnd);
+				await Promise.all(Array.from(this.pendingCacheWrites));
+				this.itemAssetPreloadState = 'complete';
+				console.log('[LazyFS] Persistent item asset preload complete');
+			})
+			.catch(error => {
+				this.itemAssetPreloadState = 'failed';
+				this.itemAssetPreloadPromise = null;
+				console.error('[LazyFS] Persistent item asset preload failed:', error);
+				throw error;
+			});
+
+		// Keep the task detached from the WASM call while still reporting errors.
+		this.itemAssetPreloadPromise.catch(() => {});
+		return this.itemAssetPreloadPromise;
 	},
 
 	/**

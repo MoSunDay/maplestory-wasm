@@ -62,8 +62,8 @@ namespace jrc
 
         if (src)
         {
-            icons[false] = src["icon"];
-            icons[true] = src["iconRaw"];
+            icons[false] = Texture(src["icon"], Texture::DEFERRED);
+            icons[true] = Texture(src["iconRaw"], Texture::DEFERRED);
             price = src["price"];
 
             name = strsrc["name"].get_string();

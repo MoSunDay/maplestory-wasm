@@ -24,7 +24,7 @@
 
 namespace jrc
 {
-    Texture::Texture(nl::node src)
+    Texture::Texture(nl::node src, LoadPolicy policy) : load_policy(policy)
     {
         if (src.data_type() == nl::node::type::bitmap)
         {
@@ -43,11 +43,18 @@ namespace jrc
             origin = src["origin"];
             dimensions = Point<int16_t>(bitmap.width(),  bitmap.height());
 
-            GraphicsGL::get().addbitmap(bitmap);
+            if (load_policy == DEFERRED)
+            {
+                bitmap.prefetch();
+            }
+            else
+            {
+                GraphicsGL::get().addbitmap(bitmap);
+            }
         }
     }
 
-    Texture::Texture() {}
+    Texture::Texture() : load_policy(IMMEDIATE) {}
 
     Texture::~Texture() {}
 
@@ -56,6 +63,18 @@ namespace jrc
         size_t id = bitmap.id();
         if (id == 0)
             return;
+
+        if (load_policy == DEFERRED && !GraphicsGL::get().hasbitmap(bitmap))
+        {
+            if (!bitmap.data_ready())
+            {
+                // A failed or interrupted request is safe to retry; the JS
+                // backend deduplicates an already-running range prefetch.
+                bitmap.prefetch();
+                return;
+            }
+            GraphicsGL::get().addbitmap(bitmap);
+        }
 
         GraphicsGL::get()
             .draw(bitmap, args.get_rectangle(origin, dimensions), args.get_color(), args.get_angle());
