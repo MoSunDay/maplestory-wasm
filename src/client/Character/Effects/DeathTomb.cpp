@@ -1,7 +1,9 @@
 #include "DeathTomb.h"
+#include "DeathTombGround.h"
 #include "DeathTombOrbit.h"
 
 #include "../../Constants.h"
+#include "../../Gameplay/Physics/Physics.h"
 
 namespace jrc
 {
@@ -21,18 +23,35 @@ namespace jrc
         land_source = Texture(source["land"]["0"]);
     }
 
-    void DeathTomb::start()
+    void DeathTomb::start(Point<int16_t> position)
     {
         fall = fall_source;
         fall.reset();
         orbit_angle.set(0.0f);
+        death_position = position;
+        ground_anchor = position;
         phase = Phase::FALLING;
+        ground_resolved = false;
         landed_event = false;
     }
 
-    void DeathTomb::update()
+    void DeathTomb::update(const Physics& physics)
     {
         landed_event = false;
+        if (phase == Phase::HIDDEN)
+        {
+            return;
+        }
+
+        if (!ground_resolved)
+        {
+            ground_anchor = death_tomb_ground::landing_anchor(
+                death_position,
+                physics.get_y_below(death_position)
+            );
+            ground_resolved = true;
+        }
+
         if (phase == Phase::FALLING && fall.update())
         {
             phase = Phase::LANDED;
@@ -42,6 +61,15 @@ namespace jrc
         {
             orbit_angle += ORBIT_STEP;
         }
+    }
+
+    Point<int16_t> DeathTomb::get_absolute(double view_x, double view_y) const
+    {
+        return death_tomb_ground::absolute_position(
+            ground_anchor,
+            view_x,
+            view_y
+        );
     }
 
     void DeathTomb::draw(Point<int16_t> position, float alpha) const
@@ -80,11 +108,19 @@ namespace jrc
     {
         phase = Phase::HIDDEN;
         orbit_angle.set(0.0f);
+        death_position = {};
+        ground_anchor = {};
+        ground_resolved = false;
         landed_event = false;
     }
 
     bool DeathTomb::landed_this_update() const
     {
         return landed_event;
+    }
+
+    bool DeathTomb::is_landed() const
+    {
+        return phase == Phase::LANDED;
     }
 }

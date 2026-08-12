@@ -44,6 +44,9 @@ namespace jrc
             int16_t bulletcost;
             int32_t hpcost;
             int32_t mpcost;
+            int32_t hprecovery;
+            int32_t mprecovery;
+            int32_t recoverytime;
             float chance;
             float critical;
             float ignoredef;
@@ -52,11 +55,14 @@ namespace jrc
 
             constexpr Stats(float damage, int32_t matk, int32_t fixdamage, int32_t mastery,
                 uint8_t attackcount, uint8_t mobcount, uint8_t bulletcount, int16_t bulletcost,
-                int32_t hpcost, int32_t mpcost, float chance, float critical, float ignoredef,
+                int32_t hpcost, int32_t mpcost, int32_t hprecovery, int32_t mprecovery,
+                int32_t recoverytime, float chance, float critical, float ignoredef,
                 float hrange, Rectangle<int16_t> range) :
                 damage(damage), matk(matk), fixdamage(fixdamage), mastery(mastery),
                 attackcount(attackcount), mobcount(mobcount), bulletcount(bulletcount), bulletcost(bulletcost),
-                hpcost(hpcost), mpcost(mpcost), chance(chance), critical(critical), ignoredef(ignoredef),
+                hpcost(hpcost), mpcost(mpcost), hprecovery(hprecovery),
+                mprecovery(mprecovery), recoverytime(recoverytime), chance(chance),
+                critical(critical), ignoredef(ignoredef),
                 hrange(hrange), range(range) {}
         };
 

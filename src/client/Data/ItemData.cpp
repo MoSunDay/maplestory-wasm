@@ -23,7 +23,7 @@
 namespace jrc
 {
     ItemData::ItemData(int32_t id)
-        : itemid(id) {
+        : itemid(id), price(0), recovery_hp(0), recovery_mp(0), valid(false) {
 
         nl::node src;
         nl::node strsrc;
@@ -65,6 +65,8 @@ namespace jrc
             icons[false] = Texture(src["icon"]);
             icons[true] = Texture(src["iconRaw"]);
             price = src["price"];
+            recovery_hp = src["recoveryHP"];
+            recovery_mp = src["recoveryMP"];
 
             name = strsrc["name"].get_string();
             desc = strsrc["desc"].get_string();
@@ -119,6 +121,16 @@ namespace jrc
     int32_t ItemData::get_price() const
     {
         return price;
+    }
+
+    int32_t ItemData::get_recovery_hp() const
+    {
+        return recovery_hp;
+    }
+
+    int32_t ItemData::get_recovery_mp() const
+    {
+        return recovery_mp;
     }
 
     const std::string& ItemData::get_name() const

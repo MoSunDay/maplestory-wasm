@@ -59,6 +59,10 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    class ShowChairHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
 
     // Display an effect on a character.
     // Opcode: SHOW_FOREIGN_EFFECT(198)
