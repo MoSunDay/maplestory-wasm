@@ -3,12 +3,15 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use tokio::net::TcpListener;
 use tokio::signal;
 use tracing::{info, warn};
 
+#[path = "../../web-common/listener.rs"]
+mod listener;
 mod respond;
 mod serve;
+
+use listener::bind_listener;
 
 #[derive(Parser)]
 #[command(
@@ -25,7 +28,7 @@ struct Cli {
     directory: PathBuf,
 
     /// Address to bind the listener to
-    #[arg(long, default_value = "0.0.0.0")]
+    #[arg(long, default_value = "::")]
     bind: String,
 }
 
@@ -52,7 +55,7 @@ async fn main() -> std::io::Result<()> {
         )
     })?;
 
-    let listener = TcpListener::bind((cli.bind.as_str(), cli.port)).await?;
+    let listener = bind_listener(&cli.bind, cli.port).await?;
     info!("============================================================");
     info!("MapleStory WASM Server with HTTP Range Request Support");
     info!("============================================================");

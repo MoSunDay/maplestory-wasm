@@ -68,6 +68,18 @@ namespace jrc
     };
 
 
+    class GiveForeignBuffHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+
+    class CancelForeignBuffHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+
     // Spawn a mob on the stage.
     // Opcode: SPAWN_MOB(236)
     class SpawnMobHandler : public PacketHandler

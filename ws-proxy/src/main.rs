@@ -4,6 +4,11 @@ use clap::Parser;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+#[path = "../../web-common/listener.rs"]
+mod listener;
+
+use listener::bind_listener;
+
 #[derive(Parser)]
 #[command(
     version,
@@ -15,7 +20,7 @@ struct Cli {
     ws_port: u16,
 
     /// Address to bind the WebSocket listener to
-    #[arg(long, default_value = "0.0.0.0")]
+    #[arg(long, default_value = "::")]
     bind: String,
 }
 
@@ -31,7 +36,7 @@ async fn main() -> std::io::Result<()> {
         .init();
 
     let cli = Cli::parse();
-    let listener = tokio::net::TcpListener::bind((cli.bind.as_str(), cli.ws_port)).await?;
+    let listener = bind_listener(&cli.bind, cli.ws_port).await?;
     let local = listener.local_addr()?;
 
     info!("============================================================");

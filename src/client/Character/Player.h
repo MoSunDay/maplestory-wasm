@@ -121,6 +121,8 @@ namespace jrc
         uint16_t get_level() const override;
         /// Return the character's level of a skill.
         int32_t get_skilllevel(int32_t skillid) const override;
+        int16_t get_visual_buff_value(Buffstat::Id stat) const override;
+        int32_t get_visual_buff_source(Buffstat::Id stat) const override;
         /// Return the character's attacking speed.
         int8_t get_integer_attackspeed() const override;
 

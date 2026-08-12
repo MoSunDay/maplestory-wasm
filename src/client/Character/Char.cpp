@@ -40,21 +40,37 @@ namespace jrc
         {
             color = Color::WHITE;
         }
-        look.draw({ absp, color }, alpha);
-
-        afterimage.draw(look.get_frame(), { absp, flip }, alpha);
-
-        if (ironbody)
+        if (state == DIED)
         {
-            float ibalpha = ironbody.alpha();
-            float scale   = 1.0f + ibalpha;
-            float opacity = 1.0f - ibalpha;
-            look.draw({ absp, scale, scale, opacity }, alpha);
-        }
+            Point<int16_t> ghost_position = absp + death_tomb.ghost_offset(alpha);
+            bool ghost_in_front = death_tomb.ghost_in_front(alpha);
 
-        // The tomb is anchored at the character's foothold and must cover the
-        // dead stance while leaving name and chat overlays readable.
-        death_tomb.draw(absp, alpha);
+            // Split the orbit at its front and back halves so the standard
+            // dead stance visibly travels around, rather than across, the tomb.
+            if (!ghost_in_front)
+            {
+                look.draw({ ghost_position, color }, alpha);
+            }
+            death_tomb.draw(absp, alpha);
+            if (ghost_in_front)
+            {
+                look.draw({ ghost_position, color }, alpha);
+            }
+        }
+        else
+        {
+            look.draw({ absp, color }, alpha);
+
+            afterimage.draw(look.get_frame(), { absp, flip }, alpha);
+
+            if (ironbody)
+            {
+                float ibalpha = ironbody.alpha();
+                float scale   = 1.0f + ibalpha;
+                float opacity = 1.0f - ibalpha;
+                look.draw({ absp, scale, scale, opacity }, alpha);
+            }
+        }
 
         for (auto& pet : pets)
         {
@@ -157,6 +173,16 @@ namespace jrc
         uint16_t delay = look.get_attackdelay(no, first_frame);
         float fspeed = get_real_attackspeed();
         return static_cast<uint16_t>(delay / fspeed);
+    }
+
+    int16_t Char::get_visual_buff_value(Buffstat::Id) const
+    {
+        return 0;
+    }
+
+    int32_t Char::get_visual_buff_source(Buffstat::Id) const
+    {
+        return 0;
     }
 
     int8_t Char::update(const Physics& physics)

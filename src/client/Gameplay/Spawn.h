@@ -136,7 +136,8 @@ namespace jrc
                   int16_t job,
                   const std::string& name,
                   int8_t stance,
-                  Point<int16_t> position);
+                  Point<int16_t> position,
+                  int16_t combo_value = 0);
 
         int32_t get_cid() const;
         std::unique_ptr<MapObject> instantiate() const;
@@ -148,6 +149,7 @@ namespace jrc
         std::string name;
         int8_t stance;
         Point<int16_t> position;
+        int16_t combo_value;
         LookEntry look;
     };
 }

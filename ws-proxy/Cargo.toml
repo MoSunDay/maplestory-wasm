@@ -7,6 +7,7 @@ edition.workspace = true
 [dependencies]
 clap = { workspace = true }
 futures-util = { workspace = true }
+socket2 = { workspace = true }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }

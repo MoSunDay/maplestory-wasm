@@ -26,7 +26,7 @@ Then start the three services in separate terminals:
 ./target/release/assets-server --port 8765 --directory .
 ```
 
-All binaries accept `--bind` (default `0.0.0.0`); pass `--port 0`
+All binaries accept `--bind` (default `::`, dual-stack on supported systems); pass `--port 0`
 (`--ws-port 0` for `ws-proxy`) for a random free port. Open `http://localhost:8000` once they are running.
 
 The game connection works like this:

@@ -146,5 +146,7 @@ namespace jrc
         uint16_t level;
         bool secondweapon;
         bool flip;
+        uint8_t hit_index = 0;
+        uint8_t target_index = 0;
     };
 }
