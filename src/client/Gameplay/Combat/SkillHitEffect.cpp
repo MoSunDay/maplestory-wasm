@@ -19,8 +19,6 @@
 
 #include "../../Util/Misc.h"
 
-#include <algorithm>
-
 namespace jrc
 {
     SingleHitEffect::SingleHitEffect(nl::node src)
@@ -40,7 +38,7 @@ namespace jrc
         effects[user.secondweapon].apply(target, user.flip);
     }
 
-    IndexedHitEffect::IndexedHitEffect(nl::node src, HitEffectIndex i)
+    IndexedHitEffect::IndexedHitEffect(nl::node src, attack_effect::HitIndex i)
         : index(i)
     {
         for (auto sub : src["hit"])
@@ -55,10 +53,10 @@ namespace jrc
         if (effects.empty())
             return;
 
-        size_t requested = index == HitEffectIndex::HIT
+        size_t requested = index == attack_effect::HitIndex::HIT
             ? user.hit_index
             : user.target_index;
-        effects[std::min(requested, effects.size() - 1)].apply(target, user.flip);
+        effects[attack_effect::bounded_variant(requested, effects.size())].apply(target, user.flip);
     }
 
 
@@ -110,7 +108,9 @@ namespace jrc
         iter->second[user.secondweapon].apply(target, user.flip);
     }
 
-    ByLevelIndexedHitEffect::ByLevelIndexedHitEffect(nl::node src, HitEffectIndex i)
+    ByLevelIndexedHitEffect::ByLevelIndexedHitEffect(
+        nl::node src,
+        attack_effect::HitIndex i)
         : index(i)
     {
         for (auto level_node : src["CharLevel"])
@@ -137,10 +137,10 @@ namespace jrc
             --iter;
 
         const auto& variants = iter->second;
-        size_t requested = index == HitEffectIndex::HIT
+        size_t requested = index == attack_effect::HitIndex::HIT
             ? user.hit_index
             : user.target_index;
-        variants[std::min(requested, variants.size() - 1)].apply(target, user.flip);
+        variants[attack_effect::bounded_variant(requested, variants.size())].apply(target, user.flip);
     }
 
 
