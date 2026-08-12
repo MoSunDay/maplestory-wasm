@@ -132,6 +132,18 @@ namespace jrc
     };
 
 
+    class ByLevelIndexedHitEffect : public SkillHitEffect
+    {
+    public:
+        ByLevelIndexedHitEffect(nl::node src, attack_effect::HitIndex index);
+        void apply(const AttackUser& user, Mob& target) const override;
+
+    private:
+        std::map<uint16_t, std::vector<Effect>> effects;
+        attack_effect::HitIndex index;
+    };
+
+
     // The animation changes with the skill level.
     class BySkillLevelHitEffect : public SkillHitEffect
     {
