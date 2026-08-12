@@ -18,9 +18,7 @@
 #include "SkillUseEffect.h"
 
 #include "../../Util/Misc.h"
-#include "../../Character/SkillId.h"
-
-#include <algorithm>
+#include "Effects/AttackEffectSelection.h"
 
 namespace jrc
 {
@@ -105,11 +103,11 @@ namespace jrc
 
         // The COMBO value includes the inactive center icon; finish nodes are
         // indexed by the number of consumable orbiting orbs.
-        int16_t combo_value = target.get_visual_buff_value(Buffstat::COMBO);
-        if (combo_value <= 1)
+        int16_t orbs = attack_effect::consumable_combo_orbs(
+            target.get_visual_buff_value(Buffstat::COMBO));
+        if (orbs == 0)
             return;
 
-        int16_t orbs = combo_value - 1;
         auto iter = effects.lower_bound(orbs);
         if (iter == effects.end())
             iter = std::prev(effects.end());
@@ -128,29 +126,10 @@ namespace jrc
 
     void ChargedBlowUseEffect::apply(Char& target) const
     {
-        int32_t source = target.get_visual_buff_source(Buffstat::WK_CHARGE);
-        int8_t element = 0;
-        switch (source)
-        {
-        case SkillId::SWORD_FIRE_CHARGE:
-        case SkillId::BW_FIRE_CHARGE:
-            element = 1;
-            break;
-        case SkillId::SWORD_ICE_CHARGE:
-        case SkillId::BW_ICE_CHARGE:
-            element = 2;
-            break;
-        case SkillId::SWORD_LIT_CHARGE:
-        case SkillId::BW_LIT_CHARGE:
-            element = 3;
-            break;
-        case SkillId::SWORD_HOLY_CHARGE:
-        case SkillId::BW_HOLY_CHARGE:
-            element = 5;
-            break;
-        default:
+        int8_t element = attack_effect::charged_blow_element(
+            target.get_visual_buff_source(Buffstat::WK_CHARGE));
+        if (element == 0)
             return;
-        }
 
         auto iter = effects.find(element);
         if (iter != effects.end())

@@ -11,7 +11,9 @@ const account = process.env.E2E_ACCOUNT || 'test1';
 const password = process.env.E2E_PASSWORD || 'test1';
 const characterName = process.env.E2E_CHARACTER || '测试一';
 const chatMessage = process.env.E2E_CHAT || '中文聊天测试';
-const maxP95FrameMs = Number(process.env.E2E_MAX_P95_FRAME_MS || 33);
+// A 30 Hz frame is 33.333... ms; 34 ms permits one scheduled frame without
+// admitting the next (50 ms) cadence tier.
+const maxP95FrameMs = Number(process.env.E2E_MAX_P95_FRAME_MS || 34);
 const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 
 const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5 });
@@ -71,10 +73,35 @@ async function requireAssetIdle(name = 'foreground assets ready') {
     "document.getElementById('asset-loading-screen').classList.contains('is-hidden')"), 45);
 }
 
+function fatalRuntimeLogs() {
+  return driver.logs.filter(line =>
+    /abort|runtimeerror|exception|\berror\b|failed to|offline/i.test(line) &&
+    !line.includes('simulated asset failure'));
+}
+
+function assertRuntimeHealthy() {
+  const fatalLogs = fatalRuntimeLogs();
+  if (driver.errors.length || fatalLogs.length) {
+    throw new Error(`Browser errors: ${driver.errors.length}; fatal logs: ${fatalLogs.length}`);
+  }
+}
+
 try {
   const pageUrl = await resolvePageUrl();
   console.log(`WebUI endpoint: ${pageUrl}`);
   await driver.start();
+  const webgl2 = await driver.evaluate(`(() => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('webgl2');
+    return context && {
+      version: context.getParameter(context.VERSION),
+      renderer: context.getParameter(context.RENDERER)
+    };
+  })()`);
+  if (!webgl2) {
+    throw new Error(`Browser does not provide WebGL2: ${browserBinary}. Set CHROME_BIN to a compatible Chromium.`);
+  }
+  console.log(`PASS  WebGL2 available ${JSON.stringify(webgl2)}`);
   // Delay the dynamically injected client briefly so the pre-WASM loading
   // state is observable and screenshot validation cannot race the first frame.
   await driver.setNetworkLatency(process.env.E2E_ASSET_ONLY === '1' ? 0 : 500);
@@ -188,6 +215,12 @@ try {
   }
   console.log('PASS  foreground asset loading failure and retry');
   if (process.env.E2E_ASSET_ONLY === '1') {
+    await requireState('client window initialized', async () => {
+      assertRuntimeHealthy();
+      return await driver.evaluate(
+        "document.getElementById('loading-screen').classList.contains('is-hidden')");
+    }, 90);
+    assertRuntimeHealthy();
     throw new Error('__ASSET_ONLY_COMPLETE__');
   }
   await requireState('loading screen dismissed after first frame', async () =>
@@ -426,12 +459,7 @@ try {
     await driver.screenshot('09-chinese-chat');
   }
 
-  const fatalLogs = driver.logs.filter(line =>
-    /abort|runtimeerror|exception|\berror\b|failed to|offline/i.test(line) &&
-    !line.includes('simulated asset failure'));
-  if (driver.errors.length || fatalLogs.length) {
-    throw new Error(`Browser errors: ${driver.errors.length}; fatal logs: ${fatalLogs.length}`);
-  }
+  assertRuntimeHealthy();
   passed = true;
 } catch (error) {
   if (process.env.E2E_ASSET_ONLY === '1' && error.message === '__ASSET_ONLY_COMPLETE__') {
