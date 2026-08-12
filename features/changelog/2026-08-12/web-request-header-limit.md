@@ -8,6 +8,7 @@ Commit: 39118cd0e745b836add45750d52d137df1ff46de
 
 - `web-server` 的单请求 HTTP 头块上限从 16 KiB 调整为 10 MiB。
 - 头块总长度包含结尾的 `CRLFCRLF`；恰好 10 MiB 可接收，超过一个字节即返回 `400 Bad Request`。
+- 移除解析器原有的固定 32 个 header 字段上限，字段槽位根据已通过大小检查的请求动态分配。
 
 ## 影响范围
 
@@ -16,5 +17,5 @@ Commit: 39118cd0e745b836add45750d52d137df1ff46de
 
 ## 验证
 
-- `cargo test -p web-server` 的 6 项单元测试和 10 项 HTTP 集成测试通过。
+- `cargo test -p web-server` 的 7 项单元测试和 10 项 HTTP 集成测试通过，其中覆盖 128 个 header 字段。
 - `10.199.71.70:8001` 实例实测 10 MiB 请求头返回 `200 OK`，10 MiB + 1 字节返回 `400 Bad Request`。
