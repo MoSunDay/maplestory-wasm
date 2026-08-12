@@ -67,6 +67,8 @@ namespace jrc
         void send_action(KeyAction::Id action, bool pressed) override;
         /// Recalculates the total stats from base stats, inventories and skills.
         void recalc_stats(bool equipchanged);
+        /// Reset server-owned progression data before applying a full snapshot.
+        void reset_progress(const StatsEntry& entry);
         /// Change the equipment at the specified slot and recalculate stats.
         void change_equip(int16_t slot);
         /// Use the item from the player's inventory with the given id.

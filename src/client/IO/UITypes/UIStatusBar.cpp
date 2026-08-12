@@ -23,8 +23,11 @@
 
 #include "../../Character/ExpTable.h"
 #include "../../Constants.h"
+#include "../../Net/Packets/CashShopPackets.h"
 
 #include "nlnx/nx.hpp"
+
+#include <algorithm>
 
 
 namespace jrc
@@ -144,6 +147,8 @@ namespace jrc
         {
             iter.second -= Constants::TIMESTEP;
         }
+        cashshop_request_cooldown = std::max(
+            0, cashshop_request_cooldown - static_cast<int32_t>(Constants::TIMESTEP));
     }
 
     void UIStatusbar::update_layout_position()
@@ -184,6 +189,9 @@ namespace jrc
         case BT_SKILL:
             popup.close();
             UI::get().send_menu(KeyAction::SKILLBOOK);
+            return Button::NORMAL;
+        case BT_CASHSHOP:
+            request_cash_shop();
             return Button::NORMAL;
         default:
             return Button::PRESSED;
@@ -259,6 +267,15 @@ namespace jrc
     void UIStatusbar::close_popup()
     {
         popup.close();
+    }
+
+    void UIStatusbar::request_cash_shop()
+    {
+        if (cashshop_request_cooldown > 0)
+            return;
+        cashshop_request_cooldown = 2'000;
+        popup.close();
+        EnterCashShopPacket().dispatch();
     }
 
     void UIStatusbar::dispatch_popup_action(StatusBarPopup::Action action)

@@ -154,6 +154,19 @@ namespace jrc
         }
     }
 
+    void Player::reset_progress(const StatsEntry& entry)
+    {
+        stats = CharStats(entry);
+        inventory = Inventory();
+        skillbook = Skillbook();
+        questlog = Questlog();
+        telerock = Telerock();
+        monsterbook = Monsterbook();
+        buffs.clear();
+        cooldowns.clear();
+        recovery_state = {};
+    }
+
     void Player::change_equip(int16_t slot)
     {
         if (int32_t itemid = inventory.get_item_id(InventoryType::EQUIPPED, slot))

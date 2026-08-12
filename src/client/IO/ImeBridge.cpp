@@ -128,6 +128,7 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE int msui_state()
     {
         jrc::UI& ui = jrc::UI::get();
+        if (ui.has_element(jrc::UIElement::CASHSHOP)) return 6;
         if (ui.has_element(jrc::UIElement::STATUSBAR)) return 5;
         if (ui.has_element(jrc::UIElement::CHARCREATION)) return 4;
         if (ui.has_element(jrc::UIElement::CHARSELECT)) return 3;

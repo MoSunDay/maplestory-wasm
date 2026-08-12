@@ -76,6 +76,7 @@ namespace jrc
             PARTY,
             MINIMAP,
             WORLDMAP,
+            CASHSHOP,
             NUM_TYPES
         };
 
