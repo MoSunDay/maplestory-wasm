@@ -18,6 +18,7 @@
 #include "MapObjectHandlers.h"
 
 #include "Helpers/LoginParser.h"
+#include "Helpers/ForeignBuffMask.h"
 #include "Helpers/MobTemporaryStatMasks.h"
 #include "Helpers/MovementParser.h"
 
@@ -25,6 +26,8 @@
 #include "../../Character/SkillId.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/Spawn.h"
+
+#include <vector>
 
 namespace jrc
 {
@@ -338,25 +341,30 @@ namespace jrc
         uint64_t firstmask = recv.read_long();
         uint64_t secondmask = recv.read_long();
 
-        // Generic foreign buffs serialize one short per set flag in mask order.
-        // Preserve the two values that affect attack animation selection.
-        auto read_mask_values = [&](uint64_t mask, bool first) {
-            for (uint8_t bit = 0; bit < 64 && recv.length() >= 2; ++bit)
-            {
-                uint64_t flag = uint64_t{1} << bit;
-                if ((mask & flag) == 0)
-                    continue;
+        struct VisualUpdate
+        {
+            Buffstat::Id stat;
+            int16_t value;
+        };
+        std::vector<VisualUpdate> updates;
 
+        // Parse the complete packet before mutating character state. A
+        // truncated packet must not leave half of a multi-buff update applied.
+        auto collect_mask_values = [&](uint64_t mask, bool first) {
+            for (uint64_t flag : foreign_buff::ordered_flags(mask))
+            {
                 int16_t value = recv.read_short();
                 if (!first && flag == Buffstat::second_codes.at(Buffstat::COMBO))
-                    Stage::get().get_chars().set_visual_buff(cid, Buffstat::COMBO, value);
+                    updates.push_back({ Buffstat::COMBO, value });
                 else if (!first && flag == Buffstat::second_codes.at(Buffstat::WK_CHARGE))
-                    Stage::get().get_chars().set_visual_buff(cid, Buffstat::WK_CHARGE, value);
+                    updates.push_back({ Buffstat::WK_CHARGE, value });
             }
         };
 
-        read_mask_values(firstmask, true);
-        read_mask_values(secondmask, false);
+        collect_mask_values(firstmask, true);
+        collect_mask_values(secondmask, false);
+        for (const VisualUpdate& update : updates)
+            Stage::get().get_chars().set_visual_buff(cid, update.stat, update.value);
     }
 
     void CancelForeignBuffHandler::handle(InPacket& recv) const
