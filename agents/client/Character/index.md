@@ -1,6 +1,6 @@
 # 角色系统
 
-Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+Commit: c8a11b8a07579923276950416e6c11a68ada35a2
 
 ## 职责
 
@@ -8,7 +8,7 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 
 ## 边界
 
-- **包含**: 角色属性/状态、装备系统、技能管理、Buff 管理、角色外观、任务日志、怪物书、瞬移石
+- **包含**: 角色属性/状态、装备系统、技能管理、Buff 管理、角色外观、角色死亡效果、任务日志、怪物书、瞬移石
 - **不包含**: 渲染逻辑、物理计算、网络通信
 
 ## 关键抽象
@@ -29,10 +29,12 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 ### Char (`Char.h`)
 
 角色基类，定义:
-- 角色状态枚举 (`State`): `WALK`, `STAND`, `FALL`, `PRONE`, `LADDER`, `ROPE`, `SIT` 等
+- 角色状态枚举 (`State`): `WALK`, `STAND`, `FALL`, `PRONE`, `LADDER`, `ROPE`, `SIT`, `DIED` 等
 - 外观渲染入口
 - 动画更新
 - 碰撞边界
+
+进入 `DIED` 时，`Char` 启动 `DeathTomb`：按顺序播放 `Effect.nx/Tomb.img/fall`，落地后持续绘制 `land/0`，离开死亡状态时清除。该流程由 `Char` 统一持有，因此本地玩家和其他玩家采用相同的墓碑表现；本地玩家仅在落地后额外显示回城确认框。
 
 供 `Player` 和 `OtherChar` 继承。
 
@@ -57,6 +59,7 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 
 | 目录 | 职责 |
 |------|------|
+| `Effects/` | 角色状态特效（标准死亡墓碑的下落、落地和清除状态） |
 | `Inventory/` | 物品栏系统 (Inventory, Equip, Item, Pet, Weapon) |
 | `Look/` | 角色外观渲染 (CharLook, Body, Clothing, Hair, Face, Stance, PetLook, Afterimage) |
 
