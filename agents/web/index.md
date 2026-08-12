@@ -1,6 +1,6 @@
 # Web 基础设施
 
-Commit: b141e14a762f6dd1d94e31c5130cc856b9b1c75a
+Commit: fc979c0fe21730064ed2054302453773440d270d
 
 ## 职责
 
@@ -28,6 +28,7 @@ Commit: b141e14a762f6dd1d94e31c5130cc856b9b1c75a
 
 HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可配）。负责:
 - 提供 `index.html` 入口页面、`build/JourneyClient.js`/`.wasm`、`web/config.json`、字体等静态资源
+- 页面在 WASM 和 NX 素材初始化期间显示加载动画及阶段提示，首帧绘制完成后再淡出；初始化失败时原位显示错误
 - 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`
 - 支持 HTTP Range 请求（单区间），目录自动索引
 
