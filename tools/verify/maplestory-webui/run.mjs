@@ -3,7 +3,8 @@ import { BrowserDriver, sleep } from './cdp.mjs';
 
 const browserBinary = process.env.CHROME_BIN || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : 'google-chrome');
 const debugPort = Number(process.env.E2E_DEBUG_PORT || 9231);
-const createCharacter = process.env.E2E_CREATE_CHARACTER !== '0';
+const retryCharacterName = process.env.E2E_RETRY_CHARACTER || '';
+const createCharacter = retryCharacterName !== '' || process.env.E2E_CREATE_CHARACTER !== '0';
 const useRegistration = process.env.E2E_REGISTER === '1';
 const account = process.env.E2E_ACCOUNT || 'test1';
 const password = process.env.E2E_PASSWORD || 'test1';
@@ -156,31 +157,62 @@ try {
     await driver.click(250, 515);
     await requireUiState('character-creation UI active', uiState.charCreation);
     await driver.click(530, 230);
-    await driver.compose(characterName);
-    await requireState('Chinese character name entered', async () =>
-      await driver.evaluate(`document.getElementById('ime-input').value === ${JSON.stringify(characterName)}`));
+    const firstName = retryCharacterName ? 'ab' : characterName;
+    await driver.compose(firstName);
+    await requireState('character name entered', async () =>
+      await driver.evaluate(`document.getElementById('ime-input').value === ${JSON.stringify(firstName)}`));
     await driver.screenshot('05-character-name');
     await driver.click(520, 310);
-    await sleep(2500);
+
+    if (retryCharacterName) {
+      await requireState('rejected name remains editable', async () =>
+        await driver.evaluate(
+          `MapleWasmIME.active && document.getElementById('ime-input').value === ${JSON.stringify(firstName)}`
+        ));
+      await driver.screenshot('05b-character-name-rejected');
+      await driver.click(392, 300);
+      await sleep(250);
+      await driver.compose(retryCharacterName);
+      await driver.click(520, 310);
+    }
+
+    if (retryCharacterName) {
+      // A pending request also blurs the field. Wait past the recovery timeout
+      // so an inactive IME proves that the server accepted the second name.
+      await sleep(8500);
+    }
+    await requireState('accepted name enters customization', async () =>
+      await driver.evaluate('MapleWasmIME.active === false'));
     await driver.screenshot('06-character-customize');
-    await driver.click(525, 465);
-    await requireUiState('character creation returned to selection', uiState.charSelect, 45);
+
+    if (retryCharacterName) {
+      // Verify availability without creating persistent test data.
+      await driver.click(565, 465);
+      await driver.click(560, 310);
+      await requireUiState('character creation cancels back to selection', uiState.charSelect);
+      await driver.screenshot('07-character-select-after');
+    } else {
+      await driver.click(525, 465);
+      await requireUiState('character creation returned to selection', uiState.charSelect, 45);
+    }
   }
-  await driver.screenshot('07-character-select-after');
+  if (!retryCharacterName) await driver.screenshot('07-character-select-after');
 
-  await driver.click(130, 220);
-  await driver.click(650, 400);
-  await requireUiState('in-game UI active', uiState.game, 60);
-  await driver.screenshot('08-in-game');
+  if (!retryCharacterName) {
+    await driver.click(130, 220);
+    await driver.click(650, 400);
+    await requireUiState('in-game UI active', uiState.game, 60);
+    await driver.screenshot('08-in-game');
 
-  await driver.key('Enter', 'Enter', 13);
-  await sleep(500);
-  await driver.compose(chatMessage);
-  await requireState('Chinese chat text entered', async () =>
-    await driver.evaluate(`document.getElementById('ime-input').value === ${JSON.stringify(chatMessage)}`));
-  await driver.key('Enter', 'Enter', 13);
-  await sleep(1500);
-  await driver.screenshot('09-chinese-chat');
+    await driver.key('Enter', 'Enter', 13);
+    await sleep(500);
+    await driver.compose(chatMessage);
+    await requireState('Chinese chat text entered', async () =>
+      await driver.evaluate(`document.getElementById('ime-input').value === ${JSON.stringify(chatMessage)}`));
+    await driver.key('Enter', 'Enter', 13);
+    await sleep(1500);
+    await driver.screenshot('09-chinese-chat');
+  }
 
   const fatalLogs = driver.logs.filter(line => /abort|runtimeerror|exception|\berror\b|failed to|offline/i.test(line));
   if (driver.errors.length || fatalLogs.length) {
