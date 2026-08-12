@@ -219,6 +219,7 @@ hwid        byte[4]  4-byte hardware ID nibbles
 | 0       | `getAuthSuccess` → full auth success payload |
 | 2 / 3   | `getPermBan` — permanent ban |
 | 5 (and AUTOMATIC_REGISTER disabled) | `getLoginFailed(5)` — not registered |
+| 5 (and AUTOMATIC_REGISTER enabled) | Valid 4–12 character ASCII-alphanumeric account plus 6–12 character printable non-whitespace ASCII password is inserted with a BCrypt hash, then login is retried; invalid credentials remain `getLoginFailed(5)` |
 | Any other non-zero | `getLoginFailed(loginok)` |
 
 Temp-ban triggers `getTempBan(timestamp, reason)`. Banned IP/MAC triggers `getLoginFailed(3)`.
@@ -283,6 +284,8 @@ Server responds with `SERVERSTATUS` (0x03).
 Field    Type   Notes
 accepted byte   1 = accepted
 ```
+
+For a newly auto-registered account, the retried login returns `LOGIN_STATUS` reason 23. The client sends `ACCEPT_TOS(1)`, receives normal auth success, and continues the existing world-list flow.
 
 ---
 

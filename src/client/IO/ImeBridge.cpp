@@ -123,6 +123,19 @@ namespace jrc
 
 extern "C"
 {
+    // Read-only state probe used by the browser acceptance flow. Keeping the
+    // state in C++ avoids treating a timed click sequence as proof of success.
+    EMSCRIPTEN_KEEPALIVE int msui_state()
+    {
+        jrc::UI& ui = jrc::UI::get();
+        if (ui.has_element(jrc::UIElement::STATUSBAR)) return 5;
+        if (ui.has_element(jrc::UIElement::CHARCREATION)) return 4;
+        if (ui.has_element(jrc::UIElement::CHARSELECT)) return 3;
+        if (ui.has_element(jrc::UIElement::WORLDSELECT)) return 2;
+        if (ui.has_element(jrc::UIElement::LOGIN)) return 1;
+        return 0;
+    }
+
     // Replace the focused field's text with the textarea content; the caret is
     // a UTF-16 offset, matching the browser's selectionStart.
     EMSCRIPTEN_KEEPALIVE void msime_input(const char* full_text, int caret_utf16)
