@@ -170,10 +170,10 @@ namespace jrc
             const Point<int16_t> data_origin = charinfopos + CHARACTER_DATA_OFFSET;
 
             std::string levelstr = std::to_string(stats.stats[Maplestat::LEVEL]);
-            int16_t lvx = levelset.draw(levelstr, data_origin + Point<int16_t>(23, -93));
-            levelset.draw('l', data_origin + Point<int16_t>(-7 - lvx / 2, -93));
+            int16_t lvx = levelset.draw(levelstr, charinfopos + Point<int16_t>(23, -93));
+            levelset.draw('l', charinfopos + Point<int16_t>(-7 - lvx / 2, -93));
 
-            namelabel.draw(data_origin + Point<int16_t>(0, -85));
+            namelabel.draw(charinfopos + Point<int16_t>(0, -85));
 
             for (size_t i = 0; i < NUM_LABELS; ++i)
             {
