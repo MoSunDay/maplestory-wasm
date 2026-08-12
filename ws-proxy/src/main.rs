@@ -5,7 +5,10 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(version, about = "WebSocket-to-TCP proxy for the MapleStory WASM client")]
+#[command(
+    version,
+    about = "WebSocket-to-TCP proxy for the MapleStory WASM client"
+)]
 struct Cli {
     /// WebSocket port to listen on
     #[arg(long, default_value_t = 8080)]
@@ -22,7 +25,9 @@ async fn main() -> std::io::Result<()> {
         .with_writer(std::io::stderr)
         .with_target(false)
         .without_time()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .init();
 
     let cli = Cli::parse();

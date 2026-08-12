@@ -39,9 +39,7 @@ async fn spawn_server(dir: &Path) -> (u16, ServerGuard) {
             let port: u16 = addr.rsplit(':').next().unwrap().trim().parse().unwrap();
             // Keep draining the log pipe in the background: if it were closed
             // here, the child's next log write would fail with EPIPE.
-            tokio::spawn(async move {
-                while let Ok(Some(_)) = lines.next_line().await {}
-            });
+            tokio::spawn(async move { while let Ok(Some(_)) = lines.next_line().await {} });
             return (port, ServerGuard { child });
         }
     }
@@ -112,19 +110,28 @@ async fn range_requests_return_206() {
     make_site(dir.path());
     let (port, _guard) = spawn_server(dir.path()).await;
 
-    let (head, body) =
-        request(port, "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=0-9\r\n\r\n").await;
+    let (head, body) = request(
+        port,
+        "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=0-9\r\n\r\n",
+    )
+    .await;
     assert!(head.starts_with("HTTP/1.1 206 Partial Content"));
     assert!(head.contains("Content-Range: bytes 0-9/250"));
     assert_eq!(body, (0..10u8).collect::<Vec<_>>());
 
-    let (head, body) =
-        request(port, "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=100-\r\n\r\n").await;
+    let (head, body) = request(
+        port,
+        "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=100-\r\n\r\n",
+    )
+    .await;
     assert!(head.contains("Content-Range: bytes 100-249/250"));
     assert_eq!(body.len(), 150);
 
-    let (_, body) =
-        request(port, "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=-10\r\n\r\n").await;
+    let (_, body) = request(
+        port,
+        "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=-10\r\n\r\n",
+    )
+    .await;
     assert_eq!(body, (240..250u32).map(|i| i as u8).collect::<Vec<_>>());
 }
 
@@ -134,8 +141,11 @@ async fn bad_range_returns_416_with_total_size() {
     make_site(dir.path());
     let (port, _guard) = spawn_server(dir.path()).await;
 
-    let (head, body) =
-        request(port, "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=abc\r\n\r\n").await;
+    let (head, body) = request(
+        port,
+        "GET /data.bin HTTP/1.1\r\nHost: x\r\nRange: bytes=abc\r\n\r\n",
+    )
+    .await;
     assert!(head.starts_with("HTTP/1.1 416"));
     assert!(head.contains("Content-Range: bytes */250"));
     assert!(body.is_empty());

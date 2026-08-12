@@ -224,7 +224,11 @@ async fn forward_tcp_to_ws(
                 break;
             }
             Ok(count) => {
-                if ws_tx.send(Message::Binary(buffer[..count].to_vec())).await.is_err() {
+                if ws_tx
+                    .send(Message::Binary(buffer[..count].to_vec()))
+                    .await
+                    .is_err()
+                {
                     debug!("[TCP→WS] WebSocket connection closed");
                     return;
                 }

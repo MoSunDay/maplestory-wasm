@@ -39,7 +39,10 @@ pub async fn handle_connection(mut stream: TcpStream, peer: SocketAddr, root: &P
         match read_request(&mut stream, &mut buffer).await {
             ReadOutcome::Request(request) => {
                 let status = respond::respond(&mut stream, root, &request).await;
-                debug!("\"{} {}\" {status} from {peer}", request.method, request.raw_path);
+                debug!(
+                    "\"{} {}\" {status} from {peer}",
+                    request.method, request.raw_path
+                );
                 if !request.keep_alive || status == 400 {
                     break;
                 }
@@ -91,9 +94,7 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
 
 fn bounded_header_end(buffer: &[u8]) -> Result<Option<usize>, ()> {
     if let Some(pos) = find_header_end(buffer) {
-        return (pos + 4 <= MAX_HEADER_SIZE)
-            .then_some(Some(pos))
-            .ok_or(());
+        return (pos + 4 <= MAX_HEADER_SIZE).then_some(Some(pos)).ok_or(());
     }
     (buffer.len() < MAX_HEADER_SIZE).then_some(None).ok_or(())
 }

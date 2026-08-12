@@ -11,7 +11,10 @@ mod respond;
 mod serve;
 
 #[derive(Parser)]
-#[command(version, about = "HTTP static file server for the MapleStory WASM client")]
+#[command(
+    version,
+    about = "HTTP static file server for the MapleStory WASM client"
+)]
 struct Cli {
     /// Port to listen on
     #[arg(long, default_value_t = 8000)]
@@ -42,7 +45,10 @@ async fn main() -> std::io::Result<()> {
     let root = std::fs::canonicalize(&cli.directory).map_err(|err| {
         std::io::Error::new(
             err.kind(),
-            format!("cannot resolve directory '{}': {err}", cli.directory.display()),
+            format!(
+                "cannot resolve directory '{}': {err}",
+                cli.directory.display()
+            ),
         )
     })?;
 

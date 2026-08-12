@@ -15,8 +15,14 @@ const BODY_CHUNK_SIZE: usize = 64 * 1024;
 /// Handle one request; returns the HTTP status sent (for logging).
 pub async fn respond(stream: &mut TcpStream, root: &Path, req: &Request) -> u16 {
     if req.method != "GET" && req.method != "HEAD" {
-        send_simple(stream, 405, "Method Not Allowed", &[("Allow", "GET, HEAD")], !req.keep_alive)
-            .await;
+        send_simple(
+            stream,
+            405,
+            "Method Not Allowed",
+            &[("Allow", "GET, HEAD")],
+            !req.keep_alive,
+        )
+        .await;
         return 405;
     }
 
@@ -113,7 +119,10 @@ async fn serve_file(stream: &mut TcpStream, req: &Request, path: &Path, size: u6
                 206,
                 "Partial Content",
                 content_type,
-                &extras.iter().map(|(name, value)| (*name, value.as_str())).collect::<Vec<_>>(),
+                &extras
+                    .iter()
+                    .map(|(name, value)| (*name, value.as_str()))
+                    .collect::<Vec<_>>(),
                 !req.keep_alive,
             );
             if stream.write_all(head.as_bytes()).await.is_ok() {
@@ -131,7 +140,10 @@ async fn serve_file(stream: &mut TcpStream, req: &Request, path: &Path, size: u6
                 416,
                 "Range Not Satisfiable",
                 content_type,
-                &extras.iter().map(|(name, value)| (*name, value.as_str())).collect::<Vec<_>>(),
+                &extras
+                    .iter()
+                    .map(|(name, value)| (*name, value.as_str()))
+                    .collect::<Vec<_>>(),
                 !req.keep_alive,
             );
             let _ = stream.write_all(head.as_bytes()).await;
@@ -143,7 +155,10 @@ async fn serve_file(stream: &mut TcpStream, req: &Request, path: &Path, size: u6
                 200,
                 "OK",
                 content_type,
-                &extras.iter().map(|(name, value)| (*name, value.as_str())).collect::<Vec<_>>(),
+                &extras
+                    .iter()
+                    .map(|(name, value)| (*name, value.as_str()))
+                    .collect::<Vec<_>>(),
                 !req.keep_alive,
             );
             if stream.write_all(head.as_bytes()).await.is_ok() && req.method == "GET" {
@@ -250,7 +265,10 @@ async fn send_body(stream: &mut TcpStream, req: &Request, content_type: &str, bo
         200,
         "OK",
         content_type,
-        &extras.iter().map(|(name, value)| (*name, value.as_str())).collect::<Vec<_>>(),
+        &extras
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect::<Vec<_>>(),
         !req.keep_alive,
     );
     if stream.write_all(head.as_bytes()).await.is_err() || req.method != "GET" {
@@ -379,6 +397,9 @@ mod tests {
         assert_eq!(content_type_of(Path::new("x/a.wasm")), "application/wasm");
         assert_eq!(content_type_of(Path::new("a.js")), "application/javascript");
         assert_eq!(content_type_of(Path::new("a.html")), "text/html");
-        assert_eq!(content_type_of(Path::new("a.nx")), "application/octet-stream");
+        assert_eq!(
+            content_type_of(Path::new("a.nx")),
+            "application/octet-stream"
+        );
     }
 }
