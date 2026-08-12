@@ -245,19 +245,10 @@ namespace jrc
         bool nowap = stats.get_stat(Maplestat::AP) > 0;
         Button::State newstate = nowap ? Button::NORMAL : Button::DISABLED;
 
-        // Keep the AP controls on a single layout and let the button state
-        // swap the texture. MapleButton already normalizes per-state origins.
-        buttons[BT_HP ]->set_position(Point<int16_t>(20, -36));
-        buttons[BT_MP ]->set_position(Point<int16_t>(20, -18));
-        buttons[BT_STR]->set_position(Point<int16_t>(20,  51));
-        buttons[BT_DEX]->set_position(Point<int16_t>(20,  69));
-        buttons[BT_INT]->set_position(Point<int16_t>(20,  87));
-        buttons[BT_LUK]->set_position(Point<int16_t>(20, 105));
-
         // Beginner AP assignment is controlled by the server: when starter AP
         // is manual, Cosmic exposes spendable AP through the normal stat pool.
-        // Keep the buttons available and let the current AP value decide
-        // whether they are usable.
+        // The NX origins already place every button beside its matching row;
+        // adding another offset moves both the sprite and its hit box away.
         buttons[BT_HP ]->set_state(newstate);
         buttons[BT_MP ]->set_state(newstate);
         buttons[BT_STR]->set_state(newstate);
