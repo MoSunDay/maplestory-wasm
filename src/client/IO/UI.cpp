@@ -70,6 +70,11 @@ namespace jrc
         enabled = false;
     }
 
+    bool UI::has_element(UIElement::Type type)
+    {
+        return state->get(type) != nullptr;
+    }
+
     void UI::change_state(State id)
     {
         switch (id)

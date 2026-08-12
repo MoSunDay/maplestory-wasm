@@ -91,6 +91,7 @@ namespace jrc
         Optional<T> emplace(Args&&...args);
         template <class T>
         Optional<T> get_element();
+        bool has_element(UIElement::Type type);
         void remove(UIElement::Type type);
 
     private:
