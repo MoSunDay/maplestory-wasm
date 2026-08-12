@@ -1,6 +1,6 @@
 # 网络层
 
-Commit: 2612e3cf9b22b324da0c751f32d2175f07030e3b
+Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
 
 ## 职责
 
@@ -63,6 +63,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 封包读写辅助:
 - `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)
 - `OutPacket`: 构建封包字节流 (`write_byte()`, `write_int()`, `write_string()` 等)
+
+自然恢复通过 `HEAL_OVER_TIME` 上报 HP/MP 增量；物品椅子使用 `USE_CHAIR`/`CANCEL_CHAIR`，其他角色的椅子外观由 `SHOW_CHAIR` 同步。本地 `CANCEL_CHAIR` 回执通过不回发封包的状态入口应用，避免服务端取消与客户端取消相互回声。
 
 ## 封包流程
 

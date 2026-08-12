@@ -122,6 +122,7 @@ namespace jrc
         GIVE_FOREIGN_BUFF     = 199,
         CANCEL_FOREIGN_BUFF   = 200,
         UPDATE_PARTYMEMBER_HP = 201,
+        CANCEL_CHAIR          = 205,
         SHOW_ITEM_GAIN_INCHAT = 206, // this is terribly named
         LOCK_UI               = 221,
         TOGGLE_UI             = 222,
@@ -176,6 +177,7 @@ namespace jrc
         emplace<SPAWN_CHAR, SpawnCharHandler>();
         emplace<CHAR_MOVED, CharMovedHandler>();
         emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();
+        emplace<SHOW_CHAIR, ShowChairHandler>();
         emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
         emplace<GIVE_FOREIGN_BUFF, GiveForeignBuffHandler>();
         emplace<CANCEL_FOREIGN_BUFF, CancelForeignBuffHandler>();
@@ -202,6 +204,7 @@ namespace jrc
         emplace<KEYMAP, KeymapHandler>();
         emplace<SKILL_MACROS, SkillMacrosHandler>();
         emplace<CHANGE_STATS, ChangeStatsHandler>();
+        emplace<CANCEL_CHAIR, CancelChairHandler>();
         emplace<GIVE_BUFF, ApplyBuffHandler>();
         emplace<CANCEL_BUFF, CancelBuffHandler>();
         emplace<RECALCULATE_STATS, RecalculateStatsHandler>();

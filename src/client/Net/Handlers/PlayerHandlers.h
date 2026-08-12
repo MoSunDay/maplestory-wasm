@@ -23,6 +23,11 @@
 
 namespace jrc
 {
+    class CancelChairHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
     class Player;
 
     // Parses keymappings and sends them to the Keyboard.

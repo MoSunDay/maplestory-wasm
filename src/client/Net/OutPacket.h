@@ -85,6 +85,8 @@ namespace jrc
         // Gameplay 1
         CHANGEMAP     = 38,
         MOVE_PLAYER   = 41,
+        CANCEL_CHAIR  = 42,
+        USE_CHAIR     = 43,
         CLOSE_ATTACK  = 44,
         RANGED_ATTACK = 45,
         MAGIC_ATTACK  = 46,
@@ -110,6 +112,7 @@ namespace jrc
 
         // Player
         SPEND_AP = 87,
+        HEAL_OVER_TIME = 89,
         SPEND_SP = 90,
         CHANGE_KEYMAP = 135,
 

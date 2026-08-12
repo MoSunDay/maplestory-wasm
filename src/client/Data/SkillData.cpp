@@ -63,6 +63,9 @@ namespace jrc
             int16_t bulletcost = (int16_t)sub["bulletConsume"].get_integer(bulletcount);
             int32_t hpcost = sub["hpCon"];
             int32_t mpcost = sub["mpCon"];
+            int32_t hprecovery = sub["hp"];
+            int32_t mprecovery = sub["mp"];
+            int32_t recoverytime = sub["time"];
             float chance = (float)sub["prop"].get_real(100.0) / 100;
             float critical = 0.0f;
             float ignoredef = 0.0f;
@@ -73,7 +76,8 @@ namespace jrc
                 std::piecewise_construct,
                 std::forward_as_tuple(level),
                 std::forward_as_tuple(damage, matk, fixdamage, mastery, attackcount, mobcount,
-                    bulletcount, bulletcost, hpcost, mpcost, chance, critical, ignoredef, hrange, range)
+                    bulletcount, bulletcost, hpcost, mpcost, hprecovery, mprecovery,
+                    recoverytime, chance, critical, ignoredef, hrange, range)
             );
         }
 
@@ -189,7 +193,7 @@ namespace jrc
         if (iter == stats.end())
         {
             static constexpr Stats null_stats{ 0.0f, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, {} };
+                0, 0, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, {} };
             return null_stats;
         }
         return iter->second;
