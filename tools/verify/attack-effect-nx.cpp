@@ -110,11 +110,15 @@ int main(int argc, char** argv)
                 maximum(skill["level"], "attackCount"),
                 maximum(skill["level"], "bulletCount"));
             uint8_t mob_count = maximum(skill["level"], "mobCount");
-            // CharLevel branches follow weapon-handedness semantics in the
-            // client. Only direct hit branches are damage/target indexed.
+            // Two direct fallback branches declare CharLevel weapon-
+            // handedness. Otherwise nested branches may represent damage
+            // lines, as with the pirate Double Shot.
             auto indexed = nested_variant_count == 0
                 ? jrc::attack_effect::indexed_hit(variants.size(), attack_count, mob_count)
-                : std::nullopt;
+                : variants.size() > 1
+                    ? std::nullopt
+                    : jrc::attack_effect::indexed_hit(
+                        nested_variant_count, attack_count, mob_count);
             if (indexed == jrc::attack_effect::HitIndex::HIT)
                 ++indexed_by_hit;
             else if (indexed == jrc::attack_effect::HitIndex::TARGET)
