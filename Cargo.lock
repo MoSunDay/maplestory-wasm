@@ -68,6 +68,7 @@ dependencies = [
  "clap",
  "futures-util",
  "serde_json",
+ "socket2",
  "tempfile",
  "tokio",
  "tokio-tungstenite",
@@ -814,6 +815,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "httparse",
+ "socket2",
  "tempfile",
  "tokio",
  "tracing",
@@ -841,6 +843,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "futures-util",
+ "socket2",
  "tokio",
  "tokio-tungstenite",
  "tracing",

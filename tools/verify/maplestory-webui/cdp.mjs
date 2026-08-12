@@ -23,7 +23,8 @@ export class BrowserDriver {
     const browserArgs = [
       '--no-sandbox', '--enable-webgl', '--ignore-gpu-blocklist',
       '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio',
-      '--no-proxy-server', '--proxy-bypass-list=*',
+      '--no-proxy-server', '--proxy-bypass-list=*', '--remote-allow-origins=*',
+      `--user-data-dir=${process.env.E2E_PROFILE_DIR || path.join(this.artifactDir, 'chrome-profile')}`,
       `--remote-debugging-port=${this.debugPort}`, '--window-size=820,640',
       ...extraArgs, 'about:blank'
     ];
@@ -44,8 +45,15 @@ export class BrowserDriver {
     }
     if (!this.socket) throw new Error('Chromium DevTools endpoint did not start');
 
-    this.socket.onmessage = event => this.onMessage(JSON.parse(event.data));
-    await new Promise(resolve => { this.socket.onopen = resolve; });
+    this.socket.addEventListener('message', event => this.onMessage(JSON.parse(event.data)));
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      await new Promise((resolve, reject) => {
+        this.socket.addEventListener('open', resolve, { once: true });
+        this.socket.addEventListener('error', () => {
+          reject(new Error('Chromium DevTools WebSocket failed'));
+        }, { once: true });
+      });
+    }
     await this.send('Runtime.enable');
     await this.send('Page.enable');
     await this.send('Network.enable');
@@ -98,8 +106,8 @@ export class BrowserDriver {
     await this.send('Network.emulateNetworkConditions', {
       offline: false,
       latency: milliseconds,
-      downloadThroughput: -1,
-      uploadThroughput: -1
+      downloadThroughput: 10 * 1024 * 1024,
+      uploadThroughput: 10 * 1024 * 1024
     });
   }
 

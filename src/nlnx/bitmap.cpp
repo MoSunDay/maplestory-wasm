@@ -18,6 +18,7 @@
 
 #include "bitmap.hpp"
 #include "file_impl.hpp"
+#include <functional>
 #include <lz4.h>
 #include <unistd.h>
 #include <vector>
@@ -32,11 +33,11 @@ namespace nl
 	}
 	bool bitmap::operator<(bitmap const& o) const
 	{
-		return m_offset < o.m_offset;
+		return m_file == o.m_file ? m_offset < o.m_offset : std::less<void*>{}(m_file, o.m_file);
 	}
 	bool bitmap::operator==(bitmap const& o) const
 	{
-		return m_offset == o.m_offset;
+		return m_file == o.m_file && m_offset == o.m_offset;
 	}
 	bitmap::operator bool() const
 	{
@@ -50,6 +51,17 @@ namespace nl
 			auto* fd = static_cast<_file_data*>(m_file);
 			auto* loader = static_cast<LazyFS::LazyFileLoader*>(const_cast<void*>(fd->base));
 			loader->prefetch_contiguous_data(m_offset + 4, length());
+		}
+#endif
+	}
+	void bitmap::request() const
+	{
+#ifdef MS_PLATFORM_WASM
+		if (m_file)
+		{
+			auto* fd = static_cast<_file_data*>(m_file);
+			auto* loader = static_cast<LazyFS::LazyFileLoader*>(const_cast<void*>(fd->base));
+			loader->request_contiguous_data(m_offset + 4, length());
 		}
 #endif
 	}
@@ -101,6 +113,13 @@ namespace nl
 	}
 	size_t bitmap::id() const
 	{
-		return static_cast<size_t>(m_offset);
+		if (!m_file)
+			return 0;
+
+		// NX offsets are only unique within one file. Include the backing file so
+		// atlas and preload deduplication cannot alias two different resources.
+		size_t seed = std::hash<void*>{}(m_file);
+		seed ^= std::hash<uint64_t>{}(m_offset) + 0x9e3779b9u + (seed << 6) + (seed >> 2);
+		return seed == 0 ? 1 : seed;
 	}
 } // namespace nl

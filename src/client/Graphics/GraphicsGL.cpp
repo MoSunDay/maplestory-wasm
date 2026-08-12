@@ -21,6 +21,7 @@
 #include "../Console.h"
 
 #include <algorithm>
+#include <chrono>
 #include <vector>
 
 namespace jrc
@@ -377,6 +378,60 @@ namespace jrc
     void GraphicsGL::addbitmap(const nl::bitmap& bmp)
     {
         getoffset(bmp);
+    }
+
+    void GraphicsGL::queuebitmap(const nl::bitmap& bmp)
+    {
+        const size_t id = bmp.id();
+        if (id == 0 || hasbitmap(bmp) || pending_bitmap_ids.find(id) != pending_bitmap_ids.end())
+        {
+            return;
+        }
+
+#ifdef MS_PLATFORM_WASM
+        bmp.prefetch();
+        pending_bitmaps.push_back(bmp);
+        pending_bitmap_ids.insert(id);
+#else
+        addbitmap(bmp);
+#endif
+    }
+
+    void GraphicsGL::preparebitmaps(uint32_t budget_ms)
+    {
+#ifdef MS_PLATFORM_WASM
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(budget_ms);
+        size_t candidates = pending_bitmaps.size();
+        while (candidates-- > 0 && !pending_bitmaps.empty())
+        {
+            nl::bitmap bmp = pending_bitmaps.front();
+            pending_bitmaps.pop_front();
+
+            if (hasbitmap(bmp))
+            {
+                pending_bitmap_ids.erase(bmp.id());
+            }
+            else if (bmp.data_ready())
+            {
+                addbitmap(bmp);
+                pending_bitmap_ids.erase(bmp.id());
+                // A single decode/upload can consume most of the frame budget.
+                // Never batch a second ready bitmap into the same frame.
+                break;
+            }
+            else
+            {
+                pending_bitmaps.push_back(bmp);
+            }
+
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                break;
+            }
+        }
+#else
+        (void)budget_ms;
+#endif
     }
 
     bool GraphicsGL::hasbitmap(const nl::bitmap& bmp) const

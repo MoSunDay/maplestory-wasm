@@ -27,6 +27,7 @@
 #include "Character/Char.h"
 #include "Gameplay/Combat/DamageNumber.h"
 #include "Gameplay/Stage.h"
+#include "Graphics/GraphicsGL.h"
 #include "IO/UI.h"
 #include "IO/Window.h"
 #include "Net/Session.h"
@@ -69,6 +70,25 @@ namespace jrc
                     window.MapleWasmLoading.fail(UTF8ToString($0));
                 }
             }, message);
+        }
+
+        bool browser_connection_lost()
+        {
+            return EM_ASM_INT({
+                return window.MapleConnectionLost &&
+                    window.MapleConnectionLost.isLost() ? 1 : 0;
+            }) != 0;
+        }
+
+        void show_connection_lost()
+        {
+            EM_ASM({
+                if (window.MapleConnectionLost)
+                {
+                    window.MapleConnectionLost.show(
+                        '连接已断开，游戏已经退出，请刷新页面重试。');
+                }
+            });
         }
     }
 #endif
@@ -159,6 +179,9 @@ namespace jrc
 
     void draw(float alpha)
     {
+#ifdef MS_PLATFORM_WASM
+        GraphicsGL::get().preparebitmaps();
+#endif
         Window::get().begin();
         Stage::get().draw(alpha);
         UI::get().draw(alpha);
@@ -180,8 +203,16 @@ namespace jrc
 
     void main_tick()
     {
-        if (!running())
+        const bool connection_lost = browser_connection_lost();
+        if (connection_lost || !running())
         {
+            const bool unexpected_session_close = !Session::get().is_connected()
+                && UI::get().not_quitted()
+                && Window::get().not_closed();
+            if (!connection_lost && unexpected_session_close)
+            {
+                show_connection_lost();
+            }
             emscripten_cancel_main_loop();
             Sound::close();
             return;

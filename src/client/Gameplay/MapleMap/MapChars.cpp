@@ -83,6 +83,24 @@ namespace jrc
         }
     }
 
+    void MapChars::set_visual_buff(int32_t cid, Buffstat::Id stat, int16_t value)
+    {
+        if (Optional<OtherChar> character = get_char(cid))
+            character->set_visual_buff(stat, value);
+    }
+
+    void MapChars::set_visual_buff_source(int32_t cid, Buffstat::Id stat, int32_t source)
+    {
+        if (Optional<OtherChar> character = get_char(cid))
+            character->set_visual_buff_source(stat, source);
+    }
+
+    void MapChars::cancel_visual_buff(int32_t cid, Buffstat::Id stat)
+    {
+        if (Optional<OtherChar> character = get_char(cid))
+            character->cancel_visual_buff(stat);
+    }
+
     Optional<OtherChar> MapChars::get_char(int32_t cid)
     {
         return chars.get(cid);

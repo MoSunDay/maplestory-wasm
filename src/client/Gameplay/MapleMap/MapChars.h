@@ -34,6 +34,9 @@ namespace jrc
         void update_party_member_hp(int32_t cid, int32_t hp, int32_t max_hp);
         // Hide all on-map party member hp bars.
         void clear_party_member_hp();
+        void set_visual_buff(int32_t cid, Buffstat::Id stat, int16_t value);
+        void set_visual_buff_source(int32_t cid, Buffstat::Id stat, int32_t source);
+        void cancel_visual_buff(int32_t cid, Buffstat::Id stat);
 
         Optional<OtherChar> get_char(int32_t cid);
 

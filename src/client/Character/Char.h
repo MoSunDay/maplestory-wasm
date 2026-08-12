@@ -1,5 +1,6 @@
 #pragma once
 #include "CharEffect.h"
+#include "Buff.h"
 #include "Effects/DeathTomb.h"
 #include "Inventory/Weapon.h"
 #include "Look/Afterimage.h"
@@ -58,6 +59,9 @@ namespace jrc
         virtual uint16_t get_level() const = 0;
         /// Return the character's level.
         virtual int32_t get_skilllevel(int32_t skillid) const = 0;
+        /// Return client-visible buff state used to select skill animations.
+        virtual int16_t get_visual_buff_value(Buffstat::Id stat) const;
+        virtual int32_t get_visual_buff_source(Buffstat::Id stat) const;
         /// Return the character's base attacking speed.
         virtual int8_t get_integer_attackspeed() const = 0;
 

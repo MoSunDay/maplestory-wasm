@@ -34,7 +34,9 @@
 #include FT_FREETYPE_H
 
 #include <cstdint>
+#include <deque>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace jrc
@@ -57,6 +59,10 @@ namespace jrc
 
         // Add a bitmap to the available resources.
         void addbitmap(const nl::bitmap& bmp);
+        // Schedule a bitmap for silent network fetch and frame-budgeted upload.
+        void queuebitmap(const nl::bitmap& bmp);
+        // Prepare ready bitmaps without letting one frame drain the whole queue.
+        void preparebitmaps(uint32_t budget_ms = 2);
         // Return whether a bitmap is currently resident in the texture atlas.
         bool hasbitmap(const nl::bitmap& bmp) const;
         // Draw the bitmap with the given parameters.
@@ -249,6 +255,8 @@ namespace jrc
         GLint uniform_fontregion;
 
         std::unordered_map<size_t, Offset> offsets;
+        std::deque<nl::bitmap> pending_bitmaps;
+        std::unordered_set<size_t> pending_bitmap_ids;
         Offset nulloffset;
 
         QuadTree<size_t, Leftover> leftovers;
