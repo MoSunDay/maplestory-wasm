@@ -58,7 +58,11 @@ async fn spawn_game_server(hello: Option<Vec<u8>>, echo: bool) -> u16 {
     port
 }
 
-async fn connect_and_target(proxy_port: u16, target: &str, as_text: bool) -> tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>> {
+async fn connect_and_target(
+    proxy_port: u16,
+    target: &str,
+    as_text: bool,
+) -> tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>> {
     let url = format!("ws://127.0.0.1:{proxy_port}");
     let (mut ws, _) = tokio_tungstenite::connect_async(url).await.unwrap();
     let msg = if as_text {
@@ -104,7 +108,9 @@ async fn text_target_and_text_frames_dropped_after_handshake() {
     let mut ws = connect_and_target(proxy_port, &format!("127.0.0.1:{game_port}"), true).await;
 
     // Text after the handshake must be dropped, not forwarded to TCP.
-    ws.send(Message::Text("not a game packet".to_owned())).await.unwrap();
+    ws.send(Message::Text("not a game packet".to_owned()))
+        .await
+        .unwrap();
 
     let payload = vec![7u8, 8, 9, 10];
     ws.send(Message::Binary(payload.clone())).await.unwrap();
@@ -141,7 +147,10 @@ async fn server_hangup_closes_client() {
     let proxy_port = spawn_proxy(docker_map(false, "")).await;
 
     let mut ws = connect_and_target(proxy_port, &format!("127.0.0.1:{game_port}"), false).await;
-    assert_eq!(ws.next().await.unwrap().unwrap(), Message::Binary(vec![0xAB; 16]));
+    assert_eq!(
+        ws.next().await.unwrap().unwrap(),
+        Message::Binary(vec![0xAB; 16])
+    );
     assert!(connection_ends(&mut ws).await);
 }
 
@@ -153,12 +162,17 @@ async fn docker_remap_routes_localhost_target() {
     let proxy_port = spawn_proxy(docker_map(true, "127.0.0.1")).await;
 
     let mut ws = connect_and_target(proxy_port, &format!("localhost:{game_port}"), false).await;
-    assert_eq!(ws.next().await.unwrap().unwrap(), Message::Binary(vec![0x5A; 16]));
+    assert_eq!(
+        ws.next().await.unwrap().unwrap(),
+        Message::Binary(vec![0x5A; 16])
+    );
 }
 
 /// True if the WebSocket connection ended (EOF, close frame, or reset).
 async fn connection_ends(
-    ws: &mut tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    ws: &mut tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
 ) -> bool {
     match ws.next().await {
         None | Some(Err(_)) => true,
