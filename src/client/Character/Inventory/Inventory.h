@@ -29,9 +29,19 @@
 
 #include <map>
 #include <unordered_map>
+#include <vector>
 
 namespace jrc
 {
+    struct CashInventoryItem
+    {
+        InventoryType::Id type;
+        int16_t slot;
+        int32_t item_id;
+        int16_t count;
+        int64_t cash_id;
+    };
+
     // The player's inventory.
     class Inventory
     {
@@ -69,14 +79,19 @@ namespace jrc
         void modify(InventoryType::Id type, int16_t pos, int8_t mode, int16_t arg, Movement movement);
         // Add a general item.
         void add_item(InventoryType::Id type, int16_t slot, int32_t itemid, bool cash, int64_t expire,
-            uint16_t count, const std::string& owner, int16_t flag);
+            uint16_t count, const std::string& owner, int16_t flag, int64_t cash_id = 0);
         // Add a pet item.
         void add_pet(InventoryType::Id type, int16_t slot, int32_t itemid, bool cash, int64_t expire,
-            const std::string& name, int8_t level, int16_t closeness, int8_t fullness);
+            const std::string& name, int8_t level, int16_t closeness, int8_t fullness,
+            int64_t cash_id = 0);
         // Add an equip item.
         void add_equip(InventoryType::Id type, int16_t slot, int32_t itemid, bool cash, int64_t expire,
             uint8_t slots, uint8_t level, const EnumMap<Equipstat::Id, uint16_t>& stats,
-            const std::string& owner, int16_t flag, uint8_t itemlevel, uint16_t itemexp, int32_t vicious);
+            const std::string& owner, int16_t flag, uint8_t itemlevel, uint16_t itemexp,
+            int32_t vicious, int64_t cash_id = 0);
+
+        std::vector<CashInventoryItem> get_cash_items() const;
+        void remove_cash_item(int64_t cash_id);
 
         // Check if the use inventory contains at least one projectile.
         bool has_projectile() const;
@@ -110,7 +125,8 @@ namespace jrc
 
     private:
         // Add an inventory slot and return the unique_id.
-        int32_t add_slot(InventoryType::Id type, int16_t slot, int32_t item_id, int16_t count, bool cash);
+        int32_t add_slot(InventoryType::Id type, int16_t slot, int32_t item_id,
+            int16_t count, bool cash, int64_t cash_id);
         // Change the quantity of an item.
         void change_count(InventoryType::Id type, int16_t slot, int16_t count);
         // Swap two items.
@@ -124,6 +140,7 @@ namespace jrc
             int32_t item_id;
             int16_t count;
             bool cash;
+            int64_t cash_id;
         };
 
         EnumMap<InventoryType::Id, std::map<int16_t, Slot>> inventories;
@@ -138,4 +155,3 @@ namespace jrc
         int16_t bulletslot;
     };
 }
-

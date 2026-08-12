@@ -26,6 +26,7 @@
 #include "Handlers/InventoryHandlers.h"
 #include "Handlers/MessagingHandlers.h"
 #include "Handlers/NpcInteractionHandlers.h"
+#include "Handlers/CashShopHandlers.h"
 
 #include "../Console.h"
 
@@ -44,6 +45,7 @@ namespace jrc
         ADD_NEWCHAR_ENTRY = 14,
         DELCHAR_RESPONSE  = 15,
         PING              = 17,
+        CHANGE_CHANNEL    = 16,
 
         // Player 1
         APPLY_BUFF = 20,
@@ -90,6 +92,7 @@ namespace jrc
         RECEIVE_POLICE          = 123,
         SKILL_MACROS            = 124,
         SET_FIELD               = 125,
+        SET_CASH_SHOP           = 127,
         MULTI_CHAT              = 134,
         FIELD_EFFECT            = 138,
         FIELD_OBSTACLE_ONOFF   = 139,
@@ -153,6 +156,8 @@ namespace jrc
 
         KEYMAP      = 335,
         AUTO_HP_POT = 336,
+        QUERY_CASH_RESULT = 324,
+        CASHSHOP_OPERATION = 325,
         AUTO_MP_POT = 337
     };
 
@@ -160,6 +165,7 @@ namespace jrc
     {
         // Common handlers
         emplace<PING, PingHandler>();
+        emplace<CHANGE_CHANNEL, ChangeChannelHandler>();
 
         // Login handlers
         emplace<LOGIN_RESULT, LoginResultHandler>();
@@ -172,6 +178,7 @@ namespace jrc
 
         // 'Setfield' handlers
         emplace<SET_FIELD, SetfieldHandler>();
+        emplace<SET_CASH_SHOP, SetCashShopHandler>();
 
         // MapObject handlers
         emplace<SPAWN_CHAR, SpawnCharHandler>();
@@ -233,6 +240,10 @@ namespace jrc
         emplace<NPC_DIALOGUE, NpcDialogueHandler>();
         emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
         emplace<STORAGE, StorageHandler>();
+
+        // Cash Shop handlers
+        emplace<QUERY_CASH_RESULT, QueryCashHandler>();
+        emplace<CASHSHOP_OPERATION, CashShopOperationHandler>();
 
         // TODO
         emplace<MOVE_MOB_RESPONSE, NullHandler>();

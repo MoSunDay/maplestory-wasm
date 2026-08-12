@@ -1,6 +1,6 @@
-# 网络层
+Commit: 10fb657e2799392e1a15e8a68d1a989a5dcb6967
 
-Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
+# 网络层
 
 ## 职责
 
@@ -32,6 +32,7 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 - `ServerIPHandler`（`Handlers/LoginHandlers.cpp`）：收到 `SERVER_IP` → `reconnect()` 到下发的频道地址 → 仅当 `is_connected()` 才 `PlayerLoginPacket().dispatch()`，否则 `Console` 诊断 + `UI::enable()`。WASM 握手 `ws_recv` 有 15s 超时（替代原先无限等待），频道不可达时 `open()` 返回 false 触发此恢复分支
 - `SetfieldHandler::set_field`（`Handlers/SetfieldHandlers.cpp`）：进入游戏前若角色选择界面已消失（重连竞态）或本地无该 cid，两处早退分支均 `Console` 诊断 + `UI::enable()`，而非静默 return
+- 退出现金商城时，空 `CHANGE_MAP` 请求触发服务端 `CHANGE_CHANNEL`；`ChangeChannelHandler` 重连原频道并发送当前 cid 的 `PLAYER_LOGGEDIN`。随后 `SET_FIELD` 直接复用现有 `Player`，用完整角色快照重置服务端所有进度数据，不依赖已销毁的角色选择 UI
 
 ### Cryptography (`Cryptography.h`)
 
@@ -66,6 +67,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 自然恢复通过 `HEAL_OVER_TIME` 上报 HP/MP 增量；物品椅子使用 `USE_CHAIR`/`CANCEL_CHAIR`，其他角色的椅子外观由 `SHOW_CHAIR` 同步。本地 `CANCEL_CHAIR` 回执通过不回发封包的状态入口应用，避免服务端取消与客户端取消相互回声。
 
+现金商城使用 `ENTER_CASHSHOP` 进入，由 `SET_CASH_SHOP` 建立完整角色快照和特殊商品状态；`QUERY_CASH_RESULT` 同步三类余额，`CASHSHOP_OPERATION` 处理商城仓库初始化、单品/礼包购买、仓库双向转移和明确错误。现金物品解析保留服务端唯一 `cash_id`，作为转移请求的稳定标识。
+
 ## 封包流程
 
 ### 发送流程
@@ -85,9 +88,9 @@ Cosmic Server → Socket::read() → Session::read()
 
 | 目录 | 职责 |
 |------|------|
-| `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, NpcInteraction 等) |
+| `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, NpcInteraction, CashShop 等) |
 | `Handlers/Helpers/` | 封包解析辅助 (ItemParser, LoginParser, MovementParser) |
-| `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets 等) |
+| `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets, CashShopPackets 等) |
 
 ## 依赖关系
 

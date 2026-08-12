@@ -49,6 +49,7 @@ namespace jrc
     struct StatsEntry
     {
         std::string name;
+        bool female = false;
         std::vector<int64_t> petids;
         EnumMap<Maplestat::Id, uint16_t> stats;
         int64_t exp;
