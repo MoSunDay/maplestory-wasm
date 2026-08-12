@@ -36,6 +36,9 @@
 #include "../Constants.h"
 #include "../Character/Inventory/InventoryType.h"
 #include "../Gameplay/Stage.h"
+#ifdef MS_PLATFORM_WASM
+#include "../LazyFS/LazyFS.h"
+#endif
 
 #include <algorithm>
 
@@ -86,6 +89,12 @@ namespace jrc
         emplace<UINpcTalk>();
         emplace<UIShop>(look, inventory);
         emplace<UIStorage>(inventory);
+
+#ifdef MS_PLATFORM_WASM
+        // Begin only after the player has entered the game so login remains
+        // responsive and normal on-demand reads retain priority.
+        LazyFS::StartItemAssetPreload();
+#endif
     }
 
     void UIStateGame::draw(float inter, Point<int16_t> cursor) const

@@ -178,7 +178,7 @@ namespace jrc
 
     UISkillbook::UISkillbook(const CharStats& in_stats,
                              const Skillbook& in_skillbook)
-        : UIDragElement({ 174, 20 }),
+        : UIDragElement({ 175, 20 }),
           stats(in_stats),
           skillbook(in_skillbook),
           sp(0),
@@ -188,11 +188,12 @@ namespace jrc
           offset(0),
           grabbing(false)
     {
-        nl::node main = nl::nx::ui["UIWindow2.img"]["Skill"]["main"];
+        // This layout renders four compact skill rows.  UIWindow2's modern
+        // 318px-wide panel expects additional content that this client does
+        // not implement, leaving almost half of the window empty.
+        nl::node main = nl::nx::ui["UIWindow.img"]["Skill"];
 
         sprites.emplace_back(main["backgrnd"]);
-        sprites.emplace_back(main["backgrnd2"]);
-        sprites.emplace_back(main["backgrnd3"]);
 
         skilld = main["skill0"];
         skille = main["skill1"];
@@ -232,7 +233,7 @@ namespace jrc
         change_job(stats.get_stat(Maplestat::JOB));
         change_sp(stats.get_stat(Maplestat::SP));
 
-        dimension = { 174, 299 };
+        dimension = { 175, 289 };
     }
 
     void UISkillbook::draw(float alpha) const
