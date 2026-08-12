@@ -26,19 +26,11 @@
 
 #include "nlnx/nx.hpp"
 
-#include <algorithm>
-
 namespace jrc
 {
     namespace
     {
-        constexpr uint8_t MIN_VISIBLE_CHANNEL_SLOTS = 2;
         constexpr Point<int16_t> CHANNEL_WINDOW_TOP{ 200, 20 };
-
-        uint8_t visible_channel_slots(uint8_t available)
-        {
-            return std::max(available, MIN_VISIBLE_CHANNEL_SLOTS);
-        }
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
@@ -82,19 +74,14 @@ namespace jrc
         if (channelid >= world.channelcount)
             channelid = 0;
 
-        // Keep the original two-slot composition even when the server exposes
-        // only channel 1. A disabled TwoSpriteButton still draws its normal
-        // texture, but Button::is_active() prevents any interaction with it.
-        for (uint8_t i = 0; i < visible_channel_slots(channelcount); ++i)
+        for (uint8_t i = 0; i < channelcount; ++i)
         {
             nl::node chnode = channelsrc["button:" + std::to_string(i)];
             buttons[BT_CHANNEL0 + i] = std::make_unique<TwoSpriteButton>(
                 chnode["normal"]["0"], chnode["keyFocused"]["0"],
                 CHANNEL_WINDOW_TOP
                 );
-            if (i >= channelcount)
-                buttons[BT_CHANNEL0 + i]->set_state(Button::DISABLED);
-            else if (i == channelid)
+            if (i == channelid)
                 buttons[BT_CHANNEL0 + i]->set_state(Button::PRESSED);
         }
 
