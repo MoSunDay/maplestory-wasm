@@ -100,7 +100,7 @@ namespace jrc
           keyboard(&UI::get().get_keyboard()),
           dirty(false)
     {
-        nl::node src = nl::nx::ui["UIWindow.img"]["KeyConfig"];
+        nl::node src = nl::nx::ui["UIWindow2.img"]["KeyConfig"];
         icon = src["icon"];
 
         Texture bg1 = Texture(src["backgrnd"]);
