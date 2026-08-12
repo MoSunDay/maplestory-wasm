@@ -108,6 +108,11 @@ export class BrowserDriver {
     })()`);
   }
 
+  async doubleClick(gameX, gameY) {
+    await this.click(gameX, gameY);
+    await this.click(gameX, gameY);
+  }
+
   async key(key, code, virtualKeyCode, text = '') {
     await this.send('Input.dispatchKeyEvent', {
       type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKeyCode,
