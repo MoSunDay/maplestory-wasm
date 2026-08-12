@@ -23,6 +23,7 @@
 #include "UIKeyConfig.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Util/Misc.h"
 
@@ -249,6 +250,9 @@ namespace jrc
                     ) {
                         UseItemPacket(slot, item_id).dispatch();
                     }
+                    break;
+                case InventoryType::SETUP:
+                    Stage::get().get_player().use_item(item_id);
                     break;
                 default:
                     break;

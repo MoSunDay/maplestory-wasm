@@ -1,6 +1,6 @@
 # 角色系统
 
-Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
+Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
 
 ## 职责
 
@@ -34,7 +34,7 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 - 动画更新
 - 碰撞边界
 
-进入 `DIED` 时，`Char` 启动 `DeathTomb` 并切换到 Character 资源的 `dead` 姿态。墓碑先播放 `Effect.nx/Tomb.img/fall`，落地后持续绘制 `land/0`；幽灵在墓碑落地后沿顺时针椭圆轨迹循环，并根据前后半圈切换与墓碑的绘制顺序。离开死亡状态时同时清除墓碑和环绕状态。该流程由 `Char` 统一持有，因此本地玩家和其他玩家采用相同表现；本地玩家仅在落地后额外显示回城确认框。
+进入 `DIED` 时，`Char` 启动 `DeathTomb` 并切换到 Character 资源的 `dead` 姿态。墓碑以死亡位置正下方最近的 foothold 为固定锚点，先播放 `Effect.nx/Tomb.img/fall`，落地后持续绘制 `land/0`；幽灵在墓碑落地后沿顺时针椭圆轨迹循环，并根据前后半圈切换与墓碑的绘制顺序。离开死亡状态时同时清除墓碑和环绕状态。该流程由 `Char` 统一持有，因此本地玩家和其他玩家采用相同表现；本地玩家仅在落地后额外显示回城确认框。
 
 供 `Player` 和 `OtherChar` 继承。
 
@@ -44,6 +44,10 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 - 基础属性和总属性（装备+Buff 加成）
 - `recalc_stats(equipchanged)`: 重新计算总属性
 - 过期 HP/MP 跟踪
+
+### NaturalRecovery (`Recovery/NaturalRecovery.h`)
+
+无副作用的自然恢复规则模块。`Player::update` 将当前姿态、HP/MP、等级、地图 `recovery` 倍率、技能 NX 数值和椅子 NX 数值组装为 `natural_recovery::Context`，按固定帧推进计时状态，再把产生的 HP/MP 增量交给网络封包发送。站立和坐下可恢复 HP，攀爬仅在 Endure 有等级时恢复 HP；存活状态持续计算 MP。技能与椅子只改变单次恢复量或攀爬间隔，HP 发送值按 Cosmic 的地图倍率动态校验上限约束，MP 发送值限制为 999。
 
 ### CharLook (`Look/`)
 
@@ -62,6 +66,7 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 | `Effects/` | 角色状态特效（死亡墓碑的下落、落地、幽灵环绕和清除状态） |
 | `Inventory/` | 物品栏系统 (Inventory, Equip, Item, Pet, Weapon) |
 | `Look/` | 角色外观渲染 (CharLook, Body, Clothing, Hair, Face, Stance, PetLook, Afterimage) |
+| `Recovery/` | HP/MP 自然恢复的纯函数规则、周期状态和服务端安全上限 |
 
 ## 依赖关系
 

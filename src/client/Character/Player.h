@@ -25,6 +25,7 @@
 #include "Buff.h"
 #include "ActiveBuffs.h"
 #include "PassiveBuffs.h"
+#include "Recovery/NaturalRecovery.h"
 
 #include "Look/CharLook.h"
 #include "Inventory/Inventory.h"
@@ -144,6 +145,12 @@ namespace jrc
 
         /// Change players position to the seat's position and stance to Char::SIT.
         void set_seat(Optional<const Seat> seat);
+        /// Apply the current map's HP/MP recovery multiplier.
+        void set_recovery_rate(float rate);
+        /// Start using an owned item chair immediately after sending its request.
+        void set_item_chair(int32_t item_id);
+        /// Apply a server-confirmed map-seat or chair cancellation without echoing it.
+        void apply_server_chair_state(bool sitting);
         /// Change players xpos to the ladder x and change stance to Char::LADDER or Char::ROPE.
         void set_ladder(Optional<const Ladder> ladder);
 
@@ -187,5 +194,9 @@ namespace jrc
         Optional<const Ladder> ladder;
         bool underwater;
         bool gm_hidden = false;
+        natural_recovery::State recovery_state;
+        float recovery_rate = 1.0f;
+        int32_t chair_id = 0;
+        int16_t map_seat_id = -1;
     };
 }

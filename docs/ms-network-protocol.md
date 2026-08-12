@@ -937,17 +937,18 @@ The server rebroadcasts movement to all players on the same map via `MOVE_PLAYER
 
 ### 0x002A — CANCEL_CHAIR
 
-**Purpose:** Client stops sitting in a chair.
+**Purpose:** Client selects a map seat or stops using an item chair.
 
 ```
-(no fields)
+Field      Type    Notes
+seatId     short   Map-seat ID, or -1 to leave any map seat or item chair
 ```
 
 ---
 
 ### 0x002B — USE_CHAIR
 
-**Purpose:** Client sits in a map object chair.
+**Purpose:** Client uses an owned item chair.
 
 ```
 Field    Type   Notes
@@ -1439,10 +1440,11 @@ job      int     Character's job ID (server verifies)
 **Purpose:** Client reports natural HP/MP regeneration ticks.
 
 ```
-Field    Type   Notes
+Field    Type    Notes
 [skip]   byte[4] Timestamp
-hpGain   short  HP healed
-mpGain   short  MP healed
+[skip]   byte[4] Legacy client field ignored by the server
+hpGain   short   HP healed
+mpGain   short   MP healed
 ```
 
 Server validates and applies the heal with anti-cheat checks.
@@ -3136,6 +3138,19 @@ Field     Type   Notes
 charId    int
 hp        int    Current HP
 maxHp     int    Maximum HP
+```
+
+---
+
+### 0x00CD — CANCEL_CHAIR
+
+**Purpose:** Confirms whether the local player is using a map seat.
+
+```
+Field       Type    Notes
+sitting     byte    1 when a map seat was accepted, otherwise 0
+[If sitting = 1:]
+seatId      short   Accepted map-seat ID
 ```
 
 ---

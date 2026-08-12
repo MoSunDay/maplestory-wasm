@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>冒险岛online</title>
-    <link rel="preload" href="/src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf"
+    <link rel="preload" href="../src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf"
         as="font" type="font/ttf" crossorigin>
     <style>
         @font-face {
             font-family: 'Maple CJK';
-            src: url('/src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf') format('truetype');
+            src: url('../src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf') format('truetype');
             font-display: swap;
         }
 
@@ -690,7 +690,7 @@
         };
 
         // Fetch configuration before loading the client
-        fetch('/web/config.json')
+        fetch('./config.json')
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -723,13 +723,13 @@
                 loadWasmClient();
             })
             .catch(err => {
-                console.warn('[config] Could not load /web/config.json, proceeding with defaults. Error:', err.message);
+                console.warn('[config] Could not load ./config.json, proceeding with defaults. Error:', err.message);
                 loadWasmClient();
             });
 
         function loadWasmClient() {
             const script = document.createElement('script');
-            script.src = '/build/JourneyClient.js';
+            script.src = '../build/JourneyClient.js';
             script.async = true;
             document.body.appendChild(script);
         }
