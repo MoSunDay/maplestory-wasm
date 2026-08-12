@@ -21,10 +21,8 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIBuffList.h"
-#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UISkillBook.h"
-#include "../../Net/Packets/GameplayPackets.h"
 
 namespace jrc
 {
@@ -144,15 +142,6 @@ namespace jrc
             if (!player.is_dead())
             {
                 player.die();
-
-                UI::get().emplace<UIOk>(
-                    "You have died. Press OK to move to the nearest town.",
-                    [&player]() {
-                        // Cosmic enters its death respawn path only when the
-                        // CHANGE_MAP request carries a non--1 target map id.
-                        ChangeMapPacket(true, player.get_stats().get_mapid(), "", false).dispatch();
-                    }
-                );
             }
         }
         else if (player.is_dead())

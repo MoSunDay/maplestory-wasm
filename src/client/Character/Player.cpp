@@ -21,6 +21,7 @@
 #include "../Constants.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
+#include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
@@ -193,6 +194,17 @@ namespace jrc
         if (state == DIED)
         {
             Char::update(physics, 1.0f);
+            if (death_tomb_landed())
+            {
+                UI::get().emplace<UIOk>(
+                    "你已死亡。点击“确定”移动到最近的城镇。",
+                    [this]() {
+                        // Cosmic enters its death respawn path only when the
+                        // request includes the current map as its target.
+                        ChangeMapPacket(true, stats.get_mapid(), "", false).dispatch();
+                    }
+                );
+            }
         }
         else
         {

@@ -52,6 +52,10 @@ namespace jrc
             look.draw({ absp, scale, scale, opacity }, alpha);
         }
 
+        // The tomb is anchored at the character's foothold and must cover the
+        // dead stance while leaving name and chat overlays readable.
+        death_tomb.draw(absp, alpha);
+
         for (auto& pet : pets)
         {
             if (pet.get_itemid())
@@ -87,6 +91,7 @@ namespace jrc
         chatballoon.update();
         invincible.update();
         ironbody.update();
+        death_tomb.update();
 
         for (auto& pet : pets)
         {
@@ -133,6 +138,11 @@ namespace jrc
         default:
             return 1.0f;
         }
+    }
+
+    bool Char::death_tomb_landed() const
+    {
+        return death_tomb.landed_this_update();
     }
 
     float Char::get_real_attackspeed() const
@@ -302,6 +312,18 @@ namespace jrc
 
     void Char::set_state(State st)
     {
+        if (state != st)
+        {
+            if (st == DIED)
+            {
+                death_tomb.start();
+            }
+            else if (state == DIED)
+            {
+                death_tomb.clear();
+            }
+        }
+
         state = st;
 
         Stance::Id stance = Stance::by_state(state);
@@ -388,6 +410,8 @@ namespace jrc
     void Char::init()
     {
         CharLook::init();
+
+        DeathTomb::initialize(nl::nx::effect["Tomb.img"]);
 
         nl::node src = nl::nx::effect["BasicEff.img"];
         for (auto iter : CharEffect::PATHS)
