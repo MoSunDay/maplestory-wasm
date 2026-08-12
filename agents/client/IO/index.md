@@ -1,6 +1,6 @@
 # UI 系统
 
-Commit: 02e256356be8552379c7d3b93068441ab9ebd485
+Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
 
 ## 职责
 
@@ -63,7 +63,7 @@ UI 状态接口。两个具体实现:
 ### 游戏内 UI (`UITypes/`)
 | 文件 | 职责 |
 |------|------|
-| `UIStatusBar` | 底部状态栏 (HP/MP/EXP/等级) |
+| `UIStatusBar` | 底部状态栏；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用，支持互斥切换、Escape 和外部点击关闭 |
 | `UIStatsInfo` | 角色属性窗口 |
 | `UISkillBook` | 技能书窗口 |
 | `UIEquipInventory` | 装备栏窗口 |
@@ -75,7 +75,7 @@ UI 状态接口。两个具体实现:
 | `UIShop` | NPC 商店界面 |
 | `UIStorage` | 仓库界面 |
 | `UIParty` | 组队界面 |
-| `UIKeyConfig` | 键位设置 |
+| `UIKeyConfig` | 键位设置；从 `UIWindow2.img/KeyConfig` 加载当前 UI.nx 的完整键盘面板 |
 | `UINotice` | 系统通知 |
 | `UISoftKey` | 虚拟按键 (移动端) |
 

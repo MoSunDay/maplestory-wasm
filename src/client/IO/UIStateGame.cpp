@@ -176,6 +176,15 @@ namespace jrc
             focused = UIElement::NONE;
         }
 
+        if (pressed && escape)
+        {
+            if (auto statusbar = UI::get().get_element<UIStatusbar>())
+            {
+                statusbar->close_popup();
+            }
+            return;
+        }
+
         if (pressed && type == KeyType::ACTION && action == KeyAction::RETURN)
         {
             if (auto statusbar = UI::get().get_element<UIStatusbar>())
@@ -192,6 +201,12 @@ namespace jrc
             {
                 switch (action)
                 {
+                case KeyAction::MAINMENU:
+                    if (auto statusbar = UI::get().get_element<UIStatusbar>())
+                    {
+                        statusbar->toggle_menu_popup();
+                    }
+                    break;
                 case KeyAction::CHARSTATS:
                     emplace<UIStatsinfo>(
                         Stage::get().get_player().get_stats()
