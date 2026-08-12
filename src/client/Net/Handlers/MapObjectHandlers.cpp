@@ -22,6 +22,7 @@
 #include "Helpers/MovementParser.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Character/SkillId.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/Spawn.h"
 
@@ -157,12 +158,18 @@ namespace jrc
 
         bool morphed = recv.read_int() == 2;
         int32_t buffmask1 = recv.read_int();
+        int16_t combo_value = 0;
         if (buffmask1 != 0)
         {
             if (morphed)
                 recv.read_short();
             else
-                recv.read_byte();
+            {
+                int8_t value = recv.read_byte();
+                constexpr int32_t COMBO_HIGH_MASK = 0x00200000;
+                if (buffmask1 & COMBO_HIGH_MASK)
+                    combo_value = value;
+            }
         }
         recv.read_int(); // buffmask 2
 
@@ -219,7 +226,7 @@ namespace jrc
         recv.read_byte(); // team
 
         Stage::get().get_chars().spawn({
-            cid, look, level, job, name, stance, position
+            cid, look, level, job, name, stance, position, combo_value
         });
     }
 
@@ -307,12 +314,62 @@ namespace jrc
             recv.read_byte(); // 'direction'
             // 9 more bytes after this
 
+            if ((skillid >= SkillId::SWORD_FIRE_CHARGE
+                    && skillid <= SkillId::BW_LIT_CHARGE)
+                || skillid == SkillId::SWORD_HOLY_CHARGE
+                || skillid == SkillId::BW_HOLY_CHARGE)
+            {
+                Stage::get().get_chars().set_visual_buff_source(
+                    cid, Buffstat::WK_CHARGE, skillid
+                );
+            }
+
             Stage::get().get_combat().show_buff(cid, skillid, effect);
         }
         else
         {
             // todo
         }
+    }
+
+    void GiveForeignBuffHandler::handle(InPacket& recv) const
+    {
+        int32_t cid = recv.read_int();
+        uint64_t firstmask = recv.read_long();
+        uint64_t secondmask = recv.read_long();
+
+        // Generic foreign buffs serialize one short per set flag in mask order.
+        // Preserve the two values that affect attack animation selection.
+        auto read_mask_values = [&](uint64_t mask, bool first) {
+            for (uint8_t bit = 0; bit < 64 && recv.length() >= 2; ++bit)
+            {
+                uint64_t flag = uint64_t{1} << bit;
+                if ((mask & flag) == 0)
+                    continue;
+
+                int16_t value = recv.read_short();
+                if (!first && flag == Buffstat::second_codes.at(Buffstat::COMBO))
+                    Stage::get().get_chars().set_visual_buff(cid, Buffstat::COMBO, value);
+                else if (!first && flag == Buffstat::second_codes.at(Buffstat::WK_CHARGE))
+                    Stage::get().get_chars().set_visual_buff(cid, Buffstat::WK_CHARGE, value);
+            }
+        };
+
+        read_mask_values(firstmask, true);
+        read_mask_values(secondmask, false);
+    }
+
+    void CancelForeignBuffHandler::handle(InPacket& recv) const
+    {
+        int32_t cid = recv.read_int();
+        uint64_t firstmask = recv.read_long();
+        uint64_t secondmask = recv.read_long();
+        (void)firstmask;
+
+        if (secondmask & Buffstat::second_codes.at(Buffstat::COMBO))
+            Stage::get().get_chars().cancel_visual_buff(cid, Buffstat::COMBO);
+        if (secondmask & Buffstat::second_codes.at(Buffstat::WK_CHARGE))
+            Stage::get().get_chars().cancel_visual_buff(cid, Buffstat::WK_CHARGE);
     }
 
 

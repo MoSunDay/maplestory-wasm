@@ -100,6 +100,19 @@ async fn binary_loopback() {
 }
 
 #[tokio::test]
+async fn zero_length_keepalive_does_not_change_tcp_payload() {
+    let game_port = spawn_game_server(None, true).await;
+    let proxy_port = spawn_proxy(docker_map(false, "")).await;
+    let mut ws = connect_and_target(proxy_port, &format!("127.0.0.1:{game_port}"), false).await;
+
+    ws.send(Message::Binary(Vec::new())).await.unwrap();
+    let payload = vec![0x13, 0x37, 0x42];
+    ws.send(Message::Binary(payload.clone())).await.unwrap();
+
+    assert_eq!(ws.next().await.unwrap().unwrap(), Message::Binary(payload));
+}
+
+#[tokio::test]
 async fn text_target_and_text_frames_dropped_after_handshake() {
     let game_port = spawn_game_server(None, true).await;
     let proxy_port = spawn_proxy(docker_map(false, "")).await;

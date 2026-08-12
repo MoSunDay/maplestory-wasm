@@ -48,9 +48,18 @@ namespace jrc
 
         sound = std::make_unique<SingleSkillSound>(strid);
 
+        bool hasfinish = src["finish"].size() > 0;
         bool byleveleffect = src["CharLevel"]["10"]["effect"].size() > 0;
         bool multieffect = src["effect0"].size() > 0;
-        if (byleveleffect)
+        if (hasfinish)
+        {
+            useeffect = std::make_unique<FinishUseEffect>(src);
+        }
+        else if (skillid == SkillId::CHARGE)
+        {
+            useeffect = std::make_unique<ChargedBlowUseEffect>(src);
+        }
+        else if (byleveleffect)
         {
             useeffect = std::make_unique<ByLevelUseEffect>(src);
         }
@@ -84,13 +93,38 @@ namespace jrc
             }
         }
 
+        size_t hitvariants = 0;
+        for (auto hit : src["hit"])
+        {
+            if (hit["0"].data_type() == nl::node::type::bitmap)
+                ++hitvariants;
+        }
+        uint8_t attackcount = 1;
+        uint8_t mobcount = 1;
+        for (auto level : src["level"])
+        {
+            attackcount = std::max<uint8_t>(attackcount,
+                static_cast<uint8_t>(level["attackCount"].get_integer(1)));
+            mobcount = std::max<uint8_t>(mobcount,
+                static_cast<uint8_t>(level["mobCount"].get_integer(1)));
+        }
+        bool indexedhit = hitvariants > 1
+            && (hitvariants == attackcount || hitvariants == mobcount);
+        HitEffectIndex hitindex = hitvariants == attackcount
+            ? HitEffectIndex::HIT
+            : HitEffectIndex::TARGET;
+
         bool bylevelhit      = src["CharLevel"]["10"]["hit"].size() > 0;
         bool byskilllevelhit = src["level"]["1"]["hit"].size() > 0;
         bool hashit0         = src["hit"]["0"].size() > 0;
         bool hashit1         = src["hit"]["1"].size() > 0;
         if (bylevelhit)
         {
-            if (hashit0 && hashit1)
+            if (indexedhit)
+            {
+                hiteffect = std::make_unique<ByLevelIndexedHitEffect>(src, hitindex);
+            }
+            else if (hashit0 && hashit1)
             {
                 hiteffect = std::make_unique<ByLevelTwoHHitEffect>(src);
             }
@@ -102,6 +136,10 @@ namespace jrc
         else if (byskilllevelhit)
         {
             hiteffect = std::make_unique<BySkillLevelHitEffect>(src);
+        }
+        else if (indexedhit)
+        {
+            hiteffect = std::make_unique<IndexedHitEffect>(src, hitindex);
         }
         else if (hashit0 && hashit1)
         {

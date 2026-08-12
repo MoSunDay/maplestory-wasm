@@ -409,6 +409,7 @@ namespace jrc
                 return base + Point<int16_t>(0, spread - center);
             };
 
+            uint8_t target_index = 0;
             for (auto& line : result.damagelines)
             {
                 int32_t oid = line.first;
@@ -420,8 +421,11 @@ namespace jrc
                     size_t i = 0;
                     for (auto& number : numbers)
                     {
+                        AttackUser indexed_user = attackuser;
+                        indexed_user.hit_index = static_cast<uint8_t>(i);
+                        indexed_user.target_index = target_index;
                         DamageEffect effect{
-                            attackuser,
+                            indexed_user,
                             number,
                             line.second[i].first,
                             result.toleft,
@@ -442,6 +446,7 @@ namespace jrc
                         i++;
                     }
                 }
+                ++target_index;
             }
 
             if (result.damagelines.empty())
@@ -474,6 +479,7 @@ namespace jrc
         }
         else
         {
+            uint8_t target_index = 0;
             for (auto& line : result.damagelines)
             {
                 int32_t oid = line.first;
@@ -484,9 +490,12 @@ namespace jrc
                     size_t i = 0;
                     for (auto& number : numbers)
                     {
+                        AttackUser indexed_user = attackuser;
+                        indexed_user.hit_index = static_cast<uint8_t>(i);
+                        indexed_user.target_index = target_index;
                         damageeffects.emplace(
                             user.get_attackdelay(i),
-                            attackuser,
+                            indexed_user,
                             number,
                             line.second[i].first,
                             result.toleft,
@@ -497,6 +506,7 @@ namespace jrc
                         i++;
                     }
                 }
+                ++target_index;
             }
         }
     }

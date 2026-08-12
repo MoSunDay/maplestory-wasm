@@ -15,6 +15,7 @@
 
 // Define LazyFS before Module is initialized
 var LazyFS = {
+	...LazyFSConnection,
 	// Configuration
 	CHUNK_SIZE: 0, // Set dynamically from C++
 	ASSETS_WS_URL: null, // Set from C++ or auto-detect
@@ -26,28 +27,25 @@ var LazyFS = {
 	db: null,
 	dbReady: false,
 	dbInitPromise: null,
-
-	// WebSocket connection
-	ws: null,
-	wsConnected: false,
-	wsConnecting: false,
-	wsQueue: [], // Queued requests while connecting
-
-	// Pending requests: Map<requestId, {resolve, reject}>
-	pendingRequests: new Map(),
-	requestIdCounter: 0,
 	inFlightBatches: new Map(),
 	inFlightPrefetches: new Map(),
+	foregroundRequests: new Map(),
+	prefetchQueue: [],
+	activePrefetches: 0,
+	MAX_CONCURRENT_PREFETCHES: 4,
 	pendingCacheWrites: new Set(),
-
+	cacheWriteStats: {
+		attempted: 0,
+		succeeded: 0,
+		failed: 0,
+		lastError: null,
+	},
 	// In-memory chunk cache: Map<"file:size:chunk", Uint8Array>
 	chunkCache: new Map(),
-
 	// File registry: Map<filepath, { size }>
 	files: new Map(),
 	itemAssetPreloadPromise: null,
 	itemAssetPreloadState: 'idle',
-
 	// ========== FETCH STATISTICS ==========
 	stats: {
 		totalRequests: 0,
@@ -183,10 +181,10 @@ var LazyFS = {
 	 */
 	setCachedChunk: function (filename, versionTag, chunkIndex, data) {
 		if (!this.dbReady || !this.db) {
-			return Promise.resolve(false);
+			return Promise.reject(new Error('IndexedDB cache is unavailable'));
 		}
 
-		return new Promise((resolve) => {
+		return new Promise((resolve, reject) => {
 			try {
 				const tx = this.db.transaction(this.STORE_NAME, 'readwrite');
 				const store = tx.objectStore(this.STORE_NAME);
@@ -194,11 +192,33 @@ var LazyFS = {
 				store.put(data, key);
 
 				tx.oncomplete = () => resolve(true);
-				tx.onerror = () => resolve(false);
+				tx.onerror = () => reject(tx.error || new Error('IndexedDB cache transaction failed'));
+				tx.onabort = () => reject(tx.error || new Error('IndexedDB cache transaction aborted'));
 			} catch (e) {
-				resolve(false);
+				reject(e);
 			}
 		});
+	},
+
+	trackCacheWrite: function (write) {
+		this.cacheWriteStats.attempted++;
+		const tracked = write.then(() => {
+			this.cacheWriteStats.succeeded++;
+			return true;
+		}, error => {
+			this.cacheWriteStats.failed++;
+			this.cacheWriteStats.lastError = error instanceof Error ? error.message : String(error);
+			return false;
+		});
+		this.pendingCacheWrites.add(tracked);
+		tracked.finally(() => this.pendingCacheWrites.delete(tracked));
+		return tracked;
+	},
+
+	awaitCacheWrites: async function () {
+		while (this.pendingCacheWrites.size > 0) {
+			await Promise.all(Array.from(this.pendingCacheWrites));
+		}
 	},
 
 	/**
@@ -226,81 +246,6 @@ var LazyFS = {
 		});
 	},
 
-	// ========== WEBSOCKET CONNECTION ==========
-
-	/**
-	 * Initialize WebSocket connection to assets server
-	 */
-	connect: function () {
-		if (this.wsConnected || this.wsConnecting) {
-			return Promise.resolve();
-		}
-
-		if (!this.ASSETS_WS_URL) {
-			// Auto-detect URL based on page location
-			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-			const host = window.location.hostname;
-			this.ASSETS_WS_URL = `${protocol}//${host}:8765`;
-		}
-
-		console.log('[LazyFS] Connecting to assets server:', this.ASSETS_WS_URL);
-		this.wsConnecting = true;
-
-		return new Promise((resolve, reject) => {
-			try {
-				this.ws = new WebSocket(this.ASSETS_WS_URL);
-				this.ws.binaryType = 'arraybuffer'; // Receive binary as ArrayBuffer
-
-				this.ws.onopen = () => {
-					console.log('[LazyFS] WebSocket connected');
-					this.wsConnected = true;
-					this.wsConnecting = false;
-
-					// Process queued requests
-					while (this.wsQueue.length > 0) {
-						const msg = this.wsQueue.shift();
-						this.ws.send(msg);
-					}
-
-					resolve();
-				};
-
-				this.ws.onmessage = (event) => {
-					this.handleMessage(event.data);
-				};
-
-				this.ws.onerror = (error) => {
-					console.error('[LazyFS] WebSocket error:', error);
-					this.wsConnecting = false;
-					reject(error);
-				};
-
-				this.ws.onclose = () => {
-					console.log('[LazyFS] WebSocket disconnected');
-					this.wsConnected = false;
-					this.ws = null;
-				};
-			} catch (e) {
-				console.error('[LazyFS] Failed to create WebSocket:', e);
-				this.wsConnecting = false;
-				reject(e);
-			}
-		});
-	},
-
-	/**
-	 * Send a message (queue if not connected)
-	 */
-	send: function (msg) {
-		const msgStr = JSON.stringify(msg);
-		if (this.wsConnected && this.ws) {
-			this.ws.send(msgStr);
-		} else {
-			this.wsQueue.push(msgStr);
-			this.connect();
-		}
-	},
-
 	/**
 	 * Handle incoming WebSocket message (text or binary)
 	 */
@@ -322,19 +267,11 @@ var LazyFS = {
 				}
 				// File size response
 				const key = `size:${msg.file}`;
-				const pending = this.pendingRequests.get(key);
-				if (pending) {
-					this.pendingRequests.delete(key);
-					pending.resolve(msg.size);
-				}
+				this.resolvePendingRequest(key, msg.size);
 			} else if (msg.type === 'chunks_done') {
 				// Batch request completed
 				const key = `batch:${msg.file}:${msg.start}:${msg.end}`;
-				const pending = this.pendingRequests.get(key);
-				if (pending) {
-					this.pendingRequests.delete(key);
-					pending.resolve();
-				}
+				this.resolvePendingRequest(key);
 			} else if (msg.type === 'error') {
 				console.error('[LazyFS] Server error:', msg.message);
 			}
@@ -368,9 +305,7 @@ var LazyFS = {
 
 		// Store in cache (persistent)
 		if (versionTag !== 'unknown') {
-			const write = this.setCachedChunk(filename, versionTag, chunkIndex, chunkData);
-			this.pendingCacheWrites.add(write);
-			write.finally(() => this.pendingCacheWrites.delete(write));
+			this.trackCacheWrite(this.setCachedChunk(filename, versionTag, chunkIndex, chunkData));
 		}
 
 		// Log
@@ -378,11 +313,7 @@ var LazyFS = {
 
 		// Resolve any pending request for this specific chunk
 		const pendingKey = `chunk:${filename}:${chunkIndex}`;
-		const pending = this.pendingRequests.get(pendingKey);
-		if (pending) {
-			this.pendingRequests.delete(pendingKey);
-			pending.resolve(chunkData);
-		}
+		this.resolvePendingRequest(pendingKey, chunkData);
 	},
 
 	// ========== FILE OPERATIONS ==========
@@ -402,56 +333,29 @@ var LazyFS = {
 	 * Get file size via WebSocket
 	 */
 	getFileSize: async function (filepath) {
-		await this.connect();
-
 		const key = `size:${filepath}`;
-
-		return new Promise((resolve, reject) => {
-			this.pendingRequests.set(key, { resolve, reject });
-			this.send({
+		return this.request(key, {
 				type: 'get_size',
 				file: filepath
-			});
-
-			// Timeout after 10 seconds
-			setTimeout(() => {
-				if (this.pendingRequests.has(key)) {
-					this.pendingRequests.delete(key);
-					reject(new Error('Timeout getting file size'));
-				}
 			}, 10000);
-		});
 	},
 
 	/**
 	 * Fetch a batch of chunks
 	 */
 	fetchChunks: async function (filepath, startChunk, endChunk) {
-		await this.connect();
-
 		const key = `batch:${filepath}:${startChunk}:${endChunk}`;
 		if (this.inFlightBatches.has(key)) {
 			return this.inFlightBatches.get(key);
 		}
 
-		const request = new Promise((resolve, reject) => {
-			this.pendingRequests.set(key, { resolve, reject });
-			this.send({
+		const request = this.request(key, {
 				type: 'get_chunks',
 				file: filepath,
 				start: startChunk,
 				end: endChunk,
 				chunk_size: this.CHUNK_SIZE
-			});
-
-			// Timeout after 60 seconds for large batches
-			setTimeout(() => {
-				if (this.pendingRequests.has(key)) {
-					this.pendingRequests.delete(key);
-					reject(new Error('Timeout fetching chunks'));
-				}
 			}, 60000);
-		});
 		this.inFlightBatches.set(key, request);
 		try {
 			return await request;
@@ -466,19 +370,102 @@ var LazyFS = {
 	 * queued behind a large preload batch.
 	 */
 	prefetchFileRange: function (filepath, offset, length) {
+		if (this.terminalConnectionFailure) {
+			return Promise.reject(new Error('LazyFS connection is no longer recoverable'));
+		}
 		const key = `${filepath}:${offset}:${length}`;
 		if (this.inFlightPrefetches.has(key)) {
 			return this.inFlightPrefetches.get(key);
 		}
 
-		const request = this.prefetchFileRangeInternal(filepath, offset, length);
+		let resolveRequest;
+		let rejectRequest;
+		const request = new Promise((resolve, reject) => {
+			resolveRequest = resolve;
+			rejectRequest = reject;
+		});
 		this.inFlightPrefetches.set(key, request);
 		const clear = () => this.inFlightPrefetches.delete(key);
 		request.then(clear, clear);
+		this.prefetchQueue.push({ key, filepath, offset, length, resolveRequest, rejectRequest });
+		this.drainPrefetchQueue();
 		return request;
 	},
 
+	startPrefetchTask: function (task) {
+		this.activePrefetches++;
+		this.prefetchFileRangeInternal(task.filepath, task.offset, task.length)
+			.then(task.resolveRequest, task.rejectRequest)
+			.finally(() => {
+				this.activePrefetches--;
+				this.drainPrefetchQueue();
+			});
+	},
+
+	drainPrefetchQueue: function () {
+		while (this.activePrefetches < this.MAX_CONCURRENT_PREFETCHES && this.prefetchQueue.length > 0) {
+			this.startPrefetchTask(this.prefetchQueue.shift());
+		}
+	},
+
+	promotePrefetch: function (filepath, offset, length) {
+		const key = `${filepath}:${offset}:${length}`;
+		const index = this.prefetchQueue.findIndex(task => task.key === key);
+		if (index >= 0) {
+			const [task] = this.prefetchQueue.splice(index, 1);
+			// Foreground work may temporarily exceed the background concurrency cap.
+			this.startPrefetchTask(task);
+		}
+	},
+
+	runForegroundRequest: function (key, operation) {
+		const existing = this.foregroundRequests.get(key);
+		if (existing) {
+			return existing.promise;
+		}
+
+		let resolveRequest;
+		const entry = {
+			promise: new Promise(resolve => { resolveRequest = resolve; })
+		};
+		const attempt = (isRetry = false) => {
+			if (isRetry && this.terminalConnectionFailure && !this.resetConnectionFailure()) {
+				return;
+			}
+			window.MapleAssetLoading?.begin(key);
+			Promise.resolve()
+				.then(operation)
+				.then(result => {
+					this.foregroundRequests.delete(key);
+					window.MapleAssetLoading?.end(key);
+					resolveRequest(result);
+				})
+				.catch(error => {
+					console.error('[LazyFS] Foreground asset request failed:', error);
+					window.MapleAssetLoading?.fail(key, () => attempt(true));
+				});
+		};
+		this.foregroundRequests.set(key, entry);
+		attempt();
+		return entry.promise;
+	},
+
+	requestForegroundFileRange: function (filepath, offset, length) {
+		if (this.isFileRangeResident(filepath, offset, length)) {
+			return Promise.resolve();
+		}
+		const key = `range:${filepath}:${offset}:${length}`;
+		return this.runForegroundRequest(key, () => {
+			const request = this.prefetchFileRange(filepath, offset, length);
+			this.promotePrefetch(filepath, offset, length);
+			return request;
+		});
+	},
+
 	prefetchFileRangeInternal: async function (filepath, offset, length) {
+		if (this.terminalConnectionFailure) {
+			throw new Error('LazyFS connection is no longer recoverable');
+		}
 		const fileEntry = this.files.get(filepath);
 		if (!fileEntry || !fileEntry.size || length <= 0) {
 			throw new Error(`Cannot preload unregistered file: ${filepath}`);
@@ -491,6 +478,9 @@ var LazyFS = {
 		const versionTag = this.getFileVersionTag(fileEntry);
 
 		for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex++) {
+			if (this.terminalConnectionFailure) {
+				throw new Error('LazyFS connection is no longer recoverable');
+			}
 			const cacheKey = this.getChunkCacheKey(filepath, versionTag, chunkIndex);
 			if (!this.chunkCache.has(cacheKey)) {
 				const cachedData = await this.getCachedChunk(filepath, versionTag, chunkIndex);
@@ -542,7 +532,7 @@ var LazyFS = {
 	},
 
 	characterMetadataEnd: async function () {
-		const header = await this.readFileData('Character.nx', 0, 40);
+		const header = await this.readFileData('Character.nx', 0, 40, false);
 		if (!header || header.length < 40) {
 			throw new Error('Character.nx header is unavailable');
 		}
@@ -566,9 +556,12 @@ var LazyFS = {
 		}
 
 		this.itemAssetPreloadState = 'running';
+		this.itemAssetPreloadResult = null;
 		this.itemAssetPreloadPromise = new Promise(resolve => setTimeout(resolve, 0))
 			.then(async () => {
-				await this.requestPersistentStorage();
+				const failureBaseline = this.cacheWriteStats.failed;
+				const attemptBaseline = this.cacheWriteStats.attempted;
+				const persistent = await this.requestPersistentStorage();
 				const stringEntry = this.files.get('String.nx');
 				const itemEntry = this.files.get('Item.nx');
 				if (!stringEntry || !itemEntry) {
@@ -578,9 +571,20 @@ var LazyFS = {
 				await this.prefetchFileRange('Item.nx', 0, itemEntry.size);
 				const metadataEnd = await this.characterMetadataEnd();
 				await this.prefetchFileRange('Character.nx', 0, metadataEnd);
-				await Promise.all(Array.from(this.pendingCacheWrites));
-				this.itemAssetPreloadState = 'complete';
-				console.log('[LazyFS] Persistent item asset preload complete');
+				await this.awaitCacheWrites();
+				const failed = this.cacheWriteStats.failed - failureBaseline;
+				const attempted = this.cacheWriteStats.attempted - attemptBaseline;
+				this.itemAssetPreloadResult = Object.freeze({
+					persistent,
+					attempted,
+					succeeded: attempted - failed,
+					failed,
+				});
+				if (failed > 0) {
+					throw new Error(`${failed} IndexedDB cache writes failed`);
+				}
+				this.itemAssetPreloadState = persistent ? 'complete' : 'degraded';
+				console.log(`[LazyFS] Item asset preload ${this.itemAssetPreloadState}`);
 			})
 			.catch(error => {
 				this.itemAssetPreloadState = 'failed';
@@ -607,35 +611,20 @@ var LazyFS = {
 			return this.chunkCache.get(cacheKey);
 		}
 
-		// Fetch single chunk
-		await this.connect();
-
 		const key = `chunk:${filepath}:${chunkIndex}`;
-
-		return new Promise((resolve, reject) => {
-			this.pendingRequests.set(key, { resolve, reject });
-			this.send({
+		return this.request(key, {
 				type: 'get_chunk',
 				file: filepath,
 				index: chunkIndex,
 				chunk_size: this.CHUNK_SIZE
-			});
-
-			// Timeout
-			setTimeout(() => {
-				if (this.pendingRequests.has(key)) {
-					this.pendingRequests.delete(key);
-					reject(new Error('Timeout fetching chunk'));
-				}
 			}, 30000);
-		});
 	},
 
 	/**
 	 * Read data from a file at a specific offset
 	 * This is called by Emscripten's FS when the file is read
 	 */
-	readFileData: async function (filepath, offset, length) {
+	readFileData: async function (filepath, offset, length, showBlockingOverlay = true) {
 		const fileEntry = this.files.get(filepath);
 		if (!fileEntry) {
 			console.error('[LazyFS] File not registered:', filepath);
@@ -724,11 +713,18 @@ var LazyFS = {
 
 		// Fetch missing batches
 		if (needsFetch) {
+			const fetchMissing = () => Promise.all(batches.map(batch =>
+				this.fetchChunks(filepath, batch.start, batch.end)
+			));
 			try {
-				// Fetch all batches in parallel
-				await Promise.all(batches.map(batch =>
-					this.fetchChunks(filepath, batch.start, batch.end)
-				));
+				const canShowRetry = showBlockingOverlay &&
+					window.MapleAssetLoading?.canInteract?.();
+				if (canShowRetry) {
+					const key = `read:${filepath}:${batches.map(batch => `${batch.start}-${batch.end}`).join(',')}`;
+					await this.runForegroundRequest(key, fetchMissing);
+				} else {
+					await fetchMissing();
+				}
 			} catch (e) {
 				console.error('[LazyFS] Failed to fetch chunks:', e);
 				return null;
