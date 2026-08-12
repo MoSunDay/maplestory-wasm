@@ -1,6 +1,6 @@
 # Web 基础设施
 
-Commit: 39118cd0e745b836add45750d52d137df1ff46de
+Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
 
 ## 职责
 
@@ -20,7 +20,9 @@ Commit: 39118cd0e745b836add45750d52d137df1ff46de
   └── WebSocket ──► assets-server :8765  (按需 .nx 资源流)
 ```
 
-三个 crate 共享根 `Cargo.toml` workspace；Docker 侧由 `docker/rust-web.Dockerfile` 多阶段构建同一镜像，`docker-compose.yml` 以不同 command 启动三个服务。
+三个 crate 共享根 `Cargo.toml` workspace 和 `web-common/listener.rs` 双栈监听实现；Docker 侧由 `docker/rust-web.Dockerfile` 多阶段构建同一镜像，`docker-compose.yml` 以不同 command 启动三个服务。
+
+三个服务默认绑定 IPv6 通配地址 `::`，并显式关闭 `IPV6_V6ONLY`，因此同一端口同时接受 IPv4 与 IPv6；显式传入其他 `--bind` 地址时维持单地址族监听。
 
 ## 关键服务
 
@@ -29,6 +31,7 @@ Commit: 39118cd0e745b836add45750d52d137df1ff46de
 HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可配）。负责:
 - 提供 `index.html` 入口页面、`build/JourneyClient.js`/`.wasm`、`web/config.json`、字体等静态资源
 - 页面在 WASM 和 NX 素材初始化期间显示加载动画及阶段提示，首帧绘制完成后再淡出；初始化失败时原位显示错误
+- 运行时前台素材网络缺块会显示玻璃化遮罩“素材加载中...”，以请求键覆盖并发和共享读取；失败后遮罩保留错误信息及重试按钮，静默后台预取不触发遮罩
 - 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`
 - 支持 HTTP Range 请求（单区间），目录自动索引
 - HTTP header 不限制字段数量，仅限制整个请求头块最多 10 MiB（包含结尾的 `CRLFCRLF`）；恰好达到上限可接收，超出后返回 `400 Bad Request` 并关闭连接
