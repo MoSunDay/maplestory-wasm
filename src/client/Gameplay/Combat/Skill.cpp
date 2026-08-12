@@ -108,11 +108,7 @@ namespace jrc
             mobcount = std::max<uint8_t>(mobcount,
                 static_cast<uint8_t>(level["mobCount"].get_integer(1)));
         }
-        bool indexedhit = hitvariants > 1
-            && (hitvariants == attackcount || hitvariants == mobcount);
-        HitEffectIndex hitindex = hitvariants == attackcount
-            ? HitEffectIndex::HIT
-            : HitEffectIndex::TARGET;
+        auto hitindex = attack_effect::indexed_hit(hitvariants, attackcount, mobcount);
 
         bool bylevelhit      = src["CharLevel"]["10"]["hit"].size() > 0;
         bool byskilllevelhit = src["level"]["1"]["hit"].size() > 0;
@@ -120,9 +116,9 @@ namespace jrc
         bool hashit1         = src["hit"]["1"].size() > 0;
         if (bylevelhit)
         {
-            if (indexedhit)
+            if (hitindex)
             {
-                hiteffect = std::make_unique<ByLevelIndexedHitEffect>(src, hitindex);
+                hiteffect = std::make_unique<ByLevelIndexedHitEffect>(src, *hitindex);
             }
             else if (hashit0 && hashit1)
             {
@@ -137,9 +133,9 @@ namespace jrc
         {
             hiteffect = std::make_unique<BySkillLevelHitEffect>(src);
         }
-        else if (indexedhit)
+        else if (hitindex)
         {
-            hiteffect = std::make_unique<IndexedHitEffect>(src, hitindex);
+            hiteffect = std::make_unique<IndexedHitEffect>(src, *hitindex);
         }
         else if (hashit0 && hashit1)
         {

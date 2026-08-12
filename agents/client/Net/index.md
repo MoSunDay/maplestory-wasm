@@ -1,6 +1,6 @@
 # 网络层
 
-Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
+Commit: 2612e3cf9b22b324da0c751f32d2175f07030e3b
 
 ## 职责
 
@@ -51,6 +51,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 ### PacketHandler (`PacketHandler.h`)
 
 封包处理器接口。每个 handler 处理特定 opcode 的业务逻辑。各 handler 分门别类放在 `Handlers/` 目录。
+
+其他玩家的可见 Buff 按掩码位序完整解析后一次性提交到角色状态；截断封包在 `InPacket` 报错时不会留下部分斗气或属性充能状态。
 
 ### 注册复用登录协议
 
