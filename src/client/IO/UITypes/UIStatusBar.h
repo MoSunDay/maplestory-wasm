@@ -70,6 +70,7 @@ namespace jrc
         const std::vector<UIChatbar::PartyMember>& get_party_members() const;
         void toggle_menu_popup();
         void close_popup();
+        void request_cash_shop();
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
@@ -116,5 +117,6 @@ namespace jrc
         Animation hpanimation;
         Animation mpanimation;
         StatusBarPopup popup;
+        int32_t cashshop_request_cooldown = 0;
     };
 }

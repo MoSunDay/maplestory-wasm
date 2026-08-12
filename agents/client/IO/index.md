@@ -1,10 +1,10 @@
-# UI 系统
+Commit: 10fb657e2799392e1a15e8a68d1a989a5dcb6967
 
-Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
+# UI 系统
 
 ## 职责
 
-管理用户界面、输入处理和 UI 状态切换。`UI` 是顶层 UI 框架，通过 `UIState` 多态在登录状态和游戏状态之间切换。
+管理用户界面、输入处理和 UI 状态切换。`UI` 是顶层 UI 框架，通过 `UIState` 多态在登录、游戏和现金商城状态之间切换。
 
 ## 边界
 
@@ -16,7 +16,8 @@ Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
 ### UI (`UI.h`)
 
 UI 框架单例。核心职责:
-- `change_state(LOGIN/GAME)`: 切换 UI 状态（登录界面/游戏界面）
+- `change_state(LOGIN/GAME)`: 切换无会话参数的登录/游戏状态
+- `enter_cash_shop(model, female)`: 使用服务端会话快照和本地商品目录进入现金商城状态
 - `update()` / `draw()`: 更新和渲染当前状态的 UI 元素
 - 输入分发: `send_cursor()`, `send_key()`, `send_scroll()`, `doubleclick()`
 - `emplace<T>()`: 动态创建 UI 元素
@@ -25,9 +26,10 @@ UI 框架单例。核心职责:
 
 ### UIState (`UIState.h`)
 
-UI 状态接口。两个具体实现:
+UI 状态接口。三个具体实现:
 - `UIStateLogin`: 登录流程状态（登录、世界选择、角色选择、角色创建）
 - `UIStateGame`: 游戏内状态（状态栏、背包、技能、聊天等）
+- `UIStateCashShop`: 商城独占状态，管理商品、商城仓库、角色现金物品与弹窗输入
 
 每个状态包含一组 `UIElement` 子元素，支持:
 - `pre_add(type)`: 检查是否允许添加元素
@@ -74,6 +76,7 @@ UI 状态接口。两个具体实现:
 | `UINpcTalk` | NPC 对话界面 |
 | `UIShop` | NPC 商店界面 |
 | `UIStorage` | 仓库界面 |
+| `CashShop/UICashShop` | 现金商城；展示余额和 NX 商品目录，处理购买及商城仓库双向转移 |
 | `UIParty` | 组队界面 |
 | `UIKeyConfig` | 键位设置；从 `UIWindow2.img/KeyConfig` 加载完整键盘面板，并以同一份当前素材布局驱动映射图标绘制、点击和拖放命中 |
 | `UINotice` | 系统通知 |

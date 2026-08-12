@@ -108,7 +108,7 @@ namespace jrc
 
         statsentry.name = recv.read_padded_string(13);
 
-        recv.read_bool(); // gender
+        statsentry.female = recv.read_bool();
         recv.read_byte(); // skin
         recv.read_int();  // face
         recv.read_int();  // hair

@@ -85,7 +85,8 @@ namespace jrc
         int32_t cid = recv.read_int();
 
         auto charselect = UI::get().get_element<UICharSelect>();
-        if (!charselect)
+        bool returning_from_cash_shop = UI::get().get_state() == UI::CASHSHOP;
+        if (!charselect && !returning_from_cash_shop)
         {
             // The character-select screen is gone (e.g. after a reconnect
             // race). Re-enable the UI rather than leaving it frozen.
@@ -94,20 +95,45 @@ namespace jrc
             return;
         }
 
-        const CharEntry& playerentry = charselect->get_character(cid);
-        if (playerentry.cid != cid)
+        if (charselect)
         {
-            // The server sent a cid we do not have locally. Recover the UI.
-            Console::get().print("set_field: cid mismatch, cannot enter game");
+            const CharEntry& playerentry = charselect->get_character(cid);
+            if (playerentry.cid != cid)
+            {
+                Console::get().print("set_field: cid mismatch, cannot enter game");
+                UI::get().enable();
+                return;
+            }
+            Stage::get().loadplayer(playerentry);
+        }
+        else if (Stage::get().get_player().get_oid() != cid)
+        {
+            Console::get().print("set_field: cash shop return cid mismatch");
             UI::get().enable();
             return;
         }
 
-        Stage::get().loadplayer(playerentry);
-
-        LoginParser::parse_stats(recv);
-
         Player& player = Stage::get().get_player();
+        player.reset_progress(LoginParser::parse_stats(recv));
+
+        parse_character_data(recv, player);
+
+        player.recalc_stats(true);
+
+        uint8_t portalid = player.get_stats().get_portal();
+        int32_t mapid    = player.get_stats().get_mapid();
+
+        transition(mapid, portalid);
+
+        PlayerUpdatePacket().dispatch();
+
+        Sound(Sound::GAMESTART).play();
+
+        UI::get().change_state(UI::GAME);
+    }
+
+    void SetfieldHandler::parse_character_data(InPacket& recv, Player& player) const
+    {
 
         recv.read_byte(); // 'buddycap'
         if (recv.read_bool())
@@ -128,18 +154,7 @@ namespace jrc
         parse_nyinfo(recv);
         parse_areainfo(recv);
 
-        player.recalc_stats(true);
-
-        uint8_t portalid = player.get_stats().get_portal();
-        int32_t mapid    = player.get_stats().get_mapid();
-
-        transition(mapid, portalid);
-
-        PlayerUpdatePacket().dispatch();
-
-        Sound(Sound::GAMESTART).play();
-
-        UI::get().change_state(UI::GAME);
+        recv.read_short(); // trailing character-info marker
     }
 
     void SetfieldHandler::parse_inventory(InPacket& recv, Inventory& invent) const

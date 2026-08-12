@@ -19,6 +19,7 @@
 
 #include "UIStateLogin.h"
 #include "UIStateGame.h"
+#include "CashShop/UIStateCashShop.h"
 #include "UITypes/UIWorldMap.h"
 #include "Window.h"
 #include "../Audio/Audio.h"
@@ -36,6 +37,7 @@ namespace jrc
         cursor_press_id = 0;
         enabled = true;
         quitted = false;
+        state_id = LOGIN;
     }
 
     void UI::init()
@@ -77,6 +79,12 @@ namespace jrc
 
     void UI::change_state(State id)
     {
+        if (id == CASHSHOP)
+        {
+            Console::get().print("Cash shop state requires session data");
+            return;
+        }
+        remove_textfield();
         switch (id)
         {
         case LOGIN:
@@ -85,7 +93,21 @@ namespace jrc
         case GAME:
             state = std::make_unique<UIStateGame>();
             break;
+        case CASHSHOP: break;
         }
+        state_id = id;
+    }
+
+    void UI::enter_cash_shop(std::shared_ptr<CashShopModel> model, bool female)
+    {
+        remove_textfield();
+        state_id = CASHSHOP;
+        state = std::make_unique<UIStateCashShop>(std::move(model), female);
+    }
+
+    UI::State UI::get_state() const
+    {
+        return state_id;
     }
 
     void UI::quit()
