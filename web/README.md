@@ -44,3 +44,19 @@ on the host is reachable via `host.docker.internal`).
 `assets-server` speaks the LazyFS protocol used by `src/client/LazyFS`:
 `get_size` / `get_chunks` / `get_chunk` requests answered with binary chunk
 frames, which the client reassembles into a virtual filesystem.
+
+By default the asset server reads requested chunks from disk. Enable its full
+NX memory snapshot when the host has enough RAM:
+
+```bash
+# Docker stack
+ASSETS_CACHE_ALL_NX=true ./scripts/run_all.sh
+
+# Local binary
+./target/release/assets-server --port 8765 --directory . --cache-all-nx
+```
+
+The switch is off by default. In memory mode every `.nx` found under the
+served root and its `assets`, `serverAssets`, `wz`, and `data` directories is
+loaded before the port starts listening. Restart the service after replacing
+NX files.

@@ -74,6 +74,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 - **LazyFS**: 按需通过 WebSocket 分块请求加载 .nx 文件
 - **浏览器缓存**: 本地 IndexedDB 持久化缓存已加载的文件块，减少重复下载
+- **服务端全量内存缓存**: 可选在 assets-server 启动时把全部可服务 `.nx` 载入共享只读内存，消除后续块请求的磁盘打开与读取；默认关闭
 
 相关模块: [按需文件系统](agents/client/LazyFS/index.md)
 
