@@ -26,6 +26,21 @@
 
 namespace jrc
 {
+    void CancelChairHandler::handle(InPacket& recv) const
+    {
+        Player& player = Stage::get().get_player();
+        bool sitting = recv.available() && recv.read_bool();
+        if (sitting && recv.length() >= sizeof(int16_t))
+        {
+            recv.read_short();
+            player.apply_server_chair_state(true);
+        }
+        else
+        {
+            player.apply_server_chair_state(false);
+        }
+    }
+
     void KeymapHandler::handle(InPacket& recv) const
     {
         recv.skip(1);

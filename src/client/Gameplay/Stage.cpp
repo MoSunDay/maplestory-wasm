@@ -103,6 +103,7 @@ namespace jrc
         backgrounds = MapBackgrounds(src["back"]);
         physics     = Physics(src["foothold"]);
         mapinfo     = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
+        player.set_recovery_rate(mapinfo.get_recovery_rate());
         portals     = MapPortals(src["portal"], mapid);
         // Keep any effect injected during the fade transition (e.g. intro Scene packets).
         // `clear()` already resets stale effects before starting a map change.

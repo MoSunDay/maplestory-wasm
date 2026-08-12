@@ -36,6 +36,8 @@ namespace jrc
         int32_t get_id() const;
         // Returns the item price.
         int32_t get_price() const;
+        int32_t get_recovery_hp() const;
+        int32_t get_recovery_mp() const;
         // Returns the item's name loaded from the String.nx file.
         const std::string& get_name() const;
         // Returns the item's description loaded from the String.nx file.
@@ -56,6 +58,8 @@ namespace jrc
         BoolPair<Texture> icons;
         int32_t itemid;
         int32_t price;
+        int32_t recovery_hp;
+        int32_t recovery_mp;
         std::string name;
         std::string desc;
         std::string category;
