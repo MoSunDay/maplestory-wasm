@@ -260,6 +260,17 @@
             const detail = document.getElementById('loading-detail');
             const shownAt = performance.now();
             let finishTimer = null;
+            // Safety net: if the client never dismisses the overlay (a stall or
+            // hang before the first frame), surface a recoverable error instead
+            // of an eternal spinner. 45s tolerates slow first loads on cold cache.
+            const WATCHDOG_MS = 45000;
+            let watchdog = setTimeout(function () {
+                if (!screen.classList.contains('is-hidden')
+                    && !screen.classList.contains('is-error'))
+                {
+                    fail('启动超时，请刷新页面后重试');
+                }
+            }, WATCHDOG_MS);
 
             function safeText(value, fallback) {
                 return typeof value === 'string' && value.trim() ? value : fallback;
@@ -276,6 +287,7 @@
             }
 
             function finish() {
+                clearTimeout(watchdog);
                 const minimumVisibleMs = 700;
                 const delay = Math.max(0, minimumVisibleMs - (performance.now() - shownAt));
                 clearTimeout(finishTimer);
@@ -288,6 +300,7 @@
 
             function fail(message) {
                 clearTimeout(finishTimer);
+                clearTimeout(watchdog);
                 screen.dataset.phase = 'error';
                 screen.classList.remove('is-hidden');
                 screen.classList.add('is-error');
@@ -687,6 +700,15 @@
 
         window.onerror = function (event) {
             console.error('[post-exception status] Exception thrown, see JavaScript console');
+            // A fatal exception while the startup overlay is still visible must
+            // not leave an eternal spinner; surface a recoverable error instead.
+            const ls = document.getElementById('loading-screen');
+            if (ls && !ls.classList.contains('is-hidden')
+                && !ls.classList.contains('is-error')
+                && window.MapleWasmLoading)
+            {
+                window.MapleWasmLoading.fail('客户端运行出错，请刷新页面后重试');
+            }
         };
 
         // Fetch configuration before loading the client
