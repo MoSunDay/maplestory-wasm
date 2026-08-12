@@ -25,11 +25,40 @@
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Net/Packets/CharCreationPackets.h"
+#include "../../Util/Utf8.h"
 
 #include "nlnx/nx.hpp"
 
 namespace jrc
 {
+    namespace
+    {
+        constexpr uint32_t NAME_CHECK_TIMEOUT = 8000;
+
+        // The server remains authoritative for name policy and uniqueness.
+        // Only reject input that cannot be represented by its v83 protocol and
+        // database constraints, avoiding divergent client-side language rules.
+        bool is_locally_valid_name(const std::string& name)
+        {
+            if (name.size() < 3 || name.size() > 12)
+            {
+                return false;
+            }
+
+            for (size_t offset = 0; offset < name.size();)
+            {
+                size_t length = Utf8::sequence_length(name[offset]);
+                char32_t codepoint = Utf8::decode(name.data() + offset, name.size() - offset);
+                if (codepoint == Utf8::REPLACEMENT || codepoint > 0xFFFF || offset + length > name.size())
+                {
+                    return false;
+                }
+                offset += length;
+            }
+            return true;
+        }
+    }
+
     UICharcreation::UICharcreation()
     {
         nl::node src = nl::nx::ui["Login.img"];
@@ -211,7 +240,7 @@ namespace jrc
         switch (id)
         {
         case BT_CHARC_OK:
-            if (named)
+            if (naming_state == NamingState::CUSTOMIZING)
             {
                 std::string cname = namechar.get_text();
                 uint16_t cjob = 1;
@@ -226,30 +255,35 @@ namespace jrc
                 CreateCharPacket(cname, cjob, cface, chair, chairc, cskin, ctop, cbot, cshoe, cwep, female).dispatch();
                 return Button::PRESSED;
             }
+            else if (naming_state == NamingState::CHECKING)
+            {
+                return Button::PRESSED;
+            }
             else
             {
                 std::string name = namechar.get_text();
-                // UTF-8 byte length is not a valid character-count policy:
-                // one Han character occupies three bytes. Keep the protocol's
-                // 12-byte field limit in Textfield and let the server decide
-                // whether a non-empty name is legal.
-                if (!name.empty())
+                if (is_locally_valid_name(name))
                 {
                     namechar.set_state(Textfield::NORMAL);
-
-                    UI::get().disable();
-                    UI::get().focus_textfield(nullptr);
+                    naming_state = NamingState::CHECKING;
+                    pending_name = name;
+                    naming_elapsed = 0;
                     NameCharPacket(name).dispatch();
                     return Button::PRESSED;
                 }
                 else
                 {
+                    // Defer focus until after the current mouse press has
+                    // finished dispatching; otherwise that same OK click is
+                    // also routed outside the field and immediately blurs it.
+                    namechar.set_state(Textfield::NORMAL);
+                    focus_name_on_update = true;
                     UI::get().emplace<UILoginNotice>(UILoginNotice::ILLEGAL_NAME);
                     return Button::NORMAL;
                 }
             }
         case BT_CHARC_CANCEL:
-            if (named)
+            if (naming_state == NamingState::CUSTOMIZING)
             {
                 buttons[BT_CHARC_OK]->set_position({ 482, 292 });
                 buttons[BT_CHARC_CANCEL]->set_position({ 555, 292 });
@@ -272,12 +306,16 @@ namespace jrc
                 buttons[BT_CHARC_GENDERL]->set_active(false);
                 buttons[BT_CHARC_GEMDERR]->set_active(false);
                 buttons[BT_CHARC_CANCEL]->set_state(Button::NORMAL);
-                namechar.set_state(Textfield::NORMAL);
-                named = false;
+                restore_name_entry();
                 return Button::NORMAL;
             }
             else
             {
+                naming_state = NamingState::EDITING;
+                pending_name.clear();
+                naming_elapsed = 0;
+                focus_name_on_update = false;
+                namechar.set_state(Textfield::NORMAL);
                 active = false;
                 if (auto charselect = UI::get().get_element<UICharSelect>())
                     charselect->makeactive();
@@ -388,39 +426,62 @@ namespace jrc
         return UIElement::send_cursor(clicked, cursorpos);
     }
 
-    void UICharcreation::send_naming_result(bool nameused)
+    void UICharcreation::restore_name_entry()
     {
-        if (!named)
+        naming_state = NamingState::EDITING;
+        pending_name.clear();
+        naming_elapsed = 0;
+        focus_name_on_update = false;
+        buttons[BT_CHARC_OK]->set_state(Button::NORMAL);
+        namechar.set_state(Textfield::FOCUSED);
+    }
+
+    void UICharcreation::send_naming_result(const std::string& name, bool nameused)
+    {
+        if (naming_state != NamingState::CHECKING || name != pending_name)
         {
-            if (nameused)
-            {
-                namechar.change_text("");
-            }
-            else
-            {
-                named = true;
-                buttons[BT_CHARC_OK]->set_position(Point<int16_t>(486, 445));
-                buttons[BT_CHARC_CANCEL]->set_position(Point<int16_t>(560, 445));
-                buttons[BT_CHARC_FACEL]->set_active(true);
-                buttons[BT_CHARC_FACER]->set_active(true);
-                buttons[BT_CHARC_HAIRL]->set_active(true);
-                buttons[BT_CHARC_HAIRR]->set_active(true);
-                buttons[BT_CHARC_HAIRCL]->set_active(true);
-                buttons[BT_CHARC_HAIRCR]->set_active(true);
-                buttons[BT_CHARC_SKINL]->set_active(true);
-                buttons[BT_CHARC_SKINR]->set_active(true);
-                buttons[BT_CHARC_TOPL]->set_active(true);
-                buttons[BT_CHARC_TOPR]->set_active(true);
-                buttons[BT_CHARC_BOTL]->set_active(true);
-                buttons[BT_CHARC_BOTR]->set_active(true);
-                buttons[BT_CHARC_SHOESL]->set_active(true);
-                buttons[BT_CHARC_SHOESR]->set_active(true);
-                buttons[BT_CHARC_WEPL]->set_active(true);
-                buttons[BT_CHARC_WEPR]->set_active(true);
-                buttons[BT_CHARC_GENDERL]->set_active(true);
-                buttons[BT_CHARC_GEMDERR]->set_active(true);
-                namechar.set_state(Textfield::DISABLED);
-            }
+            return;
+        }
+
+        // The field remains editable while the request is in flight. Never
+        // apply an old response to text the player has already changed.
+        if (namechar.get_text() != pending_name)
+        {
+            restore_name_entry();
+            return;
+        }
+
+        if (nameused)
+        {
+            restore_name_entry();
+            UI::get().emplace<UILoginNotice>(UILoginNotice::NAME_IN_USE);
+        }
+        else
+        {
+            naming_state = NamingState::CUSTOMIZING;
+            pending_name.clear();
+            naming_elapsed = 0;
+            buttons[BT_CHARC_OK]->set_position(Point<int16_t>(486, 445));
+            buttons[BT_CHARC_CANCEL]->set_position(Point<int16_t>(560, 445));
+            buttons[BT_CHARC_FACEL]->set_active(true);
+            buttons[BT_CHARC_FACER]->set_active(true);
+            buttons[BT_CHARC_HAIRL]->set_active(true);
+            buttons[BT_CHARC_HAIRR]->set_active(true);
+            buttons[BT_CHARC_HAIRCL]->set_active(true);
+            buttons[BT_CHARC_HAIRCR]->set_active(true);
+            buttons[BT_CHARC_SKINL]->set_active(true);
+            buttons[BT_CHARC_SKINR]->set_active(true);
+            buttons[BT_CHARC_TOPL]->set_active(true);
+            buttons[BT_CHARC_TOPR]->set_active(true);
+            buttons[BT_CHARC_BOTL]->set_active(true);
+            buttons[BT_CHARC_BOTR]->set_active(true);
+            buttons[BT_CHARC_SHOESL]->set_active(true);
+            buttons[BT_CHARC_SHOESR]->set_active(true);
+            buttons[BT_CHARC_WEPL]->set_active(true);
+            buttons[BT_CHARC_WEPR]->set_active(true);
+            buttons[BT_CHARC_GENDERL]->set_active(true);
+            buttons[BT_CHARC_GEMDERR]->set_active(true);
+            namechar.set_state(Textfield::DISABLED);
             buttons[BT_CHARC_OK]->set_state(Button::NORMAL);
         }
     }
@@ -440,7 +501,7 @@ namespace jrc
         cloud.draw(Point<int16_t>(cloudx, 300));
         cloud.draw(Point<int16_t>(cloudx + cloud.width(), 300));
 
-        if (!named)
+        if (naming_state != NamingState::CUSTOMIZING)
         {
             nameboard.draw(Point<int16_t>(455, 115 ));
             namechar.draw(position);
@@ -457,7 +518,7 @@ namespace jrc
 
         newchar.draw({ 360, 348 }, alpha);
 
-        if (named)
+        if (naming_state == NamingState::CUSTOMIZING)
         {
             facename.draw(Point<int16_t>(591, 214));
             hairname.draw(Point<int16_t>(591, 233));
@@ -475,7 +536,7 @@ namespace jrc
     {
         UIElement::update();
 
-        if (named)
+        if (naming_state == NamingState::CUSTOMIZING)
         {
             for (auto& sprite : sprites_lookboard)
             {
@@ -485,6 +546,22 @@ namespace jrc
 
         newchar.update(Constants::TIMESTEP);
         namechar.update(position);
+
+        if (focus_name_on_update)
+        {
+            focus_name_on_update = false;
+            namechar.set_state(Textfield::FOCUSED);
+        }
+
+        if (naming_state == NamingState::CHECKING)
+        {
+            naming_elapsed += Constants::TIMESTEP;
+            if (naming_elapsed >= NAME_CHECK_TIMEOUT)
+            {
+                restore_name_entry();
+                UI::get().emplace<UILoginNotice>(UILoginNotice::UNABLE_TO_CONNECT);
+            }
+        }
 
         cloudfx += 0.25f;
     }
