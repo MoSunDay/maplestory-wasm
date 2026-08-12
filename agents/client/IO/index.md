@@ -75,7 +75,7 @@ UI 状态接口。两个具体实现:
 | `UIShop` | NPC 商店界面 |
 | `UIStorage` | 仓库界面 |
 | `UIParty` | 组队界面 |
-| `UIKeyConfig` | 键位设置；从 `UIWindow2.img/KeyConfig` 加载当前 UI.nx 的完整键盘面板 |
+| `UIKeyConfig` | 键位设置；从 `UIWindow2.img/KeyConfig` 加载完整键盘面板，并以同一份当前素材布局驱动映射图标绘制、点击和拖放命中 |
 | `UINotice` | 系统通知 |
 | `UISoftKey` | 虚拟按键 (移动端) |
 

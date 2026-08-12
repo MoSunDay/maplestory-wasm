@@ -7,6 +7,7 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "../Layout/KeyConfigLayout.h"
 
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
@@ -366,92 +367,7 @@ namespace jrc
 
     void UIKeyConfig::load_key_bounds()
     {
-        key_bounds.clear();
-
-        auto add_key = [&](KeyConfig::Key key, int16_t x, int16_t y, int16_t width = 32, int16_t height = 32)
-        {
-            key_bounds[key] = Rectangle<int16_t>(
-                Point<int16_t>(x, y),
-                Point<int16_t>(x + width, y + height)
-            );
-        };
-
-        auto add_row = [&](std::initializer_list<KeyConfig::Key> keys, int16_t start_x, int16_t y, int16_t step = 34)
-        {
-            int16_t x = start_x;
-            for (KeyConfig::Key key : keys)
-            {
-                add_key(key, x, y);
-                x += step;
-            }
-        };
-
-        // The background already paints the keyboard legends. These bounds
-        // follow the visible key caps so dragging and dropping lines up with
-        // the artwork in the current UI.nx set.
-        add_key(KeyConfig::ESCAPE, 12, 26);
-        add_row(
-            {
-                KeyConfig::F1, KeyConfig::F2, KeyConfig::F3, KeyConfig::F4,
-                KeyConfig::F5, KeyConfig::F6, KeyConfig::F7, KeyConfig::F8,
-                KeyConfig::F9, KeyConfig::F10, KeyConfig::F11, KeyConfig::F12
-            },
-            80,
-            26
-        );
-        add_key(KeyConfig::SCROLL_LOCK, 546, 26);
-
-        add_key(KeyConfig::GRAVE_ACCENT, 12, 66);
-        add_row(
-            {
-                KeyConfig::NUM1, KeyConfig::NUM2, KeyConfig::NUM3, KeyConfig::NUM4,
-                KeyConfig::NUM5, KeyConfig::NUM6, KeyConfig::NUM7, KeyConfig::NUM8,
-                KeyConfig::NUM9, KeyConfig::NUM0, KeyConfig::MINUS, KeyConfig::EQUAL
-            },
-            46,
-            66
-        );
-        add_row({ KeyConfig::INSERT, KeyConfig::HOME, KeyConfig::PAGE_UP }, 512, 66);
-
-        add_row(
-            {
-                KeyConfig::Q, KeyConfig::W, KeyConfig::E, KeyConfig::R,
-                KeyConfig::T, KeyConfig::Y, KeyConfig::U, KeyConfig::I,
-                KeyConfig::O, KeyConfig::P, KeyConfig::LEFT_BRACKET,
-                KeyConfig::RIGHT_BRACKET, KeyConfig::BACKSLASH
-            },
-            96,
-            99
-        );
-        add_row({ KeyConfig::DELETE, KeyConfig::END, KeyConfig::PAGE_DOWN }, 512, 99);
-
-        add_row(
-            {
-                KeyConfig::A, KeyConfig::S, KeyConfig::D, KeyConfig::F,
-                KeyConfig::G, KeyConfig::H, KeyConfig::J, KeyConfig::K,
-                KeyConfig::L, KeyConfig::SEMICOLON, KeyConfig::APOSTROPHE
-            },
-            79,
-            132
-        );
-
-        add_key(KeyConfig::LEFT_SHIFT, 12, 165, 84, 32);
-        add_row(
-            {
-                KeyConfig::Z, KeyConfig::X, KeyConfig::C, KeyConfig::V,
-                KeyConfig::B, KeyConfig::N, KeyConfig::M, KeyConfig::COMMA,
-                KeyConfig::PERIOD
-            },
-            96,
-            165
-        );
-        add_key(KeyConfig::RIGHT_SHIFT, 436, 165, 68, 32);
-
-        add_key(KeyConfig::LEFT_CONTROL, 12, 198, 50, 32);
-        add_key(KeyConfig::LEFT_ALT, 112, 198, 54, 32);
-        add_key(KeyConfig::SPACE, 166, 198, 168, 32);
-        add_key(KeyConfig::RIGHT_ALT, 334, 198, 56, 32);
-        add_key(KeyConfig::RIGHT_CONTROL, 446, 198, 58, 32);
+        key_bounds = KeyConfigLayout::key_bounds();
     }
 
     void UIKeyConfig::load_action_icons()
