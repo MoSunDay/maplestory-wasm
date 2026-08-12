@@ -2,6 +2,7 @@
 
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Texture.h"
+#include "../../Template/Interpolated.h"
 
 #include "nlnx/node.hpp"
 
@@ -20,6 +21,10 @@ namespace jrc
         void update();
         /// Draw the active fall animation or persistent landed frame.
         void draw(Point<int16_t> position, float alpha) const;
+        /// Return the interpolated ghost offset around the landed tomb.
+        Point<int16_t> ghost_offset(float alpha) const;
+        /// Return whether the ghost belongs in front of the landed tomb.
+        bool ghost_in_front(float alpha) const;
         /// Hide the tomb and discard any pending landed event.
         void clear();
 
@@ -38,6 +43,7 @@ namespace jrc
         static Texture land_source;
 
         Animation fall;
+        Linear<float> orbit_angle;
         Phase phase = Phase::HIDDEN;
         bool landed_event = false;
     };

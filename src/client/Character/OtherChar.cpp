@@ -126,4 +126,35 @@ namespace jrc
 
         return iter->second;
     }
+
+    int16_t OtherChar::get_visual_buff_value(Buffstat::Id stat) const
+    {
+        return visual_buffs[stat].value;
+    }
+
+    int32_t OtherChar::get_visual_buff_source(Buffstat::Id stat) const
+    {
+        return visual_buffs[stat].skillid;
+    }
+
+    void OtherChar::set_visual_buff(Buffstat::Id stat, int16_t value, int32_t source)
+    {
+        if (source == 0)
+        {
+            source = visual_buffs[stat].skillid;
+        }
+        visual_buffs[stat] = { stat, value, source, 0 };
+    }
+
+    void OtherChar::set_visual_buff_source(Buffstat::Id stat, int32_t source)
+    {
+        Buff& buff = visual_buffs[stat];
+        buff.stat = stat;
+        buff.skillid = source;
+    }
+
+    void OtherChar::cancel_visual_buff(Buffstat::Id stat)
+    {
+        visual_buffs[stat] = {};
+    }
 }

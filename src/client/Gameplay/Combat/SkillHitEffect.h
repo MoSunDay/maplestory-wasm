@@ -22,6 +22,8 @@
 
 #include "../../Template/BoolPair.h"
 
+#include <vector>
+
 namespace jrc
 {
     // Interface for hit effects, animations applied to a mob for each hit.
@@ -90,6 +92,26 @@ namespace jrc
     };
 
 
+    enum class HitEffectIndex
+    {
+        HIT,
+        TARGET
+    };
+
+
+    // Selects one NX hit branch for each damage line or target.
+    class IndexedHitEffect : public SkillHitEffect
+    {
+    public:
+        IndexedHitEffect(nl::node src, HitEffectIndex index);
+        void apply(const AttackUser& user, Mob& target) const override;
+
+    private:
+        std::vector<Effect> effects;
+        HitEffectIndex index;
+    };
+
+
     // The animation changes with the character level.
     class ByLevelHitEffect : public SkillHitEffect
     {
@@ -113,6 +135,18 @@ namespace jrc
 
     private:
         std::map<uint16_t, BoolPair<Effect>> effects;
+    };
+
+
+    class ByLevelIndexedHitEffect : public SkillHitEffect
+    {
+    public:
+        ByLevelIndexedHitEffect(nl::node src, HitEffectIndex index);
+        void apply(const AttackUser& user, Mob& target) const override;
+
+    private:
+        std::map<uint16_t, std::vector<Effect>> effects;
+        HitEffectIndex index;
     };
 
 

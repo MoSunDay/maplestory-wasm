@@ -484,6 +484,16 @@ namespace jrc
         return buffs[stat].value > 0;
     }
 
+    int16_t Player::get_visual_buff_value(Buffstat::Id stat) const
+    {
+        return buffs[stat].value;
+    }
+
+    int32_t Player::get_visual_buff_source(Buffstat::Id stat) const
+    {
+        return buffs[stat].skillid;
+    }
+
     void Player::change_skill(int32_t skill_id, int32_t skill_level,
         int32_t masterlevel, int64_t expiration) {
 

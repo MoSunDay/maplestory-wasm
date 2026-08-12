@@ -201,16 +201,12 @@ namespace jrc
             return;
         }
 
-        // Drive gameplay repeats from the fixed update loop so held jump/attack
-        // behave consistently even when platform key-repeat is absent or uneven.
+        // Jump remains a held action. Attacks are edge-triggered in send_key;
+        // repeating them here makes a single press restart combat forever if
+        // a browser or focus transition loses the corresponding key-up event.
         if (player.is_key_down(KeyAction::JUMP))
         {
             playable->send_action(KeyAction::JUMP, true);
-        }
-
-        if (player.is_key_down(KeyAction::ATTACK))
-        {
-            combat.use_move(0);
         }
 
         // Time-based pickup retry system

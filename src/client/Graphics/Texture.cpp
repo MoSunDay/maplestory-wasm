@@ -24,7 +24,7 @@
 
 namespace jrc
 {
-    Texture::Texture(nl::node src, LoadPolicy policy) : load_policy(policy)
+    Texture::Texture(nl::node src)
     {
         if (src.data_type() == nl::node::type::bitmap)
         {
@@ -43,18 +43,15 @@ namespace jrc
             origin = src["origin"];
             dimensions = Point<int16_t>(bitmap.width(),  bitmap.height());
 
-            if (load_policy == DEFERRED)
-            {
-                bitmap.prefetch();
-            }
-            else
-            {
-                GraphicsGL::get().addbitmap(bitmap);
-            }
+#ifdef MS_PLATFORM_WASM
+            GraphicsGL::get().queuebitmap(bitmap);
+#else
+            GraphicsGL::get().addbitmap(bitmap);
+#endif
         }
     }
 
-    Texture::Texture() : load_policy(IMMEDIATE) {}
+    Texture::Texture() {}
 
     Texture::~Texture() {}
 
@@ -64,16 +61,17 @@ namespace jrc
         if (id == 0)
             return;
 
-        if (load_policy == DEFERRED && !GraphicsGL::get().hasbitmap(bitmap))
+        if (!GraphicsGL::get().hasbitmap(bitmap))
         {
-            if (!bitmap.data_ready())
-            {
-                // A failed or interrupted request is safe to retry; the JS
-                // backend deduplicates an already-running range prefetch.
-                bitmap.prefetch();
-                return;
-            }
+#ifdef MS_PLATFORM_WASM
+            // Construction already scheduled this bitmap. Re-queueing here
+            // also recovers after an atlas clear without blocking the frame.
+            GraphicsGL::get().queuebitmap(bitmap);
+            bitmap.request();
+            return;
+#else
             GraphicsGL::get().addbitmap(bitmap);
+#endif
         }
 
         GraphicsGL::get()

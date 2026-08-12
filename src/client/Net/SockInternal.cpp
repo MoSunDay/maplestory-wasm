@@ -17,13 +17,24 @@
 #define MAX_PACKET_LENGTH 4096 * 16
 
 #define WEB_SOCK_PORT "8080"
+#define WEB_SOCK_KEEPALIVE_INTERVAL_MS 25000
 
 namespace
 {
+	std::string format_url_host(const std::string& host)
+	{
+		if (host.find(':') != std::string::npos && (host.empty() || host.front() != '['))
+		{
+			return "[" + host + "]";
+		}
+		return host;
+	}
+
 	bool onopen(int eventType, const EmscriptenWebSocketOpenEvent* event, void* userData);
 	bool onmessage(int eventType, const EmscriptenWebSocketMessageEvent* event, void* userData);
 	bool onerror(int eventType, const EmscriptenWebSocketErrorEvent* event, void* userData);
 	bool onclose(int eventType, const EmscriptenWebSocketCloseEvent* event, void* userData);
+	void send_transport_keepalive(void* userData);
 
 	enum class WebSockState
 	{
@@ -44,7 +55,7 @@ namespace
 
 		~WebSockInstance()
 		{
-			// Vector cleans up itself
+			stop_keepalive();
 		}
 
 		void on_received(uint8_t* data, size_t len)
@@ -55,6 +66,7 @@ namespace
 
 		void disconnect()
 		{
+			stop_keepalive();
 			if (connected != WebSockState::CLOSED)
 			{
 				emscripten_websocket_close(socket, 1000, "Client closing");
@@ -67,6 +79,22 @@ namespace
 		void on_open()
 		{
 			connected = WebSockState::OPEN;
+			keepalive_timer = emscripten_set_interval(
+				send_transport_keepalive,
+				WEB_SOCK_KEEPALIVE_INTERVAL_MS,
+				this
+			);
+		}
+
+		void send_keepalive()
+		{
+			if (connected != WebSockState::OPEN)
+				return;
+
+			// A zero-length WebSocket data frame keeps intermediaries active but
+			// contributes no bytes to the proxied Cosmic TCP stream.
+			uint8_t empty_frame = 0;
+			emscripten_websocket_send_binary(socket, &empty_frame, 0);
 		}
 
 		size_t send(const void* data, size_t len)
@@ -106,10 +134,26 @@ namespace
 		}
 
 	  private:
+		void stop_keepalive()
+		{
+			if (keepalive_timer != 0)
+			{
+				emscripten_clear_interval(keepalive_timer);
+				keepalive_timer = 0;
+			}
+		}
+
 		EMSCRIPTEN_WEBSOCKET_T socket;
 		std::vector<int8_t> buffer;
 		WebSockState connected;
+		long keepalive_timer = 0;
 	};
+
+	void send_transport_keepalive(void* userData)
+	{
+		auto instance = static_cast<WebSockInstance*>(userData);
+		instance->send_keepalive();
+	}
 
 	class WebSockManager : public jrc::Singleton<WebSockManager>
 	{
@@ -122,9 +166,9 @@ namespace
 			std::string proxy_port = jrc::Setting<jrc::ProxyPort>::get().load();
 			
 			if (!proxy_ip.empty()) {
-				ws_url += proxy_ip;
+				ws_url += format_url_host(proxy_ip);
 			} else {
-				ws_url += jrc::getBrowserHostname(); // Dynamic hostname from browser
+				ws_url += format_url_host(jrc::getBrowserHostname()); // Dynamic hostname from browser
 			}
 			
 			ws_url += ":";

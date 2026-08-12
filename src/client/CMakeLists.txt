@@ -41,7 +41,8 @@ if(EMSCRIPTEN)
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial.ttf@fonts/Arial/Arial.ttf"
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial-Bold.ttf@fonts/Arial/Arial-Bold.ttf"
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/DroidSansFallback/DroidSansFallbackFull.ttf@fonts/DroidSansFallback/DroidSansFallbackFull.ttf"
-        --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs.js
+        "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs_connection.js"
+        "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs.js"
         -sASSERTIONS=1
     )
     
