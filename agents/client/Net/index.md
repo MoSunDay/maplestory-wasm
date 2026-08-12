@@ -1,6 +1,6 @@
 # 网络层
 
-Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
 
 ## 职责
 
@@ -23,6 +23,8 @@ Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
 - `is_connected()`: 连接状态
 
 内部维护接收缓冲区、位置指针、连接状态，以及 `connection_changed` 标志：`reconnect()` 末尾置位，`process()` 在解出一个封包后检查，若已置位则丢弃缓冲区剩余字节并复位——防止在 `forward()` 期间触发重连后，用新加密上下文继续解密旧连接的尾部字节（跨连接污染）。使用 ASIO (非 WASM) 或 Winsock 作为底层 socket 实现。
+
+WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP` 构造 IPv4、域名或带 URI 方括号的 IPv6 URL；每 25 秒发送一个零长度二进制 WebSocket 帧，只维持传输层活动，不向 Cosmic TCP 流注入数据。游戏协议仍由服务端 `PING` 和客户端 `PONG` 保活；若 Session 非主动断开，主循环停止并通过页面级一次性提示告知游戏已经退出。
 
 ### 重连路径与 UI 恢复契约
 

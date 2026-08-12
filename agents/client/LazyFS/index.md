@@ -1,6 +1,6 @@
 # 按需文件系统 (LazyFS)
 
-Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
+Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
 
 ## 职责
 
@@ -16,7 +16,7 @@ Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
 ### LazyFS 命名空间 (`LazyFS.h`)
 
 简洁的公共 API:
-- `Initialize()`: 同步 C++ 侧块大小 (`LazyFileBackend::CHUNK_SIZE`) 到 JavaScript 层，并确定资源 WebSocket URL。URL 来源优先级: 显式配置或 query 参数 `assets_url` > `AssetsServerIP/Port/Protocol` 配置 > 按页面地址自动探测 (默认 8765 端口)
+- `Initialize()`: 同步 C++ 侧块大小 (`LazyFileBackend::CHUNK_SIZE`) 到 JavaScript 层，并确定资源 WebSocket URL。URL 来源优先级: 显式配置或 query 参数 `assets_url` > `AssetsServerIP/Port/Protocol` 配置 > 按页面地址自动探测 (默认 8765 端口)；裸 IPv6 地址会自动补 URI 方括号
 - `RegisterFile(filepath, url)`: 在虚拟文件系统中注册一个文件；注册时即通过 WebSocket `get_size` 获取文件大小，数据本身延迟到首次读取时加载
 - `StartItemAssetPreload()`: 首次进入游戏后启动一次非阻塞物品素材预载；失败后再次进入游戏可重试
 
@@ -28,8 +28,10 @@ Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
    - 首次访问某块时，通过 WebSocket 发送 `get_chunks` 批量请求到 assets-server
    - 服务端以二进制帧返回块数据（4 字节块索引 + 文件名 + 原始数据），`chunks_done` 标记批次结束
    - 返回的块写入内存缓存与 IndexedDB，后续访问直接命中缓存
-4. 浏览器端的 WebSocket 连接、批量请求合并与缓存由 JavaScript 层 (`lazyfs.js`) 处理
-5. 进入游戏后以单块批次后台预取完整 `String.nx`、`Item.nx` 和 `Character.nx` 元数据；交互读取仍可插队，装备图片随实际出现继续按范围预取
+4. 浏览器端连接由 `lazyfs_connection.js` 管理：并发调用共享同一个连接 Promise；每 25 秒通过只读 `get_size` 保活；意外断线按 1/2/4 秒重试并在新连接上重放未完成请求。重试耗尽后拒绝待处理任务，由前台素材错误态允许用户重新建连重试
+5. 后台范围预取由固定 4 路队列调度；进入游戏后预取完整 `String.nx`、`Item.nx` 和 `Character.nx` 元数据，已实例化贴图也静默加入队列
+6. 贴图实际进入绘制路径但范围尚未驻留时，原预取任务会提升为前台任务并越过后台并发队列；同步前台读取也使用同一套请求键去重
+7. 前台任务只有在内存和 IndexedDB 均未命中、必须等待网络时才驱动页面素材遮罩；失败时保留错误提示和重试入口，后台预取从不显示遮罩
 
 ### 缓存策略
 
@@ -37,7 +39,8 @@ Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
 - 浏览器 IndexedDB 缓存：`lazyfs.js` 将文件块持久化到 IndexedDB（键带版本标签，跨浏览器重启有效）
 - 缓存优先级：内存 → IndexedDB → WebSocket 请求
 - 物品预载不设置应用级过期时间，并请求浏览器持久存储权限；浏览器仍可能因用户操作或存储压力回收数据
-- 延迟物品纹理先异步预取对应范围，范围进入内存后才解压并上传 WebGL，避免网络等待阻塞渲染循环
+- 预载完成状态以 IndexedDB 事务结果为准：持久权限获批且写入全成功为 `complete`，权限未获批但写入成功为 `degraded`，任一缓存写失败为 `failed`
+- 所有已实例化纹理先异步预取对应范围，范围进入内存后再由图形层按帧预算解压并上传 WebGL，避免网络等待阻塞渲染循环
 
 ## 文件组织
 
@@ -46,7 +49,8 @@ Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
 | `LazyFS.h` / `LazyFS.cpp` | 公共 API 和初始化逻辑 |
 | `LazyFileBackend.h` / `LazyFileBackend.cpp` | 文件后端，管理文件描述符，经 JS 桥接按块读取（支持 read/seek/stat 与 mmap 风格随机访问） |
 | `LazyFileLoader.h` / `LazyFileLoader.cpp` | 单文件分块加载器，维护已加载块的 LRU 缓存 |
-| `lazyfs.js` | JavaScript 桥接层，处理 WebSocket 分块请求与内存/IndexedDB 两级缓存 |
+| `lazyfs_connection.js` | WebSocket 生命周期、保活、有限重连和未完成请求重放 |
+| `lazyfs.js` | JavaScript 文件操作层，处理分块响应、预取与内存/IndexedDB 两级缓存 |
 
 ## 依赖关系
 
