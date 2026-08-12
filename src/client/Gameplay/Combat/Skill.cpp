@@ -119,15 +119,31 @@ namespace jrc
         bool hashit1         = src["hit"]["1"].size() > 0;
         if (bylevelhit)
         {
-            // CharLevel hit branches use the established weapon-handedness
-            // convention; nested numbers are not damage-line indices.
+            // A pair of direct fallbacks declares the established weapon-
+            // handedness convention used by CharLevel effects.
             if (hashit0 && hashit1)
             {
                 hiteffect = std::make_unique<ByLevelTwoHHitEffect>(src);
             }
             else
             {
-                hiteffect = std::make_unique<ByLevelHitEffect>(src);
+                size_t level_hitvariants = 0;
+                for (auto character_level : src["CharLevel"])
+                {
+                    size_t variants = 0;
+                    for (auto hit : character_level["hit"])
+                    {
+                        if (hit["0"].data_type() == nl::node::type::bitmap)
+                            ++variants;
+                    }
+                    level_hitvariants = std::max(level_hitvariants, variants);
+                }
+                auto level_index = attack_effect::indexed_hit(
+                    level_hitvariants, attackcount, mobcount);
+                if (level_index)
+                    hiteffect = std::make_unique<ByLevelIndexedHitEffect>(src, *level_index);
+                else
+                    hiteffect = std::make_unique<ByLevelHitEffect>(src);
             }
         }
         else if (byskilllevelhit)
