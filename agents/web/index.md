@@ -1,6 +1,6 @@
 # Web 基础设施
 
-Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
+Commit: 39118cd0e745b836add45750d52d137df1ff46de
 
 ## 职责
 
