@@ -65,7 +65,26 @@ try {
   const pageUrl = await resolvePageUrl();
   console.log(`WebUI endpoint: ${pageUrl}`);
   await driver.start();
+  // Delay the dynamically injected client briefly so the pre-WASM loading
+  // state is observable and screenshot validation cannot race the first frame.
+  await driver.setNetworkLatency(500);
   await driver.navigate(pageUrl);
+  await requireState('loading font ready', async () =>
+    await driver.evaluate("document.fonts.check('16px Maple CJK')"));
+  const loadingScreen = await driver.evaluate(`(() => {
+    const screen = document.getElementById('loading-screen');
+    return screen && {
+      phase: screen.dataset.phase,
+      visible: !screen.classList.contains('is-hidden'),
+      title: document.getElementById('loading-title').textContent
+    };
+  })()`);
+  if (!loadingScreen || !loadingScreen.visible || !loadingScreen.title) {
+    throw new Error('Loading screen was not visible while the client initialized');
+  }
+  console.log('PASS  loading screen visible');
+  await driver.screenshot('00-loading');
+  await driver.setNetworkLatency(0);
   await requireState('WASM module initialized', async () => {
     try {
       return await driver.evaluate(
@@ -75,6 +94,12 @@ try {
       return false;
     }
   }, 90);
+  if (!driver.logs.some(line => line.includes('[loading] assets'))) {
+    throw new Error('NX asset loading phase was not reported');
+  }
+  console.log('PASS  NX asset loading phase reported');
+  await requireState('loading screen dismissed after first frame', async () =>
+    await driver.evaluate("document.getElementById('loading-screen').classList.contains('is-hidden')"));
   if (await driver.evaluate('document.title') !== '冒险岛online') {
     throw new Error('Unexpected WebUI document title');
   }

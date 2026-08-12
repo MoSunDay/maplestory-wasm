@@ -37,6 +37,42 @@
 
 namespace jrc
 {
+#ifdef MS_PLATFORM_WASM
+    namespace
+    {
+        void set_loading_phase(const char* phase, const char* message, const char* detail)
+        {
+            EM_ASM({
+                if (window.MapleWasmLoading)
+                {
+                    window.MapleWasmLoading.setPhase(
+                        UTF8ToString($0), UTF8ToString($1), UTF8ToString($2));
+                }
+            }, phase, message, detail);
+        }
+
+        void finish_loading_screen()
+        {
+            EM_ASM({
+                if (window.MapleWasmLoading)
+                {
+                    window.MapleWasmLoading.finish();
+                }
+            });
+        }
+
+        void show_loading_error(const char* message)
+        {
+            EM_ASM({
+                if (window.MapleWasmLoading)
+                {
+                    window.MapleWasmLoading.fail(UTF8ToString($0));
+                }
+            }, message);
+        }
+    }
+#endif
+
     Error init()
     {
 #ifdef MS_PLATFORM_WASM
@@ -71,11 +107,23 @@ namespace jrc
             return error;
         }
 
+#ifdef MS_PLATFORM_WASM
+        set_loading_phase(
+            "assets",
+            "正在加载游戏素材…",
+            "首次进入可能需要更长时间，请不要关闭页面");
+#endif
         if (Error error = NxFiles::init())
         {
             return error;
         }
 
+#ifdef MS_PLATFORM_WASM
+        set_loading_phase(
+            "initializing",
+            "正在初始化游戏界面…",
+            "素材加载完成，即将进入游戏");
+#endif
         if (Error error = Window::get().init())
         {
             return error;
@@ -146,6 +194,15 @@ namespace jrc
 
         float alpha = static_cast<float>(accumulator) / timestep;
         draw(alpha);
+
+        // Keep the DOM loading layer above the black canvas until the client
+        // has actually completed its first rendered frame.
+        static bool first_frame_presented = false;
+        if (!first_frame_presented)
+        {
+            finish_loading_screen();
+            first_frame_presented = true;
+        }
 
         bool show_fps = true; // Hardcoded or from config
         if (show_fps)
@@ -222,6 +279,10 @@ namespace jrc
 
             std::cout << "Error: " << message << args << std::endl;
 
+#ifdef MS_PLATFORM_WASM
+            const std::string loading_error = std::string(message) + args;
+            show_loading_error(loading_error.c_str());
+#endif
             std::string command;
             std::cin >> command;
 
