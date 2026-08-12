@@ -71,7 +71,13 @@ namespace jrc
         }
     }
 
-    void UIStateLogin::doubleclick(Point<int16_t>) {}
+    void UIStateLogin::doubleclick(Point<int16_t> pos)
+    {
+        if (UIElement* front = get_front(pos))
+        {
+            front->doubleclick(pos);
+        }
+    }
 
     void UIStateLogin::rightclick(Point<int16_t>) {}
 
