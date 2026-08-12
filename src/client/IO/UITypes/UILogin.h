@@ -35,6 +35,7 @@ namespace jrc
 
         void draw(float alpha) const override;
         void update() override;
+        void restore_focus();
 
         CursorResult send_cursor(bool clicked, Point<int16_t> cursor_pos) override;
 
@@ -43,6 +44,7 @@ namespace jrc
 
     private:
         void login();
+        void blur_fields();
 
         enum Buttons
         {
