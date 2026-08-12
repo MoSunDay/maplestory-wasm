@@ -1,6 +1,6 @@
 # 功能能力索引
 
-Commit: 589b388fb88255db718e2ccd67b1e0a219fdd1f1
+Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
 
 ## 概述
 
@@ -15,9 +15,9 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **角色创建/删除**: 创建新角色或删除已有角色；新建冒险家、骑士团、战神的 STR/DEX/INT/LUK 均初始化为 20
 - **角色选择**: 选择角色进入游戏世界
 - **PIC 认证**: 二次密码验证
-- **游戏内账号注册**: 登录界面注册按钮打开 NX 原生风格表单；账号限 4–12 位 ASCII 字母数字，密码限 6–12 位非空白可打印 ASCII，确认一致后通过现有登录协议自动建号、接受 TOS 并继续登录
+- **游戏内账号注册**: 登录界面注册按钮打开 NX 原生风格表单；账号限 4–12 位 ASCII 字母数字，密码限 4–12 位非空白可打印 ASCII，确认一致后通过现有登录协议自动建号、接受 TOS 并继续登录
 
-相关模块: [网络层](agents/client/Net/index.md), [UI 系统](agents/client/IO/index.md)
+相关模块: [网络层](../agents/client/Net/index.md), [UI 系统](../agents/client/IO/index.md)
 
 ### 输入与本地化
 
@@ -33,17 +33,18 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **掉落物**: 物品/meso 的拾取
 - **小地图/世界地图**: 地图导航
 
-相关模块: [游戏世界](agents/client/Gameplay/index.md), [图形渲染](agents/client/Graphics/index.md)
+相关模块: [游戏世界](../agents/client/Gameplay/index.md), [图形渲染](../agents/client/Graphics/index.md)
 
 ### 战斗系统
 
 - **普通攻击**: 近战/远程攻击
 - **技能使用**: 各职业技能施放
+- **攻击特效**: 支持多段/多目标命中、斗气终结和属性充能特效；一次按键只发起一次攻击
 - **伤害数字显示**: 伤害数值渲染
 - **Buff 管理**: 增益/减益效果
 - **怪物 AI**: 怪物移动和行为
 
-相关模块: [游戏世界](agents/client/Gameplay/index.md), [角色系统](agents/client/Character/index.md)
+相关模块: [游戏世界](../agents/client/Gameplay/index.md), [角色系统](../agents/client/Character/index.md)
 
 ### 物品与装备
 
@@ -52,7 +53,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **商店交易**: NPC 商店购买/出售
 - **仓库存储**: 物品存储
 
-相关模块: [角色系统](agents/client/Character/index.md), [UI 系统](agents/client/IO/index.md)
+相关模块: [角色系统](../agents/client/Character/index.md), [UI 系统](../agents/client/IO/index.md)
 
 ### 技能系统
 
@@ -61,7 +62,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **技能冷却**: 冷却计时
 - **被动技能**: 被动效果计算
 
-相关模块: [角色系统](agents/client/Character/index.md)
+相关模块: [角色系统](../agents/client/Character/index.md)
 
 ### 社交
 
@@ -69,7 +70,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **组队**: 组队信息显示
 - **状态消息**: 在线状态/Buddy 消息
 
-相关模块: [UI 系统](agents/client/IO/index.md)
+相关模块: [UI 系统](../agents/client/IO/index.md)
 
 ### 资源流式加载
 
@@ -78,7 +79,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **物品素材后台预载**: 进入游戏后异步缓存 Item/String 和 Character 元数据；实际出现的装备图片按需永久缓存，下载期间不阻塞渲染
 - **服务端全量内存缓存**: 可选在 assets-server 启动时把全部可服务 `.nx` 载入共享只读内存，消除后续块请求的磁盘打开与读取；默认关闭
 
-相关模块: [按需文件系统](agents/client/LazyFS/index.md)
+相关模块: [按需文件系统](../agents/client/LazyFS/index.md)
 
 ### 音频
 
@@ -87,4 +88,4 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 ## 变更记录
 
-变更日志入口: [features/changelog/](features/changelog/)
+变更日志入口: [changelog/](changelog/)
