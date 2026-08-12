@@ -44,9 +44,7 @@ async fn spawn_server(dir: &Path) -> (u16, ServerGuard) {
             let port: u16 = addr.rsplit(':').next().unwrap().trim().parse().unwrap();
             // Keep draining the log pipe in the background: if it were closed
             // here, the child's next log write would fail with EPIPE.
-            tokio::spawn(async move {
-                while let Ok(Some(_)) = lines.next_line().await {}
-            });
+            tokio::spawn(async move { while let Ok(Some(_)) = lines.next_line().await {} });
             return (port, ServerGuard { child });
         }
     }
@@ -203,13 +201,17 @@ async fn invalid_json_and_unknown_type_return_errors() {
     let (port, _guard) = spawn_server(dir.path()).await;
     let mut ws = connect(port).await;
 
-    ws.send(Message::Text("this is not json".to_owned())).await.unwrap();
+    ws.send(Message::Text("this is not json".to_owned()))
+        .await
+        .unwrap();
     let Message::Text(reply) = ws.next().await.unwrap().unwrap() else {
         panic!()
     };
     assert!(reply.contains("Invalid JSON"));
 
-    ws.send(Message::Text(r#"{"type": "bogus"}"#.to_owned())).await.unwrap();
+    ws.send(Message::Text(r#"{"type": "bogus"}"#.to_owned()))
+        .await
+        .unwrap();
     let Message::Text(reply) = ws.next().await.unwrap().unwrap() else {
         panic!()
     };
