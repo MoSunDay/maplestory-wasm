@@ -1,6 +1,6 @@
-# 功能能力索引
+Commit: 10fb657e2799392e1a15e8a68d1a989a5dcb6967
 
-Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
+# 功能能力索引
 
 ## 概述
 
@@ -53,6 +53,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **装备系统**: 穿戴/卸下装备，属性变更
 - **商店交易**: NPC 商店购买/出售
 - **仓库存储**: 物品存储
+- **[现金商城](cash-shop/)**: 查询真实 NX 余额和在售目录，购买单品/礼包，并在商城仓库与角色物品栏之间转移现金物品
 
 相关模块: [角色系统](../agents/client/Character/index.md), [UI 系统](../agents/client/IO/index.md)
 

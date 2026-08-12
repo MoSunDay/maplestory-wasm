@@ -1,6 +1,6 @@
-# 角色系统
+Commit: 10fb657e2799392e1a15e8a68d1a989a5dcb6967
 
-Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
+# 角色系统
 
 ## 职责
 
@@ -25,6 +25,8 @@ Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
 - `ActiveBuffs` / `PassiveBuffs`: Buff 管理系统
 
 Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
+
+`reset_progress(StatsEntry)` 在服务端发送完整角色快照时重建属性、物品栏、技能、任务、瞬移石、怪物书、Buff 和冷却，避免商城回服后继续使用旧进度数据。`Inventory` 对现金物品额外保留服务端 `cash_id`，供商城仓库转移稳定定位；已装备现金物品不会直接暴露给仓库转移入口。
 
 ### Char (`Char.h`)
 

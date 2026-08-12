@@ -29,16 +29,19 @@
 #include "../Template/Optional.h"
 
 #include <unordered_map>
+#include <memory>
 
 namespace jrc
 {
+    class CashShopModel;
     class UI : public Singleton<UI>
     {
     public:
         enum State
         {
             LOGIN,
-            GAME
+            GAME,
+            CASHSHOP
         };
 
         UI();
@@ -50,6 +53,8 @@ namespace jrc
         void enable();
         void disable();
         void change_state(State state);
+        void enter_cash_shop(std::shared_ptr<CashShopModel> model, bool female);
+        State get_state() const;
 
         void quit();
         bool not_quitted() const;
@@ -106,6 +111,7 @@ namespace jrc
 
         bool enabled;
         bool quitted;
+        State state_id;
     };
 
     template <class T, typename...Args>

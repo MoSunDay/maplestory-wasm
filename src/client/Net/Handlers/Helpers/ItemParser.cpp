@@ -26,9 +26,10 @@ namespace jrc
         {
             // Read all item stats.
             bool cash = recv.read_bool();
+            int64_t cash_id = 0;
             if (cash)
             {
-                recv.skip(8); // unique id
+                cash_id = recv.read_long();
             }
             int64_t expire = recv.read_long();
             int16_t count = recv.read_short();
@@ -41,7 +42,7 @@ namespace jrc
                 recv.skip(8);
             }
 
-            inventory.add_item(invtype, slot, id, cash, expire, count, owner, flag);
+            inventory.add_item(invtype, slot, id, cash, expire, count, owner, flag, cash_id);
         }
 
         // Parse a pet from a packet.
@@ -49,9 +50,10 @@ namespace jrc
         {
             // Read all pet stats.
             bool cash = recv.read_bool();
+            int64_t cash_id = 0;
             if (cash)
             {
-                recv.skip(8); // unique id
+                cash_id = recv.read_long();
             }
             int64_t expire = recv.read_long();
             std::string petname = recv.read_padded_string(13);
@@ -62,7 +64,8 @@ namespace jrc
             // Some unused bytes.
             recv.skip(18);
 
-            inventory.add_pet(invtype, slot, id, cash, expire, petname, petlevel, closeness, fullness);
+            inventory.add_pet(invtype, slot, id, cash, expire, petname, petlevel,
+                closeness, fullness, cash_id);
         }
 
         // Parse an equip from a packet.
@@ -70,9 +73,10 @@ namespace jrc
         {
             // Read equip information.
             bool cash = recv.read_bool();
+            int64_t cash_id = 0;
             if (cash)
             {
-                recv.skip(8); // unique id
+                cash_id = recv.read_long();
             }
             int64_t expire = recv.read_long();
             uint8_t slots = recv.read_byte();
@@ -115,7 +119,21 @@ namespace jrc
             }
 
             inventory.add_equip(invtype, slot, id, cash, expire, slots,
-                level, stats, owner, flag, itemlevel, itemexp, vicious);
+                level, stats, owner, flag, itemlevel, itemexp, vicious, cash_id);
+        }
+
+        namespace
+        {
+            void parse_item_body(InPacket& recv, InventoryType::Id invtype,
+                int16_t slot, int32_t iid, Inventory& inventory)
+            {
+                if (invtype == InventoryType::EQUIP || invtype == InventoryType::EQUIPPED)
+                    add_equip(recv, invtype, slot, iid, inventory);
+                else if (iid >= 5000000 && iid <= 5000102)
+                    add_pet(recv, invtype, slot, iid, inventory);
+                else
+                    add_item(recv, invtype, slot, iid, inventory);
+            }
         }
 
         void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory)
@@ -124,21 +142,16 @@ namespace jrc
             recv.read_byte(); // 'type' byte
             int32_t iid = recv.read_int();
 
-            if (invtype == InventoryType::EQUIP || invtype == InventoryType::EQUIPPED)
-            {
-                // Parse an equip.
-                add_equip(recv, invtype, slot, iid, inventory);
-            }
-            else if (iid >= 5000000 && iid <= 5000102)
-            {
-                // Parse a pet.
-                add_pet(recv, invtype, slot, iid, inventory);
-            }
-            else
-            {
-                // Parse a normal item.
-                add_item(recv, invtype, slot, iid, inventory);
-            }
+            parse_item_body(recv, invtype, slot, iid, inventory);
+        }
+
+        InventoryType::Id parse_item_auto(InPacket& recv, int16_t slot, Inventory& inventory)
+        {
+            recv.read_byte();
+            int32_t iid = recv.read_int();
+            InventoryType::Id type = InventoryType::by_item_id(iid);
+            parse_item_body(recv, type, slot, iid, inventory);
+            return type;
         }
     }
 }
