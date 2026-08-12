@@ -116,6 +116,12 @@ try {
     const lazy = Module.LazyFS;
     const file = lazy.files.get('Map.nx');
     if (!file || !file.size) return false;
+    const screen = document.getElementById('asset-loading-screen');
+    window.realAssetOverlayShown = !screen.classList.contains('is-hidden');
+    window.realAssetOverlayObserver = new MutationObserver(() => {
+      if (!screen.classList.contains('is-hidden')) window.realAssetOverlayShown = true;
+    });
+    window.realAssetOverlayObserver.observe(screen, { attributes: true, attributeFilter: ['class'] });
     const offset = file.size - 1;
     const chunk = Math.floor(offset / lazy.CHUNK_SIZE);
     lazy.chunkCache.delete(lazy.getChunkCacheKey('Map.nx', lazy.getFileVersionTag(file), chunk));
@@ -126,11 +132,12 @@ try {
     throw new Error('Map.nx was unavailable for real foreground asset verification');
   }
   await requireState('real NX miss shows asset overlay', async () =>
-    await driver.evaluate("!document.getElementById('asset-loading-screen').classList.contains('is-hidden')"));
+    await driver.evaluate('window.realAssetOverlayShown === true'));
   await driver.screenshot('00b-asset-loading-real');
   await driver.evaluate('window.realAssetRequest');
   await requireState('real NX request closes asset overlay', async () =>
     await driver.evaluate("document.getElementById('asset-loading-screen').classList.contains('is-hidden')"));
+  await driver.evaluate('window.realAssetOverlayObserver.disconnect()');
   await driver.setNetworkLatency(0);
   await driver.evaluate(`(() => {
     const lazy = Module.LazyFS;
@@ -291,9 +298,64 @@ try {
 
   if (!retryCharacterName) {
     await driver.click(130, 220);
+    await driver.setNetworkLatency(500);
+    await driver.evaluate(`(() => {
+      const lazy = Module.LazyFS;
+      const screen = document.getElementById('asset-loading-screen');
+      const original = lazy.requestForegroundFileRange;
+      const evidence = {
+        totalCalls: 0,
+        missingCalls: 0,
+        sampleCalls: [],
+        overlayShown: !screen.classList.contains('is-hidden'),
+        startedAt: performance.now()
+      };
+      lazy.requestForegroundFileRange = function (filepath, offset, length) {
+        const residentBeforeRequest = this.isFileRangeResident(filepath, offset, length);
+        evidence.totalCalls += 1;
+        if (!residentBeforeRequest) evidence.missingCalls += 1;
+        if (evidence.sampleCalls.length < 100) {
+          evidence.sampleCalls.push({ filepath, offset, length, residentBeforeRequest, at: performance.now() });
+        }
+        return original.call(this, filepath, offset, length);
+      };
+      evidence.observer = new MutationObserver(() => {
+        if (!screen.classList.contains('is-hidden')) evidence.overlayShown = true;
+      });
+      evidence.observer.observe(screen, { attributes: true, attributeFilter: ['class'] });
+      evidence.restore = () => {
+        evidence.observer.disconnect();
+        lazy.requestForegroundFileRange = original;
+      };
+      window.naturalAssetEvidence = evidence;
+    })()`);
     await driver.click(650, 400);
     await requireUiState('in-game UI active', uiState.game, 60);
     await requireAssetIdle('in-game foreground assets ready');
+    const naturalAssetEvidence = await driver.evaluate(`(() => {
+      const evidence = window.naturalAssetEvidence;
+      evidence.restore();
+      return {
+        totalCalls: evidence.totalCalls,
+        missingCalls: evidence.missingCalls,
+        sampleCalls: evidence.sampleCalls,
+        overlayShown: evidence.overlayShown,
+        elapsedMs: performance.now() - evidence.startedAt
+      };
+    })()`);
+    await driver.setNetworkLatency(0);
+    fs.writeFileSync(
+      `${driver.artifactDir}/natural-asset-loading.json`,
+      `${JSON.stringify(naturalAssetEvidence, null, 2)}\n`
+    );
+    if (!naturalAssetEvidence.overlayShown || naturalAssetEvidence.missingCalls === 0) {
+      throw new Error(`Natural asset loading gate failed: ${JSON.stringify(naturalAssetEvidence)}`);
+    }
+    console.log(`PASS  natural in-game asset loading ${JSON.stringify({
+      calls: naturalAssetEvidence.totalCalls,
+      missingCalls: naturalAssetEvidence.missingCalls,
+      overlayShown: naturalAssetEvidence.overlayShown
+    })}`);
     await driver.screenshot('08-in-game');
 
     await driver.evaluate(`(() => {
