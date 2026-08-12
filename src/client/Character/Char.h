@@ -1,5 +1,6 @@
 #pragma once
 #include "CharEffect.h"
+#include "Effects/DeathTomb.h"
 #include "Inventory/Weapon.h"
 #include "Look/Afterimage.h"
 #include "Look/CharLook.h"
@@ -145,13 +146,15 @@ namespace jrc
         bool update(const Physics& physics, float speed);
         /// Get a speed modifier for the current stance.
         float get_stancespeed() const;
+        /// Return whether the death tomb landed during the latest update.
+        bool death_tomb_landed() const;
 
         CharLook look;
         PetLook pets[3];
 
-        State state;
-        bool attacking;
-        bool flip;
+        State state = STAND;
+        bool attacking = false;
+        bool flip = false;
 
     private:
         Text namelabel;
@@ -160,6 +163,7 @@ namespace jrc
         Afterimage afterimage;
         TimedBool invincible;
         TimedBool ironbody;
+        DeathTomb death_tomb;
         std::list<DamageNumber> damagenumbers;
         PartyHpBar partyhpbar;
         int32_t partyhp;

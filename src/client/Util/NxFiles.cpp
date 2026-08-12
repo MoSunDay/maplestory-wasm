@@ -78,6 +78,14 @@ namespace jrc
             return { Error::NLNX, message.c_str() };
         }
 
+        nl::node tomb = nl::nx::effect["Tomb.img"];
+        if (tomb["fall"].size() == 0 ||
+            tomb["fall"]["0"].data_type() != nl::node::type::bitmap ||
+            tomb["land"]["0"].data_type() != nl::node::type::bitmap)
+        {
+            return { Error::NLNX, "Effect.nx is missing Tomb.img/fall or Tomb.img/land/0." };
+        }
+
         constexpr const char* POSTCHAOS_BITMAP =
             "Login.img/WorldSelect/BtChannel/layer:bg";
         // Attempt to resolve it to log if this "version" identifier exists
