@@ -52,6 +52,12 @@ namespace LazyFS
 		 */
 		const void* get_contiguous_data(size_t offset, size_t size);
 
+		// Start a browser-side fetch without suspending the WASM main loop.
+		void prefetch_contiguous_data(size_t offset, size_t size) const;
+
+		// Return whether every required chunk is already in browser memory.
+		bool is_contiguous_data_ready(size_t offset, size_t size) const;
+
 		/**
 		 * Static helper to load file (creates a Loader instance)
 		 * @param path Path to file

@@ -33,6 +33,8 @@ namespace nl
 		bool operator<(bitmap const&) const;
 		bool operator==(bitmap const&) const;
 		operator bool() const;
+		void prefetch() const;
+		bool data_ready() const;
 		void const* data() const;
 		uint16_t width() const;
 		uint16_t height() const;

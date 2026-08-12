@@ -2,6 +2,9 @@
 #include <cstring>
 #include <iostream>
 #include <vector>
+#ifdef MS_PLATFORM_WASM
+#include <emscripten.h>
+#endif
 
 namespace LazyFS
 {
@@ -106,6 +109,38 @@ namespace LazyFS
 		}
 
 		return stitch_buffer_.data();
+	}
+
+	void LazyFileLoader::prefetch_contiguous_data(size_t offset, size_t size) const
+	{
+#ifdef MS_PLATFORM_WASM
+		EM_ASM({
+			const path = UTF8ToString($0);
+			if (Module.LazyFS && Module.LazyFS.prefetchFileRange) {
+				Module.LazyFS.prefetchFileRange(path, $1, $2).catch(error => {
+					console.error('[LazyFS] Bitmap prefetch failed for', path, error);
+				});
+			}
+		}, path_.c_str(), static_cast<double>(offset), static_cast<double>(size));
+#else
+		(void)offset;
+		(void)size;
+#endif
+	}
+
+	bool LazyFileLoader::is_contiguous_data_ready(size_t offset, size_t size) const
+	{
+#ifdef MS_PLATFORM_WASM
+		return EM_ASM_INT({
+			const path = UTF8ToString($0);
+			return Module.LazyFS && Module.LazyFS.isFileRangeResident &&
+				Module.LazyFS.isFileRangeResident(path, $1, $2) ? 1 : 0;
+		}, path_.c_str(), static_cast<double>(offset), static_cast<double>(size)) == 1;
+#else
+		(void)offset;
+		(void)size;
+		return true;
+#endif
 	}
 
 	LazyFileLoader::Chunk* LazyFileLoader::get_or_load_chunk(size_t chunk_index)

@@ -379,6 +379,11 @@ namespace jrc
         getoffset(bmp);
     }
 
+    bool GraphicsGL::hasbitmap(const nl::bitmap& bmp) const
+    {
+        return offsets.find(bmp.id()) != offsets.end();
+    }
+
     const GraphicsGL::Offset& GraphicsGL::getoffset(const nl::bitmap& bmp)
     {
         size_t id = bmp.id();
@@ -398,7 +403,8 @@ namespace jrc
             return nulloffset;
         }
 
-        if (!bmp.data())
+        const void* bitmap_data = bmp.data();
+        if (!bitmap_data)
         {
             return nulloffset;
         }
@@ -506,7 +512,7 @@ namespace jrc
         // from BGRA (what the game uses) to RGBA (what WebGL expects).
         int32_t len = w * h * 4;
         std::vector<uint8_t> rgba_buffer(len);
-        const uint8_t* src = (const uint8_t*)bmp.data();
+        const uint8_t* src = static_cast<const uint8_t*>(bitmap_data);
         for (int i = 0; i < len; i += 4)
         {
             rgba_buffer[i] = src[i + 2];     // R = B
@@ -516,7 +522,7 @@ namespace jrc
         }
         glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba_buffer.data());
 #else
-        glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_BGRA, GL_UNSIGNED_BYTE, bmp.data());
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_BGRA, GL_UNSIGNED_BYTE, bitmap_data);
 #endif
         return offsets.emplace(
             std::piecewise_construct,
