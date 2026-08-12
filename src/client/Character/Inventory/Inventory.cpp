@@ -22,6 +22,8 @@
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 
+#include <algorithm>
+
 namespace jrc
 {
     Inventory::Inventory()
@@ -99,32 +101,34 @@ namespace jrc
     }
 
     void Inventory::add_item(InventoryType::Id invtype, int16_t slot, int32_t item_id, bool cash,
-        int64_t expire, uint16_t count, const std::string& owner, int16_t flags) {
+        int64_t expire, uint16_t count, const std::string& owner, int16_t flags, int64_t cash_id) {
 
         items.emplace(
             std::piecewise_construct,
-            std::forward_as_tuple(add_slot(invtype, slot, item_id, count, cash)),
+            std::forward_as_tuple(add_slot(invtype, slot, item_id, count, cash, cash_id)),
             std::forward_as_tuple(item_id, expire, owner, flags)
         );
     }
 
     void Inventory::add_pet(InventoryType::Id invtype, int16_t slot, int32_t item_id, bool cash,
-        int64_t expire, const std::string& name, int8_t level, int16_t closeness, int8_t fullness) {
+        int64_t expire, const std::string& name, int8_t level, int16_t closeness,
+        int8_t fullness, int64_t cash_id) {
 
         pets.emplace(
             std::piecewise_construct,
-            std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash)),
+            std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash, cash_id)),
             std::forward_as_tuple(item_id, expire, name, level, closeness, fullness)
         );
     }
 
     void Inventory::add_equip(InventoryType::Id invtype, int16_t slot, int32_t item_id, bool cash,
         int64_t expire, uint8_t slots, uint8_t level, const EnumMap<Equipstat::Id, uint16_t>& stats,
-        const std::string& owner, int16_t flag, uint8_t ilevel, uint16_t iexp, int32_t vicious) {
+        const std::string& owner, int16_t flag, uint8_t ilevel, uint16_t iexp,
+        int32_t vicious, int64_t cash_id) {
 
         equips.emplace(
             std::piecewise_construct,
-            std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash)),
+            std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash, cash_id)),
             std::forward_as_tuple(item_id, expire, owner, flag, slots, level, stats, ilevel, iexp, vicious)
         );
     }
@@ -166,11 +170,46 @@ namespace jrc
             remove(secondtype, secondslot);
     }
 
-    int32_t Inventory::add_slot(InventoryType::Id type, int16_t slot, int32_t item_id, int16_t count, bool cash)
+    int32_t Inventory::add_slot(InventoryType::Id type, int16_t slot, int32_t item_id,
+        int16_t count, bool cash, int64_t cash_id)
     {
         running_uid++;
-        inventories[type][slot] = { running_uid, item_id, count, cash };
+        inventories[type][slot] = { running_uid, item_id, count, cash, cash_id };
         return running_uid;
+    }
+
+    std::vector<CashInventoryItem> Inventory::get_cash_items() const
+    {
+        std::vector<CashInventoryItem> result;
+        for (const auto& inventory : inventories)
+        {
+            for (const auto& entry : inventory.second)
+            {
+                const Slot& slot = entry.second;
+                // Equipped cash items must be unequipped before the server-side
+                // locker transfer can safely remove them from the character look.
+                if (inventory.first != InventoryType::EQUIPPED &&
+                    slot.cash && slot.cash_id != 0)
+                    result.push_back({ inventory.first, entry.first, slot.item_id,
+                        slot.count, slot.cash_id });
+            }
+        }
+        return result;
+    }
+
+    void Inventory::remove_cash_item(int64_t cash_id)
+    {
+        for (auto iter = inventories.begin(); iter != inventories.end(); ++iter)
+        {
+            const auto& inventory = *iter;
+            auto found = std::find_if(inventory.second.begin(), inventory.second.end(),
+                [cash_id](const auto& entry) { return entry.second.cash_id == cash_id; });
+            if (found != inventory.second.end())
+            {
+                remove(inventory.first, found->first);
+                return;
+            }
+        }
     }
 
     void Inventory::change_count(InventoryType::Id type, int16_t slot, int16_t count)

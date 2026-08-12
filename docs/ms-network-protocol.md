@@ -801,7 +801,7 @@ state    byte   0x00 = success; see error codes below
 
 ### 0x0010 — CHANGE_CHANNEL
 
-**Purpose:** Directs client to a new channel server (after CHANGE_CHANNEL request in-game).
+**Purpose:** Directs client to a new channel server after an in-game channel switch or Cash Shop exit.
 
 ```
 Field       Type     Notes
@@ -2303,12 +2303,14 @@ operation   byte    See CashOperationHandler
 ```
 
 Key operations:
-- `0x03` = Buy item with NX (+ `sn: int`, `quantity: short`)
-- `0x04` = Gift item (+ `sn: int`, `recipient: string`, `message: string`)
-- `0x06` = Modify wish list
-- `0x1D` = Move item to locker
-- `0x1E` = Move item from locker to inventory
-- `0x21` = Buy item in package
+- `0x03` = Buy one item (`byte 0`, `currency: int`, `sn: int`)
+- `0x04` = Gift item (`birthday: int`, `sn: int`, `recipient: string`, `message: string`)
+- `0x05` = Replace wish list (`sn: int[10]`)
+- `0x0D` = Move from Cash Shop locker to character inventory (`cashIdLow: int`)
+- `0x0E` = Move from character inventory to Cash Shop locker (`cashId: long`, `inventoryType: byte`)
+- `0x1E` = Buy a package (`byte 0`, `currency: int`, `sn: int`)
+
+Currency values are `1 = NX Credit`, `2 = MaplePoints`, and `4 = Prepaid NX`.
 
 ---
 
@@ -2775,6 +2777,21 @@ timestamp    long    Current server time
 ### 0x007F — SET_CASH_SHOP
 
 **Purpose:** Sets up the Cash Shop UI. Contains character and account info needed for the CS.
+
+```
+[Full Character Info]  —          §11.3
+[byte]                 byte       1
+accountName            string
+[int]                  int        0
+specialCount           short
+[Per special item:]
+  sn                    int
+  modifier              int        Bit 1024 controls add/remove state
+  info                  byte       Desired state for the modifier
+[reserved]              byte[121]
+[Best sellers]          80 × (tab: int, row: int, sn: int)
+[tail]                  int, short, byte, int
+```
 
 ---
 
@@ -3652,6 +3669,23 @@ points    int    Prepaid NX balance
 ### 0x0145 — CASHSHOP_OPERATION
 
 **Purpose:** Various Cash Shop UI responses (purchase confirmation, inventory list, gift result, etc.).
+
+Core response operations used by the client:
+
+| Operation | Meaning | Payload |
+|-----------|---------|---------|
+| `0x4B` | Initial Cash Shop locker | `count: short`, cash item records, storage slots, character slots |
+| `0x4D` | Pending gifts | `count: short`, gift records |
+| `0x4F` / `0x55` | Wish list | `sn: int[10]` |
+| `0x57` | Single-item purchase succeeded | one cash item record |
+| `0x5C` | Operation failed | `error: byte` |
+| `0x68` | Locker item moved to character inventory | `slot: short`, item info (§11.2, position omitted) |
+| `0x6A` | Character item moved to locker | one cash item record |
+| `0x89` | Package purchase succeeded | `count: byte`, cash item records, `short 0` |
+
+A cash item record contains `cashId: long`, account/padding fields, item ID,
+SN, quantity, gift sender, expiration, and trailing padding. Gift records omit
+the account/SN/quantity/expiration fields and include a fixed 73-byte message.
 
 ---
 

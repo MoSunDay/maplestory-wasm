@@ -283,6 +283,10 @@ namespace jrc
                 case KeyAction::PARTY:
                     emplace<UIParty>();
                     break;
+                case KeyAction::CASHSHOP:
+                    if (auto statusbar = UI::get().get_element<UIStatusbar>())
+                        statusbar->request_cash_shop();
+                    break;
                 default:
                     break;
                 }
