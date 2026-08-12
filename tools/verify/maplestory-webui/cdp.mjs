@@ -94,6 +94,15 @@ export class BrowserDriver {
     throw new Error(`Page did not finish loading: ${url}`);
   }
 
+  async setNetworkLatency(milliseconds) {
+    await this.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: milliseconds,
+      downloadThroughput: -1,
+      uploadThroughput: -1
+    });
+  }
+
   async click(gameX, gameY) {
     await this.evaluate(`(() => {
       const canvas = document.getElementById('canvas');
