@@ -30,7 +30,7 @@ namespace jrc
 {
     namespace
     {
-        constexpr Point<int16_t> CHANNEL_WINDOW_TOP{ 200, 20 };
+        constexpr Point<int16_t> CHANNEL_WINDOW_CENTER{ 200, 170 };
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
@@ -49,7 +49,7 @@ namespace jrc
 
         buttons[BT_ENTERWORLD] = std::make_unique<MapleButton>(
             channelsrc["button:GoWorld"],
-            CHANNEL_WINDOW_TOP
+            CHANNEL_WINDOW_CENTER
             );
 
         if (worldcount <= 0 || worlds.empty())
@@ -68,8 +68,8 @@ namespace jrc
         buttons[BT_WORLD0] = std::make_unique<MapleButton>(worldsrc["button:15"], Point<int16_t>(650, 20));
         buttons[BT_WORLD0]->set_state(Button::PRESSED);
 
-        sprites.emplace_back(channelsrc["layer:bg"], CHANNEL_WINDOW_TOP);
-        sprites.emplace_back(channelsrc["release"]["layer:15"], CHANNEL_WINDOW_TOP);
+        sprites.emplace_back(channelsrc["layer:bg"], CHANNEL_WINDOW_CENTER);
+        sprites.emplace_back(channelsrc["release"]["layer:15"], CHANNEL_WINDOW_CENTER);
 
         if (channelid >= world.channelcount)
             channelid = 0;
@@ -79,7 +79,7 @@ namespace jrc
             nl::node chnode = channelsrc["button:" + std::to_string(i)];
             buttons[BT_CHANNEL0 + i] = std::make_unique<TwoSpriteButton>(
                 chnode["normal"]["0"], chnode["keyFocused"]["0"],
-                CHANNEL_WINDOW_TOP
+                CHANNEL_WINDOW_CENTER
                 );
             if (i == channelid)
                 buttons[BT_CHANNEL0 + i]->set_state(Button::PRESSED);
@@ -102,6 +102,19 @@ namespace jrc
     uint8_t UIWorldSelect::get_channel_id() const
     {
         return channelid;
+    }
+
+    void UIWorldSelect::doubleclick(Point<int16_t> cursorpos)
+    {
+        for (uint8_t i = 0; i < channelcount; ++i)
+        {
+            if (buttons[BT_CHANNEL0 + i]->bounds(position).contains(cursorpos))
+            {
+                channelid = i;
+                button_pressed(BT_ENTERWORLD);
+                return;
+            }
+        }
     }
 
     Button::State UIWorldSelect::button_pressed(uint16_t id)
