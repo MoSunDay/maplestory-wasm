@@ -10,8 +10,9 @@ use tracing::{debug, warn};
 
 use crate::respond;
 
-/// Reject request header blocks larger than this; real requests are tiny.
-const MAX_HEADER_SIZE: usize = 16 * 1024;
+/// Bound per-request memory while allowing large authentication/cookie headers.
+/// The terminating CRLF pair is part of the limit, so exactly 10 MiB is valid.
+const MAX_HEADER_SIZE: usize = 10 * 1024 * 1024;
 
 /// One parsed HTTP request (only the parts this server cares about).
 pub struct Request {
@@ -59,11 +60,10 @@ pub async fn handle_connection(mut stream: TcpStream, peer: SocketAddr, root: &P
 /// kept in `buffer` for the next request on a keep-alive connection.
 async fn read_request(stream: &mut TcpStream, buffer: &mut Vec<u8>) -> ReadOutcome {
     let header_end = loop {
-        if let Some(pos) = find_header_end(buffer) {
-            break pos;
-        }
-        if buffer.len() > MAX_HEADER_SIZE {
-            return ReadOutcome::BadRequest;
+        match bounded_header_end(buffer) {
+            Ok(Some(pos)) => break pos,
+            Ok(None) => {}
+            Err(()) => return ReadOutcome::BadRequest,
         }
         let mut chunk = [0u8; 2048];
         match stream.read(&mut chunk).await {
@@ -87,6 +87,15 @@ async fn read_request(stream: &mut TcpStream, buffer: &mut Vec<u8>) -> ReadOutco
 
 fn find_header_end(buffer: &[u8]) -> Option<usize> {
     buffer.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+fn bounded_header_end(buffer: &[u8]) -> Result<Option<usize>, ()> {
+    if let Some(pos) = find_header_end(buffer) {
+        return (pos + 4 <= MAX_HEADER_SIZE)
+            .then_some(Some(pos))
+            .ok_or(());
+    }
+    (buffer.len() < MAX_HEADER_SIZE).then_some(None).ok_or(())
 }
 
 fn parse_request(head: &[u8]) -> ReadOutcome {
@@ -181,5 +190,24 @@ mod tests {
     fn header_end_detection() {
         assert_eq!(find_header_end(b"GET / HTTP/1.1\r\n\r\n"), Some(14));
         assert_eq!(find_header_end(b"GET /"), None);
+    }
+
+    #[test]
+    fn header_size_limit_accepts_ten_mib_and_rejects_larger_blocks() {
+        let prefix = b"GET / HTTP/1.1\r\nX-Large: ";
+        let suffix = b"\r\n\r\n";
+        let mut at_limit = Vec::with_capacity(MAX_HEADER_SIZE);
+        at_limit.extend_from_slice(prefix);
+        at_limit.resize(MAX_HEADER_SIZE - suffix.len(), b'a');
+        at_limit.extend_from_slice(suffix);
+        assert_eq!(bounded_header_end(&at_limit), Ok(Some(MAX_HEADER_SIZE - 4)));
+
+        let mut over_limit = Vec::with_capacity(MAX_HEADER_SIZE + 1);
+        over_limit.extend_from_slice(prefix);
+        over_limit.resize(MAX_HEADER_SIZE + 1 - suffix.len(), b'a');
+        over_limit.extend_from_slice(suffix);
+        assert_eq!(bounded_header_end(&over_limit), Err(()));
+
+        assert_eq!(bounded_header_end(&vec![b'a'; MAX_HEADER_SIZE]), Err(()));
     }
 }
