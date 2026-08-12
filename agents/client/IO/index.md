@@ -1,6 +1,6 @@
 # UI 系统
 
-Commit: bc0234fe7c7f53322453e7bdd79564d9aca4cd8b
+Commit: 25a0dc21919c39a58ab22eaa8d35ab91653c842f
 
 ## 职责
 
@@ -21,6 +21,7 @@ UI 框架单例。核心职责:
 - 输入分发: `send_cursor()`, `send_key()`, `send_scroll()`, `doubleclick()`
 - `emplace<T>()`: 动态创建 UI 元素
 - `get_element<T>()`: 获取 UI 元素引用
+- `has_element(type)`: 只读查询元素是否存在；WASM 验收通过导出的 `msui_state` 将登录、世界、人物、建角和游戏状态映射为稳定状态码
 
 ### UIState (`UIState.h`)
 
@@ -52,11 +53,12 @@ UI 状态接口。两个具体实现:
 | 文件 | 职责 |
 |------|------|
 | `UILogin` | 账号密码登录界面 |
+| `UIRegister` | 游戏内账号注册表单；复用 `Basic.img/Notice6` NX 面板、输入框和按钮素材，校验 4–12 位账号/密码后走登录协议自动建号 |
 | `UILoginNotice` | 登录通知弹窗 |
 | `UILoginWait` | 登录等待动画 |
-| `UIWorldSelect` | 大区/频道选择 |
-| `UICharSelect` | 角色选择 |
-| `UICharCreation` | 角色创建 |
+| `UIWorldSelect` | 大区/频道选择；单世界使用服务端实际世界 ID，单频道仍保留第二个频道槽的正常外观但禁止交互 |
+| `UICharSelect` | 角色选择；绘制角色槽计数、人物平台和对应属性面板字段 |
+| `UICharCreation` | 角色创建；非空名称按 UTF-8 原样提交，名称合法性由服务端校验 |
 
 ### 游戏内 UI (`UITypes/`)
 | 文件 | 职责 |

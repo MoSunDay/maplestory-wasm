@@ -78,7 +78,7 @@ namespace jrc
 
         if (common["frame"])
         {
-            sprites.emplace_back(common["frame"], Point<int16_t>(400, 290));
+            sprites.emplace_back(common["frame"], Point<int16_t>(400, 300));
         }
         else
         {
@@ -103,7 +103,14 @@ namespace jrc
         sprites.emplace_back(charselect["selectedWorld"]["name"]["15"],     selworldpos);
         sprites.emplace_back(charselect["selectedWorld"]["ch"][channel_id], selworldpos);
 
+        nl::node charslot = charselect["charSlot"];
+        Point<int16_t> charslotpos = charslot["pos"];
+        sprites.emplace_back(charslot["0"], charslotpos);
+        slotcountpos = charslotpos + Point<int16_t>(charslot["numberpos"]);
+        slotcountlabel = { Text::A11M, Text::RIGHT, Text::WHITE };
+
         emptyslot = charselect["buyCharacter"];
+        charplatform = charselect["character"]["0"];
         nametag   = charselect["nameTag"];
 
         buttons[BT_SELECTCHAR] = std::make_unique<MapleButton>(charselect["BtSelect"], charinfopos + Point<int16_t>(-76, 72));
@@ -145,11 +152,13 @@ namespace jrc
     void UICharSelect::draw(float alpha) const
     {
         UIElement::draw(alpha);
+        slotcountlabel.draw(slotcountpos);
 
         for (uint8_t i = 0; i < charcount_relative; ++i)
         {
             Point<int16_t> charpos = get_char_pos(i);
             uint8_t index = i + page * PAGESIZE;
+            charplatform.draw(charpos, alpha);
             charlooks[index].draw(charpos, alpha);
             nametags[index].draw(charpos);
         }
@@ -183,6 +192,7 @@ namespace jrc
         UIElement::update();
 
         emptyslot.update();
+        charplatform.update();
 
         for (auto& chit : charlooks)
         {
@@ -312,6 +322,10 @@ namespace jrc
         {
             buttons[BT_CREATECHAR]->set_state(Button::DISABLED);
         }
+
+        slotcountlabel.change_text(
+            std::to_string(charcount_absolute) + "/" + std::to_string(slots_absolute)
+        );
 
         if (charcount_relative > 0)
         {
@@ -532,10 +546,6 @@ namespace jrc
         {
         case JOB:
             return Job(stats.stats[Maplestat::JOB]).get_name();
-        case WORLDRANK:
-            return std::to_string(stats.rank.first);
-        case JOBRANK:
-            return std::to_string(stats.jobrank.first);
         case STR:
             return std::to_string(stats.stats[Maplestat::STR]);
         case DEX:
@@ -554,19 +564,15 @@ namespace jrc
         switch (label)
         {
         case JOB:
-            return { 72, -48 };
-        case WORLDRANK:
-            return { 72, -24 };
-        case JOBRANK:
-            return { 72, -4 };
+            return { 66, -36 };
         case STR:
-            return { -5, 26 };
-        case DEX:
-            return { -5, 48 };
+            return { -5, -9 };
         case INT:
-            return { 72, 26 };
+            return { 66, -9 };
+        case DEX:
+            return { -5, 16 };
         case LUK:
-            return { 72, 48 };
+            return { 66, 16 };
         default:
             return {};
         }

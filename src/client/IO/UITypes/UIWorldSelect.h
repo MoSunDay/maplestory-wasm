@@ -49,6 +49,6 @@ namespace jrc
 
         uint8_t worldid;
         uint8_t channelid;
+        uint8_t channelcount;
     };
 }
-

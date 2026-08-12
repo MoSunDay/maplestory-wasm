@@ -86,11 +86,14 @@ namespace jrc
         static constexpr uint8_t PAGESIZE = 8;
 
         Sprite emptyslot;
+        Sprite charplatform;
         Charset levelset;
         nl::node nametag;
+        Text slotcountlabel;
 
         Point<int16_t> selworldpos;
         Point<int16_t> charinfopos;
+        Point<int16_t> slotcountpos;
 
         std::vector<CharEntry> characters;
         std::vector<CharLook> charlooks;
@@ -146,12 +149,10 @@ namespace jrc
         };
         OutlinedText namelabel;
 
-        static const size_t NUM_LABELS = 7;
+        static const size_t NUM_LABELS = 5;
         enum InfoLabel
         {
-            JOB, WORLDRANK, JOBRANK,
-            STR, DEX,       INT,
-            LUK
+            JOB, STR, INT, DEX, LUK
         };
         OutlinedText infolabels[NUM_LABELS];
     };

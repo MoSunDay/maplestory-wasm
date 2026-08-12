@@ -179,13 +179,6 @@ namespace jrc
         AssetsServerProtocol() : StringEntry("AssetsServerProtocol", "ws") {}
     };
 
-    // URL of the external account registration page. When empty, the register
-    // button shows an in-game notice instead of opening a browser window.
-    struct RegisterUrl : public Configuration::StringEntry
-    {
-        RegisterUrl() : StringEntry("RegisterUrl", "") {}
-    };
-
     // Wether to start in fullscreen mode.
     struct Fullscreen : public Configuration::BoolEntry
     {

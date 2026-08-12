@@ -27,6 +27,8 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UILogin.h"
 #include "../../IO/UITypes/UILoginNotice.h"
+#include "../../IO/UITypes/UILoginWait.h"
+#include "../../IO/UITypes/UIRegister.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UICharCreation.h"
@@ -44,6 +46,24 @@ namespace jrc
         {
             printf("Login failed. reason=%d\n", reason);
             int8_t reasonbyte = static_cast<int8_t>(reason - 1);
+            auto registration = UI::get().get_element<UIRegister>();
+            bool registering = registration && registration->is_active();
+
+            if (reason == 23)
+            {
+                // A newly created account must accept the existing v83 TOS
+                // before the server can send the successful login payload.
+                TOSPacket().dispatch();
+                UI::get().emplace<UILoginwait>();
+                return;
+            }
+
+            if (registering)
+            {
+                registration->handle_login_failure(reason);
+                UI::get().enable();
+                return;
+            }
 
             if (reason > 0)
             {
@@ -68,10 +88,6 @@ namespace jrc
             case 7:
                 UI::get().emplace<UILoginNotice>(17);
                 break;
-            case 23:
-                // The server sends a request to accept the terms of service. For convenience, just auto-accept.
-                TOSPacket().dispatch();
-                break;
             default:
                 // Other reasons.
                 if (reason > 0)
@@ -85,6 +101,7 @@ namespace jrc
         else
         {
             printf("Login successful.\n");
+            UI::get().remove(UIElement::REGISTER);
             // Login successful. The packet contains information on the account, so we initialise the account with it.
             Account account = LoginParser::parse_account(recv);
 

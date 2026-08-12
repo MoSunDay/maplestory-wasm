@@ -54,6 +54,7 @@ namespace jrc
         {
             NONE,
             LOGIN,
+            REGISTER,
             LOGINWAIT,
             LOGINNOTICE,
             WORLDSELECT,
