@@ -21,6 +21,7 @@
 #include "../MapleMap/Mob.h"
 
 #include "../../Template/BoolPair.h"
+#include "Effects/AttackEffectSelection.h"
 
 #include <vector>
 
@@ -92,23 +93,16 @@ namespace jrc
     };
 
 
-    enum class HitEffectIndex
-    {
-        HIT,
-        TARGET
-    };
-
-
     // Selects one NX hit branch for each damage line or target.
     class IndexedHitEffect : public SkillHitEffect
     {
     public:
-        IndexedHitEffect(nl::node src, HitEffectIndex index);
+        IndexedHitEffect(nl::node src, attack_effect::HitIndex index);
         void apply(const AttackUser& user, Mob& target) const override;
 
     private:
         std::vector<Effect> effects;
-        HitEffectIndex index;
+        attack_effect::HitIndex index;
     };
 
 
@@ -141,12 +135,12 @@ namespace jrc
     class ByLevelIndexedHitEffect : public SkillHitEffect
     {
     public:
-        ByLevelIndexedHitEffect(nl::node src, HitEffectIndex index);
+        ByLevelIndexedHitEffect(nl::node src, attack_effect::HitIndex index);
         void apply(const AttackUser& user, Mob& target) const override;
 
     private:
         std::map<uint16_t, std::vector<Effect>> effects;
-        HitEffectIndex index;
+        attack_effect::HitIndex index;
     };
 
 

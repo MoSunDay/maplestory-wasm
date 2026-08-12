@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Stage.h"
+#include "Input/ActionTrigger.h"
 
 #include "../Audio/Audio.h"
 #include "../IO/KeyAction.h"
@@ -398,7 +399,7 @@ namespace jrc
             bool repeated_hold = down && player.is_key_down(keyaction);
 
             handle_directional_context(keyaction, down);
-            if (down && !repeated_hold)
+            if (action_trigger::pressed_once(down, repeated_hold))
             {
                 switch (action)
                 {
