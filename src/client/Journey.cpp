@@ -206,6 +206,10 @@ namespace jrc
         const bool connection_lost = browser_connection_lost();
         if (connection_lost || !running())
         {
+            // The main loop is stopping permanently. Always release the startup
+            // overlay first; otherwise a disconnect/quit that arrives before the
+            // first rendered frame leaves the spinner stuck on screen forever.
+            finish_loading_screen();
             const bool unexpected_session_close = !Session::get().is_connected()
                 && UI::get().not_quitted()
                 && Window::get().not_closed();
