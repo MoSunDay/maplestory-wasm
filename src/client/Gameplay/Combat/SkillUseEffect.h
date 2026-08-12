@@ -116,6 +116,30 @@ namespace jrc
     };
 
 
+    // A combo-finisher animation selected by the number of usable orbs.
+    class FinishUseEffect : public SkillUseEffect
+    {
+    public:
+        FinishUseEffect(nl::node src);
+        void apply(Char& target) const override;
+
+    private:
+        std::map<int16_t, Effect> effects;
+    };
+
+
+    // Charged Blow uses a different animation for each active element.
+    class ChargedBlowUseEffect : public SkillUseEffect
+    {
+    public:
+        ChargedBlowUseEffect(nl::node src);
+        void apply(Char& target) const override;
+
+    private:
+        std::map<int8_t, Effect> effects;
+    };
+
+
     // Use effect for Iron Body.
     class IronBodyUseEffect : public SkillUseEffect
     {

@@ -16,6 +16,10 @@ namespace LazyFS
 		// Sync C++ CHUNK_SIZE to JavaScript and set WebSocket URL
 		EM_ASM({
 			if (typeof Module.LazyFS !== 'undefined') {
+				var formatUrlHost = function(host) {
+					var value = String(host);
+					return value.includes(':') && !value.startsWith('[') ? '[' + value + ']' : value;
+				};
 				Module.LazyFS.CHUNK_SIZE = $0;
 				console.log('[LazyFS] Chunk size synced from C++:', $0, 'bytes');
 				
@@ -28,7 +32,7 @@ namespace LazyFS
 						Module.LazyFS.ASSETS_WS_URL = customWsUrl;
 					} else if (Module.LazyFS.AssetsServerIP !== undefined && Module.LazyFS.AssetsServerIP !== null) {
 						// Construct URL dynamically from configured IP
-						var ip = Module.LazyFS.AssetsServerIP;
+						var ip = formatUrlHost(Module.LazyFS.AssetsServerIP);
 						var port = (Module.LazyFS.AssetsServerPort !== undefined && Module.LazyFS.AssetsServerPort !== null) ? Module.LazyFS.AssetsServerPort : '8765';
 						var protocol = Module.LazyFS.AssetsServerProtocol ? Module.LazyFS.AssetsServerProtocol : 'ws';
 						Module.LazyFS.ASSETS_WS_URL = protocol + "://" + ip + ":" + port;
@@ -36,7 +40,7 @@ namespace LazyFS
 						// Auto-detect WebSocket URL based on page location
 						// Default to same host, port 8765
 						var protocol = Module.LazyFS.AssetsServerProtocol ? (Module.LazyFS.AssetsServerProtocol + ':') : (window.location.protocol === 'https:' ? 'wss:' : 'ws:');
-						var host = window.location.hostname;
+						var host = formatUrlHost(window.location.hostname);
 						Module.LazyFS.ASSETS_WS_URL = protocol + '//' + host + ':8765';
 					}
 				}

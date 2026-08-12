@@ -57,7 +57,7 @@ namespace jrc
             SWORD_PANIC = 1111003,
             AXE_PANIC = 1111004,
             SWORD_COMA = 1111005,
-            AXE_COMA = 1111005,
+            AXE_COMA = 1111006,
             SHOUT = 1111008,
 
             // Hero
@@ -79,6 +79,12 @@ namespace jrc
 
             // White Knight
             CHARGE = 1211002,
+            SWORD_FIRE_CHARGE = 1211003,
+            BW_FIRE_CHARGE = 1211004,
+            SWORD_ICE_CHARGE = 1211005,
+            BW_ICE_CHARGE = 1211006,
+            SWORD_LIT_CHARGE = 1211007,
+            BW_LIT_CHARGE = 1211008,
 
             // Paladin
             ACHILLES_PALADIN = 1220005,
@@ -87,6 +93,8 @@ namespace jrc
             RUSH_PALADIN = 1221007,
             BLAST = 1221009,
             HEAVENS_HAMMER = 1221011,
+            SWORD_HOLY_CHARGE = 1221003,
+            BW_HOLY_CHARGE = 1221004,
 
             // Spearman
             SPEAR_MASTERY = 1300000,

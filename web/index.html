@@ -57,6 +57,76 @@
             pointer-events: none;
         }
 
+        #asset-loading-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 15;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(8, 14, 24, 0.34);
+            backdrop-filter: blur(7px) saturate(72%);
+            -webkit-backdrop-filter: blur(7px) saturate(72%);
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 120ms ease, visibility 120ms ease;
+        }
+
+        #asset-loading-screen.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .asset-loading-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 22px;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            border-radius: 13px;
+            background: rgba(16, 27, 45, 0.68);
+            box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+            color: #fff8e8;
+            font-family: 'Maple CJK', sans-serif;
+            font-size: 17px;
+            letter-spacing: 0.04em;
+        }
+
+        .asset-loading-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .asset-loading-retry {
+            align-self: center;
+            padding: 6px 18px;
+            border: 1px solid rgba(255, 255, 255, 0.38);
+            border-radius: 8px;
+            background: rgba(244, 154, 53, 0.9);
+            color: #fff;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .asset-loading-retry.is-hidden {
+            display: none;
+        }
+
+        #asset-loading-screen.is-error .asset-loading-spinner {
+            display: none;
+        }
+
+        .asset-loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.22);
+            border-top-color: #ffd46a;
+            border-radius: 50%;
+            animation: loading-spin 800ms linear infinite;
+        }
+
         .loading-card {
             display: flex;
             flex-direction: column;
@@ -173,6 +243,16 @@
         </div>
     </div>
 
+    <div id="asset-loading-screen" class="is-hidden" role="status" aria-live="polite" aria-hidden="true">
+        <div class="asset-loading-card">
+            <div class="asset-loading-spinner" aria-hidden="true"></div>
+            <div class="asset-loading-content">
+                <span id="asset-loading-message">素材加载中...</span>
+                <button id="asset-loading-retry" class="asset-loading-retry is-hidden" type="button">重试</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function () {
             const screen = document.getElementById('loading-screen');
@@ -217,6 +297,94 @@
             }
 
             window.MapleWasmLoading = Object.freeze({ setPhase, finish, fail });
+        })();
+
+        (function () {
+            let connectionLost = false;
+
+            function show(message) {
+                if (connectionLost) {
+                    return;
+                }
+                connectionLost = true;
+                window.alert(
+                    typeof message === 'string' && message.trim()
+                        ? message
+                        : '连接已断开，游戏已经退出，请刷新页面重试。'
+                );
+            }
+
+            function isLost() {
+                return connectionLost;
+            }
+
+            window.MapleConnectionLost = Object.freeze({ show, isLost });
+        })();
+
+        (function () {
+            const screen = document.getElementById('asset-loading-screen');
+            const container = document.getElementById('container');
+            const message = document.getElementById('asset-loading-message');
+            const retryButton = document.getElementById('asset-loading-retry');
+            const loads = new Map();
+            let previousFocus = null;
+
+            function render() {
+                if (loads.size === 0) {
+                    screen.classList.add('is-hidden');
+                    screen.setAttribute('aria-hidden', 'true');
+                    container.inert = false;
+                    container.removeAttribute('aria-busy');
+                    retryButton.classList.add('is-hidden');
+                    screen.classList.remove('is-error');
+                    if (previousFocus && previousFocus.isConnected && previousFocus.focus) {
+                        previousFocus.focus({ preventScroll: true });
+                    }
+                    previousFocus = null;
+                    return;
+                }
+
+                if (!previousFocus) {
+                    previousFocus = document.activeElement;
+                }
+                const failed = Array.from(loads.values()).some(load => load.state === 'failed');
+                message.textContent = failed ? '素材加载失败，请重试' : '素材加载中...';
+                retryButton.classList.toggle('is-hidden', !failed);
+                screen.classList.toggle('is-error', failed);
+                container.inert = true;
+                container.setAttribute('aria-busy', 'true');
+                screen.classList.remove('is-hidden');
+                screen.removeAttribute('aria-hidden');
+            }
+
+            function begin(key) {
+                loads.set(key, { state: 'loading', retry: null });
+                render();
+            }
+
+            function end(key) {
+                loads.delete(key);
+                render();
+            }
+
+            function fail(key, retry) {
+                loads.set(key, { state: 'failed', retry });
+                render();
+            }
+
+            function canInteract() {
+                const startup = document.getElementById('loading-screen');
+                return startup && startup.classList.contains('is-hidden');
+            }
+
+            retryButton.addEventListener('click', function () {
+                const retries = Array.from(loads.values())
+                    .filter(load => load.state === 'failed' && typeof load.retry === 'function')
+                    .map(load => load.retry);
+                retries.forEach(retry => retry());
+            });
+
+            window.MapleAssetLoading = Object.freeze({ begin, end, fail, canInteract });
         })();
 
         (function () {

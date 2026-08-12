@@ -6,15 +6,18 @@ use std::sync::Arc;
 
 use clap::Parser;
 use futures_util::{SinkExt, StreamExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpStream;
 use tokio::signal;
 use tokio_tungstenite::tungstenite::protocol::{Message, WebSocketConfig};
 use tracing::{info, warn};
 
 mod cache;
+#[path = "../../web-common/listener.rs"]
+mod listener;
 mod serve;
 
 use cache::AssetCache;
+use listener::bind_listener;
 
 #[derive(Parser)]
 #[command(
@@ -31,7 +34,7 @@ struct Cli {
     directory: PathBuf,
 
     /// Address to bind the listener to
-    #[arg(long, default_value = "0.0.0.0")]
+    #[arg(long, default_value = "::")]
     bind: String,
 
     /// Load every served NX file into shared read-only memory at startup
@@ -97,7 +100,7 @@ async fn main() -> std::io::Result<()> {
     );
     info!("[AssetServer] Connect with: ws://localhost:{}", cli.port);
 
-    let listener = TcpListener::bind((cli.bind.as_str(), cli.port)).await?;
+    let listener = bind_listener(&cli.bind, cli.port).await?;
     info!("[AssetServer] Listening on ws://{}", listener.local_addr()?);
     loop {
         tokio::select! {

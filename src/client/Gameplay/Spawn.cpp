@@ -110,9 +110,10 @@ namespace jrc
                          int16_t j,
                          const std::string& nm,
                          int8_t st,
-                         Point<int16_t> p)
+                         Point<int16_t> p,
+                         int16_t combo)
         : cid(c), level(l), job(j), name(nm), stance(st), position(p),
-          look(lk) {}
+          combo_value(combo), look(lk) {}
 
     int32_t CharSpawn::get_cid() const
     {
@@ -121,6 +122,9 @@ namespace jrc
 
     std::unique_ptr<MapObject> CharSpawn::instantiate() const
     {
-        return std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
+        auto character = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
+        if (combo_value > 0)
+            character->set_visual_buff(Buffstat::COMBO, combo_value);
+        return character;
     }
 }

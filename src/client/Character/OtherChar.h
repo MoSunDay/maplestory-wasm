@@ -51,6 +51,11 @@ namespace jrc
         uint16_t get_level() const override;
         // Return the character's level of a skill.
         int32_t get_skilllevel(int32_t skillid) const override;
+        int16_t get_visual_buff_value(Buffstat::Id stat) const override;
+        int32_t get_visual_buff_source(Buffstat::Id stat) const override;
+        void set_visual_buff(Buffstat::Id stat, int16_t value, int32_t source = 0);
+        void set_visual_buff_source(Buffstat::Id stat, int32_t source);
+        void cancel_visual_buff(Buffstat::Id stat);
 
     private:
         uint16_t level;
@@ -61,5 +66,6 @@ namespace jrc
 
         std::unordered_map<int32_t, uint8_t> skilllevels;
         uint8_t attackspeed;
+        EnumMap<Buffstat::Id, Buff> visual_buffs;
     };
 }
