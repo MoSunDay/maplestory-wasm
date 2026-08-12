@@ -32,6 +32,7 @@ namespace jrc
         UIWorldSelect(std::vector<World> worlds, uint8_t worldcount);
 
         void draw(float alpha) const override;
+        void doubleclick(Point<int16_t> cursorpos) override;
 
         uint8_t get_world_id() const;
         uint8_t get_channel_id() const;
