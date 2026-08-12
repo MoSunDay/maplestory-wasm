@@ -97,6 +97,7 @@ async fn get_size_reports_size_and_version() {
 #[tokio::test]
 async fn get_size_missing_file_returns_minus_one() {
     let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("placeholder.nx"), b"placeholder").unwrap();
     let (port, _guard) = spawn_server(dir.path()).await;
     let mut ws = connect(port).await;
 
@@ -178,6 +179,7 @@ async fn traversal_is_limited_to_basename() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("outside")).unwrap();
     std::fs::write(dir.path().join("outside/secret.nx"), b"classified").unwrap();
+    std::fs::write(dir.path().join("placeholder.nx"), b"placeholder").unwrap();
     let (port, _guard) = spawn_server(dir.path()).await;
     let mut ws = connect(port).await;
 
@@ -197,6 +199,7 @@ async fn traversal_is_limited_to_basename() {
 #[tokio::test]
 async fn invalid_json_and_unknown_type_return_errors() {
     let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("placeholder.nx"), b"placeholder").unwrap();
     let (port, _guard) = spawn_server(dir.path()).await;
     let mut ws = connect(port).await;
 

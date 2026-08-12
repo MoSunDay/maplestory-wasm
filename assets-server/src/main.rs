@@ -2,6 +2,7 @@
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use clap::Parser;
 use futures_util::{SinkExt, StreamExt};
@@ -10,10 +11,16 @@ use tokio::signal;
 use tokio_tungstenite::tungstenite::protocol::{Message, WebSocketConfig};
 use tracing::{info, warn};
 
+mod cache;
 mod serve;
 
+use cache::AssetCache;
+
 #[derive(Parser)]
-#[command(version, about = "WebSocket asset server for the MapleStory WASM client")]
+#[command(
+    version,
+    about = "WebSocket asset server for the MapleStory WASM client"
+)]
 struct Cli {
     /// Port to listen on
     #[arg(long, default_value_t = 8765)]
@@ -26,6 +33,17 @@ struct Cli {
     /// Address to bind the listener to
     #[arg(long, default_value = "0.0.0.0")]
     bind: String,
+
+    /// Load every served NX file into shared read-only memory at startup
+    #[arg(long, default_value_t = false)]
+    cache_all_nx: bool,
+}
+
+fn enabled_value(value: &str) -> bool {
+    matches!(
+        value.to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
 }
 
 #[tokio::main]
@@ -44,11 +62,39 @@ async fn main() -> std::io::Result<()> {
     let root = std::fs::canonicalize(&cli.directory).map_err(|err| {
         std::io::Error::new(
             err.kind(),
-            format!("cannot resolve directory '{}': {err}", cli.directory.display()),
+            format!(
+                "cannot resolve directory '{}': {err}",
+                cli.directory.display()
+            ),
         )
     })?;
     info!("[AssetServer] Serving files from: {}", root.display());
-    info!("[AssetServer] Starting WebSocket server on port {}", cli.port);
+    let cache_all_nx = cli.cache_all_nx
+        || std::env::var("ASSETS_CACHE_ALL_NX").is_ok_and(|value| enabled_value(value.trim()));
+    if cache_all_nx {
+        info!("[AssetServer] Full NX memory cache enabled; loading all files...");
+    } else {
+        info!("[AssetServer] Full NX memory cache disabled; using on-demand disk reads");
+    }
+    let cache = Arc::new(AssetCache::load(&root, cache_all_nx).map_err(|err| {
+        std::io::Error::new(
+            err.kind(),
+            format!(
+                "cannot build NX asset index under '{}': {err}",
+                root.display()
+            ),
+        )
+    })?);
+    info!(
+        "[AssetServer] NX index ready: {} files, {:.2} GiB total, {:.2} GiB resident",
+        cache.file_count(),
+        cache.total_bytes() as f64 / 1024.0 / 1024.0 / 1024.0,
+        cache.resident_bytes() as f64 / 1024.0 / 1024.0 / 1024.0
+    );
+    info!(
+        "[AssetServer] Starting WebSocket server on port {}",
+        cli.port
+    );
     info!("[AssetServer] Connect with: ws://localhost:{}", cli.port);
 
     let listener = TcpListener::bind((cli.bind.as_str(), cli.port)).await?;
@@ -67,10 +113,10 @@ async fn main() -> std::io::Result<()> {
                         continue;
                     }
                 };
-                let root = root.clone();
+                let cache = Arc::clone(&cache);
                 tokio::spawn(async move {
                     match tokio_tungstenite::accept_async_with_config(stream, Some(ws_config())).await {
-                        Ok(ws) => handle_connection(&root, peer, ws).await,
+                        Ok(ws) => handle_connection(cache, peer, ws).await,
                         Err(err) => warn!("[AssetServer] Handshake failed: {err}"),
                     }
                 });
@@ -89,7 +135,7 @@ fn ws_config() -> WebSocketConfig {
 }
 
 async fn handle_connection(
-    root: &std::path::Path,
+    cache: Arc<AssetCache>,
     peer: SocketAddr,
     ws: tokio_tungstenite::WebSocketStream<TcpStream>,
 ) {
@@ -115,7 +161,7 @@ async fn handle_connection(
             }
         };
 
-        for frame in serve::process_message(root, &raw).await {
+        for frame in serve::process_message(&cache, &raw).await {
             let message = match frame {
                 serve::Frame::Text(text) => Message::Text(text),
                 serve::Frame::Binary(bytes) => Message::Binary(bytes),
@@ -141,4 +187,19 @@ async fn send_error(
         serde_json::json!({ "type": "error", "message": message }).to_string(),
     ))
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::enabled_value;
+
+    #[test]
+    fn memory_cache_switch_values_are_explicit() {
+        for enabled in ["1", "true", "TRUE", "yes", "on"] {
+            assert!(enabled_value(enabled));
+        }
+        for disabled in ["", "0", "false", "no", "off", "unexpected"] {
+            assert!(!enabled_value(disabled));
+        }
+    }
 }

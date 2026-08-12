@@ -36,6 +36,8 @@ services:
       context: .
       dockerfile: docker/rust-web.Dockerfile
     command: ["assets-server", "--port", "8765", "--directory", "."]
+    environment:
+      - ASSETS_CACHE_ALL_NX=${ASSETS_CACHE_ALL_NX:-false}
     ports:
       - "8765:8765"
     volumes:

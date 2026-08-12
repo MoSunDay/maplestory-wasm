@@ -1,6 +1,6 @@
 # Web 基础设施
 
-Commit: fc979c0fe21730064ed2054302453773440d270d
+Commit: 3ac87b184f131b8c3c5e496384cbb6fa827435d8
 
 ## 职责
 
@@ -31,6 +31,7 @@ HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可�
 - 页面在 WASM 和 NX 素材初始化期间显示加载动画及阶段提示，首帧绘制完成后再淡出；初始化失败时原位显示错误
 - 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`
 - 支持 HTTP Range 请求（单区间），目录自动索引
+- 每个 HTTP 请求头块最多 10 MiB（包含结尾的 `CRLFCRLF`）；恰好达到上限可接收，超出后返回 `400 Bad Request` 并关闭连接
 
 ### ws-proxy (`ws-proxy/`)
 
@@ -44,6 +45,7 @@ WebSocket-TCP 桥接代理，默认绑定 8080 端口（`--ws-port`/`--bind` 可
 LazyFS WebSocket 资源服务器，默认绑定 8765 端口（`--port`/`--bind`/`--directory` 可配）。负责:
 - 接收 LazyFS 客户端的按需文件请求（`get_size` 查询大小、`get_chunks` 批量取块、`get_chunk` 单块）
 - 以二进制帧 `[u32 块号][u8 文件名长度][文件名][数据]` 返回 .nx 文件块，`chunks_done` 结束批量请求
+- 默认按需从磁盘读取；传入 `--cache-all-nx` 或设置 `ASSETS_CACHE_ALL_NX=true` 时，启动阶段把搜索目录下全部 `.nx` 文件载入共享只读内存，后续请求仅从内存切片。内存模式是启动快照，NX 更新后须重启服务
 
 ## 配置
 
@@ -58,6 +60,8 @@ LazyFS WebSocket 资源服务器，默认绑定 8765 端口（`--port`/`--bind`/
 | `ProxyPort` | 代理端口 | 8080 |
 | `MapleStoryServerIp` | 目标 Cosmic 服务端 IP | 127.0.0.1 |
 | `MapleStoryServerPort` | 目标 Cosmic 服务端端口 | 8484 |
+
+Docker 全量 NX 内存缓存开关：`ASSETS_CACHE_ALL_NX=true ./scripts/run_all.sh`。默认值为 `false`，不会占用全量 NX 对应的常驻内存。
 
 ## 依赖关系
 
