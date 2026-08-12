@@ -58,14 +58,14 @@ UI 状态接口。两个具体实现:
 | `UILoginWait` | 登录等待动画 |
 | `UIWorldSelect` | 大区/频道选择；单世界使用服务端实际世界 ID，频道面板居中，开放按钮严格按服务端频道数绘制并支持双击进入；其余槽位沿用统一关闭背景 |
 | `UICharSelect` | 角色选择；绘制角色槽计数、人物平台和对应属性面板字段 |
-| `UICharCreation` | 角色创建；非空名称按 UTF-8 原样提交，名称合法性由服务端校验 |
+| `UICharCreation` | 角色创建；名称校验采用可恢复的局部请求状态，拒绝或超时后保留输入并恢复焦点，服务端仍负责最终合法性与唯一性校验 |
 
 ### 游戏内 UI (`UITypes/`)
 | 文件 | 职责 |
 |------|------|
 | `UIStatusBar` | 底部状态栏；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用，支持互斥切换、Escape 和外部点击关闭 |
-| `UIStatsInfo` | 角色属性窗口 |
-| `UISkillBook` | 技能书窗口 |
+| `UIStatsInfo` | 角色属性窗口；加点按钮直接采用 NX 内置 origin 定位，使可见加号与鼠标命中区域落在对应属性行 |
+| `UISkillBook` | 技能书窗口；使用与四行技能布局匹配的 175×289 紧凑 NX 面板，窗口边界与可见背景一致 |
 | `UIEquipInventory` | 装备栏窗口 |
 | `UIItemInventory` | 物品栏窗口 |
 | `UIBuffList` | Buff 列表显示 |
