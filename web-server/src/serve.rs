@@ -99,7 +99,15 @@ fn bounded_header_end(buffer: &[u8]) -> Result<Option<usize>, ()> {
 }
 
 fn parse_request(head: &[u8]) -> ReadOutcome {
-    let mut headers = [httparse::EMPTY_HEADER; 32];
+    // Size is the only request-header limit. Allocate exactly enough parser
+    // slots for the lines already admitted by the 10 MiB byte bound instead
+    // of imposing an unrelated fixed header-count ceiling.
+    let header_count = head
+        .windows(2)
+        .filter(|window| *window == b"\r\n")
+        .count()
+        .saturating_sub(2);
+    let mut headers = vec![httparse::EMPTY_HEADER; header_count];
     let mut request = httparse::Request::new(&mut headers);
     if !matches!(request.parse(head), Ok(httparse::Status::Complete(_))) {
         return ReadOutcome::BadRequest;
@@ -209,5 +217,19 @@ mod tests {
         assert_eq!(bounded_header_end(&over_limit), Err(()));
 
         assert_eq!(bounded_header_end(&vec![b'a'; MAX_HEADER_SIZE]), Err(()));
+    }
+
+    #[test]
+    fn parser_accepts_more_than_thirty_two_headers() {
+        let mut head = String::from("GET / HTTP/1.1\r\n");
+        for index in 0..128 {
+            head.push_str(&format!("X-Test-{index}: value\r\n"));
+        }
+        head.push_str("\r\n");
+
+        assert!(matches!(
+            parse_request(head.as_bytes()),
+            ReadOutcome::Request(_)
+        ));
     }
 }

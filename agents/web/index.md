@@ -31,7 +31,7 @@ HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可�
 - 页面在 WASM 和 NX 素材初始化期间显示加载动画及阶段提示，首帧绘制完成后再淡出；初始化失败时原位显示错误
 - 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`
 - 支持 HTTP Range 请求（单区间），目录自动索引
-- 每个 HTTP 请求头块最多 10 MiB（包含结尾的 `CRLFCRLF`）；恰好达到上限可接收，超出后返回 `400 Bad Request` 并关闭连接
+- HTTP header 不限制字段数量，仅限制整个请求头块最多 10 MiB（包含结尾的 `CRLFCRLF`）；恰好达到上限可接收，超出后返回 `400 Bad Request` 并关闭连接
 
 ### ws-proxy (`ws-proxy/`)
 
