@@ -5,6 +5,5 @@
   "MapleStoryServerIp": "127.0.0.1",
   "MapleStoryServerPort": null,
   "ProxyIP": null,
-  "ProxyPort": "8090",
-  "RegisterUrl": null
+  "ProxyPort": "8090"
 }

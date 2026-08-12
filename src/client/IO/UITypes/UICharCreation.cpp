@@ -43,7 +43,7 @@ namespace jrc
         sprites.emplace_back(bgsrc["16"], Point<int16_t>(200, 400));
         sprites.emplace_back(bgsrc["17"], Point<int16_t>(160, 263));
         sprites.emplace_back(bgsrc["18"], Point<int16_t>(349, 1220));
-        sprites.emplace_back(src["Common"]["frame"], Point<int16_t>(400, 290));
+        sprites.emplace_back(src["Common"]["frame"], Point<int16_t>(400, 300));
 
         nameboard = crsrc["charName"];
 
@@ -229,7 +229,11 @@ namespace jrc
             else
             {
                 std::string name = namechar.get_text();
-                if (name.size() >= 4)
+                // UTF-8 byte length is not a valid character-count policy:
+                // one Han character occupies three bytes. Keep the protocol's
+                // 12-byte field limit in Textfield and let the server decide
+                // whether a non-empty name is legal.
+                if (!name.empty())
                 {
                     namechar.set_state(Textfield::NORMAL);
 

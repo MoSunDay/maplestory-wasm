@@ -17,7 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UILogin.h"
 #include "UILoginWait.h"
-#include "UILoginNotice.h"
+#include "UIRegister.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -27,7 +27,6 @@
 #include "../../Console.h"
 #include "../../Graphics/Sprite.h"
 #include "../../Net/Packets/LoginPackets.h"
-#include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
 
@@ -84,7 +83,7 @@ namespace jrc
         }
         if (common["frame"])
         {
-            sprites.emplace_back(common["frame"], Point<int16_t>(400, 290));
+            sprites.emplace_back(common["frame"], Point<int16_t>(400, 300));
         }
 
         const bool has_legacy_title_nodes = static_cast<bool>(title["11"]) ||
@@ -209,6 +208,24 @@ namespace jrc
         ).dispatch();
     }
 
+    void UILogin::blur_fields()
+    {
+        account.set_state(Textfield::NORMAL);
+        password.set_state(Textfield::NORMAL);
+    }
+
+    void UILogin::restore_focus()
+    {
+        if (saveid && !account.empty())
+        {
+            password.set_state(Textfield::FOCUSED);
+        }
+        else
+        {
+            account.set_state(Textfield::FOCUSED);
+        }
+    }
+
     Button::State UILogin::button_pressed(uint16_t id)
     {
         switch (id)
@@ -224,20 +241,9 @@ namespace jrc
             Setting<SaveLogin>::get().save(saveid);
             return Button::MOUSEOVER;
         case BT_REGISTER:
-        {
-            std::string register_url = Setting<RegisterUrl>::get().load();
-            if (!register_url.empty())
-            {
-                // Open the registration page synchronously so popup blockers allow it.
-                open_url(register_url);
-            }
-            else
-            {
-                // No registration URL configured; show a notice instead of failing silently.
-                UI::get().emplace<UILoginNotice>(UILoginNotice::PLEASE_SIGN_UP);
-            }
+            blur_fields();
+            UI::get().emplace<UIRegister>();
             return Button::NORMAL;
-        }
         default:
             return Button::PRESSED;
         }
