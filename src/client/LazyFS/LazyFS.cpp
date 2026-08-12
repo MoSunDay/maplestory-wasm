@@ -86,6 +86,18 @@ namespace LazyFS
 			return false;
 		}
 	}
+
+	void StartItemAssetPreload()
+	{
+		EM_ASM({
+			if (typeof Module.LazyFS !== 'undefined' &&
+				Module.LazyFS.startItemAssetPreload) {
+				Module.LazyFS.startItemAssetPreload();
+			} else {
+				console.error('[LazyFS] Item asset preload backend is unavailable');
+			}
+		});
+	}
 }
 
 #else
@@ -97,10 +109,15 @@ namespace LazyFS
 		// No-op on non-WASM platforms
 	}
 
-	bool PreloadFile(const std::string& filepath, const std::string& url)
+	bool RegisterFile(const std::string&, const std::string&)
 	{
 		// LazyFS is only available on Emscripten/WASM
 		return false;
+	}
+
+	void StartItemAssetPreload()
+	{
+		// Browser-only optimization.
 	}
 }
 #endif

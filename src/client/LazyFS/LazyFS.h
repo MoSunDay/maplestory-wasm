@@ -26,4 +26,10 @@ namespace LazyFS
 	 * @param true on success, false on failure
 	 */
 	bool RegisterFile(const std::string& filepath, const std::string& url);
+
+	/**
+	 * Start the non-blocking, persistent preload for item-related NX data.
+	 * Repeated calls are ignored by the JavaScript backend.
+	 */
+	void StartItemAssetPreload();
 }

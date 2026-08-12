@@ -21,6 +21,9 @@
 #include <lz4.h>
 #include <unistd.h>
 #include <vector>
+#ifdef MS_PLATFORM_WASM
+#include <LazyFS/LazyFileLoader.h>
+#endif
 
 namespace nl
 {
@@ -38,6 +41,29 @@ namespace nl
 	bitmap::operator bool() const
 	{
 		return m_file != nullptr;
+	}
+	void bitmap::prefetch() const
+	{
+#ifdef MS_PLATFORM_WASM
+		if (m_file)
+		{
+			auto* fd = static_cast<_file_data*>(m_file);
+			auto* loader = static_cast<LazyFS::LazyFileLoader*>(const_cast<void*>(fd->base));
+			loader->prefetch_contiguous_data(m_offset + 4, length());
+		}
+#endif
+	}
+	bool bitmap::data_ready() const
+	{
+		if (!m_file)
+			return false;
+#ifdef MS_PLATFORM_WASM
+		auto* fd = static_cast<_file_data*>(m_file);
+		auto* loader = static_cast<LazyFS::LazyFileLoader*>(const_cast<void*>(fd->base));
+		return loader->is_contiguous_data_ready(m_offset + 4, length());
+#else
+		return true;
+#endif
 	}
 	std::vector<char> bitmap_buf;
 	void const* bitmap::data() const
