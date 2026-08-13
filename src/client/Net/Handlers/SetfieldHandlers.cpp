@@ -18,6 +18,7 @@
 #include <Net/Packets/GameplayPackets.h>
 #include "SetfieldHandlers.h"
 
+#include "Helpers/CharacterDataParser.h"
 #include "Helpers/ItemParser.h"
 #include "Helpers/LoginParser.h"
 
@@ -145,13 +146,11 @@ namespace jrc
         parse_skillbook(recv, player.get_skills());
         parse_cooldowns(recv, player);
         parse_questlog(recv, player.get_quests());
-        parse_minigame(recv);
-        parse_ring1(recv);
-        parse_ring2(recv);
-        parse_ring3(recv);
+        CharacterDataParser::parse_minigame_info(recv);
+        CharacterDataParser::parse_ring_info(recv);
         parse_telerock(recv, player.get_telerock());
         parse_monsterbook(recv, player.get_monsterbook());
-        parse_nyinfo(recv);
+        CharacterDataParser::parse_new_year_info(recv);
         parse_areainfo(recv);
 
         recv.read_short(); // trailing character-info marker
@@ -256,60 +255,6 @@ namespace jrc
         }
     }
 
-    void SetfieldHandler::parse_ring1(InPacket& recv) const
-    {
-        int16_t rsize = recv.read_short();
-        for (int16_t i = 0; i < rsize; ++i)
-        {
-            recv.read_int();
-            recv.read_padded_string(13);
-            recv.read_int();
-            recv.read_int();
-            recv.read_int();
-            recv.read_int();
-        }
-    }
-
-    void SetfieldHandler::parse_ring2(InPacket& recv) const
-    {
-        int16_t rsize = recv.read_short();
-        for (int16_t i = 0; i < rsize; ++i)
-        {
-            recv.read_int();
-            recv.read_padded_string(13);
-            recv.read_int();
-            recv.read_int();
-            recv.read_int();
-            recv.read_int();
-            recv.read_int();
-        }
-    }
-
-    void SetfieldHandler::parse_ring3(InPacket& recv) const
-    {
-        int16_t rsize = recv.read_short();
-        for (int16_t i = 0; i < rsize; ++i)
-        {
-            recv.read_int();
-            recv.read_int();
-            recv.read_int();
-            recv.read_short();
-            recv.read_int();
-            recv.read_int();
-            recv.read_padded_string(13);
-            recv.read_padded_string(13);
-        }
-    }
-
-    void SetfieldHandler::parse_minigame(InPacket& recv) const
-    {
-        int16_t mgsize = recv.read_short();
-        for (int16_t i = 0; i < mgsize; ++i)
-        {
-            // TODO
-        }
-    }
-
     void SetfieldHandler::parse_monsterbook(InPacket& recv, Monsterbook& monsterbook) const
     {
         monsterbook.set_cover(recv.read_int());
@@ -336,15 +281,6 @@ namespace jrc
         for (size_t i = 0; i < 10; ++i)
         {
             trock.addviplocation(recv.read_int());
-        }
-    }
-
-    void SetfieldHandler::parse_nyinfo(InPacket& recv) const
-    {
-        int16_t nysize = recv.read_short();
-        for (int16_t i = 0; i < nysize; ++i)
-        {
-            // TODO
         }
     }
 

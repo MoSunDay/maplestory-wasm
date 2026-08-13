@@ -17,6 +17,7 @@ const maxP95FrameMs = Number(process.env.E2E_MAX_P95_FRAME_MS || 34);
 const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
+const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
 
 const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5 });
 
@@ -405,6 +406,7 @@ try {
       overlayShown: naturalAssetEvidence.overlayShown
     })}`);
     await driver.screenshot('08-in-game');
+    if (stopAtGame) throw new Error('__GAME_COMPLETE__');
 
     await driver.evaluate(`(() => {
       const startedAt = performance.now();
@@ -480,6 +482,9 @@ try {
   if (process.env.E2E_ASSET_ONLY === '1' && error.message === '__ASSET_ONLY_COMPLETE__') {
     passed = true;
   } else if (stopAtCharSelect && error.message === '__CHAR_SELECT_COMPLETE__') {
+    assertRuntimeHealthy();
+    passed = true;
+  } else if (stopAtGame && error.message === '__GAME_COMPLETE__') {
     assertRuntimeHealthy();
     passed = true;
   } else {

@@ -323,7 +323,7 @@ namespace jrc
             }
             for (size_t i = 0; i < PARTY_SIZE; i++)
             {
-                raw[i].name = recv.read_padded_string(13);
+                raw[i].name = recv.read_padded_utf8_string(13);
             }
             for (size_t i = 0; i < PARTY_SIZE; i++)
             {
