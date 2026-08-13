@@ -3766,7 +3766,7 @@ Used in `CHARLIST` and `ADD_NEW_CHAR_ENTRY`.
 
 ```
 charId       int
-name         fixedStr13   13 bytes, null-padded
+name         fixedUtf16Str13   Null-padded to 13 Java UTF-16 code units, then UTF-8 encoded
 gender       byte         0=male, 1=female
 skinColor    byte         Skin color ID (0=light, 1=tanned, 2=dark, 3=pale, etc.)
 face         int          Face cosmetic ID
@@ -3774,7 +3774,7 @@ hair         int          Hair cosmetic ID
 pet1UniqueId long         Pet unique ID (0 if no pet)
 pet2UniqueId long
 pet3UniqueId long
-level        short        Running server (custom-client mode) writes level as short
+level        byte         Character level
 job          short        Job ID (see §13)
 str          short
 dex          short
@@ -3997,7 +3997,7 @@ Movement types are encoded per the `moveactions.txt` documentation; the server r
 
 ### 11.5 SP Table (for jobs with multiple SP pools)
 
-Used by Cygnus Knights and some other jobs instead of a single SP value.
+Used by Evan jobs (2001 and 2200–2218) instead of a single `short` SP value.
 
 ```
 count     byte   Number of non-zero SP pools
