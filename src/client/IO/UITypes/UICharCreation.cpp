@@ -25,7 +25,7 @@
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Net/Packets/CharCreationPackets.h"
-#include "../../Util/Utf8.h"
+#include "CharacterCreation/NamePolicy.h"
 
 #include "nlnx/nx.hpp"
 
@@ -33,30 +33,7 @@ namespace jrc
 {
     namespace
     {
-        constexpr uint32_t NAME_CHECK_TIMEOUT = 8000;
-
-        // The server remains authoritative for name policy and uniqueness.
-        // Only reject input that cannot be represented by its v83 protocol and
-        // database constraints, avoiding divergent client-side language rules.
-        bool is_locally_valid_name(const std::string& name)
-        {
-            if (name.size() < 3 || name.size() > 12)
-            {
-                return false;
-            }
-
-            for (size_t offset = 0; offset < name.size();)
-            {
-                size_t length = Utf8::sequence_length(name[offset]);
-                char32_t codepoint = Utf8::decode(name.data() + offset, name.size() - offset);
-                if (codepoint == Utf8::REPLACEMENT || codepoint > 0xFFFF || offset + length > name.size())
-                {
-                    return false;
-                }
-                offset += length;
-            }
-            return true;
-        }
+        constexpr uint32_t REQUEST_TIMEOUT = 8000;
     }
 
     UICharcreation::UICharcreation()
@@ -240,36 +217,38 @@ namespace jrc
         switch (id)
         {
         case BT_CHARC_OK:
-            if (naming_state == NamingState::CUSTOMIZING)
+            if (creation_flow.phase == CharacterCreation::Phase::CUSTOMIZING)
             {
                 std::string cname = namechar.get_text();
-                uint16_t cjob = 1;
-                int32_t cface = faces[female][face];
-                int32_t chair = hairs[female][hair];
-                uint8_t chairc = haircolors[female][haircolor];
-                uint8_t cskin = skins[female][skin];
-                int32_t ctop = tops[female][top];
-                int32_t cbot = bots[female][bot];
-                int32_t cshoe = shoes[female][shoe];
-                int32_t cwep = weapons[female][weapon];
-                CreateCharPacket(cname, cjob, cface, chair, chairc, cskin, ctop, cbot, cshoe, cwep, female).dispatch();
-                return Button::PRESSED;
+                if (!CharacterCreation::is_locally_valid_name(cname))
+                {
+                    restore_name_entry();
+                    UI::get().emplace<UILoginNotice>(UILoginNotice::ILLEGAL_NAME);
+                    return Button::NORMAL;
+                }
+
+                // The initial availability result can become stale while the
+                // player customizes the character. Recheck immediately before
+                // CREATE_CHAR so the server can report an invalid/taken ID.
+                creation_flow = CharacterCreation::checking_creation_name(cname);
+                buttons[BT_CHARC_OK]->set_state(Button::DISABLED);
+                NameCharPacket(cname).dispatch();
+                return Button::DISABLED;
             }
-            else if (naming_state == NamingState::CHECKING)
+            else if (creation_flow.phase != CharacterCreation::Phase::EDITING)
             {
-                return Button::PRESSED;
+                return Button::DISABLED;
             }
             else
             {
                 std::string name = namechar.get_text();
-                if (is_locally_valid_name(name))
+                if (CharacterCreation::is_locally_valid_name(name))
                 {
                     namechar.set_state(Textfield::NORMAL);
-                    naming_state = NamingState::CHECKING;
-                    pending_name = name;
-                    naming_elapsed = 0;
+                    creation_flow = CharacterCreation::checking_name(name);
+                    buttons[BT_CHARC_OK]->set_state(Button::DISABLED);
                     NameCharPacket(name).dispatch();
-                    return Button::PRESSED;
+                    return Button::DISABLED;
                 }
                 else
                 {
@@ -283,37 +262,14 @@ namespace jrc
                 }
             }
         case BT_CHARC_CANCEL:
-            if (naming_state == NamingState::CUSTOMIZING)
+            if (CharacterCreation::shows_customization(creation_flow.phase))
             {
-                buttons[BT_CHARC_OK]->set_position({ 482, 292 });
-                buttons[BT_CHARC_CANCEL]->set_position({ 555, 292 });
-                buttons[BT_CHARC_FACEL]->set_active(false);
-                buttons[BT_CHARC_FACER]->set_active(false);
-                buttons[BT_CHARC_HAIRL]->set_active(false);
-                buttons[BT_CHARC_HAIRR]->set_active(false);
-                buttons[BT_CHARC_HAIRCL]->set_active(false);
-                buttons[BT_CHARC_HAIRCR]->set_active(false);
-                buttons[BT_CHARC_SKINL]->set_active(false);
-                buttons[BT_CHARC_SKINR]->set_active(false);
-                buttons[BT_CHARC_TOPL]->set_active(false);
-                buttons[BT_CHARC_TOPR]->set_active(false);
-                buttons[BT_CHARC_BOTL]->set_active(false);
-                buttons[BT_CHARC_BOTR]->set_active(false);
-                buttons[BT_CHARC_SHOESL]->set_active(false);
-                buttons[BT_CHARC_SHOESR]->set_active(false);
-                buttons[BT_CHARC_WEPL]->set_active(false);
-                buttons[BT_CHARC_WEPR]->set_active(false);
-                buttons[BT_CHARC_GENDERL]->set_active(false);
-                buttons[BT_CHARC_GEMDERR]->set_active(false);
-                buttons[BT_CHARC_CANCEL]->set_state(Button::NORMAL);
                 restore_name_entry();
                 return Button::NORMAL;
             }
             else
             {
-                naming_state = NamingState::EDITING;
-                pending_name.clear();
-                naming_elapsed = 0;
+                creation_flow = CharacterCreation::editing();
                 focus_name_on_update = false;
                 namechar.set_state(Textfield::NORMAL);
                 active = false;
@@ -426,64 +382,108 @@ namespace jrc
         return UIElement::send_cursor(clicked, cursorpos);
     }
 
+    void UICharcreation::set_customization_controls(bool enabled)
+    {
+        buttons[BT_CHARC_OK]->set_position(enabled ? Point<int16_t>(486, 445) : Point<int16_t>(482, 292));
+        buttons[BT_CHARC_CANCEL]->set_position(enabled ? Point<int16_t>(560, 445) : Point<int16_t>(555, 292));
+
+        for (uint16_t id = BT_CHARC_FACEL; id <= BT_CHARC_GEMDERR; ++id)
+        {
+            buttons[id]->set_active(enabled);
+        }
+    }
+
     void UICharcreation::restore_name_entry()
     {
-        naming_state = NamingState::EDITING;
-        pending_name.clear();
-        naming_elapsed = 0;
+        creation_flow = CharacterCreation::editing();
         focus_name_on_update = false;
+        set_customization_controls(false);
         buttons[BT_CHARC_OK]->set_state(Button::NORMAL);
+        buttons[BT_CHARC_CANCEL]->set_state(Button::NORMAL);
         namechar.set_state(Textfield::FOCUSED);
+    }
+
+    void UICharcreation::restore_customization()
+    {
+        creation_flow = CharacterCreation::customizing();
+        set_customization_controls(true);
+        buttons[BT_CHARC_OK]->set_state(Button::NORMAL);
+        buttons[BT_CHARC_CANCEL]->set_state(Button::NORMAL);
+        namechar.set_state(Textfield::DISABLED);
+    }
+
+    void UICharcreation::dispatch_creation()
+    {
+        std::string cname = creation_flow.pending_name;
+        creation_flow = CharacterCreation::creating(cname);
+        buttons[BT_CHARC_OK]->set_state(Button::DISABLED);
+
+        CreateCharPacket(
+            cname,
+            1,
+            faces[female][face],
+            hairs[female][hair],
+            haircolors[female][haircolor],
+            skins[female][skin],
+            tops[female][top],
+            bots[female][bot],
+            shoes[female][shoe],
+            weapons[female][weapon],
+            female
+        ).dispatch();
     }
 
     void UICharcreation::send_naming_result(const std::string& name, bool nameused)
     {
-        if (naming_state != NamingState::CHECKING || name != pending_name)
+        CharacterCreation::NameResponseAction action =
+            CharacterCreation::name_response_action(creation_flow, name, nameused);
+        if (action == CharacterCreation::NameResponseAction::IGNORE)
         {
             return;
         }
 
-        // The field remains editable while the request is in flight. Never
-        // apply an old response to text the player has already changed.
-        if (namechar.get_text() != pending_name)
+        if (creation_flow.phase == CharacterCreation::Phase::CHECKING_NAME &&
+            namechar.get_text() != creation_flow.pending_name)
         {
             restore_name_entry();
             return;
         }
 
-        if (nameused)
+        switch (action)
+        {
+        case CharacterCreation::NameResponseAction::REJECT_NAME:
         {
             restore_name_entry();
-            UI::get().emplace<UILoginNotice>(UILoginNotice::NAME_IN_USE);
+            UILoginNotice::Message message = CharacterCreation::is_locally_valid_name(name) ?
+                UILoginNotice::NAME_IN_USE : UILoginNotice::ILLEGAL_NAME;
+            UI::get().emplace<UILoginNotice>(message);
+            break;
         }
-        else
+        case CharacterCreation::NameResponseAction::ENTER_CUSTOMIZATION:
+            restore_customization();
+            break;
+        case CharacterCreation::NameResponseAction::DISPATCH_CREATION:
+            dispatch_creation();
+            break;
+        case CharacterCreation::NameResponseAction::RESTORE_CUSTOMIZATION:
+            restore_customization();
+            UI::get().emplace<UILoginNotice>(UILoginNotice::AN_ERROR_OCCURED);
+            break;
+        default:
+            break;
+        }
+    }
+
+    bool UICharcreation::handle_creation_failure()
+    {
+        if (creation_flow.phase != CharacterCreation::Phase::CREATING)
         {
-            naming_state = NamingState::CUSTOMIZING;
-            pending_name.clear();
-            naming_elapsed = 0;
-            buttons[BT_CHARC_OK]->set_position(Point<int16_t>(486, 445));
-            buttons[BT_CHARC_CANCEL]->set_position(Point<int16_t>(560, 445));
-            buttons[BT_CHARC_FACEL]->set_active(true);
-            buttons[BT_CHARC_FACER]->set_active(true);
-            buttons[BT_CHARC_HAIRL]->set_active(true);
-            buttons[BT_CHARC_HAIRR]->set_active(true);
-            buttons[BT_CHARC_HAIRCL]->set_active(true);
-            buttons[BT_CHARC_HAIRCR]->set_active(true);
-            buttons[BT_CHARC_SKINL]->set_active(true);
-            buttons[BT_CHARC_SKINR]->set_active(true);
-            buttons[BT_CHARC_TOPL]->set_active(true);
-            buttons[BT_CHARC_TOPR]->set_active(true);
-            buttons[BT_CHARC_BOTL]->set_active(true);
-            buttons[BT_CHARC_BOTR]->set_active(true);
-            buttons[BT_CHARC_SHOESL]->set_active(true);
-            buttons[BT_CHARC_SHOESR]->set_active(true);
-            buttons[BT_CHARC_WEPL]->set_active(true);
-            buttons[BT_CHARC_WEPR]->set_active(true);
-            buttons[BT_CHARC_GENDERL]->set_active(true);
-            buttons[BT_CHARC_GEMDERR]->set_active(true);
-            namechar.set_state(Textfield::DISABLED);
-            buttons[BT_CHARC_OK]->set_state(Button::NORMAL);
+            return false;
         }
+
+        restore_customization();
+        UI::get().emplace<UILoginNotice>(UILoginNotice::AN_ERROR_OCCURED);
+        return true;
     }
 
     void UICharcreation::draw(float alpha) const
@@ -501,7 +501,7 @@ namespace jrc
         cloud.draw(Point<int16_t>(cloudx, 300));
         cloud.draw(Point<int16_t>(cloudx + cloud.width(), 300));
 
-        if (naming_state != NamingState::CUSTOMIZING)
+        if (!CharacterCreation::shows_customization(creation_flow.phase))
         {
             nameboard.draw(Point<int16_t>(455, 115 ));
             namechar.draw(position);
@@ -518,7 +518,7 @@ namespace jrc
 
         newchar.draw({ 360, 348 }, alpha);
 
-        if (naming_state == NamingState::CUSTOMIZING)
+        if (CharacterCreation::shows_customization(creation_flow.phase))
         {
             facename.draw(Point<int16_t>(591, 214));
             hairname.draw(Point<int16_t>(591, 233));
@@ -536,7 +536,7 @@ namespace jrc
     {
         UIElement::update();
 
-        if (naming_state == NamingState::CUSTOMIZING)
+        if (CharacterCreation::shows_customization(creation_flow.phase))
         {
             for (auto& sprite : sprites_lookboard)
             {
@@ -553,14 +553,37 @@ namespace jrc
             namechar.set_state(Textfield::FOCUSED);
         }
 
-        if (naming_state == NamingState::CHECKING)
+        switch (creation_flow.phase)
         {
-            naming_elapsed += Constants::TIMESTEP;
-            if (naming_elapsed >= NAME_CHECK_TIMEOUT)
-            {
-                restore_name_entry();
-                UI::get().emplace<UILoginNotice>(UILoginNotice::UNABLE_TO_CONNECT);
-            }
+        case CharacterCreation::Phase::CHECKING_NAME:
+        case CharacterCreation::Phase::CHECKING_CREATION_NAME:
+        case CharacterCreation::Phase::CREATING:
+        case CharacterCreation::Phase::RECOVERING_CREATION:
+            creation_flow = CharacterCreation::advance(creation_flow, Constants::TIMESTEP);
+            break;
+        default:
+            break;
+        }
+
+        switch (CharacterCreation::timeout_action(creation_flow, REQUEST_TIMEOUT))
+        {
+        case CharacterCreation::TimeoutAction::RESTORE_NAME_ENTRY:
+            restore_name_entry();
+            UI::get().emplace<UILoginNotice>(UILoginNotice::UNABLE_TO_CONNECT);
+            break;
+        case CharacterCreation::TimeoutAction::RESTORE_CUSTOMIZATION:
+            restore_customization();
+            UI::get().emplace<UILoginNotice>(UILoginNotice::UNABLE_TO_CONNECT);
+            break;
+        case CharacterCreation::TimeoutAction::RECHECK_CREATED_NAME:
+        {
+            std::string pending_name = creation_flow.pending_name;
+            creation_flow = CharacterCreation::recovering_creation(pending_name);
+            NameCharPacket(pending_name).dispatch();
+            break;
+        }
+        default:
+            break;
         }
 
         cloudfx += 0.25f;
