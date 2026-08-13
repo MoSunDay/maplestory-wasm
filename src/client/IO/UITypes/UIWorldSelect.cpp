@@ -16,8 +16,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "UIWorldSelect.h"
+#include "WorldSelectPolicy.h"
 
-#include "../../Configuration.h"
 #include "../../Graphics/Sprite.h"
 #include "../../IO/UI.h"
 #include "../../IO/Components/MapleButton.h"
@@ -34,9 +34,10 @@ namespace jrc
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
-        : UIElement({ 0, 0 }, { 800, 600 }), channelcount(0) {
-
-        channelid = Setting<DefaultChannel>::get().load();
+        : UIElement({ 0, 0 }, { 800, 600 }),
+          worldid(0),
+          channelid(world_select::selected_channel_id()),
+          channelcount(0) {
 
         nl::node back = nl::nx::map["Back"]["login.img"]["back"];
         nl::node worldsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtWorld"]["release"];
@@ -63,16 +64,13 @@ namespace jrc
         // server-provided id instead of a stale saved setting, which may refer
         // to a world that is no longer available.
         worldid = static_cast<uint8_t>(world.wid);
-        channelcount = world.channelcount;
+        channelcount = world_select::selectable_channel_count(world.channelcount);
 
         buttons[BT_WORLD0] = std::make_unique<MapleButton>(worldsrc["button:15"], Point<int16_t>(650, 20));
         buttons[BT_WORLD0]->set_state(Button::PRESSED);
 
         sprites.emplace_back(channelsrc["layer:bg"], CHANNEL_WINDOW_CENTER);
         sprites.emplace_back(channelsrc["release"]["layer:15"], CHANNEL_WINDOW_CENTER);
-
-        if (channelid >= world.channelcount)
-            channelid = 0;
 
         for (uint8_t i = 0; i < channelcount; ++i)
         {

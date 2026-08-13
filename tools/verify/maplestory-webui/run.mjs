@@ -279,7 +279,9 @@ try {
   await driver.screenshot('02-world-select');
 
   await driver.screenshot('03-channel-one-only');
-  await driver.doubleClick(255, 260);
+  // Exercise the visible Go To Selected Channel control. Its normal-state
+  // bitmap occupies x=445..576 and y=201..232 in the 800x600 game canvas.
+  await driver.click(510, 216);
   await requireUiState('character-select UI active', uiState.charSelect, 45);
   await requireAssetIdle('character-select assets ready');
   await driver.screenshot('04-character-select-before');
