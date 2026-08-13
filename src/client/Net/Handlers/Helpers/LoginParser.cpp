@@ -19,6 +19,31 @@
 
 namespace jrc
 {
+    namespace
+    {
+        constexpr bool has_sp_table(uint16_t job)
+        {
+            return job == 2001 || (job >= 2200 && job <= 2218);
+        }
+
+        uint16_t read_remaining_sp(InPacket& recv, uint16_t job)
+        {
+            if (!has_sp_table(job))
+            {
+                return static_cast<uint16_t>(recv.read_short());
+            }
+
+            const auto pool_count = static_cast<uint8_t>(recv.read_byte());
+            uint16_t remaining_sp = 0;
+            for (uint8_t i = 0; i < pool_count; ++i)
+            {
+                recv.read_byte(); // advancement level
+                remaining_sp += static_cast<uint8_t>(recv.read_byte());
+            }
+            return remaining_sp;
+        }
+    }
+
     Account LoginParser::parse_account(InPacket & recv)
     {
         Account account;
@@ -106,7 +131,9 @@ namespace jrc
     {
         StatsEntry statsentry;
 
-        statsentry.name = recv.read_padded_string(13);
+        // Cosmic pads names by Java String.length() before UTF-8 encoding, so
+        // non-ASCII names occupy more than 13 wire bytes.
+        statsentry.name = recv.read_padded_utf8_string(13);
 
         statsentry.female = recv.read_bool();
         recv.read_byte(); // skin
@@ -118,11 +145,10 @@ namespace jrc
             statsentry.petids.push_back(recv.read_long());
         }
 
-        // The server in custom-client mode writes level as a short (see
-        // addCharStats); reading a byte here shifts every following field
-        // and breaks CHARLIST / ADD_NEW_CHAR_ENTRY / SET_FIELD parsing.
-        statsentry.stats[Maplestat::LEVEL] = recv.read_short();
-        statsentry.stats[Maplestat::JOB]   = recv.read_short();
+        statsentry.stats[Maplestat::LEVEL] =
+            static_cast<uint8_t>(recv.read_byte());
+        const auto job = static_cast<uint16_t>(recv.read_short());
+        statsentry.stats[Maplestat::JOB]   = job;
         statsentry.stats[Maplestat::STR]   = recv.read_short();
         statsentry.stats[Maplestat::DEX]   = recv.read_short();
         statsentry.stats[Maplestat::INT]   = recv.read_short();
@@ -132,7 +158,7 @@ namespace jrc
         statsentry.stats[Maplestat::MP]    = recv.read_short();
         statsentry.stats[Maplestat::MAXMP] = recv.read_short();
         statsentry.stats[Maplestat::AP]    = recv.read_short();
-        statsentry.stats[Maplestat::SP]    = recv.read_short();
+        statsentry.stats[Maplestat::SP]    = read_remaining_sp(recv, job);
         statsentry.exp                     = recv.read_int();
         statsentry.stats[Maplestat::FAME]  = recv.read_short();
 
