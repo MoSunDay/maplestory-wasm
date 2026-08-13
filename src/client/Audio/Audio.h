@@ -77,12 +77,14 @@ namespace jrc
     public:
         Music(const std::string& path);
 
+        void prepare() const;
         void play() const;
 
         static Error init();
         static bool set_bgmvolume(uint8_t volume);
 
     private:
+        nl::audio resolve() const;
         std::string path;
     };
 }

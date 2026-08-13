@@ -21,7 +21,6 @@
 #include "../Console.h"
 
 #include <algorithm>
-#include <chrono>
 #include <vector>
 
 namespace jrc
@@ -383,7 +382,13 @@ namespace jrc
     void GraphicsGL::queuebitmap(const nl::bitmap& bmp, BitmapPriority priority)
     {
         const size_t id = bmp.id();
-        if (id == 0 || hasbitmap(bmp))
+        if (id == 0)
+        {
+            return;
+        }
+
+        addtobitmapbatch(bmp, priority);
+        if (hasbitmap(bmp))
         {
             return;
         }
@@ -426,56 +431,14 @@ namespace jrc
 #endif
     }
 
-    void GraphicsGL::preparebitmaps(uint32_t budget_ms)
-    {
-#ifdef MS_PLATFORM_WASM
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(budget_ms);
-        auto prepare_queue = [&](std::deque<nl::bitmap>& queue, size_t candidates) {
-            while (candidates-- > 0 && !queue.empty())
-            {
-                if (std::chrono::steady_clock::now() >= deadline)
-                {
-                    break;
-                }
-
-                nl::bitmap bmp = queue.front();
-                queue.pop_front();
-
-                if (hasbitmap(bmp))
-                {
-                    pending_bitmap_ids.erase(bmp.id());
-                }
-                else if (bmp.data_ready())
-                {
-                    addbitmap(bmp);
-                    pending_bitmap_ids.erase(bmp.id());
-                    return true;
-                }
-                else
-                {
-                    queue.push_back(bmp);
-                }
-            }
-            return false;
-        };
-
-        size_t priority_candidates = pending_priority_bitmaps.size();
-        if (prepare_queue(pending_priority_bitmaps, priority_candidates))
-        {
-            return;
-        }
-
-        // A single decode/upload can consume most of the frame budget. If no
-        // visible effect was ready, normal assets may use the remaining scan.
-        prepare_queue(pending_bitmaps, pending_bitmaps.size());
-#else
-        (void)budget_ms;
-#endif
-    }
-
     bool GraphicsGL::hasbitmap(const nl::bitmap& bmp) const
     {
         return offsets.find(bmp.id()) != offsets.end();
+    }
+
+    bool GraphicsGL::isonscreen(const Rectangle<int16_t>& rect) const
+    {
+        return rect.overlaps(screen());
     }
 
     const GraphicsGL::Offset& GraphicsGL::getoffset(const nl::bitmap& bmp)

@@ -61,12 +61,21 @@ namespace jrc
         if (id == 0)
             return;
 
+        const Rectangle<int16_t> destination = args.get_rectangle(origin, dimensions);
+        if (!GraphicsGL::get().isonscreen(destination))
+        {
+            return;
+        }
+
         if (!GraphicsGL::get().hasbitmap(bitmap))
         {
 #ifdef MS_PLATFORM_WASM
             // Construction already scheduled this bitmap. Re-queueing here
             // also recovers after an atlas clear without blocking the frame.
-            GraphicsGL::get().queuebitmap(bitmap);
+            GraphicsGL::get().queuebitmap(
+                bitmap,
+                GraphicsGL::BitmapPriority::VISIBLE_EFFECT
+            );
             bitmap.request();
             return;
 #else
@@ -75,7 +84,7 @@ namespace jrc
         }
 
         GraphicsGL::get()
-            .draw(bitmap, args.get_rectangle(origin, dimensions), args.get_color(), args.get_angle());
+            .draw(bitmap, destination, args.get_color(), args.get_angle());
     }
 
     void Texture::prepare_visible() const

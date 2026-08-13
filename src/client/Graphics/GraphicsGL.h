@@ -51,6 +51,19 @@ namespace jrc
             VISIBLE_EFFECT
         };
 
+        struct BitmapBatchProgress
+        {
+            size_t resident = 0;
+            size_t total = 0;
+            size_t prepared = 0;
+            size_t required = 0;
+
+            bool ready() const
+            {
+                return resident == total && prepared == required;
+            }
+        };
+
         GraphicsGL();
 
         // Initialise all resources.
@@ -71,10 +84,19 @@ namespace jrc
             const nl::bitmap& bmp,
             BitmapPriority priority = BitmapPriority::BACKGROUND
         );
-        // Prepare ready bitmaps without letting one frame drain the whole queue.
+        // Prepare ready bitmaps within a soft per-frame time budget.
         void preparebitmaps(uint32_t budget_ms = 2);
+        // Track the NX residency of textures created for one map transition.
+        uint64_t beginbitmapbatch();
+        BitmapBatchProgress bitmapbatchprogress(uint64_t generation) const;
+        uint64_t bitmapbatchrevision(uint64_t generation) const;
+        void retrybitmapbatch(uint64_t generation);
+        void endbitmapbatch(uint64_t generation);
+        bool hasblockingbitmaps() const;
         // Return whether a bitmap is currently resident in the texture atlas.
         bool hasbitmap(const nl::bitmap& bmp) const;
+        // Return whether a destination rectangle can affect the current viewport.
+        bool isonscreen(const Rectangle<int16_t>& rect) const;
         // Draw the bitmap with the given parameters.
         void draw(const nl::bitmap& bmp, const Rectangle<int16_t>& rect,
             const Color& color, float angle);
@@ -108,6 +130,7 @@ namespace jrc
 
     private:
         void clearinternal();
+        void addtobitmapbatch(const nl::bitmap& bmp, BitmapPriority priority);
 
         struct Offset
         {
@@ -268,6 +291,15 @@ namespace jrc
         std::deque<nl::bitmap> pending_priority_bitmaps;
         std::deque<nl::bitmap> pending_bitmaps;
         std::unordered_set<size_t> pending_bitmap_ids;
+        struct BitmapBatch
+        {
+            uint64_t generation = 0;
+            uint64_t revision = 0;
+            std::unordered_map<size_t, nl::bitmap> bitmaps;
+            std::unordered_set<size_t> required_bitmap_ids;
+        };
+        BitmapBatch bitmap_batch;
+        uint64_t next_bitmap_batch_generation = 0;
         Offset nulloffset;
 
         QuadTree<size_t, Leftover> leftovers;

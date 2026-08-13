@@ -22,6 +22,7 @@
 #include "Combat/Combat.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapEffect.h"
+#include "Loading/MapAssetGate.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
 #include "MapleMap/MapPortals.h"
@@ -37,6 +38,9 @@
 #include "../Template/TimedQueue.h"
 #include "../Template/Singleton.h"
 
+#include <cstdint>
+#include <functional>
+
 
 namespace jrc
 {
@@ -48,7 +52,7 @@ namespace jrc
         void init();
 
         // Loads the map to display.
-        void load(int32_t mapid, int8_t portalid);
+        void load(int32_t mapid, int8_t portalid, std::function<void()> onready);
         // Remove all map objects and graphics.
         void clear();
 
@@ -69,6 +73,8 @@ namespace jrc
 
         // Send key input to the stage.
         void send_key(KeyType::Id keytype, int32_t keycode, bool pressed);
+        // Release held movement/actions before pausing simulation for assets.
+        void release_actions();
         // Send mouse input to the stage.
         Cursor::State send_cursor(bool pressed, Point<int16_t> position);
 
@@ -89,6 +95,8 @@ namespace jrc
         Player& get_player();
         // Returns the id of the current map.
         int32_t get_mapid() const;
+        bool is_loading() const;
+        void retry_loading();
         // Return a reference to the attack and buff component.
         Combat& get_combat();
 
@@ -106,13 +114,17 @@ namespace jrc
         void update_directional_context();
         void check_drops();
         void update_intro_warp();
+        void begin_loading(std::function<void()> onready);
+        void end_loading();
+        void update_loading();
+        void finish_loading();
+        void report_loading_progress() const;
         bool is_intro_input_locked() const;
-        void release_intro_locked_actions();
 
         enum State
         {
             INACTIVE,
-            TRANSITION,
+            LOADING,
             ACTIVE
         };
 
@@ -140,5 +152,8 @@ namespace jrc
         Combat combat;
         int32_t pending_intro_warp_mapid;
         int32_t pending_intro_warp_delay_ms;
+        uint64_t asset_generation;
+        map_asset_gate::State asset_gate;
+        std::function<void()> loading_ready;
     };
 }

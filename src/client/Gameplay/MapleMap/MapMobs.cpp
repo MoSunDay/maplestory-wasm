@@ -33,6 +33,12 @@ namespace jrc
 
     void MapMobs::update(const Physics& physics)
     {
+        instantiate_spawns();
+        mobs.update(physics);
+    }
+
+    void MapMobs::instantiate_spawns()
+    {
         for ( ; !spawns.empty(); spawns.pop())
         {
             const MobSpawn& spawn = spawns.front();
@@ -54,7 +60,6 @@ namespace jrc
             }
         }
 
-        mobs.update(physics);
     }
 
     void MapMobs::spawn(MobSpawn&& spawn)
