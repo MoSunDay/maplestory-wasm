@@ -396,11 +396,13 @@ namespace jrc
     void UICharcreation::restore_name_entry()
     {
         creation_flow = CharacterCreation::editing();
-        focus_name_on_update = false;
+        // Defer browser IME focus until the current modal click finishes; an
+        // immediate transparent textarea would otherwise intercept that click.
+        focus_name_on_update = true;
         set_customization_controls(false);
         buttons[BT_CHARC_OK]->set_state(Button::NORMAL);
         buttons[BT_CHARC_CANCEL]->set_state(Button::NORMAL);
-        namechar.set_state(Textfield::FOCUSED);
+        namechar.set_state(Textfield::NORMAL);
     }
 
     void UICharcreation::restore_customization()
@@ -486,6 +488,11 @@ namespace jrc
         return true;
     }
 
+    bool UICharcreation::is_customizing() const
+    {
+        return CharacterCreation::shows_customization(creation_flow.phase);
+    }
+
     void UICharcreation::draw(float alpha) const
     {
         for (int16_t i = 0; i < 2; i++)
@@ -549,8 +556,12 @@ namespace jrc
 
         if (focus_name_on_update)
         {
-            focus_name_on_update = false;
-            namechar.set_state(Textfield::FOCUSED);
+            auto notice = UI::get().get_element<UILoginNotice>();
+            if (!notice || !notice->is_active())
+            {
+                focus_name_on_update = false;
+                namechar.set_state(Textfield::FOCUSED);
+            }
         }
 
         switch (creation_flow.phase)

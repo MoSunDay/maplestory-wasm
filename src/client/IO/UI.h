@@ -97,6 +97,7 @@ namespace jrc
         template <class T>
         Optional<T> get_element();
         bool has_element(UIElement::Type type);
+        bool is_element_active(UIElement::Type type);
         void remove(UIElement::Type type);
 
     private:

@@ -13,5 +13,6 @@
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
 - Cosmic 完整角色数据（Java 定长 UTF-8、戒指、新年贺卡、小游戏门禁）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-data-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/CharacterDataParser.cpp -o /tmp/character-data-parser && /tmp/character-data-parser`
 - 角色创建名称策略、最终确认与失败恢复状态：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-creation-flow.cpp -o /tmp/character-creation-flow && /tmp/character-creation-flow`
+- 角色创建请求字段顺序与宽度：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-creation-packet.cpp -o /tmp/character-creation-packet && /tmp/character-creation-packet`
 - 攻击 NX 结构审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/attack-effect-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/attack-effect-nx && /tmp/attack-effect-nx Skill.nx`
 - 近战武器残影 NX 审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/weapon-afterimage-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/weapon-afterimage-nx && /tmp/weapon-afterimage-nx Character.nx`

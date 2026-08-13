@@ -4,7 +4,8 @@ import { BrowserDriver, sleep } from './cdp.mjs';
 const browserBinary = process.env.CHROME_BIN || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : 'google-chrome');
 const debugPort = Number(process.env.E2E_DEBUG_PORT || 9231);
 const retryCharacterName = process.env.E2E_RETRY_CHARACTER || '';
-const createCharacter = retryCharacterName !== '' || process.env.E2E_CREATE_CHARACTER !== '0';
+const stopAfterCharacterCreate = process.env.E2E_STOP_AFTER_CHARACTER_CREATE === '1';
+const createCharacter = stopAfterCharacterCreate || retryCharacterName !== '' || process.env.E2E_CREATE_CHARACTER !== '0';
 const useRegistration = process.env.E2E_REGISTER === '1';
 const submitRegistration = process.env.E2E_REGISTER_SUBMIT === '1';
 const account = process.env.E2E_ACCOUNT || 'test1';
@@ -69,14 +70,31 @@ function currentUiState() {
   return driver.evaluate("Module.ccall('msui_state', 'number', [], [])");
 }
 
+function loginNoticeActive() {
+  return driver.evaluate("Module.ccall('msui_login_notice_active', 'number', [], [])");
+}
+
+function characterCreationCustomizing() {
+  return driver.evaluate("Module.ccall('msui_character_creation_customizing', 'number', [], [])");
+}
+
 function requireUiState(name, expected, timeoutSeconds = 30) {
   return requireState(name, async () => await currentUiState() === expected, timeoutSeconds);
 }
 
 async function requireAssetIdle(name = 'foreground assets ready') {
+  let hiddenSince = null;
   await sleep(250);
-  return requireState(name, async () => await driver.evaluate(
-    "document.getElementById('asset-loading-screen').classList.contains('is-hidden')"), 45);
+  return requireState(name, async () => {
+    const hidden = await driver.evaluate(
+      "document.getElementById('asset-loading-screen').classList.contains('is-hidden')");
+    if (!hidden) {
+      hiddenSince = null;
+      return false;
+    }
+    if (hiddenSince === null) hiddenSince = Date.now();
+    return Date.now() - hiddenSince >= 1000;
+  }, 45);
 }
 
 function fatalRuntimeLogs() {
@@ -243,7 +261,8 @@ try {
     await driver.click(360, 345);
     await requireAssetIdle('registration assets ready');
     await driver.screenshot('01b-registration');
-    await driver.typeAscii(account);
+    await driver.click(340, 250);
+    await driver.compose(account);
     await driver.click(340, 287);
     await driver.typeAscii(password);
     await driver.click(340, 324);
@@ -306,6 +325,10 @@ try {
   if (createCharacter) {
     await driver.click(250, 515);
     await requireUiState('character-creation UI active', uiState.charCreation);
+    // Character creation references a wider cold set of UI and avatar
+    // bitmaps than selection; allow the frame-budgeted queue to request them.
+    await sleep(10000);
+    await requireAssetIdle('character-creation assets ready');
     await driver.click(530, 230);
     const firstName = retryCharacterName ? 'ab' : characterName;
     await driver.compose(firstName);
@@ -315,31 +338,49 @@ try {
     await driver.click(520, 310);
 
     if (retryCharacterName) {
+      await requireState('illegal character-name notice active', async () =>
+        await loginNoticeActive() === 1, 5);
+      // Drawing the newly constructed modal schedules its cold bitmap ranges;
+      // wait for that second foreground wave before clicking the small button.
+      await sleep(5000);
+      await requireAssetIdle('illegal character-name notice assets ready');
+      await driver.screenshot('05b-character-name-rejected');
+      // The NX origin places the 50x23 visible button at (392, 311); click
+      // its center so the assertion does not depend on edge rounding.
+      await driver.click(417, 322);
+      await sleep(250);
+      await driver.screenshot('05c-character-name-notice-dismissed');
+      await requireState('illegal character-name notice dismissed', async () =>
+        await loginNoticeActive() === 0, 5);
+      await driver.click(530, 230);
       await requireState('rejected name remains editable', async () =>
         await driver.evaluate(
           `MapleWasmIME.active && document.getElementById('ime-input').value === ${JSON.stringify(firstName)}`
         ));
-      await driver.screenshot('05b-character-name-rejected');
-      await driver.click(392, 300);
-      await sleep(250);
       await driver.compose(retryCharacterName);
       await driver.click(520, 310);
     }
 
-    if (retryCharacterName) {
-      // A pending request also blurs the field. Wait past the recovery timeout
-      // so an inactive IME proves that the server accepted the second name.
-      await sleep(8500);
-    }
     await requireState('accepted name enters customization', async () =>
-      await driver.evaluate('MapleWasmIME.active === false'));
+      await characterCreationCustomizing() === 1, 15);
+    await requireAssetIdle('character-customization assets ready');
     await driver.screenshot('06-character-customize');
 
     if (retryCharacterName) {
-      // Verify availability without creating persistent test data.
-      await driver.click(565, 465);
-      await driver.click(560, 310);
-      await requireUiState('character creation cancels back to selection', uiState.charSelect);
+      if (stopAfterCharacterCreate) {
+        await driver.click(525, 465);
+        await requireUiState('created character returned to selection', uiState.charSelect, 45);
+      } else {
+        // Verify availability without creating persistent test data.
+        await driver.click(600, 470);
+        await requireState('customization returns to name entry', async () =>
+          await characterCreationCustomizing() === 0, 5);
+        await driver.screenshot('06b-character-name-restored');
+        await driver.click(600, 322);
+        await sleep(250);
+        await driver.screenshot('06c-character-creation-cancelled');
+        await requireUiState('character creation cancels back to selection', uiState.charSelect);
+      }
       await driver.screenshot('07-character-select-after');
     } else {
       await driver.click(525, 465);
@@ -348,7 +389,7 @@ try {
   }
   if (!retryCharacterName) await driver.screenshot('07-character-select-after');
 
-  if (!retryCharacterName) {
+  if (!retryCharacterName && !stopAfterCharacterCreate) {
     await driver.click(130, 220);
     await driver.setNetworkLatency(500);
     await driver.evaluate(`(() => {
