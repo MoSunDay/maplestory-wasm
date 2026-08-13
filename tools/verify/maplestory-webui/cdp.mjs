@@ -165,6 +165,18 @@ export class BrowserDriver {
     });
   }
 
+  async keyHold(key, code, virtualKeyCode, milliseconds = 50) {
+    await this.send('Input.dispatchKeyEvent', {
+      type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKeyCode,
+      nativeVirtualKeyCode: virtualKeyCode
+    });
+    await sleep(milliseconds);
+    await this.send('Input.dispatchKeyEvent', {
+      type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKeyCode,
+      nativeVirtualKeyCode: virtualKeyCode
+    });
+  }
+
   async typeAscii(value) {
     for (const character of value) {
       const upper = character.toUpperCase();

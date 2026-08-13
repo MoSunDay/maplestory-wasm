@@ -45,6 +45,12 @@ namespace jrc
     class GraphicsGL : public Singleton<GraphicsGL>
     {
     public:
+        enum class BitmapPriority
+        {
+            BACKGROUND,
+            VISIBLE_EFFECT
+        };
+
         GraphicsGL();
 
         // Initialise all resources.
@@ -59,8 +65,12 @@ namespace jrc
 
         // Add a bitmap to the available resources.
         void addbitmap(const nl::bitmap& bmp);
-        // Schedule a bitmap for silent network fetch and frame-budgeted upload.
-        void queuebitmap(const nl::bitmap& bmp);
+        // Schedule a bitmap for network fetch and frame-budgeted upload.
+        // Visible one-shot effects may promote an already queued bitmap.
+        void queuebitmap(
+            const nl::bitmap& bmp,
+            BitmapPriority priority = BitmapPriority::BACKGROUND
+        );
         // Prepare ready bitmaps without letting one frame drain the whole queue.
         void preparebitmaps(uint32_t budget_ms = 2);
         // Return whether a bitmap is currently resident in the texture atlas.
@@ -255,6 +265,7 @@ namespace jrc
         GLint uniform_fontregion;
 
         std::unordered_map<size_t, Offset> offsets;
+        std::deque<nl::bitmap> pending_priority_bitmaps;
         std::deque<nl::bitmap> pending_bitmaps;
         std::unordered_set<size_t> pending_bitmap_ids;
         Offset nulloffset;

@@ -20,6 +20,7 @@
 #include "../Constants.h"
 #include "../Util/Misc.h"
 
+#include <algorithm>
 #include <set>
 
 namespace jrc
@@ -86,6 +87,21 @@ namespace jrc
     void Frame::draw(const DrawArgument& args) const
     {
         texture.draw(args);
+    }
+
+    void Frame::prepare_visible() const
+    {
+        texture.prepare_visible();
+    }
+
+    bool Frame::is_valid() const
+    {
+        return texture.is_valid();
+    }
+
+    bool Frame::is_ready() const
+    {
+        return texture.is_ready();
     }
 
     uint8_t Frame::start_opacity() const
@@ -211,6 +227,36 @@ namespace jrc
         {
             frames[interframe].draw(args);
         }
+    }
+
+    void Animation::prepare_visible() const
+    {
+        for (const Frame& framedata : frames)
+        {
+            framedata.prepare_visible();
+        }
+    }
+
+    bool Animation::is_valid() const
+    {
+        return !frames.empty() && std::all_of(
+            frames.begin(),
+            frames.end(),
+            [](const Frame& framedata) {
+                return framedata.is_valid();
+            }
+        );
+    }
+
+    bool Animation::is_ready() const
+    {
+        return is_valid() && std::all_of(
+            frames.begin(),
+            frames.end(),
+            [](const Frame& framedata) {
+                return framedata.is_ready();
+            }
+        );
     }
 
     bool Animation::update()

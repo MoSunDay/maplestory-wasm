@@ -78,6 +78,20 @@ namespace jrc
             .draw(bitmap, args.get_rectangle(origin, dimensions), args.get_color(), args.get_angle());
     }
 
+    void Texture::prepare_visible() const
+    {
+        if (!is_valid())
+        {
+            return;
+        }
+
+        GraphicsGL::get().queuebitmap(
+            bitmap,
+            GraphicsGL::BitmapPriority::VISIBLE_EFFECT
+        );
+        bitmap.request();
+    }
+
     void Texture::shift(Point<int16_t> amount)
     {
         origin -= amount;
@@ -86,6 +100,11 @@ namespace jrc
     bool Texture::is_valid() const
     {
         return bitmap.id() > 0;
+    }
+
+    bool Texture::is_ready() const
+    {
+        return is_valid() && GraphicsGL::get().hasbitmap(bitmap);
     }
 
     int16_t Texture::width() const

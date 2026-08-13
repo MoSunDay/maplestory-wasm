@@ -32,9 +32,11 @@ namespace jrc
         ~Texture();
 
         void draw(const DrawArgument& args) const;
+        void prepare_visible() const;
         void shift(Point<int16_t> amount);
 
         bool is_valid() const;
+        bool is_ready() const;
         int16_t width() const;
         int16_t height() const;
         Point<int16_t> get_origin() const;
