@@ -34,6 +34,7 @@ namespace jrc
 
         // Draw the tile.
         void draw(Point<int16_t> viewpos) const;
+        void prepare_visible(Point<int16_t> viewpos) const;
         // Returns depth of the tile.
         uint8_t getz() const;
 
@@ -43,4 +44,3 @@ namespace jrc
         uint8_t z;
     };
 }
-

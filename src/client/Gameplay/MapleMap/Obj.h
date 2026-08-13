@@ -31,6 +31,7 @@ namespace jrc
         void update();
         // Draw the obj at the specified position.
         void draw(Point<int16_t> viewpos, float inter) const;
+        void prepare_visible(Point<int16_t> viewpos, float inter) const;
         // Return depth of the obj.
         uint8_t getz() const;
 

@@ -78,6 +78,14 @@ function characterCreationCustomizing() {
   return driver.evaluate("Module.ccall('msui_character_creation_customizing', 'number', [], [])");
 }
 
+function mapAssetLoading() {
+  return driver.evaluate("Module.ccall('msstage_loading', 'number', [], [])");
+}
+
+function assetBlocking() {
+  return driver.evaluate("Module.ccall('msasset_blocking', 'number', [], [])");
+}
+
 function requireUiState(name, expected, timeoutSeconds = 30) {
   return requireState(name, async () => await currentUiState() === expected, timeoutSeconds);
 }
@@ -424,6 +432,10 @@ try {
     })()`);
     await driver.click(650, 400);
     await requireUiState('in-game UI active', uiState.game, 60);
+    await requireState('map asset safety gate released', async () =>
+      await mapAssetLoading() === 0, 60);
+    await requireState('all blocking assets released', async () =>
+      await assetBlocking() === 0, 60);
     await requireAssetIdle('in-game foreground assets ready');
     const naturalAssetEvidence = await driver.evaluate(`(() => {
       const evidence = window.naturalAssetEvidence;

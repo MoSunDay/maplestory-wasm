@@ -38,6 +38,11 @@ namespace jrc
         animation.draw(DrawArgument(pos + viewpos, flip), inter);
     }
 
+    void Obj::prepare_visible(Point<int16_t> viewpos, float inter) const
+    {
+        animation.prepare_visible(DrawArgument(pos + viewpos, flip), inter);
+    }
+
     uint8_t Obj::getz() const
     {
         return z;
