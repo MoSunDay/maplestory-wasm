@@ -135,9 +135,9 @@ The MapleStory version used by this server is **83**. The `mapleVersion` used in
 
 All strings are Pascal-style: `[int16 length][UTF-8 bytes]`. There is no null terminator.
 
-### 4.4 Fixed-Length String
+### 4.4 Java Fixed-Length UTF-8 String
 
-Used for character names in some packets: exactly 13 bytes, right-padded with `\0`.
+Cosmic right-pads selected fields to a fixed Java `String.length()` (UTF-16 code-unit) count, then UTF-8 encodes the entire value. A `fixedUtf16Str13` therefore consumes 13 UTF-16 code units but may occupy more than 13 wire bytes when it contains non-ASCII characters.
 
 ---
 
@@ -152,7 +152,7 @@ Used for character names in some packets: exactly 13 bytes, right-padded with `\
 | `long`        | 8       | Signed 64-bit LE integer                          |
 | `bool`        | 1       | 0 = false, 1 = true                               |
 | `string`      | 2+N     | `[short length][UTF-8 bytes]`                     |
-| `fixedStr13`  | 13      | Fixed 13-byte field, null-padded                  |
+| `fixedUtf16Str13` | variable | UTF-8 field null-padded to 13 Java UTF-16 code units |
 | `pos`         | 4       | `[short x][short y]` — map coordinates            |
 | `timestamp`   | 8       | Windows FILETIME: 100-nanosecond intervals since 1601-01-01, LE `long` |
 
@@ -2931,7 +2931,7 @@ whiteScroll      bool   True = White Scroll was used
 Field        Type    Notes
 charId       int
 petSlot      byte    0, 1, or 2
-name         fixedStr13
+name         string
 petItemId    int
 petUniqueId  long
 posX         short
@@ -3812,7 +3812,7 @@ isCash       bool         True if a cash item
 expiration   long         Expiration timestamp (FILETIME)
 
 [If pet (uniqueId > -1 in item):]
-  name       fixedStr13
+  name       fixedUtf16Str13
   level      byte
   tameness   short        (closeness)
   fullness   byte
@@ -3878,7 +3878,7 @@ mesos            int
 [InventoryInfo]  —       §11.3a
 [SkillInfo]      —       §11.3b
 [QuestInfo]      —       §11.3c
-[MiniGameInfo]   —       short 0
+[MiniGameInfo]   —       short 0; running server does not emit entries
 [RingInfo]       —       §11.3d
 [TeleportInfo]   —       §11.3e
 [MonsterBook]    —       §11.3f
@@ -3937,8 +3937,33 @@ completedCount short
 
 #### 11.3d Ring Info
 ```
-[crush rings, friendship rings, marriage ring]
-Each ring entry: ringId: int, [int: 0], partnerRingId: int, [int: 0], itemId: int
+crushCount short
+[Per crush ring:]
+  partnerId   int
+  partnerName fixedUtf16Str13
+  ringId      int
+  [int]       int 0
+  partnerRingId int
+  [int]       int 0
+friendshipCount short
+[Per friendship ring:]
+  partnerId   int
+  partnerName fixedUtf16Str13
+  ringId      int
+  [int]       int 0
+  partnerRingId int
+  [int]       int 0
+  itemId      int
+marriageCount short
+[Per marriage/engagement:]
+  relationshipId int
+  maleId         int
+  femaleId       int
+  status         short
+  maleItemId     int
+  femaleItemId   int
+  maleName       fixedUtf16Str13
+  femaleName     fixedUtf16Str13
 ```
 
 #### 11.3e Teleport Info
