@@ -19,6 +19,7 @@
 #include "../UIElement.h"
 
 #include "../Components/Textfield.h"
+#include "CharacterCreation/Flow.h"
 
 #include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Texture.h"
@@ -44,6 +45,7 @@ namespace jrc
         CursorResult send_cursor(bool, Point<int16_t>) override;
 
         void send_naming_result(const std::string& name, bool nameused);
+        bool handle_creation_failure();
 
     protected:
         Button::State button_pressed(uint16_t button_id) override;
@@ -76,14 +78,10 @@ namespace jrc
             BT_CHARC_GEMDERR,
         };
 
-        enum class NamingState
-        {
-            EDITING,
-            CHECKING,
-            CUSTOMIZING
-        };
-
+        void set_customization_controls(bool enabled);
         void restore_name_entry();
+        void restore_customization();
+        void dispatch_creation();
 
         std::vector<Sprite> sprites_lookboard;
         Texture sky;
@@ -103,9 +101,7 @@ namespace jrc
         BoolPair<std::vector<int32_t>> shoes;
         BoolPair<std::vector<int32_t>> weapons;
 
-        NamingState naming_state = NamingState::EDITING;
-        std::string pending_name;
-        uint32_t naming_elapsed = 0;
+        CharacterCreation::Flow creation_flow;
         bool focus_name_on_update = false;
         bool female;
         size_t skin;
