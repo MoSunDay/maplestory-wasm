@@ -36,6 +36,7 @@ namespace jrc
 
         uint8_t get_world_id() const;
         uint8_t get_channel_id() const;
+        bool enter_selected_channel();
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
@@ -51,5 +52,6 @@ namespace jrc
         uint8_t worldid;
         uint8_t channelid;
         uint8_t channelcount;
+        bool request_pending;
     };
 }

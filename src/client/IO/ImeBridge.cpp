@@ -2,6 +2,7 @@
 
 #include "Components/Textfield.h"
 #include "UI.h"
+#include "UITypes/UIWorldSelect.h"
 
 #ifdef MS_PLATFORM_WASM
 
@@ -135,6 +136,14 @@ extern "C"
         if (ui.has_element(jrc::UIElement::WORLDSELECT)) return 2;
         if (ui.has_element(jrc::UIElement::LOGIN)) return 1;
         return 0;
+    }
+
+    // Browser click compatibility entry point. UIWorldSelect makes this
+    // idempotent with the normal GLFW mouse-down route.
+    EMSCRIPTEN_KEEPALIVE int msworldselect_enter()
+    {
+        auto worldselect = jrc::UI::get().get_element<jrc::UIWorldSelect>();
+        return worldselect && worldselect->enter_selected_channel() ? 1 : 0;
     }
 
     // Replace the focused field's text with the textarea content; the caret is
