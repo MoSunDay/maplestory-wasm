@@ -1,6 +1,6 @@
-# 游戏世界
+Commit: 207b59c38ce4d3481f8c83b38480af94c6cf29cc
 
-Commit: 2612e3cf9b22b324da0c751f32d2175f07030e3b
+# 游戏世界
 
 ## 职责
 
@@ -17,11 +17,11 @@ Commit: 2612e3cf9b22b324da0c751f32d2175f07030e3b
 
 游戏阶段单例，管理整个游戏运行时。状态机:
 - `INACTIVE`: 未进入游戏
-- `TRANSITION`: 过场/地图切换中
+- `LOADING`: 已构造地图但素材安全门尚未释放；只实例化服务端初始实体，不推进物理、AI、战斗或碰撞
 - `ACTIVE`: 正常游戏
 
 核心职责:
-- `load(mapid, portalid)`: 切换地图
+- `load(mapid, portalid, onready)`: 切换地图；当前地图素材驻留且可见素材已进入图集后调用 `onready`
 - `loadplayer(entry)`: 从角色数据构造玩家
 - `update()`: 每帧更新所有实体
 - `draw(alpha)`: 渲染所有实体
@@ -68,8 +68,8 @@ Stage 内部组合了所有地图实体管理器。
 ### 进入游戏
 ```
 SetfieldHandlers → Stage::load(mapid, portalid) → MapInfo::load()
-→ MapTilesObjs, MapBackgrounds, MapPortals 加载
-→ Stage::loadplayer() → Player 构造
+→ 构造地图/实体并异步预取全图 NX 范围 → 可见静态动画全帧进入图集
+→ 250ms 资源集合稳定窗 → 发送 PLAYER_UPDATE、启用输入并进入 ACTIVE
 ```
 
 ### 每帧更新
@@ -89,6 +89,8 @@ Stage::load(new_mapid)
 → Stage::clear()
 → load_map(new_mapid)
 → respawn(portalid)
+→ LOADING 安全门（服务端仍保持 mapTransitioning）
+→ PLAYER_UPDATE → ACTIVE
 ```
 
 ## 依赖关系

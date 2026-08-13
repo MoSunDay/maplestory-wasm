@@ -30,6 +30,12 @@ namespace jrc
 
     void MapNpcs::update(const Physics& physics)
     {
+        instantiate_spawns(physics);
+        npcs.update(physics);
+    }
+
+    void MapNpcs::instantiate_spawns(const Physics& physics)
+    {
         for (; !spawns.empty(); spawns.pop())
         {
             const NpcSpawn& spawn = spawns.front();
@@ -48,7 +54,6 @@ namespace jrc
             }
         }
 
-        npcs.update(physics);
     }
 
     void MapNpcs::spawn(NpcSpawn&& spawn)

@@ -35,6 +35,7 @@ namespace jrc
         TilesObjs();
 
         void draw(Point<int16_t> viewpos, float alpha) const;
+        void prepare_visible(Point<int16_t> viewpos, float alpha) const;
         void update();
 
     private:
@@ -51,10 +52,10 @@ namespace jrc
         MapTilesObjs();
 
         void draw(Layer::Id layer, Point<int16_t> viewpos, float alpha) const;
+        void prepare_visible(Point<int16_t> viewpos, float alpha) const;
         void update();
 
     private:
         EnumMap<Layer::Id, TilesObjs> layers;
     };
 }
-

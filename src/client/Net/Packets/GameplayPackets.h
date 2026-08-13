@@ -232,7 +232,7 @@ namespace jrc
 
     /// Tells the server that we're no longer transitioning between maps,
     /// including initial login.
-    /// Opcode: PLAYER_UPDATE(0xDF)
+    /// Opcode: PLAYER_UPDATE(0xCF)
     class PlayerUpdatePacket : public OutPacket
     {
     public:

@@ -172,15 +172,46 @@ namespace jrc
     {
         Window::get().check_events();
         Window::get().update();
+#ifdef MS_PLATFORM_WASM
+        const bool asset_blocking = GraphicsGL::get().hasblockingbitmaps() || EM_ASM_INT({
+            return window.MapleAssetLoading?.isBlocking?.() ? 1 : 0;
+        }) != 0;
+        if (asset_blocking)
+        {
+            Stage::get().release_actions();
+        }
+        if (Stage::get().is_loading() || !asset_blocking)
+        {
+            Stage::get().update();
+        }
+        if (!asset_blocking)
+        {
+            UI::get().update();
+        }
+#else
         Stage::get().update();
         UI::get().update();
+#endif
         Session::get().read();
     }
 
     void draw(float alpha)
     {
 #ifdef MS_PLATFORM_WASM
-        GraphicsGL::get().preparebitmaps();
+        const bool graphics_blocking = GraphicsGL::get().hasblockingbitmaps();
+        EM_ASM({
+            if ($0) {
+                if (!window.MapleAssetLoading?.has?.('gpu')) {
+                    window.MapleAssetLoading?.begin('gpu', { message: '正在准备可见素材...' });
+                }
+            } else {
+                window.MapleAssetLoading?.end('gpu');
+            }
+        }, graphics_blocking ? 1 : 0);
+        const bool asset_loading = EM_ASM_INT({
+            return window.MapleAssetLoading?.isBlocking?.() ? 1 : 0;
+        }) != 0;
+        GraphicsGL::get().preparebitmaps(asset_loading ? 8 : 2);
 #endif
         Window::get().begin();
         Stage::get().draw(alpha);
@@ -196,6 +227,23 @@ namespace jrc
     }
 
 #ifdef MS_PLATFORM_WASM
+    extern "C" EMSCRIPTEN_KEEPALIVE void msmap_retry()
+    {
+        Stage::get().retry_loading();
+    }
+
+    extern "C" EMSCRIPTEN_KEEPALIVE int msstage_loading()
+    {
+        return Stage::get().is_loading() ? 1 : 0;
+    }
+
+    extern "C" EMSCRIPTEN_KEEPALIVE int msasset_blocking()
+    {
+        return GraphicsGL::get().hasblockingbitmaps() || EM_ASM_INT({
+            return window.MapleAssetLoading?.isBlocking?.() ? 1 : 0;
+        }) != 0;
+    }
+
     static int64_t timestep = Constants::TIMESTEP * 1000;
     static int64_t accumulator = timestep;
     static int64_t period = 0;

@@ -33,6 +33,7 @@ namespace jrc
         void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
         // Update all npcs.
         void update(const Physics& physics);
+        void instantiate_spawns(const Physics& physics);
 
         // Add an npc to the spawn queue.
         void spawn(NpcSpawn&& spawn);

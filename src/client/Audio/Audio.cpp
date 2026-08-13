@@ -424,6 +424,29 @@ namespace jrc
 
     Music::Music(const std::string& p) : path(p) {}
 
+    nl::audio Music::resolve() const
+    {
+        return nl::nx::sound.resolve(path);
+    }
+
+    void Music::prepare() const
+    {
+        nl::audio ad = resolve();
+        const void* data = ad.data();
+        if (!data || ad.length() <= kNxAudioHeaderSize)
+        {
+            return;
+        }
+
+#ifdef MS_PLATFORM_WASM
+        wasm_audio_register_clip(
+            static_cast<int>(ad.id()),
+            static_cast<uint8_t const*>(data) + kNxAudioHeaderSize,
+            static_cast<int>(ad.length() - kNxAudioHeaderSize)
+        );
+#endif
+    }
+
     void Music::play() const
     {
 #ifndef MS_PLATFORM_WASM
@@ -436,12 +459,20 @@ namespace jrc
             return;
         }
 
+#ifdef MS_PLATFORM_WASM
+        nl::audio ad = resolve();
+        if (!ad)
+        {
+            return;
+        }
+        wasm_audio_play_music(static_cast<int>(ad.id()));
+        bgmpath = path;
+#else
         nl::audio ad = nl::nx::sound.resolve(path);
         const void* data = ad.data();
 
         if (data)
         {
-#ifndef MS_PLATFORM_WASM
             if (stream)
             {
                 BASS_ChannelStop(stream);
@@ -456,23 +487,9 @@ namespace jrc
                 BASS_SAMPLE_FLOAT | BASS_SAMPLE_LOOP
             );
             BASS_ChannelPlay(stream, true);
-#else
-            if (ad.length() <= kNxAudioHeaderSize)
-            {
-                return;
-            }
-
-            size_t id = ad.id();
-            wasm_audio_register_clip(
-                static_cast<int>(id),
-                static_cast<uint8_t const*>(data) + kNxAudioHeaderSize,
-                static_cast<int>(ad.length() - kNxAudioHeaderSize)
-            );
-            wasm_audio_play_music(static_cast<int>(id));
-#endif
-
             bgmpath = path;
         }
+#endif
     }
 
 

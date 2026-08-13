@@ -32,6 +32,7 @@ namespace jrc
         void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
         // Update all reactors.
         void update(const Physics& physics);
+        void instantiate_spawns(const Physics& physics);
 
         // Spawn a new reactor.
         void spawn(ReactorSpawn&& spawn);

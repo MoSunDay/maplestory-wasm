@@ -9,6 +9,12 @@ namespace jrc
 
     void MapChars::update(const Physics& physics)
     {
+        instantiate_spawns();
+        chars.update(physics);
+    }
+
+    void MapChars::instantiate_spawns()
+    {
         for (; !spawns.empty(); spawns.pop())
         {
             const CharSpawn& spawn = spawns.front();
@@ -27,7 +33,6 @@ namespace jrc
             }
         }
 
-        chars.update(physics);
     }
 
     void MapChars::spawn(CharSpawn&& spawn)
