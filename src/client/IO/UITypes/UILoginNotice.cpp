@@ -18,6 +18,7 @@
 #include "UILoginNotice.h"
 
 #include "../Components/MapleButton.h"
+#include "../UI.h"
 
 #include "../../Graphics/Sprite.h"
 
@@ -27,6 +28,11 @@ namespace jrc
 {
     UILoginNotice::UILoginNotice(int8_t id)
     {
+        // The modal must own keyboard focus while it is visible. Otherwise a
+        // hidden browser IME overlay from the parent field can consume its OK
+        // click before GLFW receives it.
+        UI::get().remove_textfield();
+
         nl::node notice = nl::nx::ui["Login.img"]["Notice"];
 
         int8_t back = (id == 16) ? 1 : 0;
