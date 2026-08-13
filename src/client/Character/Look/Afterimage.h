@@ -16,8 +16,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include "Afterimage/Playback.h"
+
 #include "../../Graphics/Animation.h"
 #include "../../Template/Rectangle.h"
+
+#include <vector>
 
 namespace jrc
 {
@@ -35,9 +39,15 @@ namespace jrc
         Rectangle<int16_t> get_range() const;
 
     private:
-        Animation animation;
+        struct Cue
+        {
+            Animation animation;
+            uint8_t firstframe;
+            afterimage::PlaybackPhase phase;
+        };
+
+        std::vector<Cue> cues;
         Rectangle<int16_t> range;
         uint8_t firstframe;
-        bool displayed;
     };
 }

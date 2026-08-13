@@ -380,19 +380,48 @@ namespace jrc
         getoffset(bmp);
     }
 
-    void GraphicsGL::queuebitmap(const nl::bitmap& bmp)
+    void GraphicsGL::queuebitmap(const nl::bitmap& bmp, BitmapPriority priority)
     {
         const size_t id = bmp.id();
-        if (id == 0 || hasbitmap(bmp) || pending_bitmap_ids.find(id) != pending_bitmap_ids.end())
+        if (id == 0 || hasbitmap(bmp))
         {
             return;
         }
 
 #ifdef MS_PLATFORM_WASM
+        auto pending = pending_bitmap_ids.find(id);
+        if (pending != pending_bitmap_ids.end())
+        {
+            if (priority == BitmapPriority::VISIBLE_EFFECT)
+            {
+                auto queued = std::find_if(
+                    pending_bitmaps.begin(),
+                    pending_bitmaps.end(),
+                    [id](const nl::bitmap& candidate) {
+                        return candidate.id() == id;
+                    }
+                );
+                if (queued != pending_bitmaps.end())
+                {
+                    pending_priority_bitmaps.push_back(*queued);
+                    pending_bitmaps.erase(queued);
+                }
+            }
+            return;
+        }
+
         bmp.prefetch();
-        pending_bitmaps.push_back(bmp);
+        if (priority == BitmapPriority::VISIBLE_EFFECT)
+        {
+            pending_priority_bitmaps.push_back(bmp);
+        }
+        else
+        {
+            pending_bitmaps.push_back(bmp);
+        }
         pending_bitmap_ids.insert(id);
 #else
+        (void)priority;
         addbitmap(bmp);
 #endif
     }
@@ -401,34 +430,44 @@ namespace jrc
     {
 #ifdef MS_PLATFORM_WASM
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(budget_ms);
-        size_t candidates = pending_bitmaps.size();
-        while (candidates-- > 0 && !pending_bitmaps.empty())
+        auto prepare_queue = [&](std::deque<nl::bitmap>& queue, size_t candidates) {
+            while (candidates-- > 0 && !queue.empty())
+            {
+                if (std::chrono::steady_clock::now() >= deadline)
+                {
+                    break;
+                }
+
+                nl::bitmap bmp = queue.front();
+                queue.pop_front();
+
+                if (hasbitmap(bmp))
+                {
+                    pending_bitmap_ids.erase(bmp.id());
+                }
+                else if (bmp.data_ready())
+                {
+                    addbitmap(bmp);
+                    pending_bitmap_ids.erase(bmp.id());
+                    return true;
+                }
+                else
+                {
+                    queue.push_back(bmp);
+                }
+            }
+            return false;
+        };
+
+        size_t priority_candidates = pending_priority_bitmaps.size();
+        if (prepare_queue(pending_priority_bitmaps, priority_candidates))
         {
-            nl::bitmap bmp = pending_bitmaps.front();
-            pending_bitmaps.pop_front();
-
-            if (hasbitmap(bmp))
-            {
-                pending_bitmap_ids.erase(bmp.id());
-            }
-            else if (bmp.data_ready())
-            {
-                addbitmap(bmp);
-                pending_bitmap_ids.erase(bmp.id());
-                // A single decode/upload can consume most of the frame budget.
-                // Never batch a second ready bitmap into the same frame.
-                break;
-            }
-            else
-            {
-                pending_bitmaps.push_back(bmp);
-            }
-
-            if (std::chrono::steady_clock::now() >= deadline)
-            {
-                break;
-            }
+            return;
         }
+
+        // A single decode/upload can consume most of the frame budget. If no
+        // visible effect was ready, normal assets may use the remaining scan.
+        prepare_queue(pending_bitmaps, pending_bitmaps.size());
 #else
         (void)budget_ms;
 #endif
