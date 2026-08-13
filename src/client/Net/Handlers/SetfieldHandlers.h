@@ -39,13 +39,8 @@ namespace jrc
         void parse_skillbook(InPacket& recv, Skillbook& skills) const;
         void parse_cooldowns(InPacket& recv, Player& player) const;
         void parse_questlog(InPacket& recv, Questlog& quests) const;
-        void parse_ring1(InPacket& recv) const;
-        void parse_ring2(InPacket& recv) const;
-        void parse_ring3(InPacket& recv) const;
-        void parse_minigame(InPacket& recv) const;
         void parse_monsterbook(InPacket& recv, Monsterbook& monsterbook) const;
         void parse_telerock(InPacket& recv, Telerock& telerock) const;
-        void parse_nyinfo(InPacket& recv) const;
         void parse_areainfo(InPacket& recv) const;
     };
 

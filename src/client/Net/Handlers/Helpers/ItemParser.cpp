@@ -56,7 +56,7 @@ namespace jrc
                 cash_id = recv.read_long();
             }
             int64_t expire = recv.read_long();
-            std::string petname = recv.read_padded_string(13);
+            std::string petname = recv.read_padded_utf8_string(13);
             int8_t petlevel = recv.read_byte();
             int16_t closeness = recv.read_short();
             int8_t fullness = recv.read_byte();
