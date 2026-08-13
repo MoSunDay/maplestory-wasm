@@ -77,6 +77,12 @@ namespace jrc
         return state->get(type) != nullptr;
     }
 
+    bool UI::is_element_active(UIElement::Type type)
+    {
+        UIElement* element = state->get(type);
+        return element && element->is_active();
+    }
+
     void UI::change_state(State id)
     {
         if (id == CASHSHOP)

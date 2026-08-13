@@ -443,10 +443,11 @@ Server responds with `CHAR_NAME_RESPONSE` (0x0D).
 
 ```
 Field      Type    Notes
-name       string  Character name (3–12 chars)
+name       string  Character name (3–12 UTF-8 bytes)
 job        int     Job ID. Running server (custom-client mode): 0=Cygnus, 1=Explorer, 2=Aran
 face       int     Face ID (cosmetic)
-hair       int     Hair ID (cosmetic) combined with hair color: write_int(hairStyle + hairColor)
+hair       int     Base hair style ID
+hairColor  int     Hair color offset; Cosmic combines hair + hairColor after parsing
 skin       int     Skin tone ID
 top        int     Item ID for top equip
 bottom     int     Item ID for bottom equip

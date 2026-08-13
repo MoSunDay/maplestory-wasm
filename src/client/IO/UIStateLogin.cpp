@@ -40,9 +40,26 @@ namespace jrc
     {
         for (auto iter : elements)
         {
+            if (iter.first == focused)
+            {
+                continue;
+            }
+
             UIElement* element = iter.second.get();
             if (element && element->is_active())
                 element->draw(inter);
+        }
+
+        // Focused login elements are modal surfaces. Their enum value does
+        // not encode z-order, so draw them last instead of allowing later
+        // screens such as character creation to cover the prompt.
+        if (focused != UIElement::NONE)
+        {
+            const auto& element = elements[focused];
+            if (element && element->is_active())
+            {
+                element->draw(inter);
+            }
         }
     }
 
@@ -118,11 +135,23 @@ namespace jrc
         {
             if (focusedelement->is_active())
             {
+                UIElement::Type focused_type = focused;
                 clear_cursors(clicked, pos, focused);
                 UIElement::CursorResult result = focusedelement->send_cursor(clicked, pos);
-                if (clicked && result.handled)
+                UIElement* current_focused = focused == focused_type ? get(focused_type) : nullptr;
+                bool remains_focused = current_focused == focusedelement &&
+                    current_focused && current_focused->is_active();
+                if (!remains_focused)
                 {
-                    cursor_captured = focused;
+                    if (focused == focused_type)
+                    {
+                        focused = UIElement::NONE;
+                    }
+                    cursor_captured = UIElement::NONE;
+                }
+                if (clicked && result.handled && remains_focused)
+                {
+                    cursor_captured = focused_type;
                 }
                 return result.state;
             }
@@ -163,7 +192,10 @@ namespace jrc
             {
                 clear_cursors(clicked, pos, fronttype);
                 UIElement::CursorResult result = front->send_cursor(clicked, pos);
-                if (clicked && result.handled)
+                // The button handler may have opened a modal. In that case
+                // the originating screen must not reclaim pointer capture
+                // after pre_add() handed input ownership to the modal.
+                if (clicked && result.handled && focused == UIElement::NONE)
                 {
                     cursor_captured = fronttype;
                 }
@@ -239,7 +271,13 @@ namespace jrc
         remove(type);
 
         if (is_focused)
+        {
             focused = type;
+            // A modal can be created while an underlying button press is
+            // still dispatching. It must take ownership of the next input
+            // instead of leaving that screen's pointer capture in place.
+            cursor_captured = UIElement::NONE;
+        }
 
         return elements.find(type);
     }

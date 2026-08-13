@@ -1,4 +1,4 @@
-Commit: 38e27f7292c566204925875efda52d4d81508d07
+Commit: 27a4a800c0ed9e8d0af20a3a0b5d062ebbdfebc7
 
 # UI 系统
 
@@ -22,13 +22,13 @@ UI 框架单例。核心职责:
 - 输入分发: `send_cursor()`, `send_key()`, `send_scroll()`, `doubleclick()`
 - `emplace<T>()`: 动态创建 UI 元素
 - `get_element<T>()`: 获取 UI 元素引用
-- `has_element(type)`: 只读查询元素是否存在；WASM 验收通过导出的 `msui_state` 将登录、世界、人物、建角和游戏状态映射为稳定状态码
+- `has_element(type)` / `is_element_active(type)`: 分别查询缓存对象是否存在、界面是否实际显示；WASM 验收通过 active 状态将登录、世界、人物、建角和游戏映射为稳定状态码，`msui_login_notice_active` 与 `msui_character_creation_customizing` 分别证明错误提示和外观定制阶段实际出现
 - `msworldselect_enter`: 浏览器 Canvas `click`/`dblclick` 的世界选择兼容入口；与 GLFW 路径共用 `UIWorldSelect::enter_selected_channel()`，通过请求中状态保证同一动作只发送一次角色列表请求
 
 ### UIState (`UIState.h`)
 
 UI 状态接口。三个具体实现:
-- `UIStateLogin`: 登录流程状态（登录、世界选择、角色选择、角色创建）
+- `UIStateLogin`: 登录流程状态（登录、世界选择、角色选择、角色创建）；聚焦弹窗始终最后绘制，创建时清除并阻止底层重新取得鼠标捕获，同时暂时移除父输入框的浏览器 IME 覆盖层，保证提示可见、按钮可点
 - `UIStateGame`: 游戏内状态（状态栏、背包、技能、聊天等）
 - `UIStateCashShop`: 商城独占状态，管理商品、商城仓库、角色现金物品与弹窗输入
 
