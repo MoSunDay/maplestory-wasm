@@ -18,6 +18,9 @@ const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
+const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
+const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 12);
+const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 
 const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5 });
 
@@ -406,6 +409,30 @@ try {
       overlayShown: naturalAssetEvidence.overlayShown
     })}`);
     await driver.screenshot('08-in-game');
+
+    if (captureAttackEffects) {
+      await driver.click(400, 300);
+      await sleep(1000);
+      for (let sample = 0; sample < attackSamples; sample += 1) {
+        // Hold the key across multiple game ticks so input observation does
+        // not depend on two back-to-back CDP events landing in one tick.
+        await driver.keyHold('Control', 'ControlLeft', 17, 50);
+        for (let frame = 1; frame <= 20; frame += 1) {
+          // A stab cue normally starts on stance frame 1 and a swing cue on
+          // frame 2. A 40 ms minimum cadence covers both one-shot windows and
+          // leaves room for a delayed cold-cache playback.
+          await sleep(40);
+          await driver.screenshot(
+            `08d-attack-${String(sample + 1).padStart(2, '0')}` +
+            `-frame-${String(frame).padStart(2, '0')}`
+          );
+        }
+        await requireAssetIdle(`attack sample ${sample + 1} assets ready`);
+        await sleep(attackSampleGapMs);
+      }
+      console.log(`PASS  captured ${attackSamples} cold/warm attack effect samples`);
+    }
+
     if (stopAtGame) throw new Error('__GAME_COMPLETE__');
 
     await driver.evaluate(`(() => {
