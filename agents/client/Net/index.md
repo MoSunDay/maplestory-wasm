@@ -1,4 +1,4 @@
-Commit: 10fb657e2799392e1a15e8a68d1a989a5dcb6967
+Commit: ab436306c6b1126346d683645d170930594e1fc5
 
 # 网络层
 
@@ -62,8 +62,10 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 ### InPacket / OutPacket
 
 封包读写辅助:
-- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)
+- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)；读取数值前先整体检查剩余长度，Cosmic 的 Java 定长 UTF-8 字段用 UTF-16 code unit 计数消费，避免中文或补充平面字符导致后续字段错位
 - `OutPacket`: 构建封包字节流 (`write_byte()`, `write_int()`, `write_string()` 等)
+
+登录 `CHARLIST` / 新建角色 / 进入地图复用 `LoginParser::parse_stats`。其字段宽度必须与 Cosmic `addCharStats` 一致：角色名按 13 个 Java UTF-16 code unit 补零后再 UTF-8 编码，等级为单字节；Evan 职业（2001、2200–2218）的剩余 SP 为多池表，其余职业为单个 short。
 
 自然恢复通过 `HEAL_OVER_TIME` 上报 HP/MP 增量；物品椅子使用 `USE_CHAIR`/`CANCEL_CHAIR`，其他角色的椅子外观由 `SHOW_CHAIR` 同步。本地 `CANCEL_CHAIR` 回执通过不回发封包的状态入口应用，避免服务端取消与客户端取消相互回声。
 

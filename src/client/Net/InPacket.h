@@ -21,6 +21,7 @@
 #include "../Template/Point.h"
 
 #include <cstdint>
+#include <type_traits>
 
 
 namespace jrc
@@ -58,6 +59,8 @@ namespace jrc
         std::string read_string();
         /// Read a fixed-length string.
         std::string read_padded_string(uint16_t length);
+        /// Read a UTF-8 string padded to a fixed number of UTF-16 code units.
+        std::string read_padded_utf8_string(uint16_t utf16_length);
 
         /// Inspect a byte and check if it is 1. Does not advance the buffer position.
         bool inspect_bool();
@@ -75,16 +78,24 @@ namespace jrc
         /// Read a number and advance the buffer position.
         T read()
         {
-            size_t count = sizeof(T) / sizeof(int8_t);
-            T all = 0;
+            const size_t count = sizeof(T) / sizeof(int8_t);
+            if (count > length())
+            {
+                throw PacketError("Stack underflow at " + std::to_string(pos));
+            }
+
+            using Unsigned = typename std::make_unsigned<T>::type;
+            Unsigned all = 0;
             for (size_t i = 0; i < count; ++i)
             {
-                T val = static_cast<uint8_t>(bytes[pos]);
-                all += val << (8 * i);
-
-                skip(1);
+                const auto value = static_cast<Unsigned>(
+                    static_cast<uint8_t>(bytes[pos + i])
+                );
+                all |= value << (8 * i);
             }
-            return all;
+            pos += count;
+
+            return static_cast<T>(all);
         }
 
         template <typename T>
