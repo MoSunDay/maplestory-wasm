@@ -2,6 +2,8 @@
 
 #include "Components/Textfield.h"
 #include "UI.h"
+#include "UITypes/UICharCreation.h"
+#include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
 
 #ifdef MS_PLATFORM_WASM
@@ -129,13 +131,26 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE int msui_state()
     {
         jrc::UI& ui = jrc::UI::get();
-        if (ui.has_element(jrc::UIElement::CASHSHOP)) return 6;
-        if (ui.has_element(jrc::UIElement::STATUSBAR)) return 5;
-        if (ui.has_element(jrc::UIElement::CHARCREATION)) return 4;
-        if (ui.has_element(jrc::UIElement::CHARSELECT)) return 3;
-        if (ui.has_element(jrc::UIElement::WORLDSELECT)) return 2;
-        if (ui.has_element(jrc::UIElement::LOGIN)) return 1;
+        if (ui.is_element_active(jrc::UIElement::CASHSHOP)) return 6;
+        if (ui.is_element_active(jrc::UIElement::STATUSBAR)) return 5;
+        if (ui.is_element_active(jrc::UIElement::CHARCREATION)) return 4;
+        if (ui.is_element_active(jrc::UIElement::CHARSELECT)) return 3;
+        if (ui.is_element_active(jrc::UIElement::WORLDSELECT)) return 2;
+        if (ui.is_element_active(jrc::UIElement::LOGIN)) return 1;
         return 0;
+    }
+
+    // A modal notice does not replace its parent UI state, so expose it
+    // separately to let browser acceptance prove that an error was visible.
+    EMSCRIPTEN_KEEPALIVE int msui_login_notice_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UILoginNotice::TYPE) ? 1 : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_character_creation_customizing()
+    {
+        auto creation = jrc::UI::get().get_element<jrc::UICharcreation>();
+        return creation && creation->is_customizing() ? 1 : 0;
     }
 
     // Browser click compatibility entry point. UIWorldSelect makes this

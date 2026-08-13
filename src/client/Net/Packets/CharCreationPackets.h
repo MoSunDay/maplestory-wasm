@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../OutPacket.h"
+#include "CharacterCreation/CreateCharPayload.h"
 
 namespace jrc
 {
@@ -38,17 +39,25 @@ namespace jrc
     public:
         CreateCharPacket(const std::string& name, uint16_t job, int32_t face, int32_t hair,
             uint8_t hairc, uint8_t skin, int32_t top, int32_t bot, int32_t shoes,
-            int32_t weapon, bool female) : OutPacket(CREATE_CHAR) {
-            write_string(name);
-            write_int(job);
-            write_int(face);
-            write_int(hair + hairc);
-            write_int(skin);
-            write_int(top);
-            write_int(bot);
-            write_int(shoes);
-            write_int(weapon);
-            write_byte(female);
+            int32_t weapon, bool female) : OutPacket(CREATE_CHAR)
+        {
+            const std::vector<int8_t> payload = CharacterCreation::encode_create_char_payload({
+                name,
+                job,
+                face,
+                hair,
+                hairc,
+                skin,
+                top,
+                bot,
+                shoes,
+                weapon,
+                static_cast<int8_t>(female)
+            });
+            for (int8_t byte : payload)
+            {
+                write_byte(byte);
+            }
         }
     };
 }
