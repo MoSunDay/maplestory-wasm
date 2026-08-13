@@ -33,6 +33,10 @@ namespace jrc
         Frame();
 
         void draw(const DrawArgument& args) const;
+        void prepare_visible() const;
+
+        bool is_valid() const;
+        bool is_ready() const;
 
         uint8_t start_opacity() const;
         uint16_t start_scale() const;
@@ -66,6 +70,10 @@ namespace jrc
         void reset();
 
         void draw(const DrawArgument& arguments, float inter) const;
+        void prepare_visible() const;
+
+        bool is_valid() const;
+        bool is_ready() const;
 
         uint16_t get_delay(int16_t frame) const;
         uint16_t getdelayuntil(int16_t frame) const;
@@ -90,4 +98,3 @@ namespace jrc
         float opcstep;
     };
 }
-

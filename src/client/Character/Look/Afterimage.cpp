@@ -17,12 +17,94 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "Afterimage.h"
 
+#include "Afterimage/Resolver.h"
+
+#include "../../Console.h"
 #include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
 
+#include <algorithm>
+#include <charconv>
+#include <limits>
+#include <optional>
+#include <system_error>
+#include <utility>
+#include <vector>
+
 namespace jrc
 {
+    namespace
+    {
+        std::optional<int16_t> numeric_name(const std::string& name)
+        {
+            int16_t value = 0;
+            auto result = std::from_chars(
+                name.data(),
+                name.data() + name.size(),
+                value
+            );
+            if (result.ec != std::errc{} || result.ptr != name.data() + name.size())
+            {
+                return std::nullopt;
+            }
+            return value;
+        }
+
+        std::optional<uint8_t> trigger_frame(nl::node source)
+        {
+            std::optional<int16_t> frame = numeric_name(source.name());
+            if (!frame || *frame < 0 ||
+                *frame >= std::numeric_limits<uint8_t>::max())
+            {
+                return std::nullopt;
+            }
+            return static_cast<uint8_t>(*frame);
+        }
+
+        bool has_animation(nl::node stance)
+        {
+            for (nl::node child : stance)
+            {
+                if (trigger_frame(child) &&
+                    child[0].data_type() == nl::node::type::bitmap)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        nl::node standard_source(
+            const std::string& name,
+            const std::string& stance_name,
+            int16_t level
+        )
+        {
+            nl::node tiers = nl::nx::character["Afterimage"][name + ".img"];
+            std::vector<int16_t> available;
+            for (nl::node tier : tiers)
+            {
+                std::optional<int16_t> bucket = numeric_name(tier.name());
+                if (bucket && *bucket >= 0 && has_animation(tier[stance_name]))
+                {
+                    available.push_back(*bucket);
+                }
+            }
+
+            std::sort(available.begin(), available.end());
+            available.erase(
+                std::unique(available.begin(), available.end()),
+                available.end()
+            );
+
+            int16_t requested = std::max<int16_t>(0, level / 10);
+            std::optional<int16_t> selected =
+                afterimage::select_level_bucket(requested, available);
+            return selected ? tiers[*selected][stance_name] : nl::node{};
+        }
+    }
+
     Afterimage::Afterimage(int32_t skill_id, const std::string& name,
         const std::string& stance_name, int16_t level) {
 
@@ -30,48 +112,110 @@ namespace jrc
         if (skill_id > 0)
         {
             std::string strid = string_format::extend_id(skill_id, 7);
-            src = nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid]["afterimage"][name][stance_name];
+            nl::node skill_src = nl::nx::skill[strid.substr(0, 3) + ".img"]
+                ["skill"][strid]["afterimage"][name][stance_name];
+            if (has_animation(skill_src))
+            {
+                src = skill_src;
+            }
+            else if (skill_src)
+            {
+                Console::get().print(
+                    "Invalid skill afterimage: " + strid + "/" + name + "/" + stance_name
+                );
+            }
         }
 
-        if (!src)
+        if (!has_animation(src))
         {
-            src = nl::nx::character["Afterimage"][name + ".img"][level / 10][stance_name];
+            src = standard_source(name, stance_name, level);
         }
 
         range = src;
         firstframe = 0;
-        displayed = false;
 
         for (nl::node sub : src)
         {
-            uint8_t frame = string_conversion::or_default<uint8_t>(sub.name(), 255);
-            if (frame < 255)
+            std::optional<uint8_t> frame = trigger_frame(sub);
+            if (frame && sub[0].data_type() == nl::node::type::bitmap)
             {
-                animation = sub;
-                firstframe = frame;
+                Animation animation(sub);
+                if (animation.is_valid())
+                {
+                    animation.prepare_visible();
+                    cues.push_back({
+                        std::move(animation),
+                        *frame,
+                        afterimage::PlaybackPhase::WAITING_FOR_TRIGGER
+                    });
+                }
             }
+        }
+
+        std::sort(cues.begin(), cues.end(), [](const Cue& left, const Cue& right) {
+            return left.firstframe < right.firstframe;
+        });
+        if (!cues.empty())
+        {
+            firstframe = cues.front().firstframe;
+        }
+        else
+        {
+            Console::get().print(
+                "Missing afterimage: " + name + "/" + stance_name +
+                " at level " + std::to_string(level)
+            );
         }
     }
 
     Afterimage::Afterimage()
     {
         firstframe = 0;
-        displayed = true;
     }
 
     void Afterimage::draw(uint8_t stframe, const DrawArgument& args, float alpha) const
     {
-        if (!displayed && stframe >= firstframe)
+        for (const Cue& cue : cues)
         {
-            animation.draw(args, alpha);
+            bool reached_now = stframe >= cue.firstframe;
+            if (afterimage::should_draw(
+                cue.phase,
+                cue.animation.is_ready(),
+                reached_now
+            ))
+            {
+                cue.animation.draw(args, alpha);
+            }
         }
     }
 
     void Afterimage::update(uint8_t stframe, uint16_t timestep)
     {
-        if (!displayed && stframe >= firstframe)
+        for (Cue& cue : cues)
         {
-            displayed = animation.update(timestep);
+            cue.phase = afterimage::latch_trigger(
+                cue.phase,
+                stframe >= cue.firstframe
+            );
+            bool ready = cue.animation.is_ready();
+            if (!ready && cue.phase != afterimage::PlaybackPhase::WAITING_FOR_TRIGGER &&
+                cue.phase != afterimage::PlaybackPhase::COMPLETE)
+            {
+                // Atlas eviction and interrupted range loads use the same
+                // recovery path without consuming a one-shot animation.
+                cue.animation.prepare_visible();
+            }
+            cue.phase = afterimage::begin_when_ready(
+                cue.phase,
+                ready
+            );
+            if (cue.phase == afterimage::PlaybackPhase::PLAYING && ready)
+            {
+                cue.phase = afterimage::finish(
+                    cue.phase,
+                    cue.animation.update(timestep)
+                );
+            }
         }
     }
 
