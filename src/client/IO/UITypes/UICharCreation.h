@@ -46,6 +46,7 @@ namespace jrc
 
         void send_naming_result(const std::string& name, bool nameused);
         bool handle_creation_failure();
+        bool is_customizing() const;
 
     protected:
         Button::State button_pressed(uint16_t button_id) override;
