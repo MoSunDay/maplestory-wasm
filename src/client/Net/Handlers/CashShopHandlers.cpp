@@ -86,8 +86,8 @@ namespace jrc
         if (gift)
         {
             item.item_id = recv.read_int();
-            item.gift_from = recv.read_padded_string(13);
-            recv.read_padded_string(73);
+            item.gift_from = recv.read_padded_utf8_string(13);
+            recv.read_padded_utf8_string(73);
             return item;
         }
         recv.read_int();
@@ -95,7 +95,7 @@ namespace jrc
         item.item_id = recv.read_int();
         item.sn = recv.read_int();
         item.count = recv.read_short();
-        item.gift_from = recv.read_padded_string(13);
+        item.gift_from = recv.read_padded_utf8_string(13);
         item.expiration = recv.read_long();
         recv.read_long();
         return item;
