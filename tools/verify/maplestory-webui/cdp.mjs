@@ -73,6 +73,9 @@ export class BrowserDriver {
       this.errors.push(JSON.stringify(message.params.exceptionDetails));
     }
     if (message.method === 'Network.loadingFailed') {
+      // Chromium reports deliberate request cancellation as ERR_ABORTED; it
+      // is not a transport failure and must not fail runtime acceptance.
+      if (message.params.canceled || message.params.errorText === 'net::ERR_ABORTED') return;
       this.errors.push(`Network load failed: ${message.params.errorText} ${message.params.blockedReason || ''}`.trim());
     }
   }
@@ -112,22 +115,43 @@ export class BrowserDriver {
   }
 
   async click(gameX, gameY) {
-    await this.evaluate(`(() => {
+    const point = await this.evaluate(`(() => {
       const canvas = document.getElementById('canvas');
       const bounds = canvas.getBoundingClientRect();
-      const x = bounds.left + ${gameX} * bounds.width / 800;
-      const y = bounds.top + ${gameY} * bounds.height / 600;
-      const emit = (type, buttons) => canvas.dispatchEvent(new MouseEvent(type, {
-        bubbles: true, cancelable: true, clientX: x, clientY: y,
-        button: 0, buttons, view: window
-      }));
-      emit('mousemove', 0); emit('mousedown', 1); emit('mouseup', 0);
+      return {
+        x: bounds.left + ${gameX} * bounds.width / 800,
+        y: bounds.top + ${gameY} * bounds.height / 600
+      };
     })()`);
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', x: point.x, y: point.y, button: 'none'
+    });
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed', x: point.x, y: point.y, button: 'left',
+      buttons: 1, clickCount: 1
+    });
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x: point.x, y: point.y, button: 'left',
+      buttons: 0, clickCount: 1
+    });
   }
 
   async doubleClick(gameX, gameY) {
     await this.click(gameX, gameY);
     await this.click(gameX, gameY);
+  }
+
+  async domClick(gameX, gameY) {
+    await this.evaluate(`(() => {
+      const canvas = document.getElementById('canvas');
+      const bounds = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true,
+        clientX: bounds.left + ${gameX} * bounds.width / 800,
+        clientY: bounds.top + ${gameY} * bounds.height / 600,
+        button: 0, buttons: 0, view: window
+      }));
+    })()`);
   }
 
   async key(key, code, virtualKeyCode, text = '') {

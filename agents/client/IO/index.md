@@ -1,4 +1,4 @@
-Commit: 217a98829c85304229770ba73aa5d42ec5bb76b1
+Commit: 7e68ababb9b31bcb7f6237f78081f84cdd25ab93
 
 # UI 系统
 
@@ -23,6 +23,7 @@ UI 框架单例。核心职责:
 - `emplace<T>()`: 动态创建 UI 元素
 - `get_element<T>()`: 获取 UI 元素引用
 - `has_element(type)`: 只读查询元素是否存在；WASM 验收通过导出的 `msui_state` 将登录、世界、人物、建角和游戏状态映射为稳定状态码
+- `msworldselect_enter`: 浏览器 Canvas `click`/`dblclick` 的世界选择兼容入口；与 GLFW 路径共用 `UIWorldSelect::enter_selected_channel()`，通过请求中状态保证同一动作只发送一次角色列表请求
 
 ### UIState (`UIState.h`)
 
@@ -58,7 +59,7 @@ UI 状态接口。三个具体实现:
 | `UIRegister` | 游戏内账号注册表单；复用 `Basic.img/Notice6` NX 面板、输入框和按钮素材，校验 4–12 位账号/密码后走登录协议自动建号 |
 | `UILoginNotice` | 登录通知弹窗 |
 | `UILoginWait` | 登录等待动画 |
-| `UIWorldSelect` | 大区/频道选择；单世界使用服务端实际世界 ID，客户端仅暴露首个可用频道并固定选择零基频道 0；确认按钮和双击频道均发送角色列表请求 |
+| `UIWorldSelect` | 大区/频道选择；单世界使用服务端实际世界 ID，客户端仅暴露首个可用频道并固定选择零基频道 0；确认按钮和双击频道共用幂等请求入口，连接已断开时直接提示刷新 |
 | `UICharSelect` | 角色选择；绘制角色槽计数、人物平台和对应属性面板字段 |
 | `UICharCreation` | 角色创建；名称校验采用可恢复的局部请求状态，拒绝或超时后保留输入并恢复焦点，服务端仍负责最终合法性与唯一性校验 |
 

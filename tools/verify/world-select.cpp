@@ -34,18 +34,25 @@ int main(int argc, char** argv)
 
     const std::string path = argc > 1 ? argv[1] : "UI.nx";
     nl::file file(path);
-    nl::node normal = file.root()["Login.img"]["WorldSelect"]["BtChannel"]
-        ["button:GoWorld"]["normal"]["0"];
-    if (normal.data_type() != nl::node::type::bitmap)
+    nl::node channels = file.root()["Login.img"]["WorldSelect"]["BtChannel"];
+    nl::node go_normal = channels["button:GoWorld"]["normal"]["0"];
+    nl::node channel_normal = channels["button:0"]["normal"]["0"];
+    if (go_normal.data_type() != nl::node::type::bitmap
+        || channel_normal.data_type() != nl::node::type::bitmap)
     {
-        std::cerr << "FAIL missing GoWorld normal bitmap\n";
+        std::cerr << "FAIL missing world-select button bitmap\n";
         return 1;
     }
 
-    const auto origin = normal["origin"].get_vector();
-    const auto bitmap = normal.get_bitmap();
-    std::cout << "go_world_origin=" << origin.first << ',' << origin.second
-              << " dimensions=" << bitmap.width() << 'x' << bitmap.height()
+    const auto go_origin = go_normal["origin"].get_vector();
+    const auto go_bitmap = go_normal.get_bitmap();
+    const auto channel_origin = channel_normal["origin"].get_vector();
+    const auto channel_bitmap = channel_normal.get_bitmap();
+    std::cout << "go_world_origin=" << go_origin.first << ',' << go_origin.second
+              << " dimensions=" << go_bitmap.width() << 'x' << go_bitmap.height()
+              << " channel_origin=" << channel_origin.first << ',' << channel_origin.second
+              << " dimensions=" << channel_bitmap.width() << 'x' << channel_bitmap.height()
               << '\n';
-    return bitmap.width() > 0 && bitmap.height() > 0 ? 0 : 1;
+    return go_bitmap.width() > 0 && go_bitmap.height() > 0
+        && channel_bitmap.width() > 0 && channel_bitmap.height() > 0 ? 0 : 1;
 }
