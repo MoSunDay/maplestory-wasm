@@ -12,9 +12,9 @@ function capture(pattern, label) {
 
 const resources = {
     config: capture(/fetch\('([^']+)'\)/, 'configuration URL'),
-    font: capture(/src:\s*url\('([^']+)'\)/, 'font URL'),
-    fontPreload: capture(/<link\s+rel="preload"\s+href="([^"]+)"/, 'font preload URL'),
-    script: capture(/script\.src\s*=\s*'([^']+)'/, 'WASM client script URL'),
+    loader: capture(/<script\s+src="([^"]*wasm_loader\.js)"/, 'WASM loader URL'),
+    wasm: capture(/const WASM_CLIENT_URL\s*=\s*'([^']+)'/, 'WASM binary URL'),
+    script: capture(/const WASM_SCRIPT_URL\s*=\s*'([^']+)'/, 'WASM client script URL'),
 };
 
 test('internal resources remain under a reverse-proxy path prefix', () => {
@@ -22,8 +22,8 @@ test('internal resources remain under a reverse-proxy path prefix', () => {
 
     assert.deepEqual(resources, {
         config: './config.json',
-        font: '../src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf',
-        fontPreload: '../src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf',
+        loader: './wasm_loader.js',
+        wasm: '../build/JourneyClient.wasm',
         script: '../build/JourneyClient.js',
     });
     assert.deepEqual(
@@ -32,9 +32,14 @@ test('internal resources remain under a reverse-proxy path prefix', () => {
         ),
         {
             config: 'https://octo.bytedance.net/proxy/app/web/config.json',
-            font: 'https://octo.bytedance.net/proxy/app/src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf',
-            fontPreload: 'https://octo.bytedance.net/proxy/app/src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf',
+            loader: 'https://octo.bytedance.net/proxy/app/web/wasm_loader.js',
+            wasm: 'https://octo.bytedance.net/proxy/app/build/JourneyClient.wasm',
             script: 'https://octo.bytedance.net/proxy/app/build/JourneyClient.js',
         },
     );
+});
+
+test('startup page does not download a second copy of the embedded CJK font', () => {
+    assert.doesNotMatch(html, /DroidSansFallbackFull\.ttf/);
+    assert.doesNotMatch(html, /rel="preload"[^>]+as="font"/);
 });
