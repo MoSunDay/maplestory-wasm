@@ -1,6 +1,6 @@
 # Web 基础设施
 
-Commit: 3370abf7e357e7d1303ac5f59e2485fd527b1c2b
+Commit: e264ed06c12c5c2a122ead0b7fa18299b9467b8d
 
 ## 职责
 
@@ -31,7 +31,8 @@ Commit: 3370abf7e357e7d1303ac5f59e2485fd527b1c2b
 HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可配）。负责:
 - 提供 `index.html` 入口页面、`build/JourneyClient.js`/`.wasm`、`web/config.json`、字体等静态资源
 - `web/index.html` 以页面目录为基准使用相对资源路径；部署在反向代理路径前缀下时，配置、字体和 WASM 产物请求会保留该前缀
-- 页面在 WASM 和 NX 素材初始化期间显示加载动画及阶段提示，首帧绘制完成后再淡出；初始化失败时原位显示错误
+- 页面先读取 WASM 长度，再以 1 MiB HTTP Range、最多 3 路并发下载；每块请求 15 秒超时并最多尝试 3 次，完整组装后通过 `Module.wasmBinary` 交给 Emscripten，避免单个大请求中断后永远卡在 `wasm-instantiate`
+- 页面在 WASM 下载和 NX 素材初始化期间显示进度及阶段提示；有效进度会重置 45 秒停滞计时，首帧绘制完成后再淡出，重试耗尽或初始化失败时原位显示错误
 - 运行时前台素材网络缺块会显示玻璃化遮罩“素材加载中...”，以请求键覆盖并发和共享读取；失败后遮罩保留错误信息及重试按钮，静默后台预取不触发遮罩
 - 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`
 - 支持 HTTP Range 请求（单区间），目录自动索引
