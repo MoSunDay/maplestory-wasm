@@ -33,6 +33,7 @@ namespace jrc
         Background(nl::node src);
 
         void draw(double viewx, double viewy, float alpha) const;
+        void prepare_visible(double viewx, double viewy, float alpha) const;
         void update();
 
     private:
@@ -93,6 +94,7 @@ namespace jrc
 
         void drawbackgrounds(double viewx, double viewy, float alpha) const;
         void drawforegrounds(double viewx, double viewy, float alpha) const;
+        void prepare_visible(double viewx, double viewy, float alpha) const;
         void update();
 
     private:

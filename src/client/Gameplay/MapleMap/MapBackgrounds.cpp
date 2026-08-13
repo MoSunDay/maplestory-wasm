@@ -178,6 +178,39 @@ namespace jrc
         }
     }
 
+    void Background::prepare_visible(double viewx, double viewy, float alpha) const
+    {
+        if (cx <= 0 || cy <= 0)
+        {
+            return;
+        }
+
+        double x = moveobj.hmobile()
+            ? moveobj.get_absolute_x(viewx, alpha)
+            : moveobj.get_absolute_x(rx * (woffset() - viewx) / 100 + woffset(), alpha);
+        double y = moveobj.vmobile()
+            ? moveobj.get_absolute_y(viewy, alpha)
+            : moveobj.get_absolute_y(ry * (hoffset() - viewy) / 100 + hoffset(), alpha);
+        if (htile > 1)
+        {
+            while (x > 0) x -= cx;
+            while (x < -cx) x += cx;
+        }
+        if (vtile > 1)
+        {
+            while (y > 0) y -= cy;
+            while (y < -cy) y += cy;
+        }
+        animation.prepare_visible(
+            DrawArgument(
+                Point<int16_t>(static_cast<int16_t>(std::round(x)), static_cast<int16_t>(std::round(y))),
+                flipped,
+                opacity / 255
+            ),
+            alpha
+        );
+    }
+
     void Background::update()
     {
         moveobj.move();
@@ -237,6 +270,18 @@ namespace jrc
         for (auto& foreground : foregrounds)
         {
             foreground.draw(viewx, viewy, alpha);
+        }
+    }
+
+    void MapBackgrounds::prepare_visible(double viewx, double viewy, float alpha) const
+    {
+        for (const auto& background : backgrounds)
+        {
+            background.prepare_visible(viewx, viewy, alpha);
+        }
+        for (const auto& foreground : foregrounds)
+        {
+            foreground.prepare_visible(viewx, viewy, alpha);
         }
     }
 

@@ -59,6 +59,20 @@ namespace jrc
 
     void MapDrops::update(const Physics& physics)
     {
+        instantiate_spawns();
+
+        for (auto& mesoicon : mesoicons)
+        {
+            mesoicon.update();
+        }
+
+        drops.update(physics);
+
+        lootenabled = true;
+    }
+
+    void MapDrops::instantiate_spawns()
+    {
         for (; !spawns.empty(); spawns.pop())
         {
             const DropSpawn& spawn = spawns.front();
@@ -86,14 +100,6 @@ namespace jrc
             }
         }
 
-        for (auto& mesoicon : mesoicons)
-        {
-            mesoicon.update();
-        }
-
-        drops.update(physics);
-
-        lootenabled = true;
     }
 
     void MapDrops::spawn(DropSpawn&& spawn)

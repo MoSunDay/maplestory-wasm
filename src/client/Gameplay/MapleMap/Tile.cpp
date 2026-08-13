@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Tile.h"
+#include "../../Graphics/GraphicsGL.h"
 #include "nlnx/nx.hpp"
 
 namespace jrc
@@ -50,6 +51,19 @@ namespace jrc
     void Tile::draw(Point<int16_t> viewpos) const
     {
         texture.draw(pos + viewpos);
+    }
+
+    void Tile::prepare_visible(Point<int16_t> viewpos) const
+    {
+        const DrawArgument args = pos + viewpos;
+        const Rectangle<int16_t> destination = args.get_rectangle(
+            texture.get_origin(),
+            texture.get_dimensions()
+        );
+        if (GraphicsGL::get().isonscreen(destination))
+        {
+            texture.prepare_visible();
+        }
     }
 
     uint8_t Tile::getz() const

@@ -41,6 +41,7 @@ namespace jrc
         , last_pickup_time(0)
         , pending_intro_warp_mapid(-1)
         , pending_intro_warp_delay_ms(0)
+        , asset_generation(0)
     {
         state = INACTIVE;
         mapid = 0;
@@ -51,22 +52,12 @@ namespace jrc
         drops.init();
     }
 
-    void Stage::load(int32_t mapid, int8_t portalid)
+    void Stage::load(int32_t mapid, int8_t portalid, std::function<void()> onready)
     {
-        switch (state)
-        {
-        case INACTIVE:
-            load_map(mapid);
-            respawn(portalid);
-            break;
-        case TRANSITION:
-            respawn(portalid);
-            break;
-        case ACTIVE:
-            break;
-        }
-
-        state = ACTIVE;
+        begin_loading(std::move(onready));
+        load_map(mapid);
+        respawn(portalid);
+        report_loading_progress();
     }
 
     void Stage::loadplayer(const CharEntry& entry)
@@ -77,12 +68,12 @@ namespace jrc
 
     void Stage::clear()
     {
+        end_loading();
         state = INACTIVE;
         mapid = 0;
         effect = MapEffect();
         pending_intro_warp_mapid = -1;
         pending_intro_warp_delay_ms = 0;
-
         combat.clear();
         chars.clear();
         npcs.clear();
@@ -103,6 +94,9 @@ namespace jrc
         backgrounds = MapBackgrounds(src["back"]);
         physics     = Physics(src["foothold"]);
         mapinfo     = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
+        // Audio data is part of the map safety set. Web Audio decoding remains
+        // asynchronous, but the NX range itself is resident before gameplay.
+        Music(mapinfo.get_bgm()).prepare();
         player.set_recovery_rate(mapinfo.get_recovery_rate());
         portals     = MapPortals(src["portal"], mapid);
         // Keep any effect injected during the fade transition (e.g. intro Scene packets).
@@ -111,8 +105,6 @@ namespace jrc
 
     void Stage::respawn(int8_t portalid)
     {
-        Music(mapinfo.get_bgm()).play();
-
         Point<int16_t> spawnpoint = portals.get_portal_by_id(static_cast<uint8_t>(portalid));
         Point<int16_t> startpos   = physics.get_y_below(spawnpoint);
 
@@ -123,7 +115,7 @@ namespace jrc
 
     void Stage::draw(float alpha) const
     {
-        if (state != ACTIVE)
+        if (state == INACTIVE)
         {
             return;
         }
@@ -132,6 +124,14 @@ namespace jrc
         Point<double> viewrpos = camera.realposition(alpha);
         double viewx = viewrpos.x();
         double viewy = viewrpos.y();
+
+        if (state == LOADING)
+        {
+            // Promote every frame of visible static animations before the
+            // transition can release; network prefetch still covers the rest.
+            backgrounds.prepare_visible(viewx, viewy, alpha);
+            tilesobjs.prepare_visible(viewpos, alpha);
+        }
 
         backgrounds.drawbackgrounds(viewx, viewy, alpha);
         for (auto id : Layer::IDs)
@@ -152,6 +152,11 @@ namespace jrc
 
     void Stage::update()
     {
+        if (state == LOADING)
+        {
+            update_loading();
+            return;
+        }
         if (state != ACTIVE)
         {
             return;
@@ -343,14 +348,14 @@ namespace jrc
         return effect.blocks_player_input();
     }
 
-    void Stage::release_intro_locked_actions()
+    void Stage::release_actions()
     {
         if (!playable)
         {
             return;
         }
 
-        static constexpr std::array<KeyAction::Id, 8> INTRO_LOCKED_ACTIONS =
+        static constexpr std::array<KeyAction::Id, 8> RELEASABLE_ACTIONS =
         {
             KeyAction::LEFT,
             KeyAction::RIGHT,
@@ -362,7 +367,7 @@ namespace jrc
             KeyAction::SIT
         };
 
-        for (KeyAction::Id action : INTRO_LOCKED_ACTIONS)
+        for (KeyAction::Id action : RELEASABLE_ACTIONS)
         {
             if (player.is_key_down(action))
             {
@@ -441,6 +446,10 @@ namespace jrc
 
     Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
     {
+        if (state != ACTIVE)
+        {
+            return Cursor::IDLE;
+        }
         return npcs.send_cursor(pressed, position, camera.position());
     }
 
@@ -507,7 +516,7 @@ namespace jrc
         if (is_intro_input_locked())
         {
             player.set_direction(false);
-            release_intro_locked_actions();
+            release_actions();
         }
     }
 

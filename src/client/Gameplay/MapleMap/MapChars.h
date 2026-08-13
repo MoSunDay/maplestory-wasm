@@ -18,6 +18,7 @@ namespace jrc
         void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
         // Update all characters.
         void update(const Physics& physics);
+        void instantiate_spawns();
 
         // Spawn a new character, if it has not been spawned yet.
         void spawn(CharSpawn&& spawn);
