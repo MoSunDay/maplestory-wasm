@@ -101,6 +101,78 @@ namespace jrc
         return ret;
     }
 
+    std::string InPacket::read_padded_utf8_string(uint16_t utf16_length)
+    {
+        std::string result;
+        uint16_t utf16_units = 0;
+
+        while (utf16_units < utf16_length)
+        {
+            const auto first = static_cast<uint8_t>(read_byte());
+            if (first == 0)
+            {
+                ++utf16_units;
+                continue;
+            }
+
+            uint8_t byte_count = 0;
+            uint8_t unit_count = 1;
+            if (first <= 0x7F)
+            {
+                byte_count = 1;
+            }
+            else if (first >= 0xC2 && first <= 0xDF)
+            {
+                byte_count = 2;
+            }
+            else if (first >= 0xE0 && first <= 0xEF)
+            {
+                byte_count = 3;
+            }
+            else if (first >= 0xF0 && first <= 0xF4)
+            {
+                byte_count = 4;
+                unit_count = 2;
+            }
+            else
+            {
+                throw PacketError("Malformed UTF-8 fixed string");
+            }
+
+            if (utf16_units + unit_count > utf16_length)
+            {
+                throw PacketError("UTF-8 character exceeds fixed string length");
+            }
+
+            result.push_back(static_cast<char>(first));
+            for (uint8_t i = 1; i < byte_count; ++i)
+            {
+                const auto continuation = static_cast<uint8_t>(read_byte());
+                const bool is_continuation =
+                    continuation >= 0x80 && continuation <= 0xBF;
+                const bool valid_lower_bound =
+                    (i != 1) || (first != 0xE0) || continuation >= 0xA0;
+                const bool valid_surrogate_bound =
+                    (i != 1) || (first != 0xED) || continuation <= 0x9F;
+                const bool valid_plane_lower_bound =
+                    (i != 1) || (first != 0xF0) || continuation >= 0x90;
+                const bool valid_plane_upper_bound =
+                    (i != 1) || (first != 0xF4) || continuation <= 0x8F;
+                if (!is_continuation || !valid_lower_bound ||
+                    !valid_surrogate_bound || !valid_plane_lower_bound ||
+                    !valid_plane_upper_bound)
+                {
+                    throw PacketError("Malformed UTF-8 fixed string");
+                }
+                result.push_back(static_cast<char>(continuation));
+            }
+
+            utf16_units += unit_count;
+        }
+
+        return result;
+    }
+
     bool InPacket::inspect_bool()
     {
         return inspect_byte() == 1;
