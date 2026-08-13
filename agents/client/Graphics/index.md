@@ -1,6 +1,6 @@
-# 图形渲染
+Commit: cc039ba9798debb450c69b1dd6990f2d353f1178
 
-Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
+# 图形渲染
 
 ## 职责
 
@@ -30,6 +30,8 @@ Commit: d8304dc47fa83bd1ef6722660bd549ef89913c9c
 ### 纹理图集 (`GraphicsGL::addbitmap`)
 
 - WASM 中 `Texture` 实例化后通过 `queuebitmap()` 静默预取，主循环每帧调用 `preparebitmaps()`；它以 2ms 扫描软预算查找就绪项，并且每帧最多解压、上传一张位图
+- `Texture::prepare_visible()` 将短时可见特效提升到独立优先队列并发起前台范围请求；已在普通队列中的同一位图会原地提升，仍保持全局去重
+- `Texture`、`Frame` 与 `Animation` 提供有效性和图集驻留检查，一次性动画可以等待全部帧就绪后再推进，避免异步下载消耗播放窗口
 - 首次绘制时尚未就绪的纹理跳过当前帧；图集清理后仍在使用的纹理会重新排队，不在绘制路径同步等待网络
 - 非 WASM 平台仍通过 `addbitmap()` 同步注册到图集
 - 图集空间由 `QuadTree<Leftover>` 管理，按需分配/回收
