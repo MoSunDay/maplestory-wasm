@@ -455,7 +455,12 @@ weapon     int     Item ID for weapon
 gender     byte    0 = Male, 1 = Female
 ```
 
-Server responds with `ADD_NEW_CHAR_ENTRY` (0x0E) on success, or `CHAR_NAME_RESPONSE` with error on failure.
+Cosmic responds with `ADD_NEW_CHAR_ENTRY` (0x0E) on success. Its current
+creation handler has two failure surfaces that do not use a dedicated create
+result packet: an unavailable/invalid name or a full slot count can return no
+packet, while a database insertion failure is encoded as `DELETE_CHAR_RESPONSE`
+with state 9. The client therefore rechecks name availability immediately before
+creation and recovers a timed-out request instead of holding the UI pending.
 
 ---
 

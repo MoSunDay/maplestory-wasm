@@ -1,4 +1,4 @@
-Commit: 836cbaa0879e3459cfa17a594479446e658c3d7c
+Commit: 38e27f7292c566204925875efda52d4d81508d07
 
 # 网络层
 
@@ -66,6 +66,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 - `OutPacket`: 构建封包字节流 (`write_byte()`, `write_int()`, `write_string()` 等)
 
 登录 `CHARLIST` / 新建角色 / 进入地图复用 `LoginParser::parse_stats`。其字段宽度必须与 Cosmic `addCharStats` 一致：角色名按 13 个 Java UTF-16 code unit 补零后再 UTF-8 编码，等级为单字节；Evan 职业（2001、2200–2218）的剩余 SP 为多池表，其余职业为单个 short。宠物、队伍、戒指和现金礼物的 Java 定长字段遵循同一读取规则。
+
+角色创建在最终 `CREATE_CHAR` 前再次发送 `CHECK_CHAR_NAME`，避免外观定制期间名称被占用。Cosmic 对名称不可用或角色槽已满可能静默返回，对数据库插入失败则复用 `DELETE_CHAR_RESPONSE(state=9)`；`UICharCreation` 与 `DeleteCharResponseHandler` 会把这些结果收敛为可恢复状态，重新开放输入或定制控件。
 
 `CharacterDataParser` 消费 `SET_FIELD` 的小游戏、三类戒指和新年贺卡附加数据。Cosmic 当前小游戏列表固定为空，非零计数属于不支持的合约变更并立即抛出 `PacketError`；新年贺卡无论是否为空都完整消费，保证后续区域信息与尾字段保持对齐。
 
