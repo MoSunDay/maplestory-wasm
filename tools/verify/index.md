@@ -8,4 +8,5 @@
 - 攻击输入与特效选择：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/attack-effect-selection.cpp -o /tmp/attack-effect-selection && /tmp/attack-effect-selection`
 - 远端 Buff 掩码顺序：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
 - 世界选择单频道策略与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
+- 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - 攻击 NX 结构审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/attack-effect-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/attack-effect-nx && /tmp/attack-effect-nx Skill.nx`

@@ -15,6 +15,8 @@ const chatMessage = process.env.E2E_CHAT || '中文聊天测试';
 // admitting the next (50 ms) cadence tier.
 const maxP95FrameMs = Number(process.env.E2E_MAX_P95_FRAME_MS || 34);
 const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
+const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
+const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 
 const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5 });
 
@@ -279,12 +281,23 @@ try {
   await driver.screenshot('02-world-select');
 
   await driver.screenshot('03-channel-one-only');
-  // Exercise the visible Go To Selected Channel control. Its normal-state
-  // bitmap occupies x=445..576 and y=201..232 in the 800x600 game canvas.
-  await driver.click(510, 216);
+  if (worldSelectAction === 'channel') {
+    await driver.doubleClick(255, 260);
+  } else if (worldSelectAction === 'dom-go') {
+    await driver.domClick(510, 216);
+  } else if (worldSelectAction === 'dom-channel') {
+    await driver.domClick(255, 260);
+    await driver.domClick(255, 260);
+  } else if (worldSelectAction === 'go') {
+    // The normal-state bitmap occupies x=445..576 and y=201..232.
+    await driver.click(510, 216);
+  } else {
+    throw new Error(`Unsupported E2E_WORLD_SELECT_ACTION: ${worldSelectAction}`);
+  }
   await requireUiState('character-select UI active', uiState.charSelect, 45);
   await requireAssetIdle('character-select assets ready');
   await driver.screenshot('04-character-select-before');
+  if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');
 
   if (createCharacter) {
     await driver.click(250, 515);
@@ -465,6 +478,9 @@ try {
   passed = true;
 } catch (error) {
   if (process.env.E2E_ASSET_ONLY === '1' && error.message === '__ASSET_ONLY_COMPLETE__') {
+    passed = true;
+  } else if (stopAtCharSelect && error.message === '__CHAR_SELECT_COMPLETE__') {
+    assertRuntimeHealthy();
     passed = true;
   } else {
     throw error;
