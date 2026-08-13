@@ -66,6 +66,18 @@ namespace jrc
         }
     }
 
+    void TilesObjs::prepare_visible(Point<int16_t> viewpos, float alpha) const
+    {
+        for (const auto& iter : objs)
+        {
+            iter.second.prepare_visible(viewpos, alpha);
+        }
+        for (const auto& iter : tiles)
+        {
+            iter.second.prepare_visible(viewpos);
+        }
+    }
+
 
     MapTilesObjs::MapTilesObjs(nl::node src)
     {
@@ -81,6 +93,14 @@ namespace jrc
     {
         layers[layer]
             .draw(viewpos, alpha);
+    }
+
+    void MapTilesObjs::prepare_visible(Point<int16_t> viewpos, float alpha) const
+    {
+        for (auto iter : layers)
+        {
+            iter.second.prepare_visible(viewpos, alpha);
+        }
     }
 
     void MapTilesObjs::update()

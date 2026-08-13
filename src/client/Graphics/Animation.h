@@ -71,6 +71,7 @@ namespace jrc
 
         void draw(const DrawArgument& arguments, float inter) const;
         void prepare_visible() const;
+        void prepare_visible(const DrawArgument& arguments, float inter) const;
 
         bool is_valid() const;
         bool is_ready() const;

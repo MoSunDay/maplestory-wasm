@@ -27,10 +27,27 @@
 #include "../Configuration.h"
 
 #include <GLFW/glfw3.h>
+#ifdef MS_PLATFORM_WASM
+#include <emscripten.h>
+#endif
 #include <list>
 
 namespace jrc
 {
+    namespace
+    {
+        bool asset_loading_blocks_input()
+        {
+#ifdef MS_PLATFORM_WASM
+            return EM_ASM_INT({
+                return window.MapleAssetLoading?.isBlocking?.() ? 1 : 0;
+            }) != 0;
+#else
+            return false;
+#endif
+        }
+    }
+
     UI::UI()
     {
         state = std::make_unique<UIStateNull>();
@@ -133,6 +150,12 @@ namespace jrc
 
     void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)
     {
+        if (!enabled || asset_loading_blocks_input())
+        {
+            cursor.set_state(Cursor::IDLE);
+            cursor.set_position(cursorpos);
+            return;
+        }
         Cursor::State nextstate = state->send_cursor(cursorstate, cursorpos);
         cursor.set_state(nextstate);
         cursor.set_position(cursorpos);
@@ -140,12 +163,18 @@ namespace jrc
 
     void UI::send_cursor(bool pressed)
     {
-        if (pressed && enabled)
+        if (!enabled || asset_loading_blocks_input())
+        {
+            cursor.set_state(Cursor::IDLE);
+            return;
+        }
+
+        if (pressed)
         {
             cursor_press_id++;
         }
 
-        Cursor::State cursorstate = (pressed && enabled) ?
+        Cursor::State cursorstate = pressed ?
             Cursor::CLICKING :
             Cursor::IDLE;
         Point<int16_t> cursorpos = cursor.get_position();
@@ -181,7 +210,7 @@ namespace jrc
 
     void UI::doubleclick()
     {
-        if (!enabled)
+        if (!enabled || asset_loading_blocks_input())
         {
             return;
         }
@@ -192,7 +221,7 @@ namespace jrc
 
     void UI::send_scroll(double yoffset)
     {
-        if (!enabled)
+        if (!enabled || asset_loading_blocks_input())
         {
             return;
         }
@@ -226,7 +255,7 @@ namespace jrc
 
     void UI::rightclick()
     {
-        if (!enabled)
+        if (!enabled || asset_loading_blocks_input())
         {
             return;
         }
@@ -236,6 +265,12 @@ namespace jrc
 
     void UI::send_key(int32_t keycode, bool pressed)
     {
+        if (!enabled || asset_loading_blocks_input())
+        {
+            is_key_down[keycode] = false;
+            return;
+        }
+
         bool escape = keycode == GLFW_KEY_ESCAPE;
 
         if (escape)
@@ -319,6 +354,10 @@ namespace jrc
 
     void UI::send_menu(KeyAction::Id action)
     {
+        if (!enabled || asset_loading_blocks_input())
+        {
+            return;
+        }
         state->send_key(KeyType::MENU, action, true, false);
     }
 
@@ -329,6 +368,10 @@ namespace jrc
 
     void UI::ime_input(const std::string& text, size_t caret_utf16)
     {
+        if (!enabled || asset_loading_blocks_input())
+        {
+            return;
+        }
         if (focusedtextfield)
         {
             focusedtextfield->set_text_with_caret(text, caret_utf16);

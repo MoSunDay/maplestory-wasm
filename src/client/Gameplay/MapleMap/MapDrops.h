@@ -40,6 +40,7 @@ namespace jrc
         void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
         // Update all drops.
         void update(const Physics& physics);
+        void instantiate_spawns();
 
         // Spawn a new drop.
         void spawn(DropSpawn&& spawn);

@@ -28,6 +28,12 @@ namespace jrc
 
     void MapReactors::update(const Physics& physics)
     {
+        instantiate_spawns(physics);
+        reactors.update(physics);
+    }
+
+    void MapReactors::instantiate_spawns(const Physics& physics)
+    {
         for (; !spawns.empty(); spawns.pop())
         {
             const ReactorSpawn& spawn = spawns.front();
@@ -43,7 +49,6 @@ namespace jrc
             }
         }
 
-        reactors.update(physics);
     }
 
     void MapReactors::spawn(ReactorSpawn&& spawn)

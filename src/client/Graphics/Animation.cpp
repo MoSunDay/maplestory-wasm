@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Animation.h"
+#include "GraphicsGL.h"
 
 #include "../Constants.h"
 #include "../Util/Misc.h"
@@ -234,6 +235,19 @@ namespace jrc
         for (const Frame& framedata : frames)
         {
             framedata.prepare_visible();
+        }
+    }
+
+    void Animation::prepare_visible(const DrawArgument& args, float alpha) const
+    {
+        const Frame& framedata = frames[frame.get(alpha)];
+        const Rectangle<int16_t> destination = args.get_rectangle(
+            framedata.get_origin(),
+            framedata.get_dimensions()
+        );
+        if (GraphicsGL::get().isonscreen(destination))
+        {
+            prepare_visible();
         }
     }
 

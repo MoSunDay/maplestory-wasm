@@ -361,8 +361,18 @@
                 if (!previousFocus) {
                     previousFocus = document.activeElement;
                 }
-                const failed = Array.from(loads.values()).some(load => load.state === 'failed');
-                message.textContent = failed ? '素材加载失败，请重试' : '素材加载中...';
+                const entries = Array.from(loads.values());
+                const failed = entries.some(load => load.state === 'failed');
+                const progress = entries.find(load => Number.isFinite(load.total) && load.total > 0);
+                if (failed) {
+                    message.textContent = '素材加载失败，请重试';
+                } else if (progress) {
+                    const completed = Math.min(progress.completed || 0, progress.total);
+                    const percent = Math.floor(completed * 100 / progress.total);
+                    message.textContent = (progress.message || '素材加载中...') + ' ' + percent + '%';
+                } else {
+                    message.textContent = entries.find(load => load.message)?.message || '素材加载中...';
+                }
                 retryButton.classList.toggle('is-hidden', !failed);
                 screen.classList.toggle('is-error', failed);
                 container.inert = true;
@@ -371,8 +381,15 @@
                 screen.removeAttribute('aria-hidden');
             }
 
-            function begin(key) {
-                loads.set(key, { state: 'loading', retry: null });
+            function begin(key, detail) {
+                const value = detail && typeof detail === 'object' ? detail : {};
+                loads.set(key, {
+                    state: 'loading',
+                    retry: null,
+                    message: value.message,
+                    completed: value.completed,
+                    total: value.total
+                });
                 render();
             }
 
@@ -388,7 +405,15 @@
 
             function canInteract() {
                 const startup = document.getElementById('loading-screen');
-                return startup && startup.classList.contains('is-hidden');
+                return startup && startup.classList.contains('is-hidden') && loads.size === 0;
+            }
+
+            function isBlocking() {
+                return loads.size > 0;
+            }
+
+            function has(key) {
+                return loads.has(key);
             }
 
             retryButton.addEventListener('click', function () {
@@ -398,7 +423,7 @@
                 retries.forEach(retry => retry());
             });
 
-            window.MapleAssetLoading = Object.freeze({ begin, end, fail, canInteract });
+            window.MapleAssetLoading = Object.freeze({ begin, end, fail, canInteract, isBlocking, has });
         })();
 
         (function () {

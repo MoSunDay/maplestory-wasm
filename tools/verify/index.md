@@ -2,6 +2,7 @@
 
 - [MapleStory WebUI 全流程](maplestory-webui/index.md)
 - LazyFS 连接恢复：`node tools/verify/lazyfs-connection.mjs`
+- 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`
 - 自然恢复规则：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/natural-recovery.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/natural-recovery && /tmp/natural-recovery`
 - 死亡幽灵轨迹：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-orbit.cpp -o /tmp/death-tomb-orbit && /tmp/death-tomb-orbit`
 - 死亡墓碑落地点：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-ground.cpp -o /tmp/death-tomb-ground && /tmp/death-tomb-ground`

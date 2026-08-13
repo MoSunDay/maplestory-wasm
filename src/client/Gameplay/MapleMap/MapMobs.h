@@ -35,6 +35,8 @@ namespace jrc
         void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
         // Update all mobs.
         void update(const Physics& physics);
+        // Materialize queued spawns without advancing animation or physics.
+        void instantiate_spawns();
 
         // Spawn a new mob.
         void spawn(MobSpawn&& spawn);

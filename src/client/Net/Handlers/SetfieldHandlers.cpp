@@ -40,13 +40,16 @@ namespace jrc
         float fadestep = 0.025f;
         Window::get().fadeout(fadestep, [mapid, portalid](){
             GraphicsGL::get().clear();
-            Stage::get().load(mapid, portalid);
-            UI::get().enable();
+            Stage::get().load(mapid, portalid, [](){
+                PlayerUpdatePacket().dispatch();
+                UI::get().enable();
+            });
             Timer::get().start();
             GraphicsGL::get().unlock();
         });
 
         GraphicsGL::get().lock();
+        UI::get().disable();
         Stage::get().clear();
         Timer::get().start();
     }
@@ -75,8 +78,6 @@ namespace jrc
         auto portalid = static_cast<uint8_t>(recv.read_byte());
 
         transition(mapid, portalid);
-
-        PlayerUpdatePacket().dispatch();
     }
 
     void SetfieldHandler::set_field(InPacket& recv) const
@@ -126,10 +127,7 @@ namespace jrc
 
         transition(mapid, portalid);
 
-        PlayerUpdatePacket().dispatch();
-
         Sound(Sound::GAMESTART).play();
-
         UI::get().change_state(UI::GAME);
     }
 
