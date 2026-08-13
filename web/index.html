@@ -5,15 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>冒险岛online</title>
-    <link rel="preload" href="../src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf"
-        as="font" type="font/ttf" crossorigin>
     <style>
-        @font-face {
-            font-family: 'Maple CJK';
-            src: url('../src/client/fonts/DroidSansFallback/DroidSansFallbackFull.ttf') format('truetype');
-            font-display: swap;
-        }
-
         body {
             margin: 0;
             padding: 0;
@@ -24,7 +16,7 @@
             height: 100vh;
             width: 100vw;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Noto Sans CJK SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
             color: #fff;
         }
 
@@ -88,7 +80,7 @@
             background: rgba(16, 27, 45, 0.68);
             box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
             color: #fff8e8;
-            font-family: 'Maple CJK', sans-serif;
+            font-family: inherit;
             font-size: 17px;
             letter-spacing: 0.04em;
         }
@@ -133,7 +125,7 @@
             align-items: center;
             width: min(420px, calc(100vw - 48px));
             text-align: center;
-            font-family: 'Maple CJK', sans-serif;
+            font-family: inherit;
         }
 
         .loading-spinner {
@@ -253,6 +245,7 @@
         </div>
     </div>
 
+    <script src="./wasm_loader.js"></script>
     <script>
         (function () {
             const screen = document.getElementById('loading-screen');
@@ -260,17 +253,21 @@
             const detail = document.getElementById('loading-detail');
             const shownAt = performance.now();
             let finishTimer = null;
-            // Safety net: if the client never dismisses the overlay (a stall or
-            // hang before the first frame), surface a recoverable error instead
-            // of an eternal spinner. 45s tolerates slow first loads on cold cache.
+            // Treat 45 seconds without phase or download progress as a stall.
+            // Active Range transfers re-arm this timer as each chunk completes.
             const WATCHDOG_MS = 45000;
-            let watchdog = setTimeout(function () {
-                if (!screen.classList.contains('is-hidden')
-                    && !screen.classList.contains('is-error'))
-                {
-                    fail('启动超时，请刷新页面后重试');
-                }
-            }, WATCHDOG_MS);
+            let watchdog = null;
+
+            function armWatchdog() {
+                clearTimeout(watchdog);
+                watchdog = setTimeout(function () {
+                    if (!screen.classList.contains('is-hidden')
+                        && !screen.classList.contains('is-error'))
+                    {
+                        fail('启动超时，请检查网络后刷新页面重试');
+                    }
+                }, WATCHDOG_MS);
+            }
 
             function safeText(value, fallback) {
                 return typeof value === 'string' && value.trim() ? value : fallback;
@@ -280,6 +277,7 @@
                 if (screen.classList.contains('is-error')) {
                     return;
                 }
+                armWatchdog();
                 screen.dataset.phase = safeText(phase, 'loading');
                 title.textContent = safeText(message, '正在加载游戏…');
                 detail.textContent = safeText(description, '请稍候');
@@ -309,6 +307,7 @@
                 detail.textContent = safeText(message, '请刷新页面后重试');
             }
 
+            armWatchdog();
             window.MapleWasmLoading = Object.freeze({ setPhase, finish, fail });
         })();
 
@@ -698,63 +697,98 @@
 
         console.log('[status] Downloading...');
 
-        window.onerror = function (event) {
-            console.error('[post-exception status] Exception thrown, see JavaScript console');
-            // A fatal exception while the startup overlay is still visible must
-            // not leave an eternal spinner; surface a recoverable error instead.
-            const ls = document.getElementById('loading-screen');
-            if (ls && !ls.classList.contains('is-hidden')
-                && !ls.classList.contains('is-error')
+        function failStartup(message) {
+            const screen = document.getElementById('loading-screen');
+            if (screen && !screen.classList.contains('is-hidden')
+                && !screen.classList.contains('is-error')
                 && window.MapleWasmLoading)
             {
-                window.MapleWasmLoading.fail('客户端运行出错，请刷新页面后重试');
+                window.MapleWasmLoading.fail(message);
             }
+        }
+
+        window.onerror = function () {
+            console.error('[post-exception status] Exception thrown, see JavaScript console');
+            failStartup('客户端运行出错，请刷新页面后重试');
         };
 
-        // Fetch configuration before loading the client
-        fetch('./config.json')
-            .then(response => {
+        window.addEventListener('unhandledrejection', function (event) {
+            console.error('[startup] Unhandled promise rejection:', event.reason);
+            failStartup('客户端运行出错，请刷新页面后重试');
+        });
+
+        const WASM_CLIENT_URL = '../build/JourneyClient.wasm';
+        const WASM_SCRIPT_URL = '../build/JourneyClient.js';
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('./config.json');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                return response.json();
-            })
-            .then(config => {
-                if (config) {
-                    let hasConfig = false;
-                    const lazyConfig = {};
-
-                    const lazyConfigKeys = [
-                        'AssetsServerIP', 'AssetsServerPort',
-                        'MapleStoryServerIp', 'MapleStoryServerPort',
-                        'ProxyIP', 'ProxyPort', 'AssetsServerProtocol'
-                    ];
-
-                    lazyConfigKeys.forEach(key => {
-                        if (config[key] !== undefined && config[key] !== null) {
-                            lazyConfig[key] = config[key];
-                            console.log(`[config] Set ${key} from config.json:`, config[key]);
-                            hasConfig = true;
-                        }
-                    });
-
-                    if (hasConfig) {
-                        Module.LazyFS = Object.assign(Module.LazyFS || {}, lazyConfig);
+                const config = await response.json();
+                const lazyConfig = {};
+                [
+                    'AssetsServerIP', 'AssetsServerPort',
+                    'MapleStoryServerIp', 'MapleStoryServerPort',
+                    'ProxyIP', 'ProxyPort', 'AssetsServerProtocol'
+                ].forEach(function (key) {
+                    if (config && config[key] !== undefined && config[key] !== null) {
+                        lazyConfig[key] = config[key];
+                        console.log(`[config] Set ${key} from config.json:`, config[key]);
                     }
+                });
+                if (Object.keys(lazyConfig).length > 0) {
+                    Module.LazyFS = Object.assign(Module.LazyFS || {}, lazyConfig);
                 }
-                loadWasmClient();
-            })
-            .catch(err => {
-                console.warn('[config] Could not load ./config.json, proceeding with defaults. Error:', err.message);
-                loadWasmClient();
-            });
-
-        function loadWasmClient() {
-            const script = document.createElement('script');
-            script.src = '../build/JourneyClient.js';
-            script.async = true;
-            document.body.appendChild(script);
+            } catch (error) {
+                console.warn('[config] Could not load ./config.json, proceeding with defaults. Error:', error.message);
+            }
         }
+
+        async function downloadWasmClient() {
+            if (!window.MapleWasmLoader) {
+                throw new Error('WASM range loader is unavailable');
+            }
+            window.MapleWasmLoading.setPhase('wasm', '正在下载客户端…', '已完成 0%');
+            Module.wasmBinary = await window.MapleWasmLoader.downloadWasm(WASM_CLIENT_URL, {
+                onProgress: function (progress) {
+                    window.MapleWasmLoading.setPhase(
+                        'wasm',
+                        '正在下载客户端…',
+                        '已完成 ' + progress.percent + '%'
+                    );
+                },
+                onRetry: function (retry) {
+                    console.warn('[wasm] Retrying', retry.label, retry.nextAttempt, retry.error.message);
+                    window.MapleWasmLoading.setPhase('wasm', '正在重试客户端下载…', '网络连接不稳定，请稍候');
+                }
+            });
+        }
+
+        function loadWasmScript() {
+            return new Promise(function (resolve, reject) {
+                const script = document.createElement('script');
+                script.src = WASM_SCRIPT_URL;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = function () {
+                    reject(new Error('Failed to load ' + WASM_SCRIPT_URL));
+                };
+                document.body.appendChild(script);
+            });
+        }
+
+        async function startClient() {
+            await loadConfig();
+            await downloadWasmClient();
+            await loadWasmScript();
+        }
+
+        startClient().catch(function (error) {
+            console.error('[startup] Client initialization failed:', error);
+            failStartup('客户端下载失败，请检查网络后刷新页面重试');
+        });
     </script>
 </body>
 
