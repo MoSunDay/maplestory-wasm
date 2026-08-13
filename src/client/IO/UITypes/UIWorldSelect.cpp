@@ -18,13 +18,19 @@
 #include "UIWorldSelect.h"
 #include "WorldSelectPolicy.h"
 
+#include "../../Console.h"
 #include "../../Graphics/Sprite.h"
 #include "../../IO/UI.h"
 #include "../../IO/Components/MapleButton.h"
 #include "../../IO/Components/TwoSpriteButton.h"
+#include "../../Net/Session.h"
 #include "../../Net/Packets/LoginPackets.h"
 
 #include "nlnx/nx.hpp"
+
+#ifdef MS_PLATFORM_WASM
+#include <emscripten.h>
+#endif
 
 namespace jrc
 {
@@ -37,7 +43,8 @@ namespace jrc
         : UIElement({ 0, 0 }, { 800, 600 }),
           worldid(0),
           channelid(world_select::selected_channel_id()),
-          channelcount(0) {
+          channelcount(0),
+          request_pending(false) {
 
         nl::node back = nl::nx::map["Back"]["login.img"]["back"];
         nl::node worldsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtWorld"]["release"];
@@ -109,25 +116,47 @@ namespace jrc
             if (buttons[BT_CHANNEL0 + i]->bounds(position).contains(cursorpos))
             {
                 channelid = i;
-                button_pressed(BT_ENTERWORLD);
+                enter_selected_channel();
                 return;
             }
         }
+    }
+
+    bool UIWorldSelect::enter_selected_channel()
+    {
+        if (request_pending)
+            return true;
+
+        if (channelcount == 0 || channelid >= channelcount)
+            return false;
+
+        if (!Session::get().is_connected())
+        {
+            Console::get().print("Cannot enter channel: login connection is closed");
+#ifdef MS_PLATFORM_WASM
+            EM_ASM({
+                if (window.MapleConnectionLost)
+                {
+                    window.MapleConnectionLost.show('登录连接已断开，请刷新页面后重试。');
+                }
+            });
+#endif
+            return false;
+        }
+
+        // Both GLFW mouse-down and the browser compatibility bridge can see
+        // one physical click. Mark the request first so only one packet leaves.
+        request_pending = true;
+        UI::get().disable();
+        CharlistRequestPacket(worldid, channelid).dispatch();
+        return true;
     }
 
     Button::State UIWorldSelect::button_pressed(uint16_t id)
     {
         if (id == BT_ENTERWORLD)
         {
-            if (channelcount == 0 || channelid >= channelcount)
-                return Button::DISABLED;
-
-            UI::get().disable();
-
-            CharlistRequestPacket(worldid, channelid)
-                .dispatch();
-
-            return Button::PRESSED;
+            return enter_selected_channel() ? Button::PRESSED : Button::DISABLED;
         }
         else if (id == BT_WORLD0)
         {

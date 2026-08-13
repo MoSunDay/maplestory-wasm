@@ -196,6 +196,7 @@
             cursor: none;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            touch-action: none;
         }
 
         /* Invisible but focusable: the browser attaches its IME (pinyin, etc.)
@@ -246,6 +247,7 @@
     </div>
 
     <script src="./wasm_loader.js"></script>
+    <script src="./world_select_input.js"></script>
     <script>
         (function () {
             const screen = document.getElementById('loading-screen');
@@ -685,6 +687,9 @@
                 console.log('[runtime] Initialized');
                 if (window.MapleWasmUI && window.MapleWasmUI.applyScale) {
                     window.MapleWasmUI.applyScale();
+                }
+                if (window.MapleWorldSelectInput) {
+                    window.MapleWorldSelectInput.install(Module, Module.canvas);
                 }
             },
 

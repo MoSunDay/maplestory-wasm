@@ -1,6 +1,6 @@
-# Web 基础设施
+Commit: 7e68ababb9b31bcb7f6237f78081f84cdd25ab93
 
-Commit: e264ed06c12c5c2a122ead0b7fa18299b9467b8d
+# Web 基础设施
 
 ## 职责
 
@@ -34,6 +34,7 @@ HTTP 服务器，默认绑定 8000 端口（`--port`/`--bind`/`--directory` 可�
 - 页面先读取 WASM 长度，再以 1 MiB HTTP Range、最多 3 路并发下载；每块请求 15 秒超时并最多尝试 3 次，完整组装后通过 `Module.wasmBinary` 交给 Emscripten，避免单个大请求中断后永远卡在 `wasm-instantiate`
 - 页面在 WASM 下载和 NX 素材初始化期间显示进度及阶段提示；有效进度会重置 45 秒停滞计时，首帧绘制完成后再淡出，重试耗尽或初始化失败时原位显示错误
 - 运行时前台素材网络缺块会显示玻璃化遮罩“素材加载中...”，以请求键覆盖并发和共享读取；失败后遮罩保留错误信息及重试按钮，静默后台预取不触发遮罩
+- `web/world_select_input.js` 把缩放后的 Canvas 坐标还原为 800×600 游戏坐标，并为确认按钮单击及频道双击提供浏览器原生事件兼容路径；C++ 侧负责状态校验和重复请求抑制
 - 输出 WASM 所需的跨域隔离头（COOP/COEP）与 `Cache-Control`
 - 支持 HTTP Range 请求（单区间），目录自动索引
 - HTTP header 不限制字段数量，仅限制整个请求头块最多 10 MiB（包含结尾的 `CRLFCRLF`）；恰好达到上限可接收，超出后返回 `400 Bad Request` 并关闭连接

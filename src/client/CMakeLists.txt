@@ -37,7 +37,7 @@ if(EMSCRIPTEN)
         -sSTACK_SIZE=16777216
         -sINITIAL_MEMORY=268435456  
         -sEXPORTED_RUNTIME_METHODS=FS,ccall,cwrap,setCanvasSize
-        -sEXPORTED_FUNCTIONS=_main,_msime_input,_msime_key,_msui_state
+        -sEXPORTED_FUNCTIONS=_main,_msime_input,_msime_key,_msui_state,_msworldselect_enter
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial.ttf@fonts/Arial/Arial.ttf"
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial-Bold.ttf@fonts/Arial/Arial-Bold.ttf"
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/DroidSansFallback/DroidSansFallbackFull.ttf@fonts/DroidSansFallback/DroidSansFallbackFull.ttf"
