@@ -213,6 +213,21 @@ namespace jrc
         int32_t cid = recv.read_int();
         uint8_t state = recv.read_byte();
 
+        // Cosmic also uses this response for CREATE_CHAR database failures.
+        // Restore the creation controls instead of leaving its OK button in
+        // the pending state indefinitely.
+        if (state)
+        {
+            if (auto charcreation = UI::get().get_element<UICharcreation>())
+            {
+                if (charcreation->handle_creation_failure())
+                {
+                    UI::get().enable();
+                    return;
+                }
+            }
+        }
+
         // Extract information from the state byte.
         if (state)
         {
