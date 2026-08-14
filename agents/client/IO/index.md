@@ -1,4 +1,4 @@
-Commit: 27a4a800c0ed9e8d0af20a3a0b5d062ebbdfebc7
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 
 # UI 系统
 
@@ -66,7 +66,7 @@ UI 状态接口。三个具体实现:
 ### 游戏内 UI (`UITypes/`)
 | 文件 | 职责 |
 |------|------|
-| `UIStatusBar` | 底部状态栏；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用，支持互斥切换、Escape 和外部点击关闭 |
+| `UIStatusBar` | 底部状态栏；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用，支持互斥切换、Escape 和外部点击关闭；System 登出经确认后主动关闭会话并退出客户端 |
 | `UIStatsInfo` | 角色属性窗口；加点按钮直接采用 NX 内置 origin 定位，使可见加号与鼠标命中区域落在对应属性行 |
 | `UISkillBook` | 技能书窗口；使用与四行技能布局匹配的 175×289 紧凑 NX 面板，窗口边界与可见背景一致 |
 | `UIEquipInventory` | 装备栏窗口 |
@@ -105,4 +105,4 @@ WASM 下把文本输入委托给浏览器隐藏 textarea（`web/index.html` 的
 ## 依赖关系
 
 - **内部依赖**: [图形渲染](../Graphics/index.md) (渲染), [角色系统](../Character/index.md) (数据展示)
-- **外部依赖**: Cosmic 服务端 (操作请求)
+- **外部依赖**: `link_repos/MapleStory-Server` 服务端 (操作请求)

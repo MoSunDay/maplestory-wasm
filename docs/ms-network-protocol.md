@@ -1,6 +1,6 @@
-# Cosmic MapleStory Server — Network Protocol Reference
+# Linked MapleStory Server — Network Protocol Reference
 
-**Version:** GMS v83 (OdinMS-derived, Cosmic fork)
+**Version:** GMS v83 (OdinMS-derived `link_repos/MapleStory-Server` fork)
 **Audience:** Development team implementing a compatible client or server component
 **Scope:** Complete wire-level specification for all client↔server communication
 
@@ -137,7 +137,7 @@ All strings are Pascal-style: `[int16 length][UTF-8 bytes]`. There is no null te
 
 ### 4.4 Java Fixed-Length UTF-8 String
 
-Cosmic right-pads selected fields to a fixed Java `String.length()` (UTF-16 code-unit) count, then UTF-8 encodes the entire value. A `fixedUtf16Str13` therefore consumes 13 UTF-16 code units but may occupy more than 13 wire bytes when it contains non-ASCII characters.
+The linked server right-pads selected fields to a fixed Java `String.length()` (UTF-16 code-unit) count, then UTF-8 encodes the entire value. A `fixedUtf16Str13` therefore consumes 13 UTF-16 code units but may occupy more than 13 wire bytes when it contains non-ASCII characters.
 
 ---
 
@@ -447,7 +447,7 @@ name       string  Character name (3–12 UTF-8 bytes)
 job        int     Job ID. Running server (custom-client mode): 0=Cygnus, 1=Explorer, 2=Aran
 face       int     Face ID (cosmetic)
 hair       int     Base hair style ID
-hairColor  int     Hair color offset; Cosmic combines hair + hairColor after parsing
+hairColor  int     Hair color offset; the linked server combines hair + hairColor after parsing
 skin       int     Skin tone ID
 top        int     Item ID for top equip
 bottom     int     Item ID for bottom equip
@@ -456,7 +456,7 @@ weapon     int     Item ID for weapon
 gender     byte    0 = Male, 1 = Female
 ```
 
-Cosmic responds with `ADD_NEW_CHAR_ENTRY` (0x0E) on success. Its current
+The linked server responds with `ADD_NEW_CHAR_ENTRY` (0x0E) on success. Its current
 creation handler has two failure surfaces that do not use a dedicated create
 result packet: an unavailable/invalid name or a full slot count can return no
 packet, while a database insertion failure is encoded as `DELETE_CHAR_RESPONSE`
@@ -4321,4 +4321,4 @@ Stored as 4 × int32 (128 bits):
 
 ---
 
-*End of Cosmic MapleStory Server Network Protocol Reference*
+*End of Linked MapleStory Server Network Protocol Reference*

@@ -5,7 +5,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-MapleStory WASM brings the classic MapleStory v83 client to modern web browsers using WebAssembly. The repository contains the WASM client build, the local web services used by the browser runtime, and Docker entrypoints for running the web stack. The client is designed to run with Cosmic server.
+MapleStory WASM brings the classic MapleStory v83 client to modern web browsers using WebAssembly. The repository contains the WASM client build, the local web services used by the browser runtime, and Docker entrypoints for running the web stack. The client is designed to run with the local linked checkout at `link_repos/MapleStory-Server`.
 
 ---
 
@@ -30,14 +30,14 @@ MapleStory WASM brings the classic MapleStory v83 client to modern web browsers 
                                                   │ TCP
                                                   ▼
                                           ┌───────────────────────────┐
-                                          │    Cosmic Server (TCP)    │
+                                          │ Linked MapleStory Server  │
                                           └───────────────────────────┘
 ```
 
 ### How It Works
 
 1. **WASM Client** - The original C++ MapleStory client is compiled to WebAssembly using Emscripten, and the Rust `web-server` serves the generated JS/WASM bundle to the browser.
-2. **WebSocket Proxy** - Browsers cannot make raw TCP connections, so the Rust `ws-proxy` bridges WebSocket connections to Cosmic server over TCP.
+2. **WebSocket Proxy** - Browsers cannot make raw TCP connections, so the Rust `ws-proxy` bridges WebSocket connections to `link_repos/MapleStory-Server` over TCP.
 3. **LazyFS** - A dynamic file system technology that streams game assets (`.nx` files) on-demand via WebSocket and caches them locally in your browser. Assets are only fetched from the network once, providing native loading times on subsequent loads.
 4. **Containerized Tooling** - Docker can be used both for serving the project and as a fallback way to build the WASM client.
 
@@ -124,7 +124,7 @@ cargo build --release -p web-server -p ws-proxy -p assets-server
 
 4. Open **http://localhost:8000**.
 
-The websocket proxy is intended to forward traffic to a running Cosmic server instance.
+The websocket proxy is intended to forward traffic to the linked server instance.
 
 ### Docker Deployment
 
@@ -162,6 +162,7 @@ Open **http://localhost:8000** after the containers are up.
 maplestory-wasm/
 ├── 📁 build/              # WASM build output
 ├── 📁 docker/             # Dockerfiles for services
+├── 📁 link_repos/         # Local linked server checkout (not tracked here)
 ├── 📁 scripts/            # Build & run scripts
 ├── 📁 src/
 │   ├── client/            # C++ MapleStory Client
@@ -190,8 +191,8 @@ The `web/config.json` file controls how the browser connects to backend services
 | `AssetsServerPort`     | Port of the LazyFS Assets Server (defaults to `8765`). |
 | `ProxyIP`              | IP/Hostname of the WebSocket Proxy for game traffic. |
 | `ProxyPort`            | Port of the WebSocket Proxy (defaults to `8080`). |
-| `MapleStoryServerIp`   | IP address of the target Cosmic Server (forwarded by proxy). |
-| `MapleStoryServerPort` | Port of the target Cosmic Server (defaults to `8484`). |
+| `MapleStoryServerIp`   | IP address of the target linked server (forwarded by proxy). |
+| `MapleStoryServerPort` | Port of the target linked server (defaults to `8484`). |
 
 ### Docker Environment
 

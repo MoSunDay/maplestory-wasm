@@ -1,3 +1,5 @@
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
+
 # WASM 客户端
 
 Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
@@ -39,7 +41,7 @@ Journey.cpp (入口)
 ## 依赖关系
 
 - **内部依赖**: `nlnx` (NX 文件读取), `stb` (图片/字体渲染), `lz4` (压缩), `GL/glew` (OpenGL), `FreeType` (字体)
-- **外部依赖**: Cosmic 服务端 (封包通信), LazyFS WS 服务端 (资源流), WebSocket 代理 (TCP 桥接)
+- **外部依赖**: `link_repos/MapleStory-Server` 服务端 (封包通信), LazyFS WS 服务端 (资源流), WebSocket 代理 (TCP 桥接)
 
 ## 编译
 
