@@ -131,9 +131,8 @@ namespace jrc
     {
         StatsEntry statsentry;
 
-        // Cosmic pads names by Java String.length() before UTF-8 encoding, so
-        // non-ASCII names occupy more than 13 wire bytes.
-        statsentry.name = recv.read_padded_utf8_string(13);
+        // The linked server encodes first, then pads this field to 13 bytes.
+        statsentry.name = recv.read_padded_string(13);
 
         statsentry.female = recv.read_bool();
         recv.read_byte(); // skin
@@ -145,8 +144,7 @@ namespace jrc
             statsentry.petids.push_back(recv.read_long());
         }
 
-        statsentry.stats[Maplestat::LEVEL] =
-            static_cast<uint8_t>(recv.read_byte());
+        statsentry.stats[Maplestat::LEVEL] = recv.read_short();
         const auto job = static_cast<uint16_t>(recv.read_short());
         statsentry.stats[Maplestat::JOB]   = job;
         statsentry.stats[Maplestat::STR]   = recv.read_short();

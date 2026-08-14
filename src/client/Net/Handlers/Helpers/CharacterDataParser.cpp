@@ -30,7 +30,7 @@ namespace jrc::CharacterDataParser
         for (int16_t i = 0; i < crush_count; ++i)
         {
             recv.read_int();
-            recv.read_padded_utf8_string(13);
+            recv.read_padded_string(13);
             recv.read_int();
             recv.read_int();
             recv.read_int();
@@ -41,7 +41,7 @@ namespace jrc::CharacterDataParser
         for (int16_t i = 0; i < friendship_count; ++i)
         {
             recv.read_int();
-            recv.read_padded_utf8_string(13);
+            recv.read_padded_string(13);
             recv.read_int();
             recv.read_int();
             recv.read_int();
@@ -58,8 +58,8 @@ namespace jrc::CharacterDataParser
             recv.read_short();
             recv.read_int();
             recv.read_int();
-            recv.read_padded_utf8_string(13);
-            recv.read_padded_utf8_string(13);
+            recv.read_padded_string(13);
+            recv.read_padded_string(13);
         }
     }
 
