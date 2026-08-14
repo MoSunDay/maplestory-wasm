@@ -1,10 +1,10 @@
-Commit: 10fb657e2799392e1a15e8a68d1a989a5dcb6967
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 
 # 现金商城
 
 ## 能力
 
-角色可从游戏状态栏或商城快捷键进入 Cosmic 现金商城。商城读取客户端 `Commodity.img`、`CashPackage.img` 和字符串资源形成商品目录，并以服务端下发的特殊商品状态、三类余额和商城仓库为准。
+角色可从游戏状态栏或商城快捷键进入 linked server 现金商城。商城读取客户端 `Commodity.img`、`CashPackage.img` 和字符串资源形成商品目录，并以服务端下发的特殊商品状态、三类余额和商城仓库为准。
 
 ## 规则与流程
 

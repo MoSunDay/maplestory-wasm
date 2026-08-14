@@ -1,10 +1,10 @@
-Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 
 # 角色自然恢复
 
 ## 能力
 
-角色进入游戏后由客户端按 MapleStory v83 规则定时上报 HP/MP 自然恢复。恢复不直接改写本地属性，最终数值以 Cosmic 服务端校验并回传的属性为准。
+角色进入游戏后由客户端按 MapleStory v83 规则定时上报 HP/MP 自然恢复。恢复不直接改写本地属性，最终数值以 linked server 校验并回传的属性为准。
 
 ## 规则
 
@@ -15,7 +15,7 @@ Commit: 2c824078f1fb122f71fd43ec8a223fce6ba6e7ad
 - 攀爬时仅有 `Endure` 才恢复 HP，周期使用 Skill.nx 当前等级的 `time` 秒。
 - 地图 `info/recovery` 倍率作用于单次恢复量；负值按 0 处理。
 - 物品椅子读取 Item.nx 的 `recoveryHP`/`recoveryMP`，与自然/技能恢复取较大值，不叠加。
-- HP 单次上报按 Cosmic 的 `floor(77 × 地图恢复倍率 × 1.5)` 校验上限动态约束，MP 单次最多上报 999；满值时不发送对应增量，死亡时清空计时。
+- HP 单次上报按 linked server 的 `floor(77 × 地图恢复倍率 × 1.5)` 校验上限动态约束，MP 单次最多上报 999；满值时不发送对应增量，死亡时清空计时。
 
 ## 椅子交互
 

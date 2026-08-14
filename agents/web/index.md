@@ -1,10 +1,10 @@
-Commit: 207b59c38ce4d3481f8c83b38480af94c6cf29cc
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 
 # Web 基础设施
 
 ## 职责
 
-提供浏览器运行 WASM 客户端所需的全部 Web 服务层。三个 Rust 二进制（Cargo workspace crate）通过 WebSocket/HTTP 桥接浏览器与 Cosmic 服务端和本地资源；`web/` 目录仅存放静态页面与配置。
+提供浏览器运行 WASM 客户端所需的全部 Web 服务层。三个 Rust 二进制（Cargo workspace crate）通过 WebSocket/HTTP 桥接浏览器与 linked MapleStory 服务端和本地资源；`web/` 目录仅存放静态页面与配置。
 
 ## 边界
 
@@ -16,7 +16,7 @@ Commit: 207b59c38ce4d3481f8c83b38480af94c6cf29cc
 ```
 浏览器
   ├── HTTP ──► web-server :8000         (WASM/JS/HTML 分发)
-  ├── WebSocket ──► ws-proxy :8080       (游戏封包 → TCP → Cosmic 服务端)
+  ├── WebSocket ──► ws-proxy :8080       (游戏封包 → TCP → linked 服务端)
   └── WebSocket ──► assets-server :8765  (按需 .nx 资源流)
 ```
 
@@ -64,28 +64,27 @@ LazyFS WebSocket 资源服务器，默认绑定 8765 端口（`--port`/`--bind`/
 | `AssetsServerProtocol` | 资源协议 (ws/wss) | ws (https 页面为 wss) |
 | `ProxyIP` | 代理地址 | 页面所在主机 |
 | `ProxyPort` | 代理端口 | 8080 |
-| `MapleStoryServerIp` | 目标 Cosmic 服务端 IP | 127.0.0.1 |
-| `MapleStoryServerPort` | 目标 Cosmic 服务端端口 | 8484 |
+| `MapleStoryServerIp` | 目标 linked 服务端 IP | 127.0.0.1 |
+| `MapleStoryServerPort` | 目标 linked 服务端端口 | 8484 |
 
 Docker 全量 NX 内存缓存开关：`ASSETS_CACHE_ALL_NX=true ./scripts/run_all.sh`。默认值为 `false`，不会占用全量 NX 对应的常驻内存。
 
 
-## Cosmic 服务端部署（上游依赖）
+## Linked 服务端部署（上游依赖）
 
-客户端仓库不含游戏服务端。Cosmic（GMS v83 模拟器，github.com/P0nk/Cosmic）作为外部上游以**宿主机原生 systemd** 方式部署（非 Docker）：
+游戏服务端源码固定使用仓库内的 `link_repos/MapleStory-Server`，以**宿主机原生 systemd** 方式部署（非 Docker）：
 
-- 源码+wz+scripts 位于 `/root/MapleStory-Server`（勿放 `/tmp`，避免被清理）
-- JDK21：Amazon Corretto 21 位于 `/data00/tiger/jdk/corretto-21.0.12`（系统仅 JDK11，pom 要求 Java 21）；Maven 3.9.11 位于 `/opt/maven`
-- 构建：`cd /root/MapleStory-Server && /opt/maven/bin/mvn -B clean package -Dmaven.test.skip -Dmaven.artifact.threads=8 -T 1C`，产物 `target/Cosmic.jar`
-- 运行：systemd 单元 `/etc/systemd/system/maplestory-cosmic.service`（`Environment=JAVA_HOME=/data00/tiger/jdk/corretto-21.0.12`、`-jar target/Cosmic.jar`、`Restart=always`）；登录端口 8484、世界 0 三频道 7575-7577
-- `config.yaml` 指向 `maplestory` 库（`DB_HOST=127.0.0.1`、`DB_USER=maplestory`），权限 600；`CHARSET: UTF-8`，`DB_URL_FORMAT` 追加 `?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci`
+- 源码、`wz` 和 `scripts` 位于 `link_repos/MapleStory-Server`
+- 使用宿主机 ByteOpenJDK 11；`bash posix-compile.sh` 把 Java 类编译到 `dist/`
+- 运行：systemd 单元 `maplestory-cosmic.service` 的历史名称保留，但 `WorkingDirectory` 必须是 linked server，入口为 `net.server.Server`；登录端口 8484、世界 0 单频道 7575
+- 数据库 URL、用户和密码通过 `MAPLE_DB_URL`、`MAPLE_DB_USER`、`MAPLE_DB_PASS` 覆盖，避免把凭据写入 Git；密码由服务单元运行时读取 `maplestory-mysql` 容器配置
 - 数据依赖 `maplestory-mysql` 容器（3306 映射到 127.0.0.1:3306，`maplestory` 库，全部表 utf8mb4）
-- 管理：`systemctl restart|status maplestory-cosmic`；日志 `journalctl -u maplestory-cosmic -f` 与 `/root/MapleStory-Server/logs/cosmic-log.log`
-- 恢复验证：`ss -tlnp | grep -E ':(8484|7575)'`、日志出现 `Cosmic is now online`、ws-proxy 日志出现 `Connected to target server`
+- 管理：`systemctl restart|status maplestory-cosmic`；日志使用 `journalctl -u maplestory-cosmic -f` 和 linked server 的 `logs/`
+- 恢复验证：`systemctl show maplestory-cosmic -p WorkingDirectory` 必须指向 `link_repos/MapleStory-Server`，端口 8484/7575 由同一 Java PID 监听，日志出现 `MapleStory is now online`
 - 协议级 E2E（无浏览器）：`node scripts/e2e_utf8_protocol.mjs`（v83 握手+AES-256 OFB 加密实现，中文用户名自动注册登录 + 中文角色名创建）
 
 ## 依赖关系
 
 - **运行依赖**: Rust 工具链（本地构建）或 Docker（`docker/rust-web.Dockerfile`）
-- **上游依赖**: Cosmic 服务端 (TCP)
+- **上游依赖**: `link_repos/MapleStory-Server` 服务端 (TCP)
 - **下游使用者**: 浏览器 WASM 客户端

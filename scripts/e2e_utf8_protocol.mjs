@@ -1,5 +1,5 @@
 // Protocol-level E2E: login (auto-register) with a Chinese username and create a
-// Chinese-named character on the Cosmic server. Supports raw TCP (8484) or the
+// Chinese-named character on the linked server. Supports raw TCP (8484) or the
 // ws-proxy (first WS message = "host:port").
 import crypto from 'crypto';
 import net from 'net';
