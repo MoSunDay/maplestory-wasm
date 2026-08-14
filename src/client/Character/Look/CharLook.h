@@ -27,6 +27,8 @@
 #include "../../Util/Randomizer.h"
 #include "../../Util/TimedBool.h"
 
+#include <vector>
+
 namespace jrc
 {
     class CharLook
@@ -39,7 +41,7 @@ namespace jrc
         void draw(const DrawArgument& args, float alpha) const;
         void draw(Point<int16_t> pos, bool flip,
             Stance::Id stance, Expression::Id expression) const;
-        void prepare_attack_assets() const;
+        std::vector<Stance::Id> prepare_attack_assets() const;
         bool update(uint16_t timestep);
 
         void set_hair(int32_t hairid);

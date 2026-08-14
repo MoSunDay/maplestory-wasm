@@ -180,9 +180,34 @@ namespace jrc
         return static_cast<uint16_t>(delay / fspeed);
     }
 
-    void Char::prepare_attack_assets() const
+    void Char::prepare_attack_assets()
     {
-        look.prepare_attack_assets();
+        regular_afterimages.clear();
+        prepared_afterimage_weapon_id = 0;
+
+        std::vector<Stance::Id> attack_stances = look.prepare_attack_assets();
+        int32_t weapon_id = look.get_equips().get_weapon();
+        if (weapon_id <= 0)
+        {
+            return;
+        }
+
+        const WeaponData& weapon = WeaponData::get(weapon_id);
+        int16_t weapon_level = weapon.get_equipdata().get_reqstat(Maplestat::LEVEL);
+        for (Stance::Id attack_stance : attack_stances)
+        {
+            regular_afterimages.emplace(
+                static_cast<int32_t>(attack_stance),
+                Afterimage(
+                    0,
+                    weapon.get_afterimage(),
+                    Stance::names[attack_stance],
+                    weapon_level,
+                    Afterimage::Preparation::MAP_REQUIRED
+                )
+            );
+        }
+        prepared_afterimage_weapon_id = weapon_id;
     }
 
     int16_t Char::get_visual_buff_value(Buffstat::Id) const
@@ -340,6 +365,18 @@ namespace jrc
         const WeaponData& weapon = WeaponData::get(weapon_id);
 
         std::string stance_name = Stance::names[look.get_stance()];
+        if (skill_id == 0 && weapon_id == prepared_afterimage_weapon_id)
+        {
+            auto prepared = regular_afterimages.find(
+                static_cast<int32_t>(look.get_stance())
+            );
+            if (prepared != regular_afterimages.end())
+            {
+                afterimage = prepared->second;
+                return;
+            }
+        }
+
         int16_t weapon_level = weapon.get_equipdata().get_reqstat(Maplestat::LEVEL);
         const std::string& ai_name = weapon.get_afterimage();
         afterimage = { skill_id, ai_name, stance_name, weapon_level };
