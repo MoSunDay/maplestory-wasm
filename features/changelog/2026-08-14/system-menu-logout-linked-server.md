@@ -8,8 +8,8 @@ System 的退出入口只停止客户端主循环，没有主动关闭会话；�
 
 ## Change Summary
 
-- System 的游戏退出项改为明确的登出确认，确认后主动关闭 WebSocket/TCP、清空客户端接收状态，再结束客户端循环。
-- 服务端收到连接关闭后沿既有 `sessionClosed → MapleClient.disconnect` 路径保存角色并释放在线状态，无需新增私有 opcode。
+- System 的游戏退出项改为明确的登出确认，确认后发送标准 v83 `PLAYER_DC(0x0C)`，再主动关闭 WebSocket/TCP、清空客户端接收状态并结束客户端循环。
+- linked server 接通原本只声明未注册的 `PLAYER_DC`，收到请求后主动关闭会话，并沿既有 `sessionClosed → MapleClient.disconnect` 路径保存角色、释放在线状态。
 - 线上 Java 服务的工作目录和入口切换到 `link_repos/MapleStory-Server`；数据库凭据通过运行时环境覆盖，不写入 Git。
 
 ## Impact Surface
@@ -20,7 +20,7 @@ System 的退出入口只停止客户端主循环，没有主动关闭会话；�
 
 ## Notes / Compatibility
 
-- 未新增或修改数据库表，也未删除数据库数据。
+- 未新增私有协议；复用标准 v83 opcode。未新增或修改数据库表，也未删除数据库数据。
 - 保留 systemd 单元的历史名称，但运行路径、JDK、classpath 和单频道端口均以 linked server 为准。
 
 ## Related Docs
