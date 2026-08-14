@@ -5,6 +5,7 @@
 - 位图加载分类（后台、阻塞可见、短时特效）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/bitmap-load-class.cpp -o /tmp/bitmap-load-class && /tmp/bitmap-load-class`
 - 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`
 - 自然恢复规则：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/natural-recovery.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/natural-recovery && /tmp/natural-recovery`
+- 浏览器恢复帧时间限制：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/runtime/frame-timing.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/frame-timing && /tmp/frame-timing`
 - 死亡幽灵轨迹：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-orbit.cpp -o /tmp/death-tomb-orbit && /tmp/death-tomb-orbit`
 - 死亡墓碑落地点：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-ground.cpp -o /tmp/death-tomb-ground && /tmp/death-tomb-ground`
 - 攻击输入与特效选择：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/attack-effect-selection.cpp -o /tmp/attack-effect-selection && /tmp/attack-effect-selection`
