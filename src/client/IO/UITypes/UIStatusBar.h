@@ -69,6 +69,8 @@ namespace jrc
         const std::string& get_pending_party_inviter() const;
         const std::vector<UIChatbar::PartyMember>& get_party_members() const;
         void toggle_menu_popup();
+        void open_system_popup();
+        bool activate_popup_selection();
         void close_popup();
         void request_cash_shop();
 
