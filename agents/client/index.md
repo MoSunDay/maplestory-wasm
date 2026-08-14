@@ -1,8 +1,6 @@
-Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
+Commit: a5b3b864bffe31f118e579ac357b5efb3957e627
 
 # WASM 客户端
-
-Commit: 8f4a6f68e1353ab5ce356f4e2bb865732ce65b42
 
 ## 职责
 
@@ -37,6 +35,7 @@ Journey.cpp (入口)
 - **UI 状态机**: `UI` 通过 `UIState` 多态在 `LOGIN` 和 `GAME` 两态之间切换，每态包含各自的 `UIElement` 集合
 - **封包路由**: `PacketSwitch` 维护 500 个槽位的 `PacketHandler` 数组，按 opcode 索引分发封包
 - **LazyFS 拦截层**: 在 Emscripten 文件系统层拦截 `fopen`/`fseek`/`fread` 调用，通过 WebSocket 分块请求按需读取 .nx 文件
+- **固定步长运行时**: `Journey.cpp` 以 8ms 固定步长推进游戏；`Runtime/FrameTiming.h` 将单帧补跑时间限制为 250ms，浏览器或进程长时间暂停后丢弃超额时间，避免集中重放网络与游戏事件
 
 ## 依赖关系
 
