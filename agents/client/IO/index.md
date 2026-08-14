@@ -1,4 +1,4 @@
-Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
+Commit: 722f9f98f45bc2c7317c3758b304bb3922a3297d
 
 # UI 系统
 
@@ -66,7 +66,7 @@ UI 状态接口。三个具体实现:
 ### 游戏内 UI (`UITypes/`)
 | 文件 | 职责 |
 |------|------|
-| `UIStatusBar` | 底部状态栏；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用，支持互斥切换、Escape 和外部点击关闭；System 登出经确认后主动关闭会话并退出客户端 |
+| `UIStatusBar` | 底部状态栏；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用；游戏内无其他窗口时 Escape 打开 System 并默认选中退出，Enter 发送标准登出、重连登录服并回到账号登录页 |
 | `UIStatsInfo` | 角色属性窗口；加点按钮直接采用 NX 内置 origin 定位，使可见加号与鼠标命中区域落在对应属性行 |
 | `UISkillBook` | 技能书窗口；使用与四行技能布局匹配的 175×289 紧凑 NX 面板，窗口边界与可见背景一致 |
 | `UIEquipInventory` | 装备栏窗口 |
