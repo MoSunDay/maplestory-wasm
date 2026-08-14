@@ -19,6 +19,7 @@ const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
+const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 12);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
@@ -463,6 +464,15 @@ try {
     })}`);
     await driver.screenshot('08-in-game');
 
+    if (logoutToLogin) {
+      await driver.key('Escape', 'Escape', 27);
+      await sleep(500);
+      await driver.screenshot('08e-system-logout-selected');
+      await driver.key('Enter', 'Enter', 13);
+      await requireUiState('logout returns to login UI', uiState.login, 30);
+      throw new Error('__LOGOUT_COMPLETE__');
+    }
+
     if (captureAttackEffects) {
       await driver.click(400, 300);
       await sleep(1000);
@@ -565,6 +575,9 @@ try {
     assertRuntimeHealthy();
     passed = true;
   } else if (stopAtGame && error.message === '__GAME_COMPLETE__') {
+    assertRuntimeHealthy();
+    passed = true;
+  } else if (logoutToLogin && error.message === '__LOGOUT_COMPLETE__') {
     assertRuntimeHealthy();
     passed = true;
   } else {
