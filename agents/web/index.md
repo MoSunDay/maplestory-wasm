@@ -1,4 +1,4 @@
-Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
+Commit: 9e754ab7d1a558ddfa11b800297a5f82071425f1
 
 # Web 基础设施
 
@@ -23,6 +23,8 @@ Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 三个 crate 共享根 `Cargo.toml` workspace 和 `web-common/listener.rs` 双栈监听实现；Docker 侧由 `docker/rust-web.Dockerfile` 多阶段构建同一镜像，`docker-compose.yml` 以不同 command 启动三个服务。
 
 三个服务默认绑定 IPv6 通配地址 `::`，并显式关闭 `IPV6_V6ONLY`，因此同一端口同时接受 IPv4 与 IPv6；显式传入其他 `--bind` 地址时维持单地址族监听。
+
+对外制品下载另由 `nx-nginx-dl` 提供 `:48562`：站点根目录固定为 `/data00/maplestory-wasm-deploy/current/build`，只列出当前 release 的 `JourneyClient.js` 和 `JourneyClient.wasm`，不暴露源码仓库。容器以只读方式挂载部署根目录，使 `current` 原子切换后自动跟随新制品。
 
 ## 关键服务
 
@@ -78,7 +80,7 @@ Docker 全量 NX 内存缓存开关：`ASSETS_CACHE_ALL_NX=true ./scripts/run_al
 - 使用宿主机 ByteOpenJDK 11；`bash posix-compile.sh` 把 Java 类编译到 `dist/`
 - 运行：systemd 单元 `maplestory-cosmic.service` 的历史名称保留，但 `WorkingDirectory` 必须是 linked server，入口为 `net.server.Server`；登录端口 8484、世界 0 单频道 7575
 - 数据库 URL、用户和密码通过 `MAPLE_DB_URL`、`MAPLE_DB_USER`、`MAPLE_DB_PASS` 覆盖，避免把凭据写入 Git；密码由服务单元运行时读取 `maplestory-mysql` 容器配置
-- 数据依赖 `maplestory-mysql` 容器（3306 映射到 127.0.0.1:3306，`maplestory` 库，全部表 utf8mb4）
+- 数据依赖 `maplestory-mysql` 容器（容器端口仍映射到 `127.0.0.1:3306`，`maplestory` 库，全部表 utf8mb4）；`maplestory-mysql-public.socket` 与 `maplestory-mysql-public.service` 仅在宿主机指定公网 IPv6 的 `3306` 上监听，并由 `systemd-socket-proxyd` 转发到回环 MySQL
 - 管理：`systemctl restart|status maplestory-cosmic`；日志使用 `journalctl -u maplestory-cosmic -f` 和 linked server 的 `logs/`
 - 恢复验证：`systemctl show maplestory-cosmic -p WorkingDirectory` 必须指向 `link_repos/MapleStory-Server`，端口 8484/7575 由同一 Java PID 监听，日志出现 `MapleStory is now online`
 - 协议级 E2E（无浏览器）：`node scripts/e2e_utf8_protocol.mjs`（v83 握手+AES-256 OFB 加密实现，中文用户名自动注册登录 + 中文角色名创建）
