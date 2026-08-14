@@ -32,7 +32,10 @@ namespace jrc
         ~Texture();
 
         void draw(const DrawArgument& args) const;
+        void draw_effect(const DrawArgument& args) const;
         void prepare_visible() const;
+        void prepare_map_required() const;
+        void prepare_effect() const;
         void shift(Point<int16_t> amount);
 
         bool is_valid() const;
@@ -43,6 +46,14 @@ namespace jrc
         Point<int16_t> get_dimensions() const;
 
     private:
+        enum class DrawLoadClass
+        {
+            BLOCKING_VISIBLE,
+            TRANSIENT_EFFECT
+        };
+
+        void draw_with_load_class(const DrawArgument& args, DrawLoadClass load_class) const;
+
         nl::bitmap bitmap;
         Point<int16_t> origin;
         Point<int16_t> dimensions;

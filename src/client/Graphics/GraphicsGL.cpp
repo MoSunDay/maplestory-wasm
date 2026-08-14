@@ -379,7 +379,7 @@ namespace jrc
         getoffset(bmp);
     }
 
-    void GraphicsGL::queuebitmap(const nl::bitmap& bmp, BitmapPriority priority)
+    void GraphicsGL::queuebitmap(const nl::bitmap& bmp, BitmapLoadClass load_class)
     {
         const size_t id = bmp.id();
         if (id == 0)
@@ -387,17 +387,36 @@ namespace jrc
             return;
         }
 
-        addtobitmapbatch(bmp, priority);
+        addtobitmapbatch(bmp, load_class);
         if (hasbitmap(bmp))
         {
             return;
         }
 
 #ifdef MS_PLATFORM_WASM
+        if (bitmap_loading::blocks_gameplay(load_class) && !bmp.data_ready())
+        {
+            pending_blocking_bitmap_ids.insert(id);
+        }
+
+        switch (load_class)
+        {
+        case BitmapLoadClass::BACKGROUND:
+        case BitmapLoadClass::MAP_REQUIRED:
+            bmp.prefetch();
+            break;
+        case BitmapLoadClass::BLOCKING_VISIBLE:
+            bmp.request();
+            break;
+        case BitmapLoadClass::TRANSIENT_EFFECT:
+            bmp.prioritize();
+            break;
+        }
+
         auto pending = pending_bitmap_ids.find(id);
         if (pending != pending_bitmap_ids.end())
         {
-            if (priority == BitmapPriority::VISIBLE_EFFECT)
+            if (bitmap_loading::is_priority(load_class))
             {
                 auto queued = std::find_if(
                     pending_bitmaps.begin(),
@@ -415,8 +434,7 @@ namespace jrc
             return;
         }
 
-        bmp.prefetch();
-        if (priority == BitmapPriority::VISIBLE_EFFECT)
+        if (bitmap_loading::is_priority(load_class))
         {
             pending_priority_bitmaps.push_back(bmp);
         }
@@ -426,7 +444,7 @@ namespace jrc
         }
         pending_bitmap_ids.insert(id);
 #else
-        (void)priority;
+        (void)load_class;
         addbitmap(bmp);
 #endif
     }

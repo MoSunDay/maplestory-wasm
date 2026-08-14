@@ -33,7 +33,10 @@ namespace jrc
         Frame();
 
         void draw(const DrawArgument& args) const;
+        void draw_effect(const DrawArgument& args) const;
         void prepare_visible() const;
+        void prepare_map_required() const;
+        void prepare_effect() const;
 
         bool is_valid() const;
         bool is_ready() const;
@@ -70,7 +73,10 @@ namespace jrc
         void reset();
 
         void draw(const DrawArgument& arguments, float inter) const;
+        void draw_effect(const DrawArgument& arguments, float inter) const;
         void prepare_visible() const;
+        void prepare_map_required() const;
+        void prepare_effect() const;
         void prepare_visible(const DrawArgument& arguments, float inter) const;
 
         bool is_valid() const;

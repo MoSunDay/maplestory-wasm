@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "CharLook.h"
 
+#include "Afterimage.h"
+#include "Attack/RegularStances.h"
+
 #include "../../Constants.h"
 #include "../../Data/WeaponData.h"
 
@@ -241,6 +244,30 @@ namespace jrc
 
         interstance = equips.adjust_stance(interstance);
         draw({ position, flipped }, interstance, interexpression, 0, 0);
+    }
+
+    void CharLook::prepare_attack_assets() const
+    {
+        if (!body || !hair || !equips.has_weapon())
+        {
+            return;
+        }
+
+        const WeaponData& weapon = WeaponData::get(equips.get_weapon());
+        int16_t weapon_level = weapon.get_equipdata().get_reqstat(Maplestat::LEVEL);
+        for (Stance::Id attack_stance : regular_attack::all_choices(weapon.get_attack()))
+        {
+            body->prepare(attack_stance);
+            hair->prepare(attack_stance);
+            equips.prepare(attack_stance);
+            Afterimage(
+                0,
+                weapon.get_afterimage(),
+                Stance::names[attack_stance],
+                weapon_level,
+                Afterimage::Preparation::MAP_REQUIRED
+            );
+        }
     }
 
     bool CharLook::update(uint16_t timestep)
@@ -476,54 +503,7 @@ namespace jrc
             return Stance::PRONESTAB;
         }
 
-        enum Attack
-        {
-            NONE = 0,
-            S1A1M1D = 1,
-            SPEAR = 2,
-            BOW = 3,
-            CROSSBOW = 4,
-            S2A2M2 = 5,
-            WAND = 6,
-            CLAW = 7,
-            GUN = 9,
-            NUM_ATTACKS
-        };
-
-        static const std::array<std::vector<Stance::Id>, NUM_ATTACKS> degen_stances =
-        { {
-            { Stance::NONE },
-            { Stance::NONE },
-            { Stance::NONE },
-            { Stance::SWINGT1, Stance::SWINGT3 },
-            { Stance::SWINGT1, Stance::STABT1 },
-            { Stance::NONE },
-            { Stance::NONE },
-            { Stance::SWINGT1, Stance::STABT1 },
-            { Stance::NONE },
-            { Stance::SWINGP1, Stance::STABT2 }
-        } };
-
-        static const std::array<std::vector<Stance::Id>, NUM_ATTACKS> attack_stances =
-        { {
-            { Stance::NONE },
-            { Stance::STABO1,  Stance::STABO2, Stance::SWINGO1, Stance::SWINGO2, Stance::SWINGO3 },
-            { Stance::STABT1,  Stance::SWINGP1 },
-            { Stance::SHOOT1 },
-            { Stance::SHOOT2 },
-            { Stance::STABO1,  Stance::STABO2, Stance::SWINGT1, Stance::SWINGT2, Stance::SWINGT3 },
-            { Stance::SWINGO1, Stance::SWINGO2 },
-            { Stance::SWINGO1, Stance::SWINGO2 },
-            { Stance::NONE },
-            { Stance::SHOT }
-        } };
-
-        if (attack <= NONE || attack >= NUM_ATTACKS)
-        {
-            return Stance::STAND1;
-        }
-
-        const auto& stances = degenerate ? degen_stances[attack] : attack_stances[attack];
+        const auto& stances = regular_attack::choices(attack, degenerate);
         if (stances.empty())
         {
             return Stance::STAND1;

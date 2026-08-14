@@ -225,6 +225,17 @@ namespace jrc
         }
     }
 
+    void Clothing::prepare(Stance::Id stance) const
+    {
+        for (size_t layer = 0; layer < Layer::NUM_LAYERS; ++layer)
+        {
+            for (const auto& entry : stances[stance][static_cast<Layer>(layer)])
+            {
+                entry.second.prepare_map_required();
+            }
+        }
+    }
+
     bool Clothing::contains_layer(Stance::Id stance, Layer layer) const
     {
         return !stances[stance][layer].empty();

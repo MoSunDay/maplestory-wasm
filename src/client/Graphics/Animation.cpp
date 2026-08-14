@@ -90,9 +90,24 @@ namespace jrc
         texture.draw(args);
     }
 
+    void Frame::draw_effect(const DrawArgument& args) const
+    {
+        texture.draw_effect(args);
+    }
+
     void Frame::prepare_visible() const
     {
         texture.prepare_visible();
+    }
+
+    void Frame::prepare_effect() const
+    {
+        texture.prepare_effect();
+    }
+
+    void Frame::prepare_map_required() const
+    {
+        texture.prepare_map_required();
     }
 
     bool Frame::is_valid() const
@@ -230,11 +245,47 @@ namespace jrc
         }
     }
 
+    void Animation::draw_effect(const DrawArgument& args, float alpha) const
+    {
+        int16_t interframe = frame.get(alpha);
+        float interopc = opacity.get(alpha) / 255;
+        float interscale = xyscale.get(alpha) / 100;
+
+        bool modifyopc = interopc != 1.0f;
+        bool modifyscale = interscale != 1.0f;
+        if (modifyopc || modifyscale)
+        {
+            frames[interframe].draw_effect(
+                args + DrawArgument(interscale, interscale, interopc)
+            );
+        }
+        else
+        {
+            frames[interframe].draw_effect(args);
+        }
+    }
+
     void Animation::prepare_visible() const
     {
         for (const Frame& framedata : frames)
         {
             framedata.prepare_visible();
+        }
+    }
+
+    void Animation::prepare_effect() const
+    {
+        for (const Frame& framedata : frames)
+        {
+            framedata.prepare_effect();
+        }
+    }
+
+    void Animation::prepare_map_required() const
+    {
+        for (const Frame& framedata : frames)
+        {
+            framedata.prepare_map_required();
         }
     }
 
