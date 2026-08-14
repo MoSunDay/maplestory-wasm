@@ -127,18 +127,41 @@ namespace jrc
     void StatusBarPopup::toggle(Panel panel)
     {
         active_panel = active_panel == panel ? Panel::NONE : panel;
+        selection = Action::NONE;
         remove_cursor();
+    }
+
+    void StatusBarPopup::open(Panel panel, Action selected_action)
+    {
+        active_panel = panel;
+        selection = selected_action;
+        remove_cursor();
+
+        for (Entry& entry : active_data().entries)
+        {
+            if (entry.action == selection && entry.button->is_active())
+            {
+                entry.button->set_state(Button::MOUSEOVER);
+                break;
+            }
+        }
     }
 
     void StatusBarPopup::close()
     {
         active_panel = Panel::NONE;
+        selection = Action::NONE;
         remove_cursor();
     }
 
     bool StatusBarPopup::is_open() const
     {
         return active_panel != Panel::NONE;
+    }
+
+    StatusBarPopup::Action StatusBarPopup::selected_action() const
+    {
+        return is_open() ? selection : Action::NONE;
     }
 
     bool StatusBarPopup::contains(Point<int16_t> cursor_position) const
@@ -180,6 +203,7 @@ namespace jrc
                     Sound(Sound::BUTTONOVER).play();
                     button.set_state(Button::MOUSEOVER);
                 }
+                selection = entry.action;
                 return { Cursor::CANCLICK, Action::NONE };
             }
 
