@@ -17,6 +17,7 @@
 #include "../Template/Rectangle.h"
 #include "../Util/TimedBool.h"
 
+#include <unordered_map>
 
 namespace jrc
 {
@@ -70,7 +71,7 @@ namespace jrc
         float get_real_attackspeed() const;
         /// Return the delay until applying an attack.
         uint16_t get_attackdelay(size_t no) const;
-        void prepare_attack_assets() const;
+        void prepare_attack_assets();
 
         /// Set if the character sprite is mirrored (true = facing left)
         virtual void set_direction(bool flipped);
@@ -171,6 +172,8 @@ namespace jrc
         ChatBalloon chatballoon;
         EffectLayer effects;
         Afterimage afterimage;
+        std::unordered_map<int32_t, Afterimage> regular_afterimages;
+        int32_t prepared_afterimage_weapon_id = 0;
         TimedBool invincible;
         TimedBool ironbody;
         DeathTomb death_tomb;
