@@ -183,11 +183,14 @@ async function testPersistentPreloadStates() {
 	assert.equal(complete.itemAssetPreloadState, 'complete');
 	assert.equal(complete.itemAssetPreloadResult.persistent, true);
 
-	const degraded = configurePreload(createHarness(), false);
-	degraded.prefetchFileRange = async () => {};
-	await degraded.startItemAssetPreload();
-	assert.equal(degraded.itemAssetPreloadState, 'degraded');
-	assert.equal(degraded.itemAssetPreloadResult.persistent, false);
+	const unavailable = configurePreload(createHarness(), false);
+	let unavailablePrefetches = 0;
+	unavailable.prefetchFileRange = async () => { unavailablePrefetches += 1; };
+	await unavailable.startItemAssetPreload();
+	assert.equal(unavailable.itemAssetPreloadState, 'unavailable');
+	assert.equal(unavailable.itemAssetPreloadResult.persistent, false);
+	assert.equal(unavailable.itemAssetPreloadResult.reason, 'persistent-storage-unavailable');
+	assert.equal(unavailablePrefetches, 0);
 
 	const failed = configurePreload(createHarness(), true);
 	let injected = false;
