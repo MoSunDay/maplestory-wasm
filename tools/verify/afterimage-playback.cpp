@@ -29,8 +29,17 @@ int main()
     assert(phase == PlaybackPhase::WAITING_FOR_ASSETS);
     assert(jrc::afterimage::should_draw(phase, true, false));
 
+    PlaybackPhase phase_before_assets = phase;
     phase = jrc::afterimage::begin_when_ready(phase, true);
     assert(phase == PlaybackPhase::PLAYING);
+    // A resident one-frame slash must survive the update that starts it so
+    // the draw pass can present it at least once.
+    assert(!jrc::afterimage::should_advance(
+        phase_before_assets,
+        phase,
+        true
+    ));
+    assert(jrc::afterimage::should_advance(phase, phase, true));
     phase = jrc::afterimage::finish(phase, false);
     assert(phase == PlaybackPhase::PLAYING);
     assert(jrc::afterimage::should_draw(phase, true, false));

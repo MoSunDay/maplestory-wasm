@@ -50,6 +50,7 @@ namespace jrc
 
         // Draw the equip.
         void draw(Stance::Id stance, Layer layer, uint8_t frame, const DrawArgument& args) const;
+        void prepare(Stance::Id stance) const;
         // Check if a part of the equip lies on the specified layer while in the specified stance.
         bool contains_layer(Stance::Id stance, Layer layer) const;
 

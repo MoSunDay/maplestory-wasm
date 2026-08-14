@@ -37,6 +37,17 @@ namespace jrc::afterimage
         return phase;
     }
 
+    inline bool should_advance(
+        PlaybackPhase phase_before_assets,
+        PlaybackPhase phase_after_assets,
+        bool ready
+    )
+    {
+        return ready &&
+            phase_before_assets == PlaybackPhase::PLAYING &&
+            phase_after_assets == PlaybackPhase::PLAYING;
+    }
+
     inline bool should_draw(PlaybackPhase phase, bool ready, bool reached_now)
     {
         return ready && (

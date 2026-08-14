@@ -54,6 +54,17 @@ namespace nl
 		}
 #endif
 	}
+	void bitmap::prioritize() const
+	{
+#ifdef MS_PLATFORM_WASM
+		if (m_file)
+		{
+			auto* fd = static_cast<_file_data*>(m_file);
+			auto* loader = static_cast<LazyFS::LazyFileLoader*>(const_cast<void*>(fd->base));
+			loader->prioritize_contiguous_data(m_offset + 4, length());
+		}
+#endif
+	}
 	void bitmap::request() const
 	{
 #ifdef MS_PLATFORM_WASM
