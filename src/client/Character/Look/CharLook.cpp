@@ -17,7 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "CharLook.h"
 
-#include "Afterimage.h"
 #include "Attack/RegularStances.h"
 
 #include "../../Constants.h"
@@ -246,28 +245,23 @@ namespace jrc
         draw({ position, flipped }, interstance, interexpression, 0, 0);
     }
 
-    void CharLook::prepare_attack_assets() const
+    std::vector<Stance::Id> CharLook::prepare_attack_assets() const
     {
         if (!body || !hair || !equips.has_weapon())
         {
-            return;
+            return {};
         }
 
         const WeaponData& weapon = WeaponData::get(equips.get_weapon());
-        int16_t weapon_level = weapon.get_equipdata().get_reqstat(Maplestat::LEVEL);
-        for (Stance::Id attack_stance : regular_attack::all_choices(weapon.get_attack()))
+        std::vector<Stance::Id> attack_stances =
+            regular_attack::all_choices(weapon.get_attack());
+        for (Stance::Id attack_stance : attack_stances)
         {
             body->prepare(attack_stance);
             hair->prepare(attack_stance);
             equips.prepare(attack_stance);
-            Afterimage(
-                0,
-                weapon.get_afterimage(),
-                Stance::names[attack_stance],
-                weapon_level,
-                Afterimage::Preparation::MAP_REQUIRED
-            );
         }
+        return attack_stances;
     }
 
     bool CharLook::update(uint16_t timestep)
