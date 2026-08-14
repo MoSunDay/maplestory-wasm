@@ -180,6 +180,11 @@ namespace jrc
         return static_cast<uint16_t>(delay / fspeed);
     }
 
+    void Char::prepare_attack_assets() const
+    {
+        look.prepare_attack_assets();
+    }
+
     int16_t Char::get_visual_buff_value(Buffstat::Id) const
     {
         return 0;

@@ -28,8 +28,15 @@ namespace jrc
     class Afterimage
     {
     public:
+        enum class Preparation
+        {
+            TRANSIENT_EFFECT,
+            MAP_REQUIRED
+        };
+
         Afterimage(int32_t skill_id, const std::string& name,
-            const std::string& stance, int16_t level);
+            const std::string& stance, int16_t level,
+            Preparation preparation = Preparation::TRANSIENT_EFFECT);
         Afterimage();
 
         void draw(uint8_t stframe, const DrawArgument& args, float alpha) const;

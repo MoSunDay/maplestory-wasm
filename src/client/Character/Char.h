@@ -70,6 +70,7 @@ namespace jrc
         float get_real_attackspeed() const;
         /// Return the delay until applying an attack.
         uint16_t get_attackdelay(size_t no) const;
+        void prepare_attack_assets() const;
 
         /// Set if the character sprite is mirrored (true = facing left)
         virtual void set_direction(bool flipped);

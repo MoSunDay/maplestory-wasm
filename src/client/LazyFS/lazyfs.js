@@ -462,6 +462,18 @@ var LazyFS = {
 		});
 	},
 
+	requestPriorityFileRange: function (filepath, offset, length) {
+		if (this.isFileRangeResident(filepath, offset, length)) {
+			return Promise.resolve();
+		}
+		const request = this.prefetchFileRange(filepath, offset, length);
+		this.promotePrefetch(filepath, offset, length);
+		return request.catch(error => {
+			console.error('[LazyFS] Priority asset request failed:', error);
+			return this.requestForegroundFileRange(filepath, offset, length);
+		});
+	},
+
 	prefetchFileRangeInternal: async function (filepath, offset, length) {
 		if (this.terminalConnectionFailure) {
 			throw new Error('LazyFS connection is no longer recoverable');

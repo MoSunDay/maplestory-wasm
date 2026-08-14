@@ -14,9 +14,20 @@ export class BrowserDriver {
     this.pending = new Map();
     this.logs = [];
     this.errors = [];
+    this.screencast = null;
   }
 
   async start() {
+    try {
+      const response = await fetch(`http://127.0.0.1:${this.debugPort}/json/version`, {
+        signal: AbortSignal.timeout(500)
+      });
+      if (response.ok) {
+        throw new Error(`Chromium debug port is already in use: ${this.debugPort}`);
+      }
+    } catch (error) {
+      if (error.message?.includes('already in use')) throw error;
+    }
     const extraArgs = (process.env.E2E_CHROME_ARGS || '')
       .split(/\s+/)
       .filter(Boolean);
@@ -64,6 +75,20 @@ export class BrowserDriver {
       const callback = this.pending.get(message.id);
       this.pending.delete(message.id);
       message.error ? callback.reject(new Error(JSON.stringify(message.error))) : callback.resolve(message.result);
+      return;
+    }
+    if (message.method === 'Page.screencastFrame') {
+      const capture = this.screencast;
+      if (capture) {
+        capture.frameCount += 1;
+        const number = String(capture.frameCount).padStart(4, '0');
+        const extension = capture.format === 'jpeg' ? 'jpg' : capture.format;
+        fs.writeFileSync(
+          path.join(this.artifactDir, `${capture.prefix}-frame-${number}.${extension}`),
+          Buffer.from(message.params.data, 'base64')
+        );
+      }
+      this.send('Page.screencastFrameAck', { sessionId: message.params.sessionId }).catch(() => {});
       return;
     }
     if (message.method === 'Runtime.consoleAPICalled') {
@@ -198,6 +223,22 @@ export class BrowserDriver {
   async screenshot(name) {
     const result = await this.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(path.join(this.artifactDir, `${name}.png`), Buffer.from(result.data, 'base64'));
+  }
+
+  async startScreencast(prefix) {
+    if (this.screencast) throw new Error('A screencast is already active');
+    this.screencast = { prefix, format: 'png', frameCount: 0 };
+    await this.send('Page.startScreencast', {
+      format: 'png', maxWidth: 820, maxHeight: 640, everyNthFrame: 1
+    });
+  }
+
+  async stopScreencast() {
+    if (!this.screencast) return { frameCount: 0 };
+    await this.send('Page.stopScreencast');
+    const capture = this.screencast;
+    this.screencast = null;
+    return { frameCount: capture.frameCount };
   }
 
   async stop() {

@@ -35,6 +35,7 @@ namespace jrc
         Hair(int32_t hairid, const BodyDrawinfo& drawinfo);
 
         void draw(Stance::Id stance, Layer layer, uint8_t frame, const DrawArgument& args) const;
+        void prepare(Stance::Id stance) const;
 
         const std::string& get_name() const;
         const std::string& getcolor() const;
@@ -47,4 +48,3 @@ namespace jrc
         static const std::unordered_map<std::string, Layer> layers_by_name;
     };
 }
-

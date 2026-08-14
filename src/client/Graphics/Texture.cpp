@@ -57,6 +57,19 @@ namespace jrc
 
     void Texture::draw(const DrawArgument& args) const
     {
+        draw_with_load_class(args, DrawLoadClass::BLOCKING_VISIBLE);
+    }
+
+    void Texture::draw_effect(const DrawArgument& args) const
+    {
+        draw_with_load_class(args, DrawLoadClass::TRANSIENT_EFFECT);
+    }
+
+    void Texture::draw_with_load_class(
+        const DrawArgument& args,
+        DrawLoadClass load_class
+    ) const
+    {
         size_t id = bitmap.id();
         if (id == 0)
             return;
@@ -74,9 +87,10 @@ namespace jrc
             // also recovers after an atlas clear without blocking the frame.
             GraphicsGL::get().queuebitmap(
                 bitmap,
-                GraphicsGL::BitmapPriority::VISIBLE_EFFECT
+                load_class == DrawLoadClass::BLOCKING_VISIBLE
+                    ? GraphicsGL::BitmapLoadClass::BLOCKING_VISIBLE
+                    : GraphicsGL::BitmapLoadClass::TRANSIENT_EFFECT
             );
-            bitmap.request();
             return;
 #else
             GraphicsGL::get().addbitmap(bitmap);
@@ -96,9 +110,34 @@ namespace jrc
 
         GraphicsGL::get().queuebitmap(
             bitmap,
-            GraphicsGL::BitmapPriority::VISIBLE_EFFECT
+            GraphicsGL::BitmapLoadClass::BLOCKING_VISIBLE
         );
-        bitmap.request();
+    }
+
+    void Texture::prepare_effect() const
+    {
+        if (!is_valid())
+        {
+            return;
+        }
+
+        GraphicsGL::get().queuebitmap(
+            bitmap,
+            GraphicsGL::BitmapLoadClass::TRANSIENT_EFFECT
+        );
+    }
+
+    void Texture::prepare_map_required() const
+    {
+        if (!is_valid())
+        {
+            return;
+        }
+
+        GraphicsGL::get().queuebitmap(
+            bitmap,
+            GraphicsGL::BitmapLoadClass::MAP_REQUIRED
+        );
     }
 
     void Texture::shift(Point<int16_t> amount)
