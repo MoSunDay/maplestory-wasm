@@ -1,4 +1,4 @@
-Commit: cc039ba9798debb450c69b1dd6990f2d353f1178
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 
 # 角色系统
 
@@ -49,7 +49,7 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 
 ### NaturalRecovery (`Recovery/NaturalRecovery.h`)
 
-无副作用的自然恢复规则模块。`Player::update` 将当前姿态、HP/MP、等级、地图 `recovery` 倍率、技能 NX 数值和椅子 NX 数值组装为 `natural_recovery::Context`，按固定帧推进计时状态，再把产生的 HP/MP 增量交给网络封包发送。站立和坐下可恢复 HP，攀爬仅在 Endure 有等级时恢复 HP；存活状态持续计算 MP。技能与椅子只改变单次恢复量或攀爬间隔，HP 发送值按 Cosmic 的地图倍率动态校验上限约束，MP 发送值限制为 999。
+无副作用的自然恢复规则模块。`Player::update` 将当前姿态、HP/MP、等级、地图 `recovery` 倍率、技能 NX 数值和椅子 NX 数值组装为 `natural_recovery::Context`，按固定帧推进计时状态，再把产生的 HP/MP 增量交给网络封包发送。站立和坐下可恢复 HP，攀爬仅在 Endure 有等级时恢复 HP；存活状态持续计算 MP。技能与椅子只改变单次恢复量或攀爬间隔，HP 发送值按 linked server 的地图倍率动态校验上限约束，MP 发送值限制为 999。
 
 ### CharLook (`Look/`)
 
@@ -75,4 +75,4 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 ## 依赖关系
 
 - **内部依赖**: [游戏世界](../Gameplay/index.md) (Physics, Playable 接口), [图形渲染](../Graphics/index.md) (渲染), Data 模块 (物品/技能静态数据)
-- **外部依赖**: Cosmic 服务端 (属性/装备/技能同步)
+- **外部依赖**: `link_repos/MapleStory-Server` 服务端 (属性/装备/技能同步)

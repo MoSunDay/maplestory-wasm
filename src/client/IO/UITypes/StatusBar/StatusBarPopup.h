@@ -27,7 +27,7 @@ namespace jrc
             ITEMS,
             SKILLS,
             KEY_CONFIG,
-            QUIT
+            LOGOUT
         };
 
         struct CursorResult

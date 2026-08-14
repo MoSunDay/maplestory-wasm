@@ -1,4 +1,4 @@
-Commit: 207b59c38ce4d3481f8c83b38480af94c6cf29cc
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 
 # 游戏世界
 
@@ -96,4 +96,4 @@ Stage::load(new_mapid)
 ## 依赖关系
 
 - **内部依赖**: [角色系统](../Character/index.md) (Player), [图形渲染](../Graphics/index.md) (渲染), [UI 系统](../IO/index.md) (输入)
-- **外部依赖**: Cosmic 服务端 (实体状态同步)
+- **外部依赖**: `link_repos/MapleStory-Server` 服务端 (实体状态同步)
