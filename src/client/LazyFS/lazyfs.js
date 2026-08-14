@@ -562,6 +562,18 @@ var LazyFS = {
 				const failureBaseline = this.cacheWriteStats.failed;
 				const attemptBaseline = this.cacheWriteStats.attempted;
 				const persistent = await this.requestPersistentStorage();
+				if (!persistent) {
+					this.itemAssetPreloadResult = Object.freeze({
+						persistent: false,
+						attempted: 0,
+						succeeded: 0,
+						failed: 0,
+						reason: 'persistent-storage-unavailable',
+					});
+					this.itemAssetPreloadState = 'unavailable';
+					console.warn('[LazyFS] Persistent item asset preload unavailable; bulk preload skipped');
+					return;
+				}
 				const stringEntry = this.files.get('String.nx');
 				const itemEntry = this.files.get('Item.nx');
 				if (!stringEntry || !itemEntry) {
@@ -583,7 +595,7 @@ var LazyFS = {
 				if (failed > 0) {
 					throw new Error(`${failed} IndexedDB cache writes failed`);
 				}
-				this.itemAssetPreloadState = persistent ? 'complete' : 'degraded';
+				this.itemAssetPreloadState = 'complete';
 				console.log(`[LazyFS] Item asset preload ${this.itemAssetPreloadState}`);
 			})
 			.catch(error => {
