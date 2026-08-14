@@ -1,10 +1,10 @@
-Commit: 207b59c38ce4d3481f8c83b38480af94c6cf29cc
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 
 # 功能能力索引
 
 ## 概述
 
-MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所有功能通过 WebAssembly 在浏览器中实现，经由 WebSocket 代理与 Cosmic 服务端通信。
+MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所有功能通过 WebAssembly 在浏览器中实现，经由 WebSocket 代理与仓库 `link_repos/MapleStory-Server` 服务端通信。
 
 ## 功能分组
 
@@ -27,7 +27,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 - **地图加载与渲染**: 加载 .nx 地图数据，渲染背景、图块、对象；进入地图前阻塞到全图已实例化素材驻留、首屏与当前实体素材进入图集，期间服务端仍保持过图保护
 - **角色移动**: 行走、跳跃、攀爬、游泳等物理移动
-- **[角色自然恢复](character-recovery/)**: 按 v83 站立、攀爬、技能、地图倍率和椅子规则恢复 HP/MP，并与 Cosmic 的恢复校验及椅子状态同步
+- **[角色自然恢复](character-recovery/)**: 按 v83 站立、攀爬、技能、地图倍率和椅子规则恢复 HP/MP，并与 linked server 的恢复校验及椅子状态同步
 - **传送门**: 地图间瞬移
 - **NPC 交互**: 对话、商店、仓库等
 - **反应器**: 可交互物体（如采集物）

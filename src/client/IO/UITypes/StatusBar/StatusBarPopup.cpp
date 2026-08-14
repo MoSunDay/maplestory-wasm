@@ -43,7 +43,7 @@ namespace jrc
             { "BtOption", Action::NONE },
             { "BtMonsterLife", Action::NONE },
             { "BtRoomChange", Action::NONE },
-            { "BtGameQuit", Action::QUIT }
+            { "BtGameQuit", Action::LOGOUT }
         });
     }
 

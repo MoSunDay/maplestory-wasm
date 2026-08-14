@@ -36,7 +36,7 @@ Browser (WASM client) <--WebSocket--> ws-proxy <--TCP--> MapleStory server
 ```
 
 The client sends the target as the first WebSocket message (`host:port`, e.g.
-`127.0.0.1:8484`); the proxy connects there and forwards bytes in both
+`127.0.0.1:8484`); the proxy connects to the linked server there and forwards bytes in both
 directions. Set `WS_PROXY_LOCALHOST_TARGET=<host>` to remap `127.0.0.1` /
 `localhost` targets (needed when the proxy runs in Docker and the game server
 on the host is reachable via `host.docker.internal`).

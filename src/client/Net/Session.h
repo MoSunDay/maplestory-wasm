@@ -46,6 +46,8 @@ namespace jrc
         void read();
         // Closes the current connection and opens a new one.
         void reconnect(const char* address, const char* port);
+        // Closes the current connection and resets buffered packet state.
+        void disconnect();
         // Check if the connection is alive.
         bool is_connected() const;
 

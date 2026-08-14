@@ -1,10 +1,12 @@
+Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
+
 # 逻辑结构
 
 Commit: 589b388fb88255db718e2ccd67b1e0a219fdd1f1
 
 ## 概述
 
-MapleStory WASM 是 MapleStory v83 客户端的 WebAssembly 移植。C++ 客户端经 Emscripten 编译为 WASM，在浏览器中完成游戏渲染、交互与协议通信；Rust Web 服务层负责分发 WASM 产物、桥接游戏封包（WebSocket → TCP）并按需流式提供 `.nx` 游戏资源。客户端设计为与 Cosmic 服务端配合运行。
+MapleStory WASM 是 MapleStory v83 客户端的 WebAssembly 移植。C++ 客户端经 Emscripten 编译为 WASM，在浏览器中完成游戏渲染、交互与协议通信；Rust Web 服务层负责分发 WASM 产物、桥接游戏封包（WebSocket → TCP）并按需流式提供 `.nx` 游戏资源。客户端设计为与本地 linked checkout `link_repos/MapleStory-Server` 配合运行。
 
 构建、部署与环境约定见根目录 [AGENTS.md](AGENTS.md)（构建/运行入口），网络协议细节见 [docs/ms-network-protocol.md](docs/ms-network-protocol.md)。
 

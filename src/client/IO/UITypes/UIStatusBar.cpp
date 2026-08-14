@@ -24,6 +24,7 @@
 #include "../../Character/ExpTable.h"
 #include "../../Constants.h"
 #include "../../Net/Packets/CashShopPackets.h"
+#include "../../Net/Session.h"
 
 #include "nlnx/nx.hpp"
 
@@ -298,12 +299,13 @@ namespace jrc
         case StatusBarPopup::Action::KEY_CONFIG:
             UI::get().send_menu(KeyAction::KEYCONFIG);
             break;
-        case StatusBarPopup::Action::QUIT:
+        case StatusBarPopup::Action::LOGOUT:
             UI::get().emplace<UIYesNo>(
-                "确定要退出游戏吗？",
+                "确定要登出并退出游戏吗？",
                 [](bool confirmed) {
                     if (confirmed)
                     {
+                        Session::get().disconnect();
                         UI::get().quit();
                     }
                 }

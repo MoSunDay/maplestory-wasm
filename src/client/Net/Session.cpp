@@ -64,10 +64,7 @@ namespace jrc
 
     Session::~Session()
     {
-        if (connected)
-        {
-            socket.close();
-        }
+        disconnect();
     }
 
     bool Session::init(const char* host, const char* port)
@@ -136,6 +133,19 @@ namespace jrc
 
         // Signal that the socket/crypto were swapped so process() can stop
         // consuming bytes that belonged to the old connection.
+        connection_changed = true;
+    }
+
+    void Session::disconnect()
+    {
+        if (connected)
+        {
+            socket.close();
+        }
+
+        connected = false;
+        length = 0;
+        pos = 0;
         connection_changed = true;
     }
 
