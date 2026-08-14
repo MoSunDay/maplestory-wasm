@@ -19,10 +19,11 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
-#include "UINotice.h"
 
 #include "../../Character/ExpTable.h"
+#include "../../Console.h"
 #include "../../Constants.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/CashShopPackets.h"
 #include "../../Net/Packets/LoginPackets.h"
 #include "../../Net/Session.h"
@@ -266,6 +267,23 @@ namespace jrc
         popup.toggle(StatusBarPopup::Panel::MENU);
     }
 
+    void UIStatusbar::open_system_popup()
+    {
+        popup.open(StatusBarPopup::Panel::SYSTEM, StatusBarPopup::Action::LOGOUT);
+    }
+
+    bool UIStatusbar::activate_popup_selection()
+    {
+        const auto action = popup.selected_action();
+        if (action == StatusBarPopup::Action::NONE)
+        {
+            return false;
+        }
+
+        dispatch_popup_action(action);
+        return true;
+    }
+
     void UIStatusbar::close_popup()
     {
         popup.close();
@@ -301,18 +319,19 @@ namespace jrc
             UI::get().send_menu(KeyAction::KEYCONFIG);
             break;
         case StatusBarPopup::Action::LOGOUT:
-            UI::get().emplace<UIYesNo>(
-                "确定要登出并退出游戏吗？",
-                [](bool confirmed) {
-                    if (confirmed)
-                    {
-                        PlayerDisconnectPacket().dispatch();
-                        Session::get().disconnect();
-                        UI::get().quit();
-                    }
-                }
-            );
-            break;
+        {
+            PlayerDisconnectPacket().dispatch();
+            Session::get().disconnect();
+            const Error reconnect_error = Session::get().init();
+            Stage::get().clear();
+            UI::get().change_state(UI::LOGIN);
+            UI::get().enable();
+            if (reconnect_error != Error::NONE)
+            {
+                Console::get().print("Failed to reconnect to the login server after logout");
+            }
+            return;
+        }
         case StatusBarPopup::Action::NONE:
             break;
         }
