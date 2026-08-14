@@ -1,4 +1,4 @@
-Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
+Commit: b6cde97b087a8c94bf9ace910bb726776bec6d23
 
 # 网络层
 
@@ -63,10 +63,10 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 ### InPacket / OutPacket
 
 封包读写辅助:
-- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)；读取数值前先整体检查剩余长度，linked server 的 Java 定长 UTF-8 字段用 UTF-16 code unit 计数消费，避免中文或补充平面字符导致后续字段错位
+- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)；读取数值前先整体检查剩余长度，linked server 的 Java 定长 UTF-8 字段先编码再补零到固定字节数，客户端必须按线上字节宽度消费
 - `OutPacket`: 构建封包字节流 (`write_byte()`, `write_int()`, `write_string()` 等)
 
-登录 `CHARLIST` / 新建角色 / 进入地图复用 `LoginParser::parse_stats`。其字段宽度必须与 linked server 的 `addCharStats` 一致：角色名按 13 个 Java UTF-16 code unit 补零后再 UTF-8 编码，等级为单字节；Evan 职业（2001、2200–2218）的剩余 SP 为多池表，其余职业为单个 short。宠物、队伍、戒指和现金礼物的 Java 定长字段遵循同一读取规则。
+登录 `CHARLIST` / 新建角色 / 进入地图复用 `LoginParser::parse_stats`。其字段宽度必须与 linked server 的 `addCharStats` 一致：角色名固定 13 字节，custom-client 模式的等级为 short；Evan 职业（2001、2200–2218）的剩余 SP 为多池表，其余职业为单个 short。宠物、队伍、戒指和现金礼物的 Java 定长字段遵循同一字节宽度规则。
 
 角色创建在最终 `CREATE_CHAR` 前再次发送 `CHECK_CHAR_NAME`，避免外观定制期间名称被占用。创建 payload 严格按 linked server 合约写入名称、`job/face/hair/hairColor/skin/top/bottom/shoes/weapon` 九个整数和性别字节，基础发型与颜色偏移在线上独立传输；纯编码函数为字段顺序和字节宽度提供回归边界。服务端对名称不可用或角色槽已满可能静默返回，对数据库插入失败则复用 `DELETE_CHAR_RESPONSE(state=9)`；`UICharCreation` 与 `DeleteCharResponseHandler` 会把这些结果收敛为可恢复状态，重新开放输入或定制控件。
 
