@@ -31,6 +31,7 @@
 #include "IO/UI.h"
 #include "IO/Window.h"
 #include "Net/Session.h"
+#include "Runtime/FrameTiming.h"
 #include "Util/NxFiles.h"
 
 #include <iostream>
@@ -270,7 +271,7 @@ namespace jrc
             return;
         }
 
-        int64_t elapsed = Timer::get().stop();
+        int64_t elapsed = frame_timing::bounded_elapsed_us(Timer::get().stop());
 
         for (accumulator += elapsed; accumulator >= timestep; accumulator -= timestep)
             update();
@@ -320,7 +321,7 @@ namespace jrc
 
         while (running())
         {
-            int64_t elapsed = Timer::get().stop();
+            int64_t elapsed = frame_timing::bounded_elapsed_us(Timer::get().stop());
 
             // Update game with constant timestep as many times as possible.
             for (accumulator += elapsed; accumulator >= timestep; accumulator -= timestep)
