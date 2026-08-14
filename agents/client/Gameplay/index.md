@@ -1,4 +1,4 @@
-Commit: 1e51cbab54f091d291c4e1019fb483712ae05541
+Commit: c2cd3682d8a2cf5216e4be0890c6f1712e81d031
 
 # 游戏世界
 
@@ -21,7 +21,7 @@ Commit: 1e51cbab54f091d291c4e1019fb483712ae05541
 - `ACTIVE`: 正常游戏
 
 核心职责:
-- `load(mapid, portalid, onready)`: 切换地图；当前地图素材、当前武器全部普通攻击姿态和残影已准备后调用 `onready`
+- `load(mapid, portalid, onready)`: 切换地图；当前地图素材、当前武器全部普通攻击姿态和可复用残影模板已准备后调用 `onready`
 - `loadplayer(entry)`: 从角色数据构造玩家
 - `update()`: 每帧更新所有实体
 - `draw(alpha)`: 渲染所有实体
