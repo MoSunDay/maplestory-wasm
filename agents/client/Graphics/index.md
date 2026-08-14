@@ -1,4 +1,4 @@
-Commit: 207b59c38ce4d3481f8c83b38480af94c6cf29cc
+Commit: 1e51cbab54f091d291c4e1019fb483712ae05541
 
 # 图形渲染
 
@@ -32,9 +32,10 @@ Commit: 207b59c38ce4d3481f8c83b38480af94c6cf29cc
 - WASM 中 `Texture` 实例化后通过 `queuebitmap()` 静默预取，主循环每帧调用 `preparebitmaps()`；普通运行使用 2ms、阻塞加载使用 8ms 软预算批量解压和上传
 - `beginbitmapbatch()`/`bitmapbatchprogress()` 在地图切换期间收集所有新实例化贴图；全图贴图要求 NX 范围驻留，首屏可见贴图还要求已经进入 WebGL 图集
 - 首屏静态地图对象、图块和背景会把可见动画的全部帧提升为高优先级，避免安全门释放后紧接着因下一动画帧再次停顿
-- `Texture::prepare_visible()` 将短时可见特效提升到独立优先队列并发起前台范围请求；已在普通队列中的同一位图会原地提升，仍保持全局去重
+- 位图准备分为 `BACKGROUND`、`MAP_REQUIRED`、`BLOCKING_VISIBLE`、`TRANSIENT_EFFECT`：地图必需素材参与安全门，可交互 UI 缺图才暂停玩法，剑光和掉落物等瞬态内容只提升网络/GPU 优先级
+- `Texture::prepare_effect()` 与 `draw_effect()` 使用非阻塞瞬态路径；已在普通队列中的同一位图会原地提升，仍保持全局去重，网络失败才升级到可重试的前台错误态
 - `Texture`、`Frame` 与 `Animation` 提供有效性和图集驻留检查，一次性动画可以等待全部帧就绪后再推进，避免异步下载消耗播放窗口
-- 首次绘制时尚未就绪的纹理会进入可见优先队列；WASM 主循环在该队列清空前冻结 Stage/UI 更新并显示素材遮罩，图集清理后仍在使用的纹理同样重新进入此流程
+- 首次绘制时尚未就绪的普通纹理会进入阻塞可见队列；WASM 主循环只在显式 `BLOCKING_VISIBLE` 集合未清空时冻结 Stage/UI 并显示素材遮罩，优先队列本身不再等同于玩法阻塞
 - 非 WASM 平台仍通过 `addbitmap()` 同步注册到图集
 - 图集空间由 `QuadTree<Leftover>` 管理，按需分配/回收
 - 当图集空间不足时调用 `clear()` 清空
