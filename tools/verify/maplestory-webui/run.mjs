@@ -257,7 +257,7 @@ try {
     throw new Error('__ASSET_ONLY_COMPLETE__');
   }
   await requireState('loading screen dismissed after first frame', async () =>
-    await driver.evaluate("document.getElementById('loading-screen').classList.contains('is-hidden')"));
+    await driver.evaluate("document.getElementById('loading-screen').classList.contains('is-hidden')"), 60);
   if (await driver.evaluate('document.title') !== '冒险岛online') {
     throw new Error('Unexpected WebUI document title');
   }
