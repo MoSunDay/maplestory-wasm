@@ -106,7 +106,8 @@ namespace jrc
     }
 
     Afterimage::Afterimage(int32_t skill_id, const std::string& name,
-        const std::string& stance_name, int16_t level) {
+        const std::string& stance_name, int16_t level,
+        Preparation preparation) {
 
         nl::node src;
         if (skill_id > 0)
@@ -142,7 +143,14 @@ namespace jrc
                 Animation animation(sub);
                 if (animation.is_valid())
                 {
-                    animation.prepare_visible();
+                    if (preparation == Preparation::MAP_REQUIRED)
+                    {
+                        animation.prepare_map_required();
+                    }
+                    else
+                    {
+                        animation.prepare_effect();
+                    }
                     cues.push_back({
                         std::move(animation),
                         *frame,
@@ -184,7 +192,7 @@ namespace jrc
                 reached_now
             ))
             {
-                cue.animation.draw(args, alpha);
+                cue.animation.draw_effect(args, alpha);
             }
         }
     }
@@ -203,13 +211,18 @@ namespace jrc
             {
                 // Atlas eviction and interrupted range loads use the same
                 // recovery path without consuming a one-shot animation.
-                cue.animation.prepare_visible();
+                cue.animation.prepare_effect();
             }
+            afterimage::PlaybackPhase phase_before_assets = cue.phase;
             cue.phase = afterimage::begin_when_ready(
                 cue.phase,
                 ready
             );
-            if (cue.phase == afterimage::PlaybackPhase::PLAYING && ready)
+            if (afterimage::should_advance(
+                phase_before_assets,
+                cue.phase,
+                ready
+            ))
             {
                 cue.phase = afterimage::finish(
                     cue.phase,

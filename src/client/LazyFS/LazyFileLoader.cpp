@@ -128,6 +128,23 @@ namespace LazyFS
 #endif
 	}
 
+	void LazyFileLoader::prioritize_contiguous_data(size_t offset, size_t size) const
+	{
+#ifdef MS_PLATFORM_WASM
+		EM_ASM({
+			const path = UTF8ToString($0);
+			if (Module.LazyFS && Module.LazyFS.requestPriorityFileRange) {
+				Module.LazyFS.requestPriorityFileRange(path, $1, $2).catch(error => {
+					console.error('[LazyFS] Priority bitmap request failed for', path, error);
+				});
+			}
+		}, path_.c_str(), static_cast<double>(offset), static_cast<double>(size));
+#else
+		(void)offset;
+		(void)size;
+#endif
+	}
+
 	void LazyFileLoader::request_contiguous_data(size_t offset, size_t size) const
 	{
 #ifdef MS_PLATFORM_WASM

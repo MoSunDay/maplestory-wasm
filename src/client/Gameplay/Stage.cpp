@@ -55,6 +55,7 @@ namespace jrc
     void Stage::load(int32_t mapid, int8_t portalid, std::function<void()> onready)
     {
         begin_loading(std::move(onready));
+        player.prepare_attack_assets();
         load_map(mapid);
         respawn(portalid);
         report_loading_progress();
