@@ -20,7 +20,7 @@ Commit: fde7b1761b51ea4cf6d9c5ff2902b63506a86088
 - `write(bytes, length)`: 发送加密封包
 - `read()`: 帧循环中轮询接收，解密后分发
 - `reconnect(address, port)`: 断开旧连接并建立新连接（用于登录→频道切换）。内部经 `resolve_channel_address` 对本地频道地址做配置 IP 替换；末尾置位 `connection_changed` 标志
-- `disconnect()`: 主动关闭当前 WebSocket/TCP 连接并清空接收缓冲状态；系统菜单登出先调用该入口，使服务端执行会话关闭与角色持久化，再结束客户端循环
+- `disconnect()`: 主动关闭当前 WebSocket/TCP 连接并清空接收缓冲状态；系统菜单登出先发送标准 `PLAYER_DC(0x0C)`，再调用该入口关闭传输并结束客户端循环
 - `is_connected()`: 连接状态
 
 内部维护接收缓冲区、位置指针、连接状态，以及 `connection_changed` 标志：`reconnect()` 末尾置位，`process()` 在解出一个封包后检查，若已置位则丢弃缓冲区剩余字节并复位——防止在 `forward()` 期间触发重连后，用新加密上下文继续解密旧连接的尾部字节（跨连接污染）。使用 ASIO (非 WASM) 或 Winsock 作为底层 socket 实现。

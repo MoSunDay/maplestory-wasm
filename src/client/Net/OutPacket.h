@@ -73,6 +73,7 @@ namespace jrc
         AFTER_LOGIN          = 0x9,
         REGISTER_PIN         = 0xA,
         SERVERLIST_REQUEST   = 0xB,
+        PLAYER_DISCONNECT    = 0xC,
         SELECT_CHAR          = 0x13,
         PLAYER_LOGIN         = 0x14,
         NAME_CHAR            = 0x15,

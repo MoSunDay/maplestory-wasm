@@ -96,18 +96,40 @@ class MapleSession {
     this.waiters = [];
     this.pending = Buffer.alloc(0);
     this.attached = false;
+    this.expectedClose = null;
   }
   attach() {
     if (this.attached) return;
     this.attached = true;
     if (this.sock instanceof net.Socket) {
       this.sock.on('data', (chunk) => { this._feed(chunk); });
-      this.sock.on('close', () => { console.error('TCP closed by server'); process.exit(9); });
+      this.sock.on('close', () => this._closed('TCP'));
       this.sock.on('error', (e) => { console.error('TCP error:', e.message); });
     } else {
       this.sock.onmessage = (ev) => { toBuf(ev.data).then((d) => this._feed(d)); };
-      this.sock.onclose = (ev) => { console.error('WS closed', ev.code, ev.reason); process.exit(9); };
+      this.sock.onclose = () => this._closed('WS');
     }
+  }
+  _closed(transport) {
+    if (this.expectedClose) {
+      this.expectedClose(transport);
+      this.expectedClose = null;
+      return;
+    }
+    console.error(`${transport} closed by server`);
+    process.exit(9);
+  }
+  waitForClose(timeout = 10000) {
+    return new Promise((res, rej) => {
+      const timer = setTimeout(() => {
+        this.expectedClose = null;
+        rej(new Error('logout close timeout'));
+      }, timeout);
+      this.expectedClose = (transport) => {
+        clearTimeout(timer);
+        res(transport);
+      };
+    });
   }
   _feed(data) {
     this.pending = Buffer.concat([this.pending, data]);
@@ -264,8 +286,16 @@ async function main() {
   if (r5[0] !== 0x0E) { console.log('UNEXPECTED CREATE RESPONSE'); process.exit(4); }
   const found = r5.includes(Buffer.from(CHARNAME, 'utf8'));
   console.log(`new char entry contains name echo: ${found}`);
-  console.log(found ? 'E2E PASS: Chinese login + Chinese character creation' : 'E2E FAIL');
-  process.exit(found ? 0 : 5);
+  if (!found) {
+    console.log('E2E FAIL');
+    process.exit(5);
+  }
+
+  const closed = sess.waitForClose();
+  sess.sendPacket(0x0C, Buffer.alloc(0));
+  const transport = await closed;
+  console.log(`PLAYER_DC closed ${transport} session`);
+  console.log('E2E PASS: Chinese login + Chinese character creation + logout');
 }
 
 main().catch(e => { console.error('E2E ERROR:', e.message); process.exit(1); });
