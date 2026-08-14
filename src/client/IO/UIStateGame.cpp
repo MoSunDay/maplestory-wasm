@@ -180,7 +180,7 @@ namespace jrc
         {
             if (auto statusbar = UI::get().get_element<UIStatusbar>())
             {
-                statusbar->close_popup();
+                statusbar->open_system_popup();
             }
             return;
         }
@@ -189,6 +189,10 @@ namespace jrc
         {
             if (auto statusbar = UI::get().get_element<UIStatusbar>())
             {
+                if (statusbar->activate_popup_selection())
+                {
+                    return;
+                }
                 statusbar->focus_chatfield();
             }
             return;

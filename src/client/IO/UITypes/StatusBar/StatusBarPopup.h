@@ -43,8 +43,10 @@ namespace jrc
                             Rectangle<int16_t> system_anchor);
 
         void toggle(Panel panel);
+        void open(Panel panel, Action selected_action);
         void close();
         bool is_open() const;
+        Action selected_action() const;
         bool contains(Point<int16_t> cursor_position) const;
 
         CursorResult send_cursor(bool pressed, Point<int16_t> cursor_position);
@@ -86,5 +88,6 @@ namespace jrc
         PanelData menu;
         PanelData system;
         Panel active_panel = Panel::NONE;
+        Action selection = Action::NONE;
     };
 }
