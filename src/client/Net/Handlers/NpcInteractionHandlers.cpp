@@ -94,7 +94,7 @@ namespace jrc
             }
             else if (is_pet)
             {
-                recv.read_padded_utf8_string(13); // name
+                recv.read_padded_string(13); // name
                 recv.skip(4); // level + closeness + fullness
                 recv.skip(18); // pet details tail
             }

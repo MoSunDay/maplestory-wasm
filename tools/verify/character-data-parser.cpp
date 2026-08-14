@@ -38,6 +38,16 @@ namespace
         }
     }
 
+    void append_fixed_bytes(Bytes& bytes, const std::string& value,
+        uint16_t field_bytes)
+    {
+        bytes.insert(bytes.end(), value.begin(), value.end());
+        for (size_t i = value.size(); i < field_bytes; ++i)
+        {
+            append_number<uint8_t>(bytes, 0);
+        }
+    }
+
     void expect_packet_error(const std::function<void()>& action)
     {
         bool threw = false;
@@ -97,12 +107,12 @@ namespace
     {
         append_number<int16_t>(bytes, 1);
         append_number<int32_t>(bytes, 11);
-        append_fixed_utf8(bytes, u8"伙伴甲", 3, 13);
+        append_fixed_bytes(bytes, u8"伙伴甲", 13);
         for (int i = 0; i < 4; ++i) append_number<int32_t>(bytes, 20 + i);
 
         append_number<int16_t>(bytes, 1);
         append_number<int32_t>(bytes, 31);
-        append_fixed_utf8(bytes, u8"A😀中", 4, 13);
+        append_fixed_bytes(bytes, u8"A😀中", 13);
         for (int i = 0; i < 5; ++i) append_number<int32_t>(bytes, 40 + i);
 
         append_number<int16_t>(bytes, 1);
@@ -112,8 +122,8 @@ namespace
         append_number<int16_t>(bytes, 3);
         append_number<int32_t>(bytes, 54);
         append_number<int32_t>(bytes, 55);
-        append_fixed_utf8(bytes, u8"新人甲", 3, 13);
-        append_fixed_utf8(bytes, u8"新人乙", 3, 13);
+        append_fixed_bytes(bytes, u8"新人甲", 13);
+        append_fixed_bytes(bytes, u8"新人乙", 13);
     }
 
     void append_new_year_card(Bytes& bytes, int32_t id,
