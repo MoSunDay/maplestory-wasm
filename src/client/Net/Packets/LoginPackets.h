@@ -59,6 +59,14 @@ namespace jrc
         ServerRequestPacket() : OutPacket(SERVERLIST_REQUEST) {}
     };
 
+    // Requests a graceful account logout before the transport is closed.
+    // Opcode: PLAYER_DC(12)
+    class PlayerDisconnectPacket : public OutPacket
+    {
+    public:
+        PlayerDisconnectPacket() : OutPacket(PLAYER_DISCONNECT) {}
+    };
+
     // Requests the list of characters on a world.
     // Opcode: CHARLIST_REQUEST(5)
     class CharlistRequestPacket : public OutPacket

@@ -24,6 +24,7 @@
 #include "../../Character/ExpTable.h"
 #include "../../Constants.h"
 #include "../../Net/Packets/CashShopPackets.h"
+#include "../../Net/Packets/LoginPackets.h"
 #include "../../Net/Session.h"
 
 #include "nlnx/nx.hpp"
@@ -305,6 +306,7 @@ namespace jrc
                 [](bool confirmed) {
                     if (confirmed)
                     {
+                        PlayerDisconnectPacket().dispatch();
                         Session::get().disconnect();
                         UI::get().quit();
                     }
