@@ -37,6 +37,7 @@ namespace jrc
         Body(int32_t skin, const BodyDrawinfo& drawinfo);
 
         void draw(Stance::Id stance, Layer layer, uint8_t frame, const DrawArgument& args) const;
+        void prepare(Stance::Id stance) const;
 
         const std::string& get_name() const;
 
@@ -51,4 +52,3 @@ namespace jrc
         static const std::unordered_map<std::string, Layer> layers_by_name;
     };
 }
-

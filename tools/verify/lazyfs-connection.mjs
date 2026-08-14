@@ -254,10 +254,74 @@ async function testForegroundAssetFailureRetries() {
   ]);
 }
 
+async function testPriorityAssetDoesNotBlockGameplay() {
+  const harness = createHarness();
+  const events = [];
+  const attempts = [];
+  let promotions = 0;
+  harness.window.MapleAssetLoading = {
+    begin: key => events.push(`begin:${key}`),
+    end: key => events.push(`end:${key}`),
+    fail: key => events.push(`fail:${key}`),
+  };
+  harness.lazyfs.isFileRangeResident = () => false;
+  harness.lazyfs.prefetchFileRange = () => new Promise((resolve, reject) => {
+    attempts.push({ resolve, reject });
+  });
+  harness.lazyfs.promotePrefetch = () => { promotions += 1; };
+
+  const result = harness.lazyfs.requestPriorityFileRange('Character.nx', 30, 40);
+  await until(() => attempts.length === 1);
+  assert.deepEqual(events, []);
+  assert.equal(promotions, 1);
+  attempts[0].resolve('ready');
+  assert.equal(await result, 'ready');
+  assert.deepEqual(events, []);
+}
+
+async function testPriorityAssetFailureEscalatesToRetry() {
+  const harness = createHarness();
+  const events = [];
+  const attempts = [];
+  let retry;
+  harness.window.MapleAssetLoading = {
+    begin: key => events.push(`begin:${key}`),
+    end: key => events.push(`end:${key}`),
+    fail: (key, callback) => {
+      events.push(`fail:${key}`);
+      retry = callback;
+    },
+  };
+  harness.lazyfs.isFileRangeResident = () => false;
+  harness.lazyfs.prefetchFileRange = () => new Promise((resolve, reject) => {
+    attempts.push({ resolve, reject });
+  });
+  harness.lazyfs.promotePrefetch = () => {};
+
+  const result = harness.lazyfs.requestPriorityFileRange('Character.nx', 50, 60);
+  await until(() => attempts.length === 1);
+  attempts[0].reject(new Error('priority request failed'));
+  await until(() => attempts.length === 2);
+  attempts[1].reject(new Error('foreground retry required'));
+  await until(() => typeof retry === 'function');
+  retry();
+  await until(() => attempts.length === 3);
+  attempts[2].resolve('ready');
+  assert.equal(await result, 'ready');
+  assert.deepEqual(events, [
+    'begin:range:Character.nx:50:60',
+    'fail:range:Character.nx:50:60',
+    'begin:range:Character.nx:50:60',
+    'end:range:Character.nx:50:60',
+  ]);
+}
+
 await testSharedConnectionAndKeepAlive();
 await testReconnectReplaysPendingRequest();
 await testTerminalAssetFailureDoesNotExitGame();
 await testUnloadSuppressesRecovery();
 await testPersistentPreloadStates();
 await testForegroundAssetFailureRetries();
+await testPriorityAssetDoesNotBlockGameplay();
+await testPriorityAssetFailureEscalatesToRetry();
 console.log('LazyFS connection verification passed');

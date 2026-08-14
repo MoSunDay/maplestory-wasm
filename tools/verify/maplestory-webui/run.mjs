@@ -476,24 +476,85 @@ try {
     if (captureAttackEffects) {
       await driver.click(400, 300);
       await sleep(1000);
+      // Leave the spawn ledge and approach the map's live mobs so the
+      // screencast proves movement and hit feedback, not only the attack pose.
+      await driver.keyHold('ArrowRight', 'ArrowRight', 39, 3500);
+      await sleep(1000);
+      await driver.screenshot('08a-attack-position');
+      await driver.evaluate(`(() => {
+        const screen = document.getElementById('asset-loading-screen');
+        const lazy = Module.LazyFS;
+        const originalForeground = lazy.requestForegroundFileRange;
+        const evidence = {
+          active: true,
+          blockingSeen: false,
+          overlaySeen: false,
+          gpuSeen: false,
+          mapSeen: false,
+          foregroundKeys: [],
+          rangeCalls: []
+        };
+        lazy.requestForegroundFileRange = function (filepath, offset, length) {
+          if (evidence.active && evidence.rangeCalls.length < 100) {
+            evidence.rangeCalls.push({
+              filepath, offset, length,
+              residentBeforeRequest: this.isFileRangeResident(filepath, offset, length)
+            });
+          }
+          return originalForeground.call(this, filepath, offset, length);
+        };
+        evidence.restore = () => { lazy.requestForegroundFileRange = originalForeground; };
+        const sample = () => {
+          if (!evidence.active) return;
+          evidence.overlaySeen ||= !screen.classList.contains('is-hidden');
+          evidence.blockingSeen ||= Module.ccall('msasset_blocking', 'number', [], []) !== 0;
+          evidence.gpuSeen ||= window.MapleAssetLoading.has('gpu');
+          evidence.mapSeen ||= window.MapleAssetLoading.has('map');
+          if (evidence.foregroundKeys.length === 0 && lazy.foregroundRequests.size > 0) {
+            evidence.foregroundKeys = Array.from(lazy.foregroundRequests.keys());
+          }
+          requestAnimationFrame(sample);
+        };
+        window.attackVisualEvidence = evidence;
+        requestAnimationFrame(sample);
+      })()`);
+      const screencasts = [];
       for (let sample = 0; sample < attackSamples; sample += 1) {
+        const prefix = `08d-attack-${String(sample + 1).padStart(2, '0')}`;
+        await driver.startScreencast(prefix);
         // Hold the key across multiple game ticks so input observation does
         // not depend on two back-to-back CDP events landing in one tick.
         await driver.keyHold('Control', 'ControlLeft', 17, 50);
-        for (let frame = 1; frame <= 20; frame += 1) {
-          // A stab cue normally starts on stance frame 1 and a swing cue on
-          // frame 2. A 40 ms minimum cadence covers both one-shot windows and
-          // leaves room for a delayed cold-cache playback.
-          await sleep(40);
-          await driver.screenshot(
-            `08d-attack-${String(sample + 1).padStart(2, '0')}` +
-            `-frame-${String(frame).padStart(2, '0')}`
-          );
+        await sleep(900);
+        const capture = await driver.stopScreencast();
+        if (capture.frameCount < 3) {
+          throw new Error(`Attack screencast ${sample + 1} captured only ${capture.frameCount} frames`);
         }
+        screencasts.push({ sample: sample + 1, frames: capture.frameCount });
         await requireAssetIdle(`attack sample ${sample + 1} assets ready`);
         await sleep(attackSampleGapMs);
       }
-      console.log(`PASS  captured ${attackSamples} cold/warm attack effect samples`);
+      const attackVisualEvidence = await driver.evaluate(`(() => {
+        window.attackVisualEvidence.active = false;
+        window.attackVisualEvidence.restore();
+        return {
+          active: false,
+          blockingSeen: window.attackVisualEvidence.blockingSeen,
+          overlaySeen: window.attackVisualEvidence.overlaySeen,
+          gpuSeen: window.attackVisualEvidence.gpuSeen,
+          mapSeen: window.attackVisualEvidence.mapSeen,
+          foregroundKeys: window.attackVisualEvidence.foregroundKeys,
+          rangeCalls: window.attackVisualEvidence.rangeCalls
+        };
+      })()`);
+      fs.writeFileSync(
+        `${driver.artifactDir}/attack-visual-evidence.json`,
+        `${JSON.stringify({ ...attackVisualEvidence, screencasts }, null, 2)}\n`
+      );
+      if (attackVisualEvidence.blockingSeen || attackVisualEvidence.overlaySeen) {
+        throw new Error(`Attack unexpectedly blocked asset loading: ${JSON.stringify(attackVisualEvidence)}`);
+      }
+      console.log(`CAPTURE  ${attackSamples} attack screencasts require visual slash/hit review`);
     }
 
     if (stopAtGame) throw new Error('__GAME_COMPLETE__');

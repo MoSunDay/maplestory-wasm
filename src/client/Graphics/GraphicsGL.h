@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include "BitmapLoadClass.h"
 #include "DrawArgument.h"
 #include "FontCache.h"
 #include "Text.h"
@@ -45,11 +46,7 @@ namespace jrc
     class GraphicsGL : public Singleton<GraphicsGL>
     {
     public:
-        enum class BitmapPriority
-        {
-            BACKGROUND,
-            VISIBLE_EFFECT
-        };
+        using BitmapLoadClass = bitmap_loading::LoadClass;
 
         struct BitmapBatchProgress
         {
@@ -82,7 +79,7 @@ namespace jrc
         // Visible one-shot effects may promote an already queued bitmap.
         void queuebitmap(
             const nl::bitmap& bmp,
-            BitmapPriority priority = BitmapPriority::BACKGROUND
+            BitmapLoadClass load_class = BitmapLoadClass::BACKGROUND
         );
         // Prepare ready bitmaps within a soft per-frame time budget.
         void preparebitmaps(uint32_t budget_ms = 2);
@@ -130,7 +127,7 @@ namespace jrc
 
     private:
         void clearinternal();
-        void addtobitmapbatch(const nl::bitmap& bmp, BitmapPriority priority);
+        void addtobitmapbatch(const nl::bitmap& bmp, BitmapLoadClass load_class);
 
         struct Offset
         {
@@ -291,6 +288,7 @@ namespace jrc
         std::deque<nl::bitmap> pending_priority_bitmaps;
         std::deque<nl::bitmap> pending_bitmaps;
         std::unordered_set<size_t> pending_bitmap_ids;
+        std::unordered_set<size_t> pending_blocking_bitmap_ids;
         struct BitmapBatch
         {
             uint64_t generation = 0;

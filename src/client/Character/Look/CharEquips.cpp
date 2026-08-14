@@ -35,6 +35,17 @@ namespace jrc
         }
     }
 
+    void CharEquips::prepare(Stance::Id stance) const
+    {
+        for (const auto& entry : clothes)
+        {
+            if (entry.second)
+            {
+                entry.second->prepare(stance);
+            }
+        }
+    }
+
     void CharEquips::add_equip(int32_t itemid, const BodyDrawinfo& drawinfo)
     {
         if (itemid <= 0)

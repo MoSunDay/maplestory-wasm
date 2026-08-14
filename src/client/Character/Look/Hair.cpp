@@ -81,6 +81,17 @@ namespace jrc
         frameit->second.draw(args);
     }
 
+    void Hair::prepare(Stance::Id stance) const
+    {
+        for (size_t layer = 0; layer < Layer::NUM_LAYERS; ++layer)
+        {
+            for (const auto& entry : stances[stance][layer])
+            {
+                entry.second.prepare_map_required();
+            }
+        }
+    }
+
     const std::string& Hair::get_name() const
     {
         return name;

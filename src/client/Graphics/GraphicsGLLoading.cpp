@@ -4,7 +4,7 @@
 
 namespace jrc
 {
-    void GraphicsGL::addtobitmapbatch(const nl::bitmap& bmp, BitmapPriority priority)
+    void GraphicsGL::addtobitmapbatch(const nl::bitmap& bmp, BitmapLoadClass load_class)
     {
         const size_t id = bmp.id();
         if (bitmap_batch.generation == 0 || id == 0)
@@ -13,7 +13,7 @@ namespace jrc
         }
 
         bool changed = bitmap_batch.bitmaps.emplace(id, bmp).second;
-        if (priority == BitmapPriority::VISIBLE_EFFECT)
+        if (bitmap_loading::is_map_required(load_class))
         {
             changed = bitmap_batch.required_bitmap_ids.emplace(id).second || changed;
         }
@@ -79,7 +79,7 @@ namespace jrc
             }
             else if (required && !hasbitmap(entry.second))
             {
-                queuebitmap(entry.second, BitmapPriority::VISIBLE_EFFECT);
+                queuebitmap(entry.second, BitmapLoadClass::BLOCKING_VISIBLE);
             }
         }
     }
@@ -95,7 +95,7 @@ namespace jrc
     bool GraphicsGL::hasblockingbitmaps() const
     {
 #ifdef MS_PLATFORM_WASM
-        return !pending_priority_bitmaps.empty();
+        return !pending_blocking_bitmap_ids.empty();
 #else
         return false;
 #endif
@@ -119,11 +119,13 @@ namespace jrc
                 if (hasbitmap(bmp))
                 {
                     pending_bitmap_ids.erase(bmp.id());
+                    pending_blocking_bitmap_ids.erase(bmp.id());
                 }
                 else if (bmp.data_ready())
                 {
                     addbitmap(bmp);
                     pending_bitmap_ids.erase(bmp.id());
+                    pending_blocking_bitmap_ids.erase(bmp.id());
                     prepared = true;
                 }
                 else
