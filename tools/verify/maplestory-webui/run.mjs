@@ -19,12 +19,13 @@ const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
+const verifyCashShop = process.env.E2E_CASH_SHOP === '1';
 const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 12);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 
-const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5 });
+const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5, cashShop: 6 });
 
 const driver = new BrowserDriver({ binary: browserBinary, debugPort });
 let passed = false;
@@ -75,8 +76,16 @@ function loginNoticeActive() {
   return driver.evaluate("Module.ccall('msui_login_notice_active', 'number', [], [])");
 }
 
+function loginNoticeMessage() {
+  return driver.evaluate("Module.ccall('msui_login_notice_message', 'number', [], [])");
+}
+
 function characterCreationCustomizing() {
   return driver.evaluate("Module.ccall('msui_character_creation_customizing', 'number', [], [])");
+}
+
+function noticeActive() {
+  return driver.evaluate("Module.ccall('msui_notice_active', 'number', [], [])");
 }
 
 function mapAssetLoading() {
@@ -85,6 +94,10 @@ function mapAssetLoading() {
 
 function assetBlocking() {
   return driver.evaluate("Module.ccall('msasset_blocking', 'number', [], [])");
+}
+
+function cashShopProbe(name) {
+  return driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', [], [])`);
 }
 
 function requireUiState(name, expected, timeoutSeconds = 30) {
@@ -264,6 +277,25 @@ try {
   console.log('PASS  Chinese WebUI title');
   await requireUiState('login UI active', uiState.login, 30);
   await requireAssetIdle('login assets ready');
+  const loginCanvasLayout = await driver.evaluate(`(() => {
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const viewport = window.visualViewport
+      ? { width: window.visualViewport.width, height: window.visualViewport.height }
+      : { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight };
+    return {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height
+    };
+  })()`);
+  if (Math.abs(loginCanvasLayout.top) > 1) {
+    throw new Error(`Canvas is not top-aligned: ${JSON.stringify(loginCanvasLayout)}`);
+  }
+  console.log(`PASS  canvas top aligned ${JSON.stringify(loginCanvasLayout)}`);
   await driver.screenshot('01-login');
 
   if (useRegistration) {
@@ -349,6 +381,10 @@ try {
     if (retryCharacterName) {
       await requireState('illegal character-name notice active', async () =>
         await loginNoticeActive() === 1, 5);
+      const illegalNameNotice = await loginNoticeMessage();
+      if (illegalNameNotice !== 10) {
+        throw new Error(`Expected ILLEGAL_NAME notice (10), got ${illegalNameNotice}`);
+      }
       // Drawing the newly constructed modal schedules its cold bitmap ranges;
       // wait for that second foreground wave before clicking the small button.
       await sleep(5000);
@@ -463,6 +499,75 @@ try {
       overlayShown: naturalAssetEvidence.overlayShown
     })}`);
     await driver.screenshot('08-in-game');
+
+    if (verifyCashShop) {
+      // StatusBar2 BtCashShop occupies x=569..625, y=554..589 at 800x600.
+      // Use the visible button because account keymaps may rebind the shortcut.
+      await driver.click(597, 571);
+      await requireUiState('cash-shop UI active', uiState.cashShop, 30);
+      await requireAssetIdle('cash-shop assets ready');
+      const initial = {
+        locker: await cashShopProbe('mscashshop_locker_count'),
+        inventory: await cashShopProbe('mscashshop_inventory_count'),
+        nxCredit: await cashShopProbe('mscashshop_nx_credit')
+      };
+      if (initial.locker < 0 || initial.inventory < 0 || initial.nxCredit < 1) {
+        throw new Error(`Invalid initial cash-shop state: ${JSON.stringify(initial)}`);
+      }
+      await driver.screenshot('10-cash-shop-classic');
+
+      // Classic Shop is 465x328 and centered at (167,136) in the 800x600 canvas.
+      await driver.click(250, 205);
+      await requireState('cash-shop search focused', async () =>
+        await driver.evaluate('MapleWasmIME.active === true'));
+      await driver.compose('80000002');
+      await requireState('cash-shop SN entered', async () =>
+        await driver.evaluate("document.getElementById('ime-input').value === '80000002'"));
+      await sleep(250);
+      await driver.key('Enter', 'Enter', 13);
+      await sleep(500);
+      await driver.click(270, 270);
+      await sleep(250);
+      await driver.screenshot('11-cash-shop-selected');
+      await driver.click(350, 190);
+      await requireState('cash purchase confirmation visible', async () =>
+        await noticeActive() === 1);
+      await sleep(500);
+      await driver.screenshot('12-cash-shop-confirm');
+      await driver.click(380, 285);
+      await requireState('cash item purchase persisted in UI model', async () =>
+        await cashShopProbe('mscashshop_pending') === 0 &&
+        await cashShopProbe('mscashshop_nx_credit') === initial.nxCredit - 1 &&
+        await cashShopProbe('mscashshop_locker_count') === initial.locker + 1, 30);
+      await driver.screenshot('13-cash-shop-purchased');
+
+      const lockerRow = await cashShopProbe('mscashshop_selected_right_row');
+      if (lockerRow < 0) {
+        throw new Error('Purchased locker item was not selected');
+      }
+      await driver.click(500, 270 + lockerRow * 42);
+      await requireState('cash item taken into character inventory', async () =>
+        await cashShopProbe('mscashshop_pending') === 0 &&
+        await cashShopProbe('mscashshop_locker_count') === initial.locker &&
+        await cashShopProbe('mscashshop_inventory_count') === initial.inventory + 1, 30);
+      await driver.screenshot('14-cash-shop-taken');
+
+      const inventoryRow = await cashShopProbe('mscashshop_selected_right_row');
+      if (inventoryRow < 0) {
+        throw new Error('Taken cash item was not selected');
+      }
+      await driver.click(500, 270 + inventoryRow * 42);
+      await requireState('cash item returned to locker', async () =>
+        await cashShopProbe('mscashshop_pending') === 0 &&
+        await cashShopProbe('mscashshop_locker_count') === initial.locker + 1 &&
+        await cashShopProbe('mscashshop_inventory_count') === initial.inventory, 30);
+      await driver.screenshot('15-cash-shop-returned');
+      await driver.key('Escape', 'Escape', 27);
+      await requireUiState('cash-shop exits back to game', uiState.game, 30);
+      await requireAssetIdle('returned map assets ready');
+      await driver.screenshot('16-cash-shop-exited');
+      throw new Error('__CASH_SHOP_COMPLETE__');
+    }
 
     if (logoutToLogin) {
       await driver.key('Escape', 'Escape', 27);
@@ -636,6 +741,9 @@ try {
     assertRuntimeHealthy();
     passed = true;
   } else if (stopAtGame && error.message === '__GAME_COMPLETE__') {
+    assertRuntimeHealthy();
+    passed = true;
+  } else if (verifyCashShop && error.message === '__CASH_SHOP_COMPLETE__') {
     assertRuntimeHealthy();
     passed = true;
   } else if (logoutToLogin && error.message === '__LOGOUT_COMPLETE__') {

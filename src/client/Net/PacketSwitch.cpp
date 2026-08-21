@@ -150,9 +150,10 @@ namespace jrc
         REMOVE_REACTOR    = 280,
 
         // NPC Interaction
-        NPC_DIALOGUE  = 304,
-        OPEN_NPC_SHOP = 305,
-        STORAGE       = 309,
+        NPC_DIALOGUE     = 304,
+        OPEN_NPC_SHOP    = 305,
+        SHOP_TRANSACTION = 306,
+        STORAGE          = 309,
 
         KEYMAP      = 335,
         AUTO_HP_POT = 336,
@@ -239,6 +240,7 @@ namespace jrc
         // Npc Interaction Handlers
         emplace<NPC_DIALOGUE, NpcDialogueHandler>();
         emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
+        emplace<SHOP_TRANSACTION, ShopTransactionHandler>();
         emplace<STORAGE, StorageHandler>();
 
         // Cash Shop handlers
