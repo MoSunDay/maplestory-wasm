@@ -96,6 +96,7 @@ namespace jrc
         UILoginNotice(int8_t message);
 
         void draw(float alpha) const override;
+        Message get_message() const;
 
     protected:
         Button::State button_pressed(uint16_t id) override;
@@ -108,6 +109,7 @@ namespace jrc
 
         Texture background;
         Sprite text;
+        Message message_id;
         bool saveid;
     };
 }

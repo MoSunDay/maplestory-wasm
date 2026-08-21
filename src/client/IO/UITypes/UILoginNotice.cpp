@@ -27,6 +27,7 @@
 namespace jrc
 {
     UILoginNotice::UILoginNotice(int8_t id)
+        : message_id(static_cast<Message>(id))
     {
         // The modal must own keyboard focus while it is visible. Otherwise a
         // hidden browser IME overlay from the parent field can consume its OK
@@ -52,6 +53,11 @@ namespace jrc
         text.draw(position, alpha);
 
         UIElement::draw(alpha);
+    }
+
+    UILoginNotice::Message UILoginNotice::get_message() const
+    {
+        return message_id;
     }
 
     Button::State UILoginNotice::button_pressed(uint16_t)

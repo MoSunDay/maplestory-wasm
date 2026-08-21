@@ -1,11 +1,14 @@
 #pragma once
 
 #include "CashShopModel.h"
-#include "../UIElement.h"
+#include "CashShopView.h"
 #include "../Components/Textfield.h"
+#include "../UIElement.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace jrc
@@ -35,58 +38,77 @@ namespace jrc
         void show_error(const std::string& message);
         void reconnect_failed(const std::string& address);
 
+        int32_t locker_count() const;
+        int32_t inventory_count() const;
+        int32_t nx_credit() const;
+        int32_t selected_right_row() const;
+        int64_t transfer_cash_id() const;
+        bool is_pending() const;
+
     protected:
         Button::State button_pressed(uint16_t id) override;
 
     private:
-        enum class Mode : uint8_t { CATALOG, LOCKER, INVENTORY };
         enum Buttons : uint16_t
         {
+            BT_BUY_HIT,
+            BT_SELECTED_TRANSFER,
             BT_EXIT,
-            BT_CREDIT,
-            BT_POINTS,
-            BT_PREPAID,
-            BT_CATALOG,
-            BT_LOCKER,
-            BT_INVENTORY,
-            BT_CATEGORY_ALL,
-            BT_CATEGORY_EQUIP,
-            BT_CATEGORY_USE,
-            BT_CATEGORY_SETUP,
-            BT_CATEGORY_ETC,
-            BT_CATEGORY_CASH,
-            BT_CATEGORY_PACKAGE,
-            BT_PREVIOUS,
-            BT_NEXT,
-            BT_ITEM_FIRST
+            BT_BUY,
+            BT_TRANSFER,
+            BT_CATEGORY,
+            BT_CURRENCY,
+            BT_RIGHT_MODE,
+            BT_LEFT_PREVIOUS,
+            BT_LEFT_NEXT,
+            BT_RIGHT_PREVIOUS,
+            BT_RIGHT_NEXT,
+            BT_LEFT_FIRST,
+            BT_RIGHT_FIRST = BT_LEFT_FIRST + cash_shop_view::ROWS_PER_PANE
         };
 
-        static constexpr size_t ITEMS_PER_PAGE = 14;
-
-        void rebuild();
-        void refresh_labels();
-        void set_mode(Mode value);
-        void set_category(int8_t value);
-        void request_purchase(size_t visible_index);
-        void request_transfer(size_t visible_index);
+        void rebuild_catalog();
+        void refresh();
+        void refresh_rows();
+        void change_right_pane(cash_shop_view::RightPane pane);
         void set_pending(bool value);
-        size_t result_count() const;
-        std::string visible_name(size_t index) const;
+        void select_new_locker_item(int64_t cash_id);
+        void select_inventory_item(int64_t cash_id);
+        void request_purchase(size_t filtered_index);
+        void request_transfer(size_t item_index);
+        size_t right_count() const;
+        int32_t right_item_id(size_t index) const;
+        int64_t right_cash_id(size_t index) const;
+        Point<int16_t> row_position(bool right, size_t row) const;
 
         std::shared_ptr<CashShopModel> model;
         bool female;
-        Mode mode;
+        cash_shop_view::RightPane right_pane;
         CashCurrency currency;
         int8_t category;
-        size_t page;
+        size_t left_page;
+        size_t right_page;
         bool pending;
         int64_t pending_cash_id;
+        std::optional<size_t> selected_left;
+        std::optional<size_t> selected_right;
         std::vector<size_t> filtered;
+        Point<int16_t> last_cursor_position;
+
+        Texture selection;
         Textfield search;
         Text title;
+        Text category_label;
+        Text currency_label;
+        Text search_label;
         Text balance_label;
-        Text status_label;
-        Text item_names[ITEMS_PER_PAGE];
-        Text item_prices[ITEMS_PER_PAGE];
+        Text right_mode_label;
+        Text transfer_label;
+        Text left_page_label;
+        Text right_page_label;
+        Text left_names[cash_shop_view::ROWS_PER_PANE];
+        Text left_details[cash_shop_view::ROWS_PER_PANE];
+        Text right_names[cash_shop_view::ROWS_PER_PANE];
+        Text right_details[cash_shop_view::ROWS_PER_PANE];
     };
 }

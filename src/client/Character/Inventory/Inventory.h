@@ -119,6 +119,8 @@ namespace jrc
         int16_t get_item_count(InventoryType::Id type, int16_t slot) const;
         // Return the id of an item. Returns 0 if the slot is empty.
         int32_t get_item_id(InventoryType::Id type, int16_t slot) const;
+        // Return whether the item in a slot is a cash item.
+        bool is_cash_item(InventoryType::Id type, int16_t slot) const;
 
         // Return a pointer to an equip.
         Optional<const Equip> get_equip(InventoryType::Id type, int16_t slot) const;

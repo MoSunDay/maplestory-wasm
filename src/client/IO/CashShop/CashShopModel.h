@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace jrc
@@ -68,7 +67,6 @@ namespace jrc
 
     private:
         void load_catalog();
-        void load_packages(std::unordered_map<int32_t, std::vector<int32_t>>& packages);
 
         std::vector<CashCommodity> commodities;
         std::vector<CashLockerItem> locker_items;
