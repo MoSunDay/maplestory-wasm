@@ -22,7 +22,8 @@ namespace jrc
     namespace ItemParser
     {
         // Parse a normal item from a packet.
-        void add_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, int32_t id, Inventory& inventory)
+        void add_item(InPacket& recv, InventoryType::Id invtype, int16_t slot,
+            int32_t id, Inventory& inventory, int64_t forced_cash_id)
         {
             // Read all item stats.
             bool cash = recv.read_bool();
@@ -30,6 +31,11 @@ namespace jrc
             if (cash)
             {
                 cash_id = recv.read_long();
+            }
+            else if (forced_cash_id != 0)
+            {
+                cash = true;
+                cash_id = forced_cash_id;
             }
             int64_t expire = recv.read_long();
             int16_t count = recv.read_short();
@@ -46,7 +52,8 @@ namespace jrc
         }
 
         // Parse a pet from a packet.
-        void add_pet(InPacket& recv, InventoryType::Id invtype, int16_t slot, int32_t id, Inventory& inventory)
+        void add_pet(InPacket& recv, InventoryType::Id invtype, int16_t slot,
+            int32_t id, Inventory& inventory, int64_t forced_cash_id)
         {
             // Read all pet stats.
             bool cash = recv.read_bool();
@@ -54,6 +61,11 @@ namespace jrc
             if (cash)
             {
                 cash_id = recv.read_long();
+            }
+            else if (forced_cash_id != 0)
+            {
+                cash = true;
+                cash_id = forced_cash_id;
             }
             int64_t expire = recv.read_long();
             std::string petname = recv.read_padded_string(13);
@@ -69,14 +81,21 @@ namespace jrc
         }
 
         // Parse an equip from a packet.
-        void add_equip(InPacket& recv, InventoryType::Id invtype, int16_t slot, int32_t id, Inventory& inventory)
+        void add_equip(InPacket& recv, InventoryType::Id invtype, int16_t slot,
+            int32_t id, Inventory& inventory, int64_t forced_cash_id)
         {
             // Read equip information.
             bool cash = recv.read_bool();
+            const bool wire_cash = cash;
             int64_t cash_id = 0;
             if (cash)
             {
                 cash_id = recv.read_long();
+            }
+            else if (forced_cash_id != 0)
+            {
+                cash = true;
+                cash_id = forced_cash_id;
             }
             int64_t expire = recv.read_long();
             uint8_t slots = recv.read_byte();
@@ -95,7 +114,7 @@ namespace jrc
             uint8_t itemlevel = 0;
             uint16_t itemexp = 0;
             int32_t vicious = 0;
-            if (cash)
+            if (wire_cash)
             {
                 // Some unused bytes.
                 recv.skip(10);
@@ -125,14 +144,14 @@ namespace jrc
         namespace
         {
             void parse_item_body(InPacket& recv, InventoryType::Id invtype,
-                int16_t slot, int32_t iid, Inventory& inventory)
+                int16_t slot, int32_t iid, Inventory& inventory, int64_t forced_cash_id)
             {
                 if (invtype == InventoryType::EQUIP || invtype == InventoryType::EQUIPPED)
-                    add_equip(recv, invtype, slot, iid, inventory);
+                    add_equip(recv, invtype, slot, iid, inventory, forced_cash_id);
                 else if (iid >= 5000000 && iid <= 5000102)
-                    add_pet(recv, invtype, slot, iid, inventory);
+                    add_pet(recv, invtype, slot, iid, inventory, forced_cash_id);
                 else
-                    add_item(recv, invtype, slot, iid, inventory);
+                    add_item(recv, invtype, slot, iid, inventory, forced_cash_id);
             }
         }
 
@@ -142,15 +161,16 @@ namespace jrc
             recv.read_byte(); // 'type' byte
             int32_t iid = recv.read_int();
 
-            parse_item_body(recv, invtype, slot, iid, inventory);
+            parse_item_body(recv, invtype, slot, iid, inventory, 0);
         }
 
-        InventoryType::Id parse_item_auto(InPacket& recv, int16_t slot, Inventory& inventory)
+        InventoryType::Id parse_item_auto(InPacket& recv, int16_t slot,
+            Inventory& inventory, int64_t forced_cash_id)
         {
             recv.read_byte();
             int32_t iid = recv.read_int();
             InventoryType::Id type = InventoryType::by_item_id(iid);
-            parse_item_body(recv, type, slot, iid, inventory);
+            parse_item_body(recv, type, slot, iid, inventory, forced_cash_id);
             return type;
         }
     }

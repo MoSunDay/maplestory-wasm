@@ -25,6 +25,7 @@ namespace jrc
     namespace ItemParser
     {
         void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory);
-        InventoryType::Id parse_item_auto(InPacket& recv, int16_t slot, Inventory& inventory);
+        InventoryType::Id parse_item_auto(InPacket& recv, int16_t slot,
+            Inventory& inventory, int64_t forced_cash_id = 0);
     }
 }

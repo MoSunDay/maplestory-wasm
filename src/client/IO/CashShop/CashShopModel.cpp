@@ -4,7 +4,11 @@
 #include "nlnx/nx.hpp"
 
 #include <algorithm>
+#include <fstream>
 #include <iterator>
+#include <stdexcept>
+#include <string_view>
+#include <unordered_map>
 
 namespace jrc
 {
@@ -46,6 +50,27 @@ namespace jrc
             default:
                 return {};
             }
+        }
+
+        std::vector<std::string_view> split(std::string_view value, char separator)
+        {
+            std::vector<std::string_view> fields;
+            size_t begin = 0;
+            while (begin <= value.size())
+            {
+                const size_t end = value.find(separator, begin);
+                fields.push_back(value.substr(begin,
+                    end == std::string_view::npos ? value.size() - begin : end - begin));
+                if (end == std::string_view::npos)
+                    break;
+                begin = end + 1;
+            }
+            return fields;
+        }
+
+        int32_t number(const std::vector<std::string_view>& fields, size_t index)
+        {
+            return std::stoi(std::string(fields.at(index)));
         }
     }
 
@@ -128,48 +153,62 @@ namespace jrc
         return name.empty() ? "物品 " + std::to_string(item_id) : name;
     }
 
-    void CashShopModel::load_packages(
-        std::unordered_map<int32_t, std::vector<int32_t>>& packages)
-    {
-        for (nl::node package : nl::nx::etc["CashPackage.img"])
-        {
-            std::vector<int32_t> sns;
-            for (nl::node entry : package["SN"])
-                sns.push_back(static_cast<int32_t>(entry.get_integer()));
-            packages.emplace(std::stoi(package.name()), std::move(sns));
-        }
-    }
-
     void CashShopModel::load_catalog()
     {
         std::unordered_map<int32_t, std::vector<int32_t>> packages;
-        load_packages(packages);
-
-        for (nl::node source : nl::nx::etc["Commodity.img"])
+        std::ifstream source("data/cash-shop-v83.csv", std::ios::binary);
+        if (!source)
+            throw std::runtime_error("Missing linked-server cash shop catalog");
+        const std::string content{
+            std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()};
+        for (std::string_view record : split(content, ';'))
         {
-            CashCommodity item;
-            item.sn = source["SN"];
-            item.item_id = source["ItemId"];
-            item.price = source["Price"];
-            item.period = source["Period"];
-            item.count = static_cast<int16_t>(source["Count"].get_integer(1));
-            item.gender = static_cast<int8_t>(source["Gender"].get_integer(2));
-            item.priority = source["Priority"];
-            item.on_sale = source["OnSale"].get_integer() == 1;
-            item.category = category_for_item(item.item_id);
-            item.name = item_name(item.item_id);
-
-            auto package = packages.find(item.item_id);
-            if (package != packages.end())
+            const auto fields = split(record, ',');
+            if (fields.empty() || fields[0].empty())
+                continue;
+            if (fields[0] == "C" && fields.size() == 9)
             {
-                item.package = true;
-                item.category = 6;
-                item.package_sns = package->second;
-                if (item.name.rfind("物品 ", 0) == 0)
-                    item.name = "礼包 " + std::to_string(item.item_id);
+                CashCommodity item;
+                item.sn = number(fields, 1);
+                item.item_id = number(fields, 2);
+                item.price = number(fields, 3);
+                item.period = number(fields, 4);
+                item.count = static_cast<int16_t>(number(fields, 5));
+                item.gender = static_cast<int8_t>(number(fields, 6));
+                item.priority = number(fields, 7);
+                item.on_sale = number(fields, 8) == 1;
+                item.category = category_for_item(item.item_id);
+                item.name = item_name(item.item_id);
+                commodities.push_back(std::move(item));
             }
-            commodities.push_back(std::move(item));
+            else if (fields[0] == "P" && fields.size() >= 3)
+            {
+                std::vector<int32_t> sns;
+                for (size_t index = 2; index < fields.size(); ++index)
+                    sns.push_back(number(fields, index));
+                packages.emplace(number(fields, 1), std::move(sns));
+            }
+            else
+                throw std::runtime_error("Invalid linked-server cash shop catalog record");
         }
+
+        for (CashCommodity& item : commodities)
+        {
+            auto package = packages.find(item.item_id);
+            if (package == packages.end())
+                continue;
+            item.package = true;
+            item.category = 6;
+            item.package_sns = package->second;
+            if (item.name.rfind("物品 ", 0) == 0)
+                item.name = "礼包 " + std::to_string(item.item_id);
+        }
+
+        auto acceptance = std::find_if(commodities.begin(), commodities.end(),
+            [](const CashCommodity& item) { return item.sn == 80000002; });
+        if (acceptance == commodities.end() || acceptance->item_id != 4031192 ||
+            acceptance->price != 1 || !acceptance->on_sale)
+            throw std::runtime_error("Invalid linked-server cash shop acceptance item");
 
         std::stable_sort(commodities.begin(), commodities.end(),
             [](const CashCommodity& left, const CashCommodity& right) {

@@ -165,7 +165,9 @@ namespace jrc
         case 0x68:
         {
             int16_t slot = recv.read_short();
-            ItemParser::parse_item_auto(recv, slot, Stage::get().get_player().get_inventory());
+            const int64_t cash_id = shop ? shop->transfer_cash_id() : 0;
+            ItemParser::parse_item_auto(
+                recv, slot, Stage::get().get_player().get_inventory(), cash_id);
             if (shop)
                 shop->take_succeeded();
             return;

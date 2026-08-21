@@ -6,27 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>冒险岛online</title>
     <style>
+        html,
         body {
             margin: 0;
             padding: 0;
+            width: 100%;
+            height: 100%;
             background-color: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            width: 100vw;
             overflow: hidden;
+        }
+
+        body {
+            position: relative;
             font-family: 'Noto Sans CJK SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
             color: #fff;
         }
 
         #container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            width: 100%;
-            height: 100%;
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
         }
 
         #loading-screen {
@@ -189,6 +188,9 @@
         }
 
         #canvas {
+            position: absolute;
+            left: 50%;
+            top: 0;
             border: none;
             background-color: #000;
             display: block;
@@ -197,6 +199,7 @@
             image-rendering: pixelated;
             image-rendering: crisp-edges;
             touch-action: none;
+            transform: translateX(-50%);
         }
 
         /* Invisible but focusable: the browser attaches its IME (pinyin, etc.)
@@ -430,6 +433,21 @@
             const GAME_WIDTH = 800;
             const GAME_HEIGHT = 600;
 
+            function getViewportSize() {
+                if (window.visualViewport) {
+                    return {
+                        width: window.visualViewport.width,
+                        height: window.visualViewport.height
+                    };
+                }
+
+                const root = document.documentElement;
+                return {
+                    width: root.clientWidth || window.innerWidth,
+                    height: root.clientHeight || window.innerHeight
+                };
+            }
+
             function syncCanvasResolution(canvas) {
                 if (canvas.width === GAME_WIDTH && canvas.height === GAME_HEIGHT) {
                     return;
@@ -468,10 +486,12 @@
                 // Keep the render surface fixed and only scale it with CSS.
                 syncCanvasResolution(canvas);
 
-                const { width, height } = getFittedCanvasSize(window.innerWidth, window.innerHeight);
+                const viewport = getViewportSize();
+                const { width, height } = getFittedCanvasSize(viewport.width, viewport.height);
 
                 canvas.style.width = width + 'px';
                 canvas.style.height = height + 'px';
+                canvas.style.top = '0px';
             }
 
             window.MapleWasmUI = {
