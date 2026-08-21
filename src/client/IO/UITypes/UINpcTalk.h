@@ -49,6 +49,11 @@ namespace jrc
             const std::string& text
         );
 
+        const std::string& get_prompt_text() const
+        {
+            return prompttext;
+        }
+
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
 

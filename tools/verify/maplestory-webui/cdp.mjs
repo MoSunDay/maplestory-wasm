@@ -9,7 +9,12 @@ export class BrowserDriver {
   constructor(options) {
     this.binary = options.binary;
     this.debugPort = options.debugPort;
-    this.artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'maplestory-webui-'));
+    this.artifactDir = options.artifactDir || fs.mkdtempSync(path.join(os.tmpdir(), 'maplestory-webui-'));
+    this.profileDir = options.profileDir || path.join(this.artifactDir, 'chrome-profile');
+    this.extraArgs = options.extraArgs || [];
+    this.headed = options.headed;
+    fs.mkdirSync(this.artifactDir, { recursive: true });
+    fs.mkdirSync(this.profileDir, { recursive: true });
     this.nextId = 0;
     this.pending = new Map();
     this.logs = [];
@@ -35,11 +40,11 @@ export class BrowserDriver {
       '--no-sandbox', '--enable-webgl', '--ignore-gpu-blocklist',
       '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio',
       '--no-proxy-server', '--proxy-bypass-list=*', '--remote-allow-origins=*',
-      `--user-data-dir=${process.env.E2E_PROFILE_DIR || path.join(this.artifactDir, 'chrome-profile')}`,
+      `--user-data-dir=${this.profileDir}`,
       `--remote-debugging-port=${this.debugPort}`, '--window-size=820,640',
-      ...extraArgs, 'about:blank'
+      ...extraArgs, ...this.extraArgs, 'about:blank'
     ];
-    if (process.env.E2E_HEADED !== '1') browserArgs.unshift('--headless=new');
+    if (this.headed !== true && process.env.E2E_HEADED !== '1') browserArgs.unshift('--headless=new');
     this.process = spawn(this.binary, browserArgs, { stdio: 'ignore' });
 
     for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -164,6 +169,30 @@ export class BrowserDriver {
   async doubleClick(gameX, gameY) {
     await this.click(gameX, gameY);
     await this.click(gameX, gameY);
+  }
+
+  async drag(fromX, fromY, toX, toY) {
+    const points = await this.evaluate(`(() => {
+      const bounds = document.getElementById('canvas').getBoundingClientRect();
+      const point = (x, y) => ({
+        x: bounds.left + x * bounds.width / 800,
+        y: bounds.top + y * bounds.height / 600
+      });
+      return { from: point(${fromX}, ${fromY}), to: point(${toX}, ${toY}) };
+    })()`);
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', ...points.from, button: 'none'
+    });
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed', ...points.from, button: 'left', buttons: 1, clickCount: 1
+    });
+    await sleep(50);
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', ...points.to, button: 'left', buttons: 1
+    });
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', ...points.to, button: 'left', buttons: 0, clickCount: 1
+    });
   }
 
   async domClick(gameX, gameY) {

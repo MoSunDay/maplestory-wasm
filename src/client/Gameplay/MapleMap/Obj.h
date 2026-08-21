@@ -19,6 +19,8 @@
 #include "../../Graphics/Animation.h"
 #include "../../Template/Point.h"
 
+#include <string>
+
 namespace jrc
 {
     // Represents an obj (map decoration) on a map.
@@ -34,11 +36,15 @@ namespace jrc
         void prepare_visible(Point<int16_t> viewpos, float inter) const;
         // Return depth of the obj.
         uint8_t getz() const;
+        bool set_active_if_named(const std::string& target_name, bool value);
+        bool is_named_active(const std::string& target_name) const;
 
     private:
         Animation animation;
         Point<int16_t> pos;
         uint8_t z;
         bool flip;
+        std::string name;
+        bool active;
     };
 }

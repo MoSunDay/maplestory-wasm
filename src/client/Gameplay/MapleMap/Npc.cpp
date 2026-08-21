@@ -141,6 +141,11 @@ namespace jrc
         return scripted;
     }
 
+    bool Npc::accepts_keyboard_talk() const
+    {
+        return active && !mouseonly;
+    }
+
     bool Npc::inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const
     {
         if (!active)

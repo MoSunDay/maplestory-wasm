@@ -68,6 +68,8 @@ namespace jrc
         void show_character_effect(int32_t cid, CharEffect::Id effect);
         // Show a map-level field effect.
         void add_effect(const std::string& path);
+        size_t set_named_object_active(const std::string& name, bool active);
+        size_t count_active_named_objects(const std::string& name) const;
         // Schedule a timed map-warp request used by intro scene scripts.
         void schedule_intro_warp(int32_t mapid, int32_t delay_ms);
 

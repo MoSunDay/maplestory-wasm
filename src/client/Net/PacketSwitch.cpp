@@ -99,6 +99,7 @@ namespace jrc
         FIELD_OBSTACLE_LIST    = 140,
         FIELD_OBSTACLE_RESET   = 141,
         CLOCK                   = 147,
+        STOP_CLOCK              = 154,
         LEGACY_FIELD_OBJECT     = 159,
 
         // Mapobject
@@ -180,6 +181,8 @@ namespace jrc
         // 'Setfield' handlers
         emplace<SET_FIELD, SetfieldHandler>();
         emplace<SET_CASH_SHOP, SetCashShopHandler>();
+        emplace<CLOCK, ClockHandler>();
+        emplace<STOP_CLOCK, StopClockHandler>();
 
         // MapObject handlers
         emplace<SPAWN_CHAR, SpawnCharHandler>();

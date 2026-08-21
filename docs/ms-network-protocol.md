@@ -2812,9 +2812,14 @@ specialCount           short
 
 ```
 Field      Type    Notes
-type       byte    0=music, 1=object effect, 3=skill aura
-[varies]   —       Depends on type
+type       byte    2=deactivate named map object, 3=visual effect, 4=field sound, 6=music
+path       string  Object name or Sound/Effect NX path
 ```
+
+The client handles the Kerning PQ modes explicitly: mode 2 deactivates every
+map object with the supplied `name`, mode 3 displays the one-shot map effect,
+and mode 4 resolves both direct Sound.nx paths and the server's `Party1/*`
+paths under `Field.img`.
 
 ---
 
@@ -2833,6 +2838,9 @@ type     byte   1=clock (HH:MM:SS), 2=countdown (seconds)
   secs   int    Countdown duration in seconds
 ```
 
+Countdown time is measured with a monotonic clock and clamps at zero. A new
+packet replaces the current clock state.
+
 ---
 
 ### 0x0096 — SET_QUEST_CLEAR
@@ -2842,6 +2850,17 @@ type     byte   1=clock (HH:MM:SS), 2=countdown (seconds)
 ```
 Field     Type   Notes
 questId   short
+```
+
+---
+
+### 0x009A — STOP_CLOCK
+
+**Purpose:** Removes the active field clock.
+
+```
+Field      Type   Notes
+[reserved] byte   Server writes zero; no semantic payload
 ```
 
 ---
