@@ -197,6 +197,7 @@ namespace jrc
         numfield = Textfield(Text::A11M, Text::LEFT, Text::LIGHTGREY, area, 9);
         numfield.set_state(Textfield::FOCUSED);
         numfield.change_text(std::to_string(de));
+        numfield.select_all();
         numfield.set_enter_callback([&](std::string numstr){
             handlestring(numstr);
         });

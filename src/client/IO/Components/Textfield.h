@@ -53,6 +53,9 @@ namespace jrc
 
         void set_state(State state);
         void change_text(const std::string& text);
+        // Select the current value so the next edit replaces it. This is used
+        // by fields whose pre-filled default should not have to be erased.
+        void select_all();
         // Replace text and caret in one step (used by the browser IME bridge,
         // where the caret is a UTF-16 offset).
         void set_text_with_caret(const std::string& text, size_t caret_utf16);
@@ -73,6 +76,7 @@ namespace jrc
 
     private:
         void modifytext(const std::string&);
+        bool clear_selection();
         bool belowlimit(size_t extra = 1) const;
 
         Text textlabel;
@@ -81,6 +85,7 @@ namespace jrc
         bool showmarker;
         uint16_t elapsed;
         size_t markerpos;
+        bool allselected = false;
         Rectangle<int16_t> bounds;
         Point<int16_t> parentpos;
         size_t limit;
@@ -91,4 +96,3 @@ namespace jrc
         std::function<void(std::string)> onreturn;
     };
 }
-

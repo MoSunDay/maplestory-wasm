@@ -33,7 +33,8 @@ namespace jrc
                          size_t lim)
         : textlabel(font, alignment, color, "", 0, false), text(),
           marker(font, alignment, color, "|"),             markerpos(0),
-          bounds(bnd),                                     limit(lim),
+          allselected(false),                              bounds(bnd),
+          limit(lim),
           crypt(0),                                        state(NORMAL)
         {}
 
@@ -94,6 +95,7 @@ namespace jrc
             }
             else if (previous == FOCUSED)
             {
+                allselected = false;
                 UI::get().blur_textfield(this);
                 ImeBridge::blur_field();
             }
@@ -120,7 +122,13 @@ namespace jrc
                 switch (key)
                 {
                 case KeyAction::LEFT:
-                    if (markerpos > 0)
+                    if (allselected)
+                    {
+                        allselected = false;
+                        markerpos = 0;
+                        ImeBridge::sync_field(this);
+                    }
+                    else if (markerpos > 0)
                     {
                         // Step over the whole preceding codepoint, not just one
                         // byte of a multi-byte sequence.
@@ -132,7 +140,13 @@ namespace jrc
                     }
                     break;
                 case KeyAction::RIGHT:
-                    if (markerpos < text.size())
+                    if (allselected)
+                    {
+                        allselected = false;
+                        markerpos = text.size();
+                        ImeBridge::sync_field(this);
+                    }
+                    else if (markerpos < text.size())
                     {
                         markerpos++;
                         while (markerpos < text.size() && Utf8::is_continuation(text[markerpos]))
@@ -142,7 +156,11 @@ namespace jrc
                     }
                     break;
                 case KeyAction::BACK:
-                    if (text.size() > 0 && markerpos > 0)
+                    if (clear_selection())
+                    {
+                        modifytext(text);
+                    }
+                    else if (text.size() > 0 && markerpos > 0)
                     {
                         // Delete the entire codepoint before the caret.
                         size_t start = markerpos - 1;
@@ -169,13 +187,20 @@ namespace jrc
                     }
                     break;
                 case KeyAction::SPACE:
+                {
+                    bool replaced = clear_selection();
                     if (markerpos > 0 && belowlimit())
                     {
                         text.insert(markerpos, 1, ' ');
                         markerpos++;
                         modifytext(text);
                     }
+                    else if (replaced)
+                    {
+                        modifytext(text);
+                    }
                     break;
+                }
                 default:
                     if (callbacks.count(key))
                     {
@@ -190,10 +215,15 @@ namespace jrc
             if (!pressed)
             {
                 auto c = static_cast<int8_t>(key);
+                bool replaced = clear_selection();
                 if (belowlimit())
                 {
                     text.insert(markerpos, 1, c);
                     markerpos++;
+                    modifytext(text);
+                }
+                else if (replaced)
+                {
                     modifytext(text);
                 }
             }
@@ -205,6 +235,9 @@ namespace jrc
 
     void Textfield::add_string(const std::string& str)
     {
+        bool replaced = !str.empty() && clear_selection();
+        bool inserted = false;
+
         for (size_t i = 0; i < str.size(); )
         {
             size_t seqlen = Utf8::sequence_length(str[i]);
@@ -220,9 +253,14 @@ namespace jrc
 
             text.insert(markerpos, str, i, seqlen);
             markerpos += seqlen;
-            modifytext(text);
+            inserted = true;
 
             i += seqlen;
+        }
+
+        if (replaced || inserted)
+        {
+            modifytext(text);
         }
     }
 
@@ -290,12 +328,26 @@ namespace jrc
 
     void Textfield::change_text(const std::string& t)
     {
+        allselected = false;
+        markerpos = t.size();
         modifytext(t);
+    }
+
+    void Textfield::select_all()
+    {
+        if (text.empty())
+        {
+            return;
+        }
+
+        allselected = true;
         markerpos = text.size();
+        ImeBridge::select_all(this);
     }
 
     void Textfield::set_text_with_caret(const std::string& newtext, size_t caret_utf16)
     {
+        allselected = false;
         std::string value = newtext;
 
         // Fixed-limit fields are bounded by the protocol in bytes, so trim at
@@ -339,6 +391,19 @@ namespace jrc
             caret = text.size();
         }
         markerpos = caret;
+    }
+
+    bool Textfield::clear_selection()
+    {
+        if (!allselected)
+        {
+            return false;
+        }
+
+        text.clear();
+        markerpos = 0;
+        allselected = false;
+        return true;
     }
 
     void Textfield::set_cryptchar(int8_t c)

@@ -102,6 +102,21 @@ namespace jrc
         }, text.c_str(), caret);
     }
 
+    void ImeBridge::select_all(const Textfield* field)
+    {
+        if (!active || field != focusedfield)
+        {
+            return;
+        }
+
+        EM_ASM({
+            if (window.MapleWasmIME && window.MapleWasmIME.onSelectAll)
+            {
+                window.MapleWasmIME.onSelectAll();
+            }
+        });
+    }
+
     void ImeBridge::apply_text(const std::string& text, size_t caret_utf16)
     {
         if (active)
@@ -233,6 +248,8 @@ namespace jrc
     void ImeBridge::blur_field() {}
 
     void ImeBridge::sync_field(const Textfield*) {}
+
+    void ImeBridge::select_all(const Textfield*) {}
 
     void ImeBridge::apply_text(const std::string&, size_t) {}
 
