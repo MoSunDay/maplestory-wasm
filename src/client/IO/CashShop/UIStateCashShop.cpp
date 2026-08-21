@@ -17,8 +17,13 @@ namespace jrc
 
     void UIStateCashShop::draw(float alpha, Point<int16_t>) const
     {
+        if (const UIElement* cash_shop = elements[UIElement::CASHSHOP].get();
+            cash_shop && cash_shop->is_active())
+        {
+            cash_shop->draw(alpha);
+        }
         for (const auto& entry : elements)
-            if (entry.second && entry.second->is_active())
+            if (entry.first != UIElement::CASHSHOP && entry.second && entry.second->is_active())
                 entry.second->draw(alpha);
     }
 
@@ -129,7 +134,10 @@ namespace jrc
     {
         remove(type);
         if (is_focused)
+        {
             focused = type;
+            cursor_captured = UIElement::NONE;
+        }
         return elements.find(type);
     }
 
