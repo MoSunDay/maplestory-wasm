@@ -12,6 +12,7 @@
 - 死亡墓碑落地点：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-ground.cpp -o /tmp/death-tomb-ground && /tmp/death-tomb-ground`
 - 攻击输入与特效选择：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/attack-effect-selection.cpp -o /tmp/attack-effect-selection && /tmp/attack-effect-selection`
 - 武器残影档位与播放状态：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/afterimage-playback.cpp -o /tmp/afterimage-playback && /tmp/afterimage-playback`
+- 动画单端透明度语义：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/animation-frame-properties.cpp -o /tmp/animation-frame-properties && /tmp/animation-frame-properties`
 - 普通攻击姿态预热集合：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/regular-attack-stances.cpp -o /tmp/regular-attack-stances && /tmp/regular-attack-stances`
 - 远端 Buff 掩码顺序：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
 - 世界选择单频道策略与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
@@ -25,3 +26,4 @@
 - NPC 商店售卖数量钳制、批量售卖 Tab 与现金物品过滤：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/npc-shop-sale.cpp -o /tmp/npc-shop-sale && /tmp/npc-shop-sale`
 - 攻击 NX 结构审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/attack-effect-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/attack-effect-nx && /tmp/attack-effect-nx Skill.nx`
 - 近战武器残影 NX 审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/weapon-afterimage-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/weapon-afterimage-nx && /tmp/weapon-afterimage-nx Character.nx`
+- 手套图层与 Base zmap 一致性：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/glove-layering-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/glove-layering-nx && /tmp/glove-layering-nx Character.nx Base.nx`

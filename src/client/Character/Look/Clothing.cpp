@@ -23,6 +23,7 @@
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
+#include <stdexcept>
 #include <unordered_set>
 
 namespace jrc
@@ -143,6 +144,18 @@ namespace jrc
                     if (part == "mailArm")
                     {
                         z = Layer::MAILARM;
+                    }
+                    else if (eqslot == Equipslot::GLOVES)
+                    {
+                        std::optional<Layer> glove_layer = glove_layer_by_name(zs);
+                        if (!glove_layer)
+                        {
+                            throw std::runtime_error(
+                                "Unhandled glove layer: " + zs + " in " +
+                                std::to_string(itemid)
+                            );
+                        }
+                        z = *glove_layer;
                     }
                     else
                     {
@@ -290,12 +303,6 @@ namespace jrc
         { "shieldOverHair",       Layer::SHIELD_OVER_HAIR  },
         { "shieldBelowBody",      Layer::SHIELD_BELOW_BODY },
         { "backShield",           Layer::BACKSHIELD        },
-        // GLOVE
-        { "gloveWrist",           Layer::WRIST             },
-        { "gloveOverHair",        Layer::GLOVE_OVER_HAIR   },
-        { "gloveOverBody",        Layer::GLOVE_OVER_BODY   },
-        { "gloveWristOverHair",   Layer::WRIST_OVER_HAIR   },
-        { "gloveWristOverBody",   Layer::WRIST_OVER_BODY   },
         // CAP
         { "capOverHair",          Layer::CAP_OVER_HAIR     },
         { "capBelowBody",         Layer::CAP_BELOW_BODY    },

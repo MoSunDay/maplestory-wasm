@@ -16,12 +16,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Animation.h"
+
+#include "Animation/FrameProperties.h"
 #include "GraphicsGL.h"
 
 #include "../Constants.h"
 #include "../Util/Misc.h"
 
 #include <algorithm>
+#include <optional>
 #include <set>
 
 namespace jrc
@@ -37,26 +40,11 @@ namespace jrc
             delay = 100;
         }
 
-        bool hasa0 = src["a0"].data_type() == nl::node::type::integer;
-        bool hasa1 = src["a1"].data_type() == nl::node::type::integer;
-        if (hasa0 && hasa1)
-        {
-            opacities = { src["a0"], src["a1"] };
-        }
-        else if (hasa0)
-        {
-            uint8_t a0 = src["a0"];
-            opacities = { a0, a0 };
-        }
-        else if (hasa1)
-        {
-            uint8_t a1 = src["a1"];
-            opacities = { a1, a1 };
-        }
-        else
-        {
-            opacities = { 255, 255 };
-        }
+        std::optional<uint8_t> a0;
+        std::optional<uint8_t> a1;
+        if (src["a0"].data_type() == nl::node::type::integer) a0 = src["a0"];
+        if (src["a1"].data_type() == nl::node::type::integer) a1 = src["a1"];
+        opacities = animation::opacity_endpoints(a0, a1);
 
         bool hasz0 = src["z0"].data_type() == nl::node::type::integer;
         bool hasz1 = src["z1"].data_type() == nl::node::type::integer;
@@ -90,9 +78,9 @@ namespace jrc
         texture.draw(args);
     }
 
-    void Frame::draw_effect(const DrawArgument& args) const
+    bool Frame::draw_effect(const DrawArgument& args) const
     {
-        texture.draw_effect(args);
+        return texture.draw_effect(args);
     }
 
     void Frame::prepare_visible() const
@@ -245,7 +233,7 @@ namespace jrc
         }
     }
 
-    void Animation::draw_effect(const DrawArgument& args, float alpha) const
+    bool Animation::draw_effect(const DrawArgument& args, float alpha) const
     {
         int16_t interframe = frame.get(alpha);
         float interopc = opacity.get(alpha) / 255;
@@ -255,13 +243,13 @@ namespace jrc
         bool modifyscale = interscale != 1.0f;
         if (modifyopc || modifyscale)
         {
-            frames[interframe].draw_effect(
+            return frames[interframe].draw_effect(
                 args + DrawArgument(interscale, interscale, interopc)
             );
         }
         else
         {
-            frames[interframe].draw_effect(args);
+            return frames[interframe].draw_effect(args);
         }
     }
 

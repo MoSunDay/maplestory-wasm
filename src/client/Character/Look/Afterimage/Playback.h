@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace jrc::afterimage
 {
     enum class PlaybackPhase
@@ -37,13 +39,22 @@ namespace jrc::afterimage
         return phase;
     }
 
+    inline bool reached_trigger(
+        uint8_t previous_frame,
+        uint8_t current_frame,
+        uint8_t trigger_frame
+    ) {
+        return previous_frame >= trigger_frame || current_frame >= trigger_frame;
+    }
+
     inline bool should_advance(
         PlaybackPhase phase_before_assets,
         PlaybackPhase phase_after_assets,
-        bool ready
+        bool ready,
+        bool presented
     )
     {
-        return ready &&
+        return ready && presented &&
             phase_before_assets == PlaybackPhase::PLAYING &&
             phase_after_assets == PlaybackPhase::PLAYING;
     }
