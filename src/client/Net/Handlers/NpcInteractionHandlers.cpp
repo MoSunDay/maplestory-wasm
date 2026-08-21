@@ -159,6 +159,44 @@ namespace jrc
 
             UI::get().emplace<UIOk>(message, []() {});
         }
+
+        void show_shop_error_message(int8_t result)
+        {
+            const char* message = nullptr;
+            switch (result)
+            {
+            case 0x01:
+                message = "The requested shop item is no longer available.";
+                break;
+            case 0x05:
+                message = "No eligible items could be sold.";
+                break;
+            case 0x02:
+                message = "You do not have enough mesos.";
+                break;
+            case 0x03:
+                message = "Your inventory is full.";
+                break;
+            case 0x0D:
+                message = "You do not have the required items.";
+                break;
+            case 0x10:
+                message = "现金物品不能出售。";
+                break;
+            case 0x06:
+            case 0x07:
+                message = "The shop transaction could not be completed.";
+                break;
+            default:
+                message = "The shop returned an unknown transaction error.";
+                break;
+            }
+
+            if (message)
+            {
+                UI::get().emplace<UIOk>(message, []() {});
+            }
+        }
     }
 
     void NpcDialogueHandler::handle(InPacket& recv) const
@@ -224,6 +262,15 @@ namespace jrc
 
                 shop.add_rechargable(itemid, price, pitch, time, rechargeprice, slotmax);
             }
+        }
+    }
+
+    void ShopTransactionHandler::handle(InPacket& recv) const
+    {
+        int8_t result = recv.read_byte();
+        if (result != 0x00 && result != 0x08)
+        {
+            show_shop_error_message(result);
         }
     }
 

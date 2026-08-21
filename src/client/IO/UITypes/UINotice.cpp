@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "UINotice.h"
+#include "Notice/NumberInputPolicy.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -176,12 +177,14 @@ namespace jrc
     }
 
 
-    UIEnterNumber::UIEnterNumber(std::string q, std::function<void(int32_t)> nh, int32_t mi, int32_t ma, int32_t de)
+    UIEnterNumber::UIEnterNumber(std::string q, std::function<void(int32_t)> nh, int32_t mi,
+                                 int32_t ma, int32_t de, bool clamp_max)
         : UINotice(q) {
 
         numhandler = nh;
         min = mi;
         max = ma;
+        clamp_max_on_input = clamp_max;
 
         int16_t belowtext = UINotice::box2offset();
 
@@ -210,6 +213,16 @@ namespace jrc
     void UIEnterNumber::update()
     {
         UIElement::update();
+
+        if (clamp_max_on_input)
+        {
+            std::string current = numfield.get_text();
+            std::string normalized = number_input_policy::clamp_maximum(current, max);
+            if (normalized != current)
+            {
+                numfield.change_text(normalized);
+            }
+        }
 
         numfield.update(position);
     }
@@ -262,6 +275,15 @@ namespace jrc
 
     void UIEnterNumber::handlestring(std::string numstr)
     {
+        if (clamp_max_on_input)
+        {
+            numstr = number_input_policy::clamp_maximum(numstr, max);
+            if (numstr != numfield.get_text())
+            {
+                numfield.change_text(numstr);
+            }
+        }
+
         if (numstr.size() > 0)
         {
             int32_t num;

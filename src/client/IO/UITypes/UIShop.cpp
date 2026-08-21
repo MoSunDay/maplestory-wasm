@@ -20,7 +20,6 @@
 
 #include "../UI.h"
 #include "../Components/AreaButton.h"
-#include "../Components/Charset.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 
@@ -45,6 +44,7 @@ namespace jrc
 
         buttons[BUY_ITEM]  = std::make_unique<MapleButton>(src["BtBuy"]);
         buttons[SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"]);
+        buttons[SELL_ALL]  = std::make_unique<MapleButton>(src["BtSell"], 0, 20);
         buttons[EXIT]      = std::make_unique<MapleButton>(src["BtExit"]);
         if (nl::node rechargenode = src["BtRecharge"])
         {
@@ -85,6 +85,7 @@ namespace jrc
         meso       = src["meso"];
 
         mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
+        sellalllabel = { Text::A11M, Text::RIGHT, Text::DARKGREY, "全部" };
 
         buyslider  = {
             11, { 115, 308 }, 214, 5, 1,
@@ -129,6 +130,7 @@ namespace jrc
         );
 
         mesolabel.draw(position + Point<int16_t>(450, 62));
+        sellalllabel.draw(position + Point<int16_t>(388, 68));
 
         buystate.draw(position, selection);
         sellstate.draw(position, selection);
@@ -185,6 +187,13 @@ namespace jrc
                 return Button::NORMAL;
             case SELL_ITEM:
                 sellstate.sell();
+                return Button::NORMAL;
+            case SELL_ALL:
+                if (!sellstate.has_sellable_items())
+                {
+                    return Button::DISABLED;
+                }
+                sellstate.sell_all();
                 return Button::NORMAL;
             case EXIT:
                 active = false;
@@ -363,6 +372,7 @@ namespace jrc
 
         sellslider.setrows(5, sellstate.lastslot);
         update_recharge_buttons();
+        update_sell_all_button();
     }
 
     void UIShop::update_recharge_buttons()
@@ -388,6 +398,13 @@ namespace jrc
                 recharge->set_state(Button::NORMAL);
             }
         }
+    }
+
+    void UIShop::update_sell_all_button()
+    {
+        buttons[SELL_ALL]->set_state(
+            sellstate.has_sellable_items() ? Button::NORMAL : Button::DISABLED
+        );
     }
 
     void UIShop::reset(int32_t npcid)
@@ -531,67 +548,6 @@ namespace jrc
         return buyable;
     }
 
-    UIShop::SellItem::SellItem(int32_t item_id,
-                               int16_t count,
-                               int16_t s,
-                               bool sc,
-                               Texture cur)
-    {
-        const ItemData& idata = ItemData::get(item_id);
-
-        icon      = idata.get_icon(false);
-        id        = item_id;
-        sellable  = count;
-        slot      = s;
-        rechargable = item_id / 10000 == 207 || item_id / 10000 == 233;
-        showcount = sc;
-        currency  = cur;
-
-        namelabel  = { Text::A11M, Text::LEFT, Text::DARKGREY };
-        pricelabel = { Text::A11M, Text::LEFT, Text::DARKGREY };
-
-        std::string name = idata.get_name();
-        namelabel.change_text(name);
-
-        int32_t price = idata.get_price();
-        std::string mesostr = std::to_string(price);
-        string_format::split_number(mesostr);
-        pricelabel.change_text(mesostr + " Mesos");
-    }
-
-    void UIShop::SellItem::draw(Point<int16_t> pos) const
-    {
-        icon.draw(pos + Point<int16_t>(0, 32));
-        if (showcount)
-        {
-            static const Charset countset = { nl::nx::ui["Basic.img"]["ItemNo"], Charset::LEFT };
-            countset.draw(std::to_string(sellable), pos + Point<int16_t>(0, 20));
-        }
-        namelabel.draw(pos + Point<int16_t>(40, -1));
-        currency.draw(pos + Point<int16_t>(38, 20));
-        pricelabel.draw(pos + Point<int16_t>(53, 17));
-    }
-
-    int32_t UIShop::SellItem::get_id() const
-    {
-        return id;
-    }
-
-    int16_t UIShop::SellItem::get_slot() const
-    {
-        return slot;
-    }
-
-    int16_t UIShop::SellItem::get_sellable() const
-    {
-        return sellable;
-    }
-
-    bool UIShop::SellItem::is_rechargable() const
-    {
-        return rechargable;
-    }
-
     void UIShop::BuyState::reset()
     {
         items.clear();
@@ -687,145 +643,4 @@ namespace jrc
     }
 
 
-    void UIShop::SellState::reset()
-    {
-        items.clear();
-
-        offset    = 0;
-        lastslot  = 0;
-        selection = -1;
-        tab       = InventoryType::NONE;
-    }
-
-    void UIShop::SellState::change_tab(const Inventory& inventory, InventoryType::Id newtab, Texture meso)
-    {
-        tab = newtab;
-
-        offset    = 0;
-        selection = -1;
-
-        items.clear();
-
-        int16_t slots = inventory.get_slotmax(tab);
-        for (int16_t i = 1; i <= slots; ++i)
-        {
-            if (int32_t item_id = inventory.get_item_id(tab, i))
-            {
-                int16_t count = inventory.get_item_count(tab, i);
-                items.emplace_back(item_id, count, i, tab != InventoryType::EQUIP, meso);
-            }
-        }
-
-        lastslot = static_cast<int16_t>(items.size());
-    }
-
-    void UIShop::SellState::draw(Point<int16_t> parentpos, const Texture& selected) const
-    {
-        for (int16_t i = 0; i < 5; ++i)
-        {
-            int16_t slot = i + offset;
-            if (slot >= lastslot)
-            {
-                break;
-            }
-
-            Point<int16_t> itempos(243, 116 + 42 * i);
-            if (slot == selection)
-            {
-                selected.draw(parentpos + itempos + Point<int16_t>(35, -1));
-            }
-            items[slot].draw(parentpos + itempos);
-        }
-    }
-
-    void UIShop::SellState::show_item(int16_t slot)
-    {
-        int16_t absslot = slot + offset;
-        if (absslot < 0 || absslot >= lastslot)
-        {
-            return;
-        }
-
-        if (tab == InventoryType::EQUIP)
-        {
-            int16_t realslot = items[absslot].get_slot();
-            UI::get().show_equip(Tooltip::SHOP, realslot);
-        }
-        else
-        {
-            int32_t itemid = items[absslot].get_id();
-            UI::get().show_item(Tooltip::SHOP, itemid);
-        }
-    }
-
-    bool UIShop::SellState::can_recharge_at(int16_t visibleslot) const
-    {
-        if (tab != InventoryType::USE)
-        {
-            return false;
-        }
-
-        int16_t absslot = visibleslot + offset;
-        return absslot >= 0 &&
-            absslot < lastslot &&
-            items[absslot].is_rechargable();
-    }
-
-    void UIShop::SellState::recharge_at(int16_t visibleslot) const
-    {
-        int16_t absslot = visibleslot + offset;
-        if (!can_recharge_at(visibleslot))
-        {
-            return;
-        }
-
-        NpcShopActionPacket(items[absslot].get_slot()).dispatch();
-    }
-
-    void UIShop::SellState::sell() const
-    {
-        if (selection < 0 || selection >= lastslot)
-        {
-            return;
-        }
-
-        const SellItem& item = items[selection];
-        int32_t itemid = item.get_id();
-        int16_t sellable = item.get_sellable();
-        int16_t slot = item.get_slot();
-        if (sellable > 1)
-        {
-            constexpr auto question = "How many would you like to sell?";
-            auto onenter = [itemid, slot](int32_t qty){
-                auto shortqty = static_cast<int16_t>(qty);
-
-                NpcShopActionPacket(slot, itemid, shortqty, false).dispatch();
-            };
-            UI::get().emplace<UIEnterNumber>(question, onenter, 1, sellable, 1);
-        }
-        else if (sellable > 0)
-        {
-            constexpr auto question = "Would you like to sell the item?";
-            auto ondecide = [itemid, slot](bool yes){
-                if (yes)
-                {
-                    NpcShopActionPacket(slot, itemid, 1, false).dispatch();
-                }
-            };
-            UI::get().emplace<UIYesNo>(question, ondecide);
-        }
-    }
-
-    void UIShop::SellState::select(int16_t selected)
-    {
-        int16_t slot = selected + offset;
-        if (slot == selection)
-        {
-            sell();
-        }
-        else
-        {
-            selection = slot;
-        }
-    }
 }

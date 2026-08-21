@@ -32,6 +32,12 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    // Handles the result of a buy, sell, bulk-sell, or recharge operation.
+    class ShopTransactionHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
     // Handles storage (trunk) open/update packets.
     class StorageHandler : public PacketHandler
     {
