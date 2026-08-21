@@ -37,9 +37,13 @@ int main()
     assert(!jrc::afterimage::should_advance(
         phase_before_assets,
         phase,
-        true
+        true,
+        false
     ));
-    assert(jrc::afterimage::should_advance(phase, phase, true));
+    // Updates cannot consume a resident one-frame slash until a draw pass has
+    // actually submitted it.
+    assert(!jrc::afterimage::should_advance(phase, phase, true, false));
+    assert(jrc::afterimage::should_advance(phase, phase, true, true));
     phase = jrc::afterimage::finish(phase, false);
     assert(phase == PlaybackPhase::PLAYING);
     assert(jrc::afterimage::should_draw(phase, true, false));
@@ -54,5 +58,24 @@ int main()
         PlaybackPhase::WAITING_FOR_TRIGGER,
         true,
         true
+    ));
+
+    // Trigger observation happens after the stance update. The previous frame
+    // still closes the terminal-frame transition if the body wrapped to zero.
+    assert(jrc::afterimage::reached_trigger(1, 2, 2));
+    assert(jrc::afterimage::reached_trigger(2, 0, 2));
+    assert(!jrc::afterimage::reached_trigger(0, 1, 2));
+
+    // Starting another attack resets presentation independently of asset
+    // readiness; the copied template must earn a new draw before advancing.
+    phase = PlaybackPhase::WAITING_FOR_TRIGGER;
+    phase = jrc::afterimage::latch_trigger(phase, true);
+    phase_before_assets = phase;
+    phase = jrc::afterimage::begin_when_ready(phase, true);
+    assert(!jrc::afterimage::should_advance(
+        phase_before_assets,
+        phase,
+        true,
+        false
     ));
 }

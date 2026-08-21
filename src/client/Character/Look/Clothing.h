@@ -22,6 +22,8 @@
 #include "../../Graphics/Texture.h"
 #include "../../Template/EnumMap.h"
 
+#include <optional>
+#include <string_view>
 #include <unordered_map>
 
 namespace jrc
@@ -37,7 +39,13 @@ namespace jrc
             CAPE, SHOES, PANTS, TOP, MAIL, MAILARM,
             EARRINGS, FACEACC, EYEACC, PENDANT, BELT, MEDAL, RING,
             CAP, CAP_BELOW_BODY, CAP_OVER_HAIR,
-            GLOVE, WRIST, GLOVE_OVER_HAIR, WRIST_OVER_HAIR, GLOVE_OVER_BODY, WRIST_OVER_BODY,
+            GLOVE, WRIST,
+            GLOVE_BELOW_BODY, WRIST_BELOW_BODY,
+            GLOVE_OVER_BODY, WRIST_OVER_BODY,
+            GLOVE_BELOW_HEAD, WRIST_BELOW_HEAD,
+            GLOVE_BELOW_MAILARM, WRIST_BELOW_MAILARM,
+            GLOVE_BELOW_WEAPON, WRIST_BELOW_WEAPON,
+            GLOVE_OVER_HAIR, WRIST_OVER_HAIR,
             SHIELD, BACKSHIELD, SHIELD_BELOW_BODY, SHIELD_OVER_HAIR,
             WEAPON, BACKWEAPON, WEAPON_BELOW_ARM, WEAPON_BELOW_BODY,
             WEAPON_OVER_HAND, WEAPON_OVER_BODY, WEAPON_OVER_GLOVE,
@@ -68,6 +76,50 @@ namespace jrc
         Stance::Id get_walk() const;
         // Return the vslot, used to distinguish some layering types.
         const std::string& get_vslot() const;
+
+        // Pure mapping for every glove z label present in the v83 Character
+        // NX. Distinct hand parts must never collapse into the default layer.
+        static constexpr std::optional<Layer> glove_layer_by_name(
+            std::string_view name
+        ) {
+            if (name == "glove") return GLOVE;
+            if (name == "gloveWrist") return WRIST;
+            if (name == "gloveBelowBody") return GLOVE_BELOW_BODY;
+            if (name == "gloveWristBelowBody") return WRIST_BELOW_BODY;
+            if (name == "gloveOverBody") return GLOVE_OVER_BODY;
+            if (name == "gloveWristOverBody") return WRIST_OVER_BODY;
+            if (name == "gloveBelowHead") return GLOVE_BELOW_HEAD;
+            if (name == "gloveWristBelowHead") return WRIST_BELOW_HEAD;
+            if (name == "gloveBelowMailArm") return GLOVE_BELOW_MAILARM;
+            if (name == "gloveWristBelowMailArm") return WRIST_BELOW_MAILARM;
+            if (name == "gloveBelowWeapon") return GLOVE_BELOW_WEAPON;
+            if (name == "gloveWristBelowWeapon") return WRIST_BELOW_WEAPON;
+            if (name == "gloveOverHair") return GLOVE_OVER_HAIR;
+            if (name == "gloveWristOverHair") return WRIST_OVER_HAIR;
+            return std::nullopt;
+        }
+
+        static constexpr std::optional<int16_t> glove_z(Layer layer)
+        {
+            switch (layer)
+            {
+            case GLOVE_BELOW_BODY: return 78;
+            case WRIST_BELOW_BODY: return 77;
+            case GLOVE_OVER_BODY: return 75;
+            case WRIST_OVER_BODY: return 63;
+            case GLOVE_BELOW_HEAD: return 57;
+            case WRIST_BELOW_HEAD: return 55;
+            case GLOVE: return 49;
+            case WRIST: return 47;
+            case GLOVE_BELOW_MAILARM: return 24;
+            case WRIST_BELOW_MAILARM: return 22;
+            case GLOVE_BELOW_WEAPON: return 19;
+            case WRIST_BELOW_WEAPON: return 18;
+            case GLOVE_OVER_HAIR: return 14;
+            case WRIST_OVER_HAIR: return 13;
+            default: return std::nullopt;
+            }
+        }
 
     private:
         EnumMap<Stance::Id, EnumMap<Layer, std::unordered_multimap<uint8_t, Texture>, NUM_LAYERS>> stances;
