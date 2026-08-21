@@ -4,6 +4,7 @@
 use futures_util::{SinkExt, StreamExt};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+use tokio::time::{timeout, Duration};
 use tokio_tungstenite::tungstenite::Message;
 
 fn docker_map(enabled: bool, mapped_host: &str) -> ws_proxy::DockerMap {
@@ -17,7 +18,11 @@ fn docker_map(enabled: bool, mapped_host: &str) -> ws_proxy::DockerMap {
 async fn spawn_proxy(map: ws_proxy::DockerMap) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
-    tokio::spawn(ws_proxy::run(listener, map));
+    tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+        ws_proxy::handle_connection(ws, &map).await;
+    });
     port
 }
 
@@ -56,6 +61,25 @@ async fn spawn_game_server(hello: Option<Vec<u8>>, echo: bool) -> u16 {
         }
     });
     port
+}
+
+/// Fake game server that reports when the proxy closes its TCP side.
+async fn spawn_disconnect_observer() -> (u16, tokio::task::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let observer = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        socket.write_all(&[0x5A; 16]).await.unwrap();
+        let mut buffer = [0u8; 16];
+        loop {
+            match socket.read(&mut buffer).await {
+                Ok(0) => break,
+                Ok(_) => {}
+                Err(err) => panic!("target TCP read failed before EOF: {err}"),
+            }
+        }
+    });
+    (port, observer)
 }
 
 async fn connect_and_target(
@@ -165,6 +189,42 @@ async fn server_hangup_closes_client() {
         Message::Binary(vec![0xAB; 16])
     );
     assert!(connection_ends(&mut ws).await);
+}
+
+#[tokio::test]
+async fn websocket_close_immediately_closes_target_tcp() {
+    let (game_port, disconnected) = spawn_disconnect_observer().await;
+    let proxy_port = spawn_proxy(docker_map(false, "")).await;
+
+    let mut ws = connect_and_target(proxy_port, &format!("127.0.0.1:{game_port}"), false).await;
+    assert_eq!(
+        ws.next().await.unwrap().unwrap(),
+        Message::Binary(vec![0x5A; 16])
+    );
+
+    ws.close(None).await.unwrap();
+    timeout(Duration::from_secs(1), disconnected)
+        .await
+        .expect("proxy left the target TCP connection open")
+        .expect("disconnect observer task failed");
+}
+
+#[tokio::test]
+async fn websocket_transport_drop_immediately_closes_target_tcp() {
+    let (game_port, disconnected) = spawn_disconnect_observer().await;
+    let proxy_port = spawn_proxy(docker_map(false, "")).await;
+
+    let mut ws = connect_and_target(proxy_port, &format!("127.0.0.1:{game_port}"), false).await;
+    assert_eq!(
+        ws.next().await.unwrap().unwrap(),
+        Message::Binary(vec![0x5A; 16])
+    );
+
+    drop(ws);
+    timeout(Duration::from_secs(1), disconnected)
+        .await
+        .expect("proxy left target TCP open after WebSocket transport drop")
+        .expect("disconnect observer task failed");
 }
 
 #[tokio::test]
