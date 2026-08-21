@@ -61,6 +61,7 @@ namespace jrc
         void show_item(int16_t slot, bool sale);
         void changeselltab(InventoryType::Id tab);
         void update_recharge_buttons();
+        void update_sell_all_button();
         int16_t slot_by_position(int16_t y);
         uint16_t tabbyinventory(InventoryType::Id type);
 
@@ -79,7 +80,8 @@ namespace jrc
             BUY0 = 13,
             BUY4 = 17,
             SELL0 = 18,
-            SELL4 = 22
+            SELL4 = 22,
+            SELL_ALL = 23
         };
 
         const CharLook& charlook;
@@ -90,6 +92,7 @@ namespace jrc
         Texture impossible;
         Texture meso;
         Text mesolabel;
+        Text sellalllabel;
 
         Slider buyslider;
         Slider sellslider;
@@ -172,6 +175,8 @@ namespace jrc
             bool can_recharge_at(int16_t visibleslot) const;
             void recharge_at(int16_t visibleslot) const;
             void sell() const;
+            void sell_all() const;
+            bool has_sellable_items() const;
             void select(int16_t selected);
         };
         SellState sellstate;
