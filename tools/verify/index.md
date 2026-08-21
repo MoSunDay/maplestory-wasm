@@ -1,6 +1,8 @@
 # 验证工具索引
 
 - [MapleStory WebUI 全流程](maplestory-webui/index.md)
+- 商城纯视图策略：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/cash-shop-view.cpp src/client/IO/CashShop/CashShopView.cpp -o /tmp/cash-shop-view && /tmp/cash-shop-view`
+- 老版商城素材与 linked-server 确定性商品：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/cash-shop-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/cash-shop-ui-nx && /tmp/cash-shop-ui-nx UI.nx src/client/data/cash-shop-v83.csv`
 - LazyFS 连接恢复：`node tools/verify/lazyfs-connection.mjs`
 - 位图加载分类（后台、阻塞可见、短时特效）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/bitmap-load-class.cpp -o /tmp/bitmap-load-class && /tmp/bitmap-load-class`
 - 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`
@@ -15,8 +17,10 @@
 - 世界选择单频道策略与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
+- Cosmic 远端玩家出生头（custom-client short 等级与角色名对齐）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-player-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnPlayerHeader.cpp -o /tmp/spawn-player-parser && /tmp/spawn-player-parser`
 - Cosmic 完整角色数据（Java 定长 UTF-8、戒指、新年贺卡、小游戏门禁）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-data-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/CharacterDataParser.cpp -o /tmp/character-data-parser && /tmp/character-data-parser`
 - 角色创建名称策略、最终确认与失败恢复状态：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-creation-flow.cpp -o /tmp/character-creation-flow && /tmp/character-creation-flow`
 - 角色创建请求字段顺序与宽度：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-creation-packet.cpp -o /tmp/character-creation-packet && /tmp/character-creation-packet`
+- NPC 商店售卖数量钳制、批量售卖 Tab 与现金物品过滤：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/npc-shop-sale.cpp -o /tmp/npc-shop-sale && /tmp/npc-shop-sale`
 - 攻击 NX 结构审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/attack-effect-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/attack-effect-nx && /tmp/attack-effect-nx Skill.nx`
 - 近战武器残影 NX 审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/weapon-afterimage-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/weapon-afterimage-nx && /tmp/weapon-afterimage-nx Character.nx`
