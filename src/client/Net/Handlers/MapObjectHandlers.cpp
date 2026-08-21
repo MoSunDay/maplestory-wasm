@@ -21,6 +21,7 @@
 #include "Helpers/ForeignBuffMask.h"
 #include "Helpers/MobTemporaryStatMasks.h"
 #include "Helpers/MovementParser.h"
+#include "../Protocol/SpawnPlayerHeader.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Character/SkillId.h"
@@ -147,9 +148,7 @@ namespace jrc
 
     void SpawnCharHandler::handle(InPacket& recv) const
     {
-        int32_t cid = recv.read_int();
-        uint8_t level = recv.read_byte();
-        std::string name = recv.read_string();
+        const spawn_player::Header header = spawn_player::parse_header(recv);
 
         recv.read_string(); // guildname
         recv.read_short(); // guildlogobg
@@ -229,7 +228,7 @@ namespace jrc
         recv.read_byte(); // team
 
         Stage::get().get_chars().spawn({
-            cid, look, level, job, name, stance, position, combo_value
+            header.cid, look, header.level, job, header.name, stance, position, combo_value
         });
     }
 

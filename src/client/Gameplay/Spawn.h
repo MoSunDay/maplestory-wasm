@@ -132,7 +132,7 @@ namespace jrc
     public:
         CharSpawn(int32_t cid,
                   const LookEntry& look,
-                  uint8_t level,
+                  uint16_t level,
                   int16_t job,
                   const std::string& name,
                   int8_t stance,
@@ -144,7 +144,7 @@ namespace jrc
 
     private:
         int32_t cid;
-        uint8_t level;
+        uint16_t level;
         int16_t job;
         std::string name;
         int8_t stance;
