@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Audio.h"
+#include "FieldSoundPath.h"
 
 #include "../Configuration.h"
 
@@ -288,6 +289,27 @@ namespace jrc
         {
             play(id);
         }
+    }
+
+    bool Sound::play_field(const std::string& path)
+    {
+        for (const std::string& candidate : field_sound::candidate_paths(path))
+        {
+            nl::node source = nl::nx::sound.resolve(candidate);
+            if (source.data_type() != nl::node::type::audio)
+            {
+                continue;
+            }
+
+            Sound sound(source);
+            if (sound.id == 0)
+            {
+                return false;
+            }
+            sound.play();
+            return true;
+        }
+        return false;
     }
 
     Error Sound::init() {

@@ -27,3 +27,6 @@
 - 攻击 NX 结构审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/attack-effect-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/attack-effect-nx && /tmp/attack-effect-nx Skill.nx`
 - 近战武器残影 NX 审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/weapon-afterimage-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/weapon-afterimage-nx && /tmp/weapon-afterimage-nx Character.nx`
 - 手套图层与 Base zmap 一致性：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/glove-layering-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/glove-layering-nx && /tmp/glove-layering-nx Character.nx Base.nx`
+- 场地计时器倒计时、跨日时钟与格式化：`c++ -std=c++17 -Isrc tools/verify/field-clock.cpp src/client/IO/Field/FieldClockModel.cpp -o /tmp/field-clock && /tmp/field-clock`
+- 废弃都市组队任务门对象与成功/失败音效素材：`c++ -std=c++17 -Isrc -Isrc/client -Isrc/nlnx tools/verify/kerning-pq-field-assets.cpp src/client/Audio/FieldSoundPath.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/kerning-pq-field-assets && /tmp/kerning-pq-field-assets`
+- 废弃都市组队任务服务端脚本、地图、怪物、掉落、计时与奖励契约：`node tools/verify/kerning-pq-contract.mjs`

@@ -78,6 +78,32 @@ namespace jrc
         }
     }
 
+    size_t TilesObjs::set_named_object_active(const std::string& name, bool active)
+    {
+        size_t changed = 0;
+        for (auto& iter : objs)
+        {
+            if (iter.second.set_active_if_named(name, active))
+            {
+                changed++;
+            }
+        }
+        return changed;
+    }
+
+    size_t TilesObjs::count_active_named_objects(const std::string& name) const
+    {
+        size_t count = 0;
+        for (const auto& iter : objs)
+        {
+            if (iter.second.is_named_active(name))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
 
     MapTilesObjs::MapTilesObjs(nl::node src)
     {
@@ -109,5 +135,25 @@ namespace jrc
         {
             iter.second.update();
         }
+    }
+
+    size_t MapTilesObjs::set_named_object_active(const std::string& name, bool active)
+    {
+        size_t changed = 0;
+        for (auto iter : layers)
+        {
+            changed += iter.second.set_named_object_active(name, active);
+        }
+        return changed;
+    }
+
+    size_t MapTilesObjs::count_active_named_objects(const std::string& name) const
+    {
+        size_t count = 0;
+        for (auto iter : layers)
+        {
+            count += iter.second.count_active_named_objects(name);
+        }
+        return count;
     }
 }

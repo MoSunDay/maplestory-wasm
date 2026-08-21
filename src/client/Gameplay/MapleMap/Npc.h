@@ -48,6 +48,7 @@ namespace jrc
 
         // Check wether this is a server-sided npc.
         bool isscripted() const;
+        bool accepts_keyboard_talk() const;
         // Check if the npc is in range of the cursor.
         bool inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const;
 
