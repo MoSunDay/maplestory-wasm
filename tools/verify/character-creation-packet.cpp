@@ -49,7 +49,7 @@ namespace
             1
         });
 
-        assert(payload.size() == 2 + name.size() + 9 * sizeof(int32_t) + sizeof(int8_t));
+        assert(payload.size() == 2 + name.size() + 8 * sizeof(int32_t) + sizeof(int8_t));
 
         size_t offset = 0;
         const uint16_t name_length = read_uint16(payload, offset);
@@ -61,8 +61,7 @@ namespace
 
         assert(read_int32(payload, offset) == 1);
         assert(read_int32(payload, offset) == 20000);
-        assert(read_int32(payload, offset) == 30030);
-        assert(read_int32(payload, offset) == 7);
+        assert(read_int32(payload, offset) == 30037);
         assert(read_int32(payload, offset) == 3);
         assert(read_int32(payload, offset) == 1040002);
         assert(read_int32(payload, offset) == 1060002);
@@ -77,7 +76,7 @@ namespace
         const std::vector<int8_t> payload = encode_create_char_payload({
             "Hero123", 1, 20000, 30000, 0, 0, 1040002, 1060002, 1072001, 1302000, 0
         });
-        assert(payload.size() == 2 + 7 + 9 * sizeof(int32_t) + sizeof(int8_t));
+        assert(payload.size() == 2 + 7 + 8 * sizeof(int32_t) + sizeof(int8_t));
         assert(payload.back() == 0);
     }
 }
