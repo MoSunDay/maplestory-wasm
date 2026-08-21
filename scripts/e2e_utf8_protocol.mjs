@@ -267,13 +267,16 @@ async function main() {
 
   // 6. CREATE_CHAR
   const nameBuf = writeStr(CHARNAME);
-  const cc = Buffer.alloc(nameBuf.length + 40); // name + 9 ints + 1 byte
+  const cc = Buffer.alloc(nameBuf.length + 33); // name + 8 ints + 1 byte
   nameBuf.copy(cc, 0);
   let o = nameBuf.length;
+  const hairStyle = 30030;
+  const hairColor = 0;
   cc.writeInt32LE(1, o); o += 4;      // job 1 = Adventurer (Beginner)
   cc.writeInt32LE(20000, o); o += 4;  // face
-  cc.writeInt32LE(30030, o); o += 4;  // hair
-  cc.writeInt32LE(0, o); o += 4;      // haircolor
+  // The linked login server runs with USE_CUSTOM_CLIENT and reads a single
+  // packed hair integer rather than separate hair/hairColor fields.
+  cc.writeInt32LE(hairStyle + hairColor, o); o += 4; // hair
   cc.writeInt32LE(0, o); o += 4;      // skincolor
   cc.writeInt32LE(1040002, o); o += 4; // top
   cc.writeInt32LE(1060002, o); o += 4; // bottom
