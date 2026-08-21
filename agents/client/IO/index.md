@@ -1,4 +1,4 @@
-Commit: 722f9f98f45bc2c7317c3758b304bb3922a3297d
+Commit: d484de5f30c73b3b55c1c5f1ed9816ffe133fabd
 
 # UI 系统
 
@@ -22,7 +22,7 @@ UI 框架单例。核心职责:
 - 输入分发: `send_cursor()`, `send_key()`, `send_scroll()`, `doubleclick()`
 - `emplace<T>()`: 动态创建 UI 元素
 - `get_element<T>()`: 获取 UI 元素引用
-- `has_element(type)` / `is_element_active(type)`: 分别查询缓存对象是否存在、界面是否实际显示；WASM 验收通过 active 状态将登录、世界、人物、建角和游戏映射为稳定状态码，`msui_login_notice_active` 与 `msui_character_creation_customizing` 分别证明错误提示和外观定制阶段实际出现
+- `has_element(type)` / `is_element_active(type)`: 分别查询缓存对象是否存在、界面是否实际显示；WASM 验收通过 active 状态将登录、世界、人物、建角、游戏和商城映射为稳定状态码，商城另以只读探针暴露 NX Credit、仓库数量、角色现金栏数量和请求中状态
 - `msworldselect_enter`: 浏览器 Canvas `click`/`dblclick` 的世界选择兼容入口；与 GLFW 路径共用 `UIWorldSelect::enter_selected_channel()`，通过请求中状态保证同一动作只发送一次角色列表请求
 
 ### UIState (`UIState.h`)
@@ -75,12 +75,12 @@ UI 状态接口。三个具体实现:
 | `UIMiniMap` / `UIWorldMap` | 小地图/世界地图 |
 | `UIChatBar` | 聊天输入栏 |
 | `UINpcTalk` | NPC 对话界面 |
-| `UIShop` | NPC 商店界面 |
+| `UIShop` | NPC 商店界面；售卖数量输入超过当前堆叠时立即回填上限，支持二次确认后一键售卖当前分类全部非现金物品；现金 Tab 保留但不展示可售物品 |
 | `UIStorage` | 仓库界面 |
-| `CashShop/UICashShop` | 现金商城；展示余额和 NX 商品目录，处理购买及商城仓库双向转移 |
+| `CashShop/UICashShop` | 现金商城；严格复用 `UIWindow2.img/Shop` 的 465×328 老版素材，以左商品目录、右商城仓库/角色现金栏双栏布局展示余额、搜索和翻页，处理真实购买及双向转移；商品 SN/价格/礼包读取随 WASM 内嵌的 linked-server v83 清单，筛选、分页和模式循环由无 UI 依赖的纯函数模块提供 |
 | `UIParty` | 组队界面 |
 | `UIKeyConfig` | 键位设置；从 `UIWindow2.img/KeyConfig` 加载完整键盘面板，并以同一份当前素材布局驱动映射图标绘制、点击和拖放命中 |
-| `UINotice` | 系统通知 |
+| `UINotice` | 系统通知；数字输入弹窗可按调用场景启用输入期上限钳制，购买和仓库调用保持原行为 |
 | `UISoftKey` | 虚拟按键 (移动端) |
 
 ### 通用组件 (`Components/`)
