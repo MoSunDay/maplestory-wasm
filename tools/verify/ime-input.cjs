@@ -18,5 +18,8 @@ assert.strictEqual(ime.sameSnapshot(
     { value: '中文', caret: 2 }, { value: '中文', caret: 2 }), true);
 assert.strictEqual(ime.sameSnapshot(
     { value: 'zhongwen', caret: 8 }, { value: '中文', caret: 2 }), false);
+assert.deepStrictEqual(ime.selectionRange('1', 1, true), { start: 0, end: 1 });
+assert.deepStrictEqual(ime.selectionRange('123', 2, false), { start: 2, end: 2 });
+assert.deepStrictEqual(ime.selectionRange('', 4, true), { start: 0, end: 0 });
 
 console.log('IME input policy verification passed');

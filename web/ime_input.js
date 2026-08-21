@@ -28,6 +28,13 @@
         return left.value === right.value && left.caret === right.caret;
     }
 
+    function selectionRange(value, caretUtf16, selectAll) {
+        const caret = clampCaret(value, caretUtf16);
+        return selectAll && value.length > 0
+            ? { start: 0, end: value.length }
+            : { start: caret, end: caret };
+    }
+
     function createBridge(document, moduleProvider, schedule) {
         const textarea = document.getElementById('ime-input');
         if (!textarea) {
@@ -129,6 +136,17 @@
                 }
                 textarea.value = value;
                 textarea.setSelectionRange(caret, caret);
+            },
+            onSelectAll: function () {
+                if (!active || composing || settlingComposition) {
+                    return false;
+                }
+                const range = selectionRange(textarea.value, 0, true);
+                // A selectionchange caused by this operation must not echo a
+                // caret-only update that immediately collapses the selection.
+                lastSynced = { value: textarea.value, caret: range.start };
+                textarea.setSelectionRange(range.start, range.end);
+                return range.start !== range.end;
             }
         };
 
@@ -245,5 +263,7 @@
         return true;
     }
 
-    return Object.freeze({ shouldSync, isImeOwnedKey, clampCaret, sameSnapshot, createBridge, install });
+    return Object.freeze({
+        shouldSync, isImeOwnedKey, clampCaret, sameSnapshot, selectionRange, createBridge, install
+    });
 });
