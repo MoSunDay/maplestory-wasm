@@ -446,8 +446,7 @@ Field      Type    Notes
 name       string  Character name (3–12 UTF-8 bytes)
 job        int     Job ID. Running server (custom-client mode): 0=Cygnus, 1=Explorer, 2=Aran
 face       int     Face ID (cosmetic)
-hair       int     Base hair style ID
-hairColor  int     Hair color offset; the linked server combines hair + hairColor after parsing
+hair       int     Hair style value sent on the wire. In the linked server's current `USE_CUSTOM_CLIENT` mode this must already be `baseHair + hairColor`
 skin       int     Skin tone ID
 top        int     Item ID for top equip
 bottom     int     Item ID for bottom equip
@@ -460,8 +459,10 @@ The linked server responds with `ADD_NEW_CHAR_ENTRY` (0x0E) on success. Its curr
 creation handler has two failure surfaces that do not use a dedicated create
 result packet: an unavailable/invalid name or a full slot count can return no
 packet, while a database insertion failure is encoded as `DELETE_CHAR_RESPONSE`
-with state 9. The client therefore rechecks name availability immediately before
-creation and recovers a timed-out request instead of holding the UI pending.
+with state 9. In legacy non-custom-client mode the server instead reads separate
+`hair` and `hairColor` ints and combines them after parsing. The client therefore
+rechecks name availability immediately before creation and recovers a timed-out
+request instead of holding the UI pending.
 
 ---
 
@@ -1142,10 +1143,10 @@ response    byte    Selection index (0/1 for yes/no, or menu option)
 
 ```
 Field       Type    Notes
-operation   byte    0 = buy, 1 = sell, 2 = recharge, 3 = exit
+operation   byte    0 = buy, 1 = sell, 2 = recharge, 3 = exit, 4 = sell current tab
 [If buy:]
   slot      short   Shop slot index (0-based)
-  unknown   short   Usually 0
+  itemId    int     Item ID
   quantity  short   Amount to buy
 [If sell:]
   slot      short   Inventory slot
@@ -1153,9 +1154,13 @@ operation   byte    0 = buy, 1 = sell, 2 = recharge, 3 = exit
   quantity  short   Amount to sell
 [If recharge:]
   slot      short   Inventory slot of the rechargeable item
+[If sell current tab:]
+  type      byte    Inventory type: 1=equip, 2=use, 3=setup, 4=etc; cash is rejected
 ```
 
-Server responds with `CONFIRM_SHOP_TRANSACTION` (0x132) and `INVENTORY_OPERATION` (0x1D).
+The bulk operation sells every eligible stack in the selected tab at its full quantity,
+skips cash items, and emits one final `CONFIRM_SHOP_TRANSACTION` (0x132). Inventory and
+meso updates continue to use their normal update packets.
 
 ---
 
@@ -2848,7 +2853,7 @@ questId   short
 ```
 Field           Type    Notes
 charId          int     Character ID
-level           byte
+level           short   Custom-client mode uses a 16-bit character level
 name            string
 guildName       string
 guildLogoInfo   short+byte+short+byte  (if in guild)
@@ -3630,7 +3635,8 @@ itemCount    short   Number of items in shop
 
 ```
 Field    Type   Notes
-code     byte   0=success, 1=no stock, 2=no mesos, 3=inventory full, others=errors
+code     byte   0/8=success, 1=no stock, 2=no mesos, 3=inventory full,
+                5=nothing eligible/invalid sale, 16=cash item sale forbidden, others=errors
 ```
 
 ---
