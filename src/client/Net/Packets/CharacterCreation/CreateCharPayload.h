@@ -25,7 +25,7 @@ namespace jrc::CharacterCreation
     inline std::vector<int8_t> encode_create_char_payload(const CreateCharPayload& payload)
     {
         std::vector<int8_t> bytes;
-        bytes.reserve(2 + payload.name.size() + 9 * sizeof(int32_t) + sizeof(int8_t));
+        bytes.reserve(2 + payload.name.size() + 8 * sizeof(int32_t) + sizeof(int8_t));
 
         auto append_little_endian = [&bytes](uint32_t value, size_t width)
         {
@@ -42,11 +42,12 @@ namespace jrc::CharacterCreation
             bytes.push_back(static_cast<int8_t>(byte));
         }
 
+        // The linked login server currently runs with USE_CUSTOM_CLIENT and
+        // reads a single packed hair integer on CREATE_CHAR.
         const int32_t fields[] = {
             payload.job,
             payload.face,
-            payload.hair,
-            payload.hair_color,
+            payload.hair + payload.hair_color,
             payload.skin,
             payload.top,
             payload.bottom,
