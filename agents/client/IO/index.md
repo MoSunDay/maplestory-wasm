@@ -1,4 +1,4 @@
-Commit: 62348ef7079246e1eedc88edecad4a310b337420
+Commit: 1dc1c57bd59dc76444cae0cacedd95e490237a8e
 
 # UI 系统
 
@@ -75,12 +75,12 @@ UI 状态接口。三个具体实现:
 | `UIMiniMap` / `UIWorldMap` | 小地图/世界地图 |
 | `UIChatBar` | 聊天输入栏 |
 | `UINpcTalk` | NPC 对话界面 |
-| `UIShop` | NPC 商店界面；售卖数量输入超过当前堆叠时立即回填上限，支持二次确认后一键售卖当前分类全部非现金物品；现金 Tab 保留但不展示可售物品 |
+| `UIShop` | NPC 商店界面；购买堆叠物品时数量默认值 `1` 处于全选态，首次输入直接替换；售卖数量输入超过当前堆叠时立即回填上限，支持二次确认后一键售卖当前分类全部非现金物品；现金 Tab 保留但不展示可售物品 |
 | `UIStorage` | 仓库界面 |
 | `CashShop/UICashShop` | 现金商城；严格复用 `UIWindow2.img/Shop` 的 465×328 老版素材，以左商品目录、右商城仓库/角色现金栏双栏布局展示余额、搜索和翻页，处理真实购买及双向转移；商品 SN/价格/礼包读取随 WASM 内嵌的 linked-server v83 清单，筛选、分页和模式循环由无 UI 依赖的纯函数模块提供 |
 | `UIParty` | 组队界面 |
 | `UIKeyConfig` | 键位设置；从 `UIWindow2.img/KeyConfig` 加载完整键盘面板，并以同一份当前素材布局驱动映射图标绘制、点击和拖放命中 |
-| `UINotice` | 系统通知；数字输入弹窗可按调用场景启用输入期上限钳制，购买和仓库调用保持原行为 |
+| `UINotice` | 系统通知；数字输入弹窗默认全选预填值，首次字符输入、退格或粘贴会替换预填值，并可按调用场景启用输入期上限钳制 |
 | `UISoftKey` | 虚拟按键 (移动端) |
 
 ### 通用组件 (`Components/`)
@@ -89,7 +89,7 @@ UI 状态接口。三个具体实现:
 | `Button` / `MapleButton` / `TwoSpriteButton` / `AreaButton` | 各种按钮 |
 | `Icon` / `IconCover` | 图标显示 |
 | `Gauge` / `Slider` | 进度条/滑块 |
-| `Textfield` | 文本输入框（UTF-8 按码点编辑，限长按字节以兼容协议） |
+| `Textfield` | 文本输入框（UTF-8 按码点编辑，限长按字节以兼容协议）；支持一次性全选替换，并与 WASM 隐藏 textarea 的选择范围同步 |
 | `ChatBalloon` / `Nametag` | 聊天气泡/名字标签 |
 | `Tooltip` / `EquipTooltip` / `ItemTooltip` / `SkillTooltip` / `MapTooltip` | 各种悬浮提示 |
 | `ScrollingNotice` | 滚动公告 |
@@ -98,12 +98,13 @@ UI 状态接口。三个具体实现:
 
 WASM 下把文本输入委托给浏览器隐藏 textarea（`web/index.html` 的
 `#ime-input`），由浏览器原生输入法提供候选词窗口。C++ 通过
-`EM_ASM` 调 JS 的 `MapleWasmIME.onFocus/onBlur/onText`，JS 通过导出函数
+`EM_ASM` 调 JS 的 `MapleWasmIME.onFocus/onBlur/onText/onSelectAll`，JS 通过导出函数
 `msime_input`（整段文本 + UTF-16 光标）与 `msime_key`（白名单控制键）回传。
 浏览器侧实现位于 `web/ime_input.js`：`compositionstart` 到候选词确认期间，
 `input` 和 `selectionchange` 只保留 DOM preedit，不调用 `msime_input`；
 `compositionend` 后以最终非合成 `input` 为主、下一任务为兼容回退同步候选结果。
-合成期的物理键事件不向 GLFW 窗口气泡，回显快照去重避免 DOM/C++ 循环同步。
+合成期的物理键事件不向 GLFW 窗口气泡，回显快照去重避免 DOM/C++ 循环同步；
+全选时先记录选择起点快照，防止 `selectionchange` 回传后立即折叠选择范围。
 密码字段（`crypt > 0`）不走桥接，保持纯键盘路径。非 WASM 平台为空实现。
 
 ## 依赖关系
