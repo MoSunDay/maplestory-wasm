@@ -16,7 +16,7 @@
 //   E2E_URL         page under test (default: http://127.0.0.1:8000/web/index.html)
 //   E2E_DEBUG_PORT  Chrome remote-debugging port (default: 9224)
 //
-// Exit code 0 = all 12 checks passed.
+// Exit code 0 = all checks passed.
 
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -111,26 +111,46 @@ fs.writeFileSync(path.join(ARTIFACT_DIR, 'e2e_before_click.png'), Buffer.from(fu
 const baseline = await shot();
 fs.writeFileSync(path.join(ARTIFACT_DIR, 'e2e_field_before.png'), Buffer.from(baseline, 'base64'));
 
-// --- 2. simulate IME composition committing Chinese text ---
+// --- 2. preedit text must stay in the browser until a candidate commits ---
+const preeditCalls = await js(`(() => {
+  const ta = document.getElementById('ime-input');
+  const original = Module.ccall;
+  window.__imeInputCalls = [];
+  Module.ccall = function(name, returnType, argumentTypes, argumentValues) {
+    if (name === 'msime_input') window.__imeInputCalls.push(argumentValues.slice());
+    return original.apply(this, arguments);
+  };
+  ta.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+  ta.value = 'zhongwen';
+  ta.setSelectionRange(8, 8);
+  ta.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'zhongwen', isComposing: true }));
+  document.dispatchEvent(new Event('selectionchange'));
+  return window.__imeInputCalls;
+})()`);
+check('ime: pinyin preedit not sent to game before candidate commit', preeditCalls.length === 0,
+  `calls=${JSON.stringify(preeditCalls)}`);
+
+// --- 3. simulate IME composition committing Chinese text ---
 await js(`(() => {
   const ta = document.getElementById('ime-input');
-  ta.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
   ta.value = '中文测试';
   ta.dispatchEvent(new InputEvent('input', { bubbles: true, data: '中文测试', isComposing: true }));
   ta.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '中文测试' }));
+  ta.dispatchEvent(new InputEvent('input', { bubbles: true, data: '中文测试', isComposing: false }));
   return 'sent'; })()`);
 await sleep(800);
 let taValue = await js(`document.getElementById('ime-input').value`);
 console.log(`  textarea after commit: "${taValue}"`);
 check('ime: Chinese text accepted by game (echoed back)', taValue.startsWith('中文测试') || taValue.includes('中文'), `got "${taValue}"`);
 
-// --- 3. byte limit: account limit is 12 bytes; add more, expect truncation ---
+// --- 4. byte limit: account limit is 12 bytes; add more, expect truncation ---
 await js(`(() => {
   const ta = document.getElementById('ime-input');
   ta.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
   ta.value = '中文测试甲乙丙丁';
   ta.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
   ta.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+  ta.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: false }));
   return 'sent'; })()`);
 await sleep(800);
 taValue = await js(`document.getElementById('ime-input').value`);
@@ -138,12 +158,12 @@ console.log(`  textarea after over-limit commit: "${taValue}" (${taValue.length}
 const enc = new TextEncoder();
 check('limit: text truncated to 12 bytes', enc.encode(taValue).length <= 12 && taValue.length > 0, `bytes=${enc.encode(taValue).length}`);
 
-// --- 4. glyphs rendered: field area pixels changed vs baseline ---
+// --- 5. glyphs rendered: field area pixels changed vs baseline ---
 const afterText = await shot();
 fs.writeFileSync(path.join(ARTIFACT_DIR, 'e2e_field_after.png'), Buffer.from(afterText, 'base64'));
 check('render: field pixels changed after CJK input', baseline !== afterText);
 
-// --- 5. backspace via real key event ---
+// --- 6. backspace via real key event ---
 // Establish a deterministic precondition: textarea focused with the caret at
 // the end of the value. The glue echoes field state back through an async
 // msime_input round trip that can race the caret position, so pin the caret
@@ -196,13 +216,13 @@ if (afterLen !== beforeLen - 1) {
 }
 check('edit: backspace removed one codepoint', afterLen === beforeLen - 1, `before=${beforeLen} after=${afterLen}`);
 
-// --- 6. Tab moves to password field; IME bridge must stay OFF there ---
+// --- 7. Tab moves to password field; IME bridge must stay OFF there ---
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
 await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
 await sleep(600);
 check('password: IME bridge inactive on crypted field', await js(`window.MapleWasmIME.active`) === false);
 
-// --- 7. click away: blur path ---
+// --- 8. click away: blur path ---
 await click(700, 500);
 await sleep(500);
 check('blur: bridge inactive after defocus', await js(`window.MapleWasmIME.active`) === false);

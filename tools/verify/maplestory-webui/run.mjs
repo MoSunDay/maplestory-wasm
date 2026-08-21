@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 
 const browserBinary = process.env.CHROME_BIN || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : 'google-chrome');
@@ -22,6 +23,7 @@ const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
 const verifyCashShop = process.env.E2E_CASH_SHOP === '1';
 const verifyNpcShop = process.env.E2E_NPC_SHOP === '1';
+const verifyImeChat = process.env.E2E_IME_CHAT === '1';
 const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 12);
@@ -671,6 +673,11 @@ try {
 
     if (stopAtGame) throw new Error('__GAME_COMPLETE__');
 
+    if (verifyImeChat) {
+      await verifyImeChatFlow(driver, chatMessage);
+      throw new Error('__IME_CHAT_COMPLETE__');
+    }
+
     await driver.evaluate(`(() => {
       const startedAt = performance.now();
       const sample = { frames: [], longTasks: [], previous: startedAt, startedAt, active: true };
@@ -729,14 +736,7 @@ try {
     console.log(`PASS  asset performance ${JSON.stringify(performanceSample)}`);
     await driver.key('k', 'KeyK', 75, 'k');
 
-    await driver.key('Enter', 'Enter', 13);
-    await sleep(500);
-    await driver.compose(chatMessage);
-    await requireState('Chinese chat text entered', async () =>
-      await driver.evaluate(`document.getElementById('ime-input').value === ${JSON.stringify(chatMessage)}`));
-    await driver.key('Enter', 'Enter', 13);
-    await sleep(1500);
-    await driver.screenshot('09-chinese-chat');
+    await verifyImeChatFlow(driver, chatMessage);
   }
 
   assertRuntimeHealthy();
@@ -754,6 +754,9 @@ try {
     assertRuntimeHealthy();
     passed = true;
   } else if (verifyNpcShop && error.message === '__NPC_SHOP_COMPLETE__') {
+    assertRuntimeHealthy();
+    passed = true;
+  } else if (verifyImeChat && error.message === '__IME_CHAT_COMPLETE__') {
     assertRuntimeHealthy();
     passed = true;
   } else if (logoutToLogin && error.message === '__LOGOUT_COMPLETE__') {

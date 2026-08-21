@@ -217,6 +217,53 @@ export class BrowserDriver {
       input.value = ${encoded};
       input.dispatchEvent(new InputEvent('input', { bubbles: true, data: ${encoded}, isComposing: true }));
       input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: ${encoded} }));
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, data: ${encoded}, isComposing: false }));
+    })()`);
+  }
+
+  async composeWithPreedit(preedit, value) {
+    const encodedPreedit = JSON.stringify(preedit);
+    const encodedValue = JSON.stringify(value);
+    return this.evaluate(`(() => {
+      const input = document.getElementById('ime-input');
+      const original = Module.ccall;
+      const inputCalls = [];
+      const leakedKeys = [];
+      const observeKey = event => leakedKeys.push(event.key);
+      window.addEventListener('keydown', observeKey);
+      Module.ccall = function(name, returnType, argumentTypes, argumentValues) {
+        if (name === 'msime_input') inputCalls.push(argumentValues.slice());
+        return original.apply(this, arguments);
+      };
+      try {
+        input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+        for (const character of ${encodedPreedit}) {
+          input.dispatchEvent(new KeyboardEvent('keydown', {
+            bubbles: true, cancelable: true, key: character,
+            code: 'Key' + character.toUpperCase(), keyCode: 229, isComposing: true
+          }));
+        }
+        input.value = ${encodedPreedit};
+        input.setSelectionRange(input.value.length, input.value.length);
+        input.dispatchEvent(new InputEvent('input', {
+          bubbles: true, data: ${encodedPreedit}, isComposing: true
+        }));
+        document.dispatchEvent(new Event('selectionchange'));
+        const preeditCalls = inputCalls.slice();
+
+        input.value = ${encodedValue};
+        input.setSelectionRange(input.value.length, input.value.length);
+        input.dispatchEvent(new CompositionEvent('compositionend', {
+          bubbles: true, data: ${encodedValue}
+        }));
+        input.dispatchEvent(new InputEvent('input', {
+          bubbles: true, data: ${encodedValue}, isComposing: false
+        }));
+        return { preeditCalls, committedCalls: inputCalls.slice(), leakedKeys };
+      } finally {
+        Module.ccall = original;
+        window.removeEventListener('keydown', observeKey);
+      }
     })()`);
   }
 
