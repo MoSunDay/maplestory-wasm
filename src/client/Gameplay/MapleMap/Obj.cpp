@@ -26,25 +26,52 @@ namespace jrc
         pos = Point<int16_t>(src["x"], src["y"]);
         flip = src["f"].get_bool();
         z = src["z"];
+        name = src["name"].get_string();
+        active = true;
     }
 
     void Obj::update()
     {
-        animation.update();
+        if (active)
+        {
+            animation.update();
+        }
     }
 
     void Obj::draw(Point<int16_t> viewpos, float inter) const
     {
-        animation.draw(DrawArgument(pos + viewpos, flip), inter);
+        if (active)
+        {
+            animation.draw(DrawArgument(pos + viewpos, flip), inter);
+        }
     }
 
     void Obj::prepare_visible(Point<int16_t> viewpos, float inter) const
     {
-        animation.prepare_visible(DrawArgument(pos + viewpos, flip), inter);
+        if (active)
+        {
+            animation.prepare_visible(DrawArgument(pos + viewpos, flip), inter);
+        }
     }
 
     uint8_t Obj::getz() const
     {
         return z;
+    }
+
+    bool Obj::set_active_if_named(const std::string& target_name, bool value)
+    {
+        if (name.empty() || name != target_name)
+        {
+            return false;
+        }
+
+        active = value;
+        return true;
+    }
+
+    bool Obj::is_named_active(const std::string& target_name) const
+    {
+        return !name.empty() && name == target_name && active;
     }
 }

@@ -77,6 +77,7 @@ namespace jrc
             MINIMAP,
             WORLDMAP,
             CASHSHOP,
+            FIELDCLOCK,
             NUM_TYPES
         };
 
