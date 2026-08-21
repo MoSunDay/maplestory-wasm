@@ -1,6 +1,7 @@
 #include "ImeBridge.h"
 
 #include "Components/Textfield.h"
+#include "CashShop/UICashShop.h"
 #include "UI.h"
 #include "UITypes/UICharCreation.h"
 #include "UITypes/UILoginNotice.h"
@@ -147,10 +148,51 @@ extern "C"
         return jrc::UI::get().is_element_active(jrc::UILoginNotice::TYPE) ? 1 : 0;
     }
 
+    EMSCRIPTEN_KEEPALIVE int msui_login_notice_message()
+    {
+        auto notice = jrc::UI::get().get_element<jrc::UILoginNotice>();
+        return notice ? static_cast<int>(notice->get_message()) : -1;
+    }
+
     EMSCRIPTEN_KEEPALIVE int msui_character_creation_customizing()
     {
         auto creation = jrc::UI::get().get_element<jrc::UICharcreation>();
         return creation && creation->is_customizing() ? 1 : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_notice_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::NOTICE) ? 1 : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_locker_count()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->locker_count() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_inventory_count()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->inventory_count() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_nx_credit()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->nx_credit() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_selected_right_row()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->selected_right_row() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_pending()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop && shop->is_pending() ? 1 : 0;
     }
 
     // Browser click compatibility entry point. UIWorldSelect makes this

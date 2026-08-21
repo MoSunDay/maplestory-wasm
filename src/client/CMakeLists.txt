@@ -37,10 +37,11 @@ if(EMSCRIPTEN)
         -sSTACK_SIZE=16777216
         -sINITIAL_MEMORY=268435456  
         -sEXPORTED_RUNTIME_METHODS=FS,ccall,cwrap,setCanvasSize
-        -sEXPORTED_FUNCTIONS=_main,_msime_input,_msime_key,_msui_state,_msui_login_notice_active,_msui_character_creation_customizing,_msworldselect_enter,_msmap_retry,_msstage_loading,_msasset_blocking
+        -sEXPORTED_FUNCTIONS=_main,_msime_input,_msime_key,_msui_state,_msui_login_notice_active,_msui_login_notice_message,_msui_character_creation_customizing,_msui_notice_active,_msworldselect_enter,_msmap_retry,_msstage_loading,_msasset_blocking,_mscashshop_locker_count,_mscashshop_inventory_count,_mscashshop_nx_credit,_mscashshop_selected_right_row,_mscashshop_pending
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial.ttf@fonts/Arial/Arial.ttf"
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial-Bold.ttf@fonts/Arial/Arial-Bold.ttf"
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/DroidSansFallback/DroidSansFallbackFull.ttf@fonts/DroidSansFallback/DroidSansFallbackFull.ttf"
+        "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/data/cash-shop-v83.csv@data/cash-shop-v83.csv"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs_connection.js"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs.js"
         -sASSERTIONS=1

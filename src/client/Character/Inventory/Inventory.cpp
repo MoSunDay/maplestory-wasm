@@ -373,6 +373,12 @@ namespace jrc
         }
     }
 
+    bool Inventory::is_cash_item(InventoryType::Id type, int16_t slot) const
+    {
+        auto iter = inventories[type].find(slot);
+        return iter != inventories[type].end() && iter->second.cash;
+    }
+
     Optional<const Equip> Inventory::get_equip(InventoryType::Id type, int16_t slot) const
     {
         if (type != InventoryType::EQUIPPED && type != InventoryType::EQUIP)

@@ -1,122 +1,132 @@
 #include "UICashShop.h"
 
-#include "../UI.h"
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
+#include "../KeyAction.h"
+#include "../UI.h"
 #include "../UITypes/UINotice.h"
-#include "../../Character/Inventory/Inventory.h"
+#include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/CashShopPackets.h"
-#include "../../Constants.h"
 
 #include "nlnx/nx.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace jrc
 {
-    namespace
-    {
-        const char* currency_name(CashCurrency currency)
-        {
-            switch (currency)
-            {
-            case CashCurrency::NX_CREDIT: return "NX Credit";
-            case CashCurrency::MAPLE_POINT: return "Maple Point";
-            case CashCurrency::NX_PREPAID: return "Prepaid NX";
-            }
-            return "NX";
-        }
-
-        std::string format_amount(int32_t amount)
-        {
-            std::string text = std::to_string(amount);
-            for (int32_t index = static_cast<int32_t>(text.size()) - 3; index > 0; index -= 3)
-                text.insert(static_cast<size_t>(index), ",");
-            return text;
-        }
-    }
+    namespace view = cash_shop_view;
 
     UICashShop::UICashShop(std::shared_ptr<CashShopModel> value, bool is_female)
-        : model(std::move(value)), female(is_female), mode(Mode::CATALOG),
-          currency(CashCurrency::NX_CREDIT), category(0), page(0), pending(false),
-          pending_cash_id(0),
-          search(Text::A11M, Text::LEFT, Text::BLACK, {{250, 337}, {500, 357}}, 40),
-          title(Text::A18M, Text::LEFT, Text::WHITE, "现金商城"),
-          balance_label(Text::A11M, Text::LEFT, Text::WHITE),
-          status_label(Text::A11B, Text::LEFT, Text::YELLOW)
+        : model(std::move(value)), female(is_female), right_pane(view::RightPane::LOCKER),
+          currency(CashCurrency::NX_CREDIT), category(0), left_page(0), right_page(0),
+          pending(false), pending_cash_id(0), last_cursor_position(),
+          search(Text::A11M, Text::LEFT, Text::DARKGREY, {{48, 61}, {148, 79}}, 40),
+          title(Text::A11B, Text::LEFT, Text::DARKGREY, "现金商城"),
+          category_label(Text::A11M, Text::LEFT, Text::DARKGREY),
+          currency_label(Text::A11M, Text::LEFT, Text::DARKGREY),
+          search_label(Text::A11M, Text::LEFT, Text::DARKGREY, "搜索:"),
+          balance_label(Text::A11M, Text::LEFT, Text::DARKGREY),
+          right_mode_label(Text::A11B, Text::LEFT, Text::DARKGREY),
+          transfer_label(Text::A11B, Text::CENTER, Text::DARKGREY, "", 64),
+          left_page_label(Text::A11M, Text::CENTER, Text::DARKGREY, "", 100),
+          right_page_label(Text::A11M, Text::CENTER, Text::DARKGREY, "", 100)
     {
-        nl::node cash_shop = nl::nx::ui["CashShop.img"];
-        nl::node background = cash_shop["Base"]["backgrnd"];
-        sprites.emplace_back(background);
+        nl::node shop = nl::nx::ui["UIWindow2.img"]["Shop"];
+        nl::node background = shop["backgrnd"];
         dimension = Texture(background).get_dimensions();
-        if (dimension.x() <= 0 || dimension.y() <= 0)
-            dimension = { 1024, 768 };
+        if (dimension != Point<int16_t>{465, 328})
+            throw std::runtime_error("Missing required classic Shop background");
 
-        buttons[BT_EXIT] = std::make_unique<MapleButton>(cash_shop["CSTab"]["BtExit"], 5, 728);
-        buttons[BT_CREDIT] = std::make_unique<AreaButton>(Point<int16_t>{660, 6}, Point<int16_t>{105, 26});
-        buttons[BT_POINTS] = std::make_unique<AreaButton>(Point<int16_t>{765, 6}, Point<int16_t>{105, 26});
-        buttons[BT_PREPAID] = std::make_unique<AreaButton>(Point<int16_t>{870, 6}, Point<int16_t>{105, 26});
-        buttons[BT_CATALOG] = std::make_unique<AreaButton>(Point<int16_t>{140, 300}, Point<int16_t>{95, 28});
-        buttons[BT_LOCKER] = std::make_unique<AreaButton>(Point<int16_t>{240, 300}, Point<int16_t>{95, 28});
-        buttons[BT_INVENTORY] = std::make_unique<AreaButton>(Point<int16_t>{340, 300}, Point<int16_t>{120, 28});
+        sprites.emplace_back(background);
+        sprites.emplace_back(shop["backgrnd2"]);
+        sprites.emplace_back(shop["backgrnd3"]);
+        selection = shop["select"];
 
-        for (uint16_t id = BT_CATEGORY_ALL; id <= BT_CATEGORY_PACKAGE; ++id)
-            buttons[id] = std::make_unique<AreaButton>(
-                Point<int16_t>{12, static_cast<int16_t>(92 + (id - BT_CATEGORY_ALL) * 34)},
-                Point<int16_t>{112, 28});
+        buttons[BT_EXIT] = std::make_unique<MapleButton>(shop["BtExit"]);
+        buttons[BT_BUY] = std::make_unique<MapleButton>(shop["BtBuy"]);
+        buttons[BT_BUY_HIT] = std::make_unique<AreaButton>(
+            Point<int16_t>{150, 42}, Point<int16_t>{80, 24});
+        buttons[BT_SELECTED_TRANSFER] = std::make_unique<AreaButton>(
+            Point<int16_t>{0, 0}, Point<int16_t>{200, 36});
+        buttons[BT_TRANSFER] = std::make_unique<AreaButton>(
+            Point<int16_t>{375, 38}, Point<int16_t>{80, 32});
+        buttons[BT_CATEGORY] = std::make_unique<AreaButton>(
+            Point<int16_t>{12, 22}, Point<int16_t>{136, 16});
+        buttons[BT_CURRENCY] = std::make_unique<AreaButton>(
+            Point<int16_t>{12, 40}, Point<int16_t>{136, 16});
+        buttons[BT_RIGHT_MODE] = std::make_unique<AreaButton>(
+            Point<int16_t>{242, 40}, Point<int16_t>{136, 20});
+        buttons[BT_LEFT_PREVIOUS] = std::make_unique<AreaButton>(
+            Point<int16_t>{12, 92}, Point<int16_t>{36, 18});
+        buttons[BT_LEFT_NEXT] = std::make_unique<AreaButton>(
+            Point<int16_t>{172, 92}, Point<int16_t>{36, 18});
+        buttons[BT_RIGHT_PREVIOUS] = std::make_unique<AreaButton>(
+            Point<int16_t>{242, 92}, Point<int16_t>{36, 18});
+        buttons[BT_RIGHT_NEXT] = std::make_unique<AreaButton>(
+            Point<int16_t>{406, 92}, Point<int16_t>{36, 18});
 
-        buttons[BT_PREVIOUS] = std::make_unique<AreaButton>(Point<int16_t>{760, 337}, Point<int16_t>{70, 26});
-        buttons[BT_NEXT] = std::make_unique<AreaButton>(Point<int16_t>{840, 337}, Point<int16_t>{70, 26});
-
-        nl::node buy = cash_shop["CSList"]["BtBuy"];
-        for (size_t index = 0; index < ITEMS_PER_PAGE; ++index)
+        for (size_t row = 0; row < view::ROWS_PER_PANE; ++row)
         {
-            size_t column = index % 7;
-            size_t row = index / 7;
-            buttons[BT_ITEM_FIRST + index] = std::make_unique<MapleButton>(buy,
-                Point<int16_t>{ static_cast<int16_t>(146 + 124 * column),
-                    static_cast<int16_t>(523 + 205 * row) });
-            item_names[index] = Text(Text::A11B, Text::CENTER, Text::BLACK, "", 96);
-            item_prices[index] = Text(Text::A11M, Text::CENTER, Text::DARKGREY, "", 96);
+            buttons[BT_LEFT_FIRST + row] = std::make_unique<AreaButton>(
+                Point<int16_t>{8, static_cast<int16_t>(116 + row * 42)},
+                Point<int16_t>{200, 36});
+            buttons[BT_RIGHT_FIRST + row] = std::make_unique<AreaButton>(
+                Point<int16_t>{242, static_cast<int16_t>(116 + row * 42)},
+                Point<int16_t>{200, 36});
+            left_names[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
+            left_details[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
+            right_names[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
+            right_details[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
         }
 
-        search.set_enter_callback([this](const std::string&) { rebuild(); });
+        search.set_enter_callback([this](const std::string&) { rebuild_catalog(); });
         update_screen(Constants::viewwidth(), Constants::viewheight());
-        rebuild();
+        rebuild_catalog();
     }
 
     void UICashShop::draw(float alpha) const
     {
         UIElement::draw(alpha);
-        title.draw(position + Point<int16_t>{18, 8});
-        balance_label.draw(position + Point<int16_t>{470, 12});
-        status_label.draw(position + Point<int16_t>{140, 342});
+        title.draw(position + Point<int16_t>{12, 5});
+        category_label.draw(position + Point<int16_t>{12, 22});
+        currency_label.draw(position + Point<int16_t>{12, 40});
+        search_label.draw(position + Point<int16_t>{12, 62});
         search.draw(position);
+        balance_label.draw(position + Point<int16_t>{242, 5});
+        right_mode_label.draw(position + Point<int16_t>{242, 40});
+        transfer_label.draw(position + Point<int16_t>{390, 47});
+        left_page_label.draw(position + Point<int16_t>{60, 95});
+        right_page_label.draw(position + Point<int16_t>{290, 95});
 
-        for (size_t index = 0; index < ITEMS_PER_PAGE; ++index)
+        for (size_t row = 0; row < view::ROWS_PER_PANE; ++row)
         {
-            if (page * ITEMS_PER_PAGE + index >= result_count())
-                continue;
-            size_t column = index % 7;
-            size_t row = index / 7;
-            Point<int16_t> base = position + Point<int16_t>{
-                static_cast<int16_t>(192 + 124 * column),
-                static_cast<int16_t>(470 + 205 * row) };
-            int32_t item_id = 0;
-            if (mode == Mode::CATALOG)
-                item_id = model->catalog()[filtered[page * ITEMS_PER_PAGE + index]].item_id;
-            else if (mode == Mode::LOCKER)
-                item_id = model->locker()[page * ITEMS_PER_PAGE + index].item_id;
-            else
-                item_id = Stage::get().get_player().get_inventory().get_cash_items()[page * ITEMS_PER_PAGE + index].item_id;
+            const size_t left_index = left_page * view::ROWS_PER_PANE + row;
+            const size_t right_index = right_page * view::ROWS_PER_PANE + row;
+            const Point<int16_t> left = position + row_position(false, row);
+            const Point<int16_t> right = position + row_position(true, row);
 
-            const ItemData& data = ItemData::get(item_id);
-            if (data)
-                data.get_icon(false).draw(DrawArgument(base));
-            item_names[index].draw(base + Point<int16_t>{0, 42});
-            item_prices[index].draw(base + Point<int16_t>{0, 60});
+            if (left_index < filtered.size())
+            {
+                if (selected_left && *selected_left == left_index)
+                    selection.draw(left + Point<int16_t>{35, -1});
+                const int32_t item_id = model->catalog()[filtered[left_index]].item_id;
+                if (const ItemData& data = ItemData::get(item_id))
+                    data.get_icon(false).draw(DrawArgument(left + Point<int16_t>{0, 32}));
+                left_names[row].draw(left + Point<int16_t>{40, -1});
+                left_details[row].draw(left + Point<int16_t>{40, 17});
+            }
+            if (right_index < right_count())
+            {
+                if (selected_right && *selected_right == right_index)
+                    selection.draw(right + Point<int16_t>{35, -1});
+                if (const ItemData& data = ItemData::get(right_item_id(right_index)))
+                    data.get_icon(false).draw(DrawArgument(right + Point<int16_t>{0, 32}));
+                right_names[row].draw(right + Point<int16_t>{40, -1});
+                right_details[row].draw(right + Point<int16_t>{40, 17});
+            }
         }
     }
 
@@ -134,83 +144,37 @@ namespace jrc
 
     UIElement::CursorResult UICashShop::send_cursor(bool pressed, Point<int16_t> cursorpos)
     {
-        if (search.get_bounds().contains(cursorpos))
+        last_cursor_position = cursorpos - position;
+        const Rectangle<int16_t> search_hitbox(
+            position + Point<int16_t>{12, 55}, position + Point<int16_t>{208, 86});
+        if (search_hitbox.contains(cursorpos))
         {
-            Cursor::State state = search.send_cursor(cursorpos, pressed);
             if (pressed)
-                UI::get().focus_textfield(&search);
-            return { state, true };
+                search.set_state(Textfield::FOCUSED);
+            return { pressed ? Cursor::CLICKING : Cursor::CANCLICK, true };
         }
+        if (pressed && search.get_state() == Textfield::FOCUSED)
+            search.set_state(Textfield::NORMAL);
         return UIElement::send_cursor(pressed, cursorpos);
     }
 
     void UICashShop::send_scroll(double yoffset)
     {
+        size_t& page = last_cursor_position.x() < 232 ? left_page : right_page;
+        const size_t count = last_cursor_position.x() < 232 ? filtered.size() : right_count();
         if (yoffset > 0 && page > 0)
             --page;
-        else if (yoffset < 0 && (page + 1) * ITEMS_PER_PAGE < result_count())
+        else if (yoffset < 0 && page + 1 < view::page_count(count))
             ++page;
-        refresh_labels();
+        refresh();
     }
 
-    void UICashShop::send_key(int32_t, bool pressed, bool escape)
+    void UICashShop::send_key(int32_t keycode, bool pressed, bool escape)
     {
         if (pressed && escape && !pending)
             button_pressed(BT_EXIT);
-    }
-
-    void UICashShop::set_balances(CashBalances balances)
-    {
-        model->set_balances(balances);
-        refresh_labels();
-    }
-
-    void UICashShop::replace_locker(std::vector<CashLockerItem> items)
-    {
-        model->replace_locker(std::move(items));
-        rebuild();
-    }
-
-    void UICashShop::purchase_succeeded(CashLockerItem item)
-    {
-        model->add_locker(std::move(item));
-        set_pending(false);
-        rebuild();
-    }
-
-    void UICashShop::package_purchase_succeeded(std::vector<CashLockerItem> items)
-    {
-        for (auto& item : items)
-            model->add_locker(std::move(item));
-        set_pending(false);
-        rebuild();
-    }
-
-    void UICashShop::take_succeeded()
-    {
-        model->remove_locker(pending_cash_id);
-        set_pending(false);
-        rebuild();
-    }
-
-    void UICashShop::put_succeeded(CashLockerItem item)
-    {
-        Stage::get().get_player().get_inventory().remove_cash_item(pending_cash_id);
-        model->add_locker(std::move(item));
-        set_pending(false);
-        rebuild();
-    }
-
-    void UICashShop::show_error(const std::string& message)
-    {
-        set_pending(false);
-        UI::get().emplace<UIOk>(message, []() {});
-    }
-
-    void UICashShop::reconnect_failed(const std::string& address)
-    {
-        UI::get().enable();
-        show_error("返回游戏服务器失败：" + address);
+        else if (pressed && keycode == KeyAction::RETURN && selected_left && !pending)
+            request_purchase(*selected_left);
     }
 
     Button::State UICashShop::button_pressed(uint16_t id)
@@ -222,172 +186,59 @@ namespace jrc
             pending = true;
             UI::get().disable();
             LeaveCashShopPacket().dispatch();
-            return Button::NORMAL;
         }
-        if (id >= BT_CREDIT && id <= BT_PREPAID)
+        else if (id == BT_CATEGORY)
         {
-            constexpr CashCurrency currencies[] = { CashCurrency::NX_CREDIT,
-                CashCurrency::MAPLE_POINT, CashCurrency::NX_PREPAID };
-            currency = currencies[id - BT_CREDIT];
-            refresh_labels();
-            return Button::NORMAL;
+            category = view::next_category(category);
+            rebuild_catalog();
         }
-        if (id >= BT_CATALOG && id <= BT_INVENTORY)
+        else if (id == BT_CURRENCY)
         {
-            set_mode(static_cast<Mode>(id - BT_CATALOG));
-            return Button::NORMAL;
+            currency = view::next_currency(currency);
+            refresh();
         }
-        if (id >= BT_CATEGORY_ALL && id <= BT_CATEGORY_PACKAGE)
+        else if (id == BT_RIGHT_MODE)
         {
-            set_category(static_cast<int8_t>(id - BT_CATEGORY_ALL));
-            return Button::NORMAL;
+            change_right_pane(view::toggle_pane(right_pane));
         }
-        if (id == BT_PREVIOUS && page > 0)
-            --page;
-        else if (id == BT_NEXT && (page + 1) * ITEMS_PER_PAGE < result_count())
-            ++page;
-        else if (id >= BT_ITEM_FIRST && id < BT_ITEM_FIRST + ITEMS_PER_PAGE)
+        else if (id == BT_LEFT_PREVIOUS && left_page > 0)
+            --left_page;
+        else if (id == BT_LEFT_NEXT && left_page + 1 < view::page_count(filtered.size()))
+            ++left_page;
+        else if (id == BT_RIGHT_PREVIOUS && right_page > 0)
+            --right_page;
+        else if (id == BT_RIGHT_NEXT && right_page + 1 < view::page_count(right_count()))
+            ++right_page;
+        else if ((id == BT_BUY || id == BT_BUY_HIT) && selected_left)
+            request_purchase(*selected_left);
+        else if (id == BT_TRANSFER && selected_right)
+            request_transfer(*selected_right);
+        else if (id == BT_SELECTED_TRANSFER && selected_right)
+            request_transfer(*selected_right);
+        else if (id >= BT_LEFT_FIRST && id < BT_RIGHT_FIRST)
         {
-            size_t visible = id - BT_ITEM_FIRST;
-            if (mode == Mode::CATALOG)
-                request_purchase(visible);
-            else
-                request_transfer(visible);
+            const size_t index = left_page * view::ROWS_PER_PANE + id - BT_LEFT_FIRST;
+            if (index < filtered.size())
+            {
+                if (selected_left && *selected_left == index)
+                    request_purchase(index);
+                else
+                    selected_left = index;
+            }
         }
-        refresh_labels();
+        else if (id >= BT_RIGHT_FIRST && id < BT_RIGHT_FIRST + view::ROWS_PER_PANE)
+        {
+            const size_t index = right_page * view::ROWS_PER_PANE + id - BT_RIGHT_FIRST;
+            if (index < right_count())
+            {
+                if (selected_right && *selected_right == index)
+                    request_transfer(index);
+                else
+                    selected_right = index;
+            }
+        }
+        refresh();
         return Button::NORMAL;
     }
 
-    void UICashShop::rebuild()
-    {
-        filtered.clear();
-        const std::string query = search.get_text();
-        const auto& catalog = model->catalog();
-        for (size_t index = 0; index < catalog.size(); ++index)
-        {
-            const CashCommodity& item = catalog[index];
-            bool gender_ok = item.gender == 2 || item.gender == (female ? 1 : 0);
-            bool category_ok = category == 0 || item.category == category;
-            bool query_ok = query.empty() || item.name.find(query) != std::string::npos ||
-                std::to_string(item.sn).find(query) != std::string::npos;
-            if (item.on_sale && gender_ok && category_ok && query_ok)
-                filtered.push_back(index);
-        }
-        page = 0;
-        refresh_labels();
-    }
-
-    void UICashShop::refresh_labels()
-    {
-        const CashBalances& balances = model->balances();
-        balance_label.change_text(
-            "NX " + format_amount(balances.nx_credit) + "  点数 " +
-            format_amount(balances.maple_points) + "  预付 " +
-            format_amount(balances.nx_prepaid));
-        std::string mode_name = mode == Mode::CATALOG ? "商品" :
-            mode == Mode::LOCKER ? "商城仓库" : "角色现金栏";
-        status_label.change_text(mode_name + "  支付: " + currency_name(currency) +
-            "  第 " + std::to_string(page + 1) + " 页");
-
-        size_t total = result_count();
-        size_t offset = page * ITEMS_PER_PAGE;
-        size_t count = offset < total ? std::min(ITEMS_PER_PAGE, total - offset) : 0;
-        for (size_t index = 0; index < ITEMS_PER_PAGE; ++index)
-        {
-            bool active = index < count;
-            buttons[BT_ITEM_FIRST + index]->set_active(active);
-            item_names[index].change_text(active ? visible_name(index) : "");
-            std::string price;
-            if (active && mode == Mode::CATALOG)
-            {
-                const CashCommodity& item = model->catalog()[filtered[page * ITEMS_PER_PAGE + index]];
-                price = format_amount(item.price) + " NX";
-            }
-            else if (active)
-                price = mode == Mode::LOCKER ? "取出" : "存入";
-            item_prices[index].change_text(price);
-        }
-    }
-
-    void UICashShop::set_mode(Mode value)
-    {
-        mode = value;
-        page = 0;
-        refresh_labels();
-    }
-
-    void UICashShop::set_category(int8_t value)
-    {
-        category = value;
-        mode = Mode::CATALOG;
-        rebuild();
-    }
-
-    void UICashShop::request_purchase(size_t visible_index)
-    {
-        size_t index = page * ITEMS_PER_PAGE + visible_index;
-        if (index >= filtered.size())
-            return;
-        const CashCommodity item = model->catalog()[filtered[index]];
-        std::string question = "使用 " + std::string(currency_name(currency)) + " 购买 " +
-            item.name + "，价格 " + format_amount(item.price) + "？";
-        UI::get().emplace<UIYesNo>(question, [this, item](bool confirmed) {
-            if (!confirmed)
-                return;
-            if (model->balances().get(currency) < item.price)
-            {
-                show_error("所选支付余额不足。");
-                return;
-            }
-            set_pending(true);
-            BuyCashItemPacket(item.sn, currency, item.package).dispatch();
-        });
-    }
-
-    void UICashShop::request_transfer(size_t visible_index)
-    {
-        size_t index = page * ITEMS_PER_PAGE + visible_index;
-        if (mode == Mode::LOCKER)
-        {
-            if (index >= model->locker().size())
-                return;
-            pending_cash_id = model->locker()[index].cash_id;
-            set_pending(true);
-            TakeCashLockerItemPacket(pending_cash_id).dispatch();
-            return;
-        }
-        std::vector<CashInventoryItem> items = Stage::get().get_player().get_inventory().get_cash_items();
-        if (index >= items.size())
-            return;
-        pending_cash_id = items[index].cash_id;
-        set_pending(true);
-        PutCashLockerItemPacket(pending_cash_id, static_cast<int8_t>(items[index].type)).dispatch();
-    }
-
-    void UICashShop::set_pending(bool value)
-    {
-        pending = value;
-        for (size_t index = 0; index < ITEMS_PER_PAGE; ++index)
-            buttons[BT_ITEM_FIRST + index]->set_active(
-                !pending && page * ITEMS_PER_PAGE + index < result_count());
-    }
-
-    size_t UICashShop::result_count() const
-    {
-        size_t total = mode == Mode::CATALOG ? filtered.size() :
-            mode == Mode::LOCKER ? model->locker().size() :
-            Stage::get().get_player().get_inventory().get_cash_items().size();
-        return total;
-    }
-
-    std::string UICashShop::visible_name(size_t index) const
-    {
-        size_t absolute = page * ITEMS_PER_PAGE + index;
-        if (mode == Mode::CATALOG)
-            return model->catalog()[filtered[absolute]].name;
-        if (mode == Mode::LOCKER)
-            return CashShopModel::item_name(model->locker()[absolute].item_id);
-        auto items = Stage::get().get_player().get_inventory().get_cash_items();
-        return CashShopModel::item_name(items[absolute].item_id);
-    }
 }
