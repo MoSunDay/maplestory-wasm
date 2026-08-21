@@ -78,15 +78,22 @@ namespace jrc
 
         if (Stance::is_climbing(interstance))
         {
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_BODY, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_BODY, interframe, args);
             body->draw(interstance, Body::BODY, interframe, args);
-            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_OVER_BODY, interframe, args);
             equips.draw(Equipslot::SHOES, interstance, Clothing::SHOES, interframe, args);
             equips.draw(Equipslot::BOTTOM_DEFAULT, interstance, Clothing::PANTS_DEFAULT, interframe, args);
             equips.draw(Equipslot::PANTS, interstance, Clothing::PANTS, interframe, args);
             equips.draw(Equipslot::TOP_DEFAULT, interstance, Clothing::TOP_DEFAULT, interframe, args);
             equips.draw(Equipslot::TOP, interstance, Clothing::TOP, interframe, args);
             equips.draw(Equipslot::TOP, interstance, Clothing::MAIL, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_OVER_BODY, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_HEAD, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_HEAD, interframe, args);
             equips.draw(Equipslot::CAPE, interstance, Clothing::CAPE, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST, interframe, args);
             body->draw(interstance, Body::HEAD, interframe, args);
             equips.draw(Equipslot::EARRINGS, interstance, Clothing::EARRINGS, interframe, args);
 
@@ -111,6 +118,12 @@ namespace jrc
 
             equips.draw(Equipslot::SHIELD, interstance, Clothing::BACKSHIELD, interframe, args);
             equips.draw(Equipslot::WEAPON, interstance, Clothing::BACKWEAPON, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_MAILARM, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_MAILARM, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_WEAPON, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_WEAPON, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_OVER_HAIR, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_OVER_HAIR, interframe, args);
         }
         else
         {
@@ -119,11 +132,11 @@ namespace jrc
             equips.draw(Equipslot::SHIELD, interstance, Clothing::SHIELD_BELOW_BODY, interframe, args);
             equips.draw(Equipslot::WEAPON, interstance, Clothing::WEAPON_BELOW_BODY, interframe, args);
             equips.draw(Equipslot::CAP, interstance, Clothing::CAP_BELOW_BODY, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_BODY, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_BODY, interframe, args);
             body->draw(interstance, Body::BODY, interframe, args);
-            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_OVER_BODY, interframe, args);
             equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_OVER_BODY, interframe, args);
             equips.draw(Equipslot::SHOES, interstance, Clothing::SHOES, interframe, args);
-            body->draw(interstance, Body::ARM_BELOW_HEAD, interframe, args);
 
             if (equips.has_overall())
             {
@@ -137,7 +150,11 @@ namespace jrc
                 equips.draw(Equipslot::TOP, interstance, Clothing::TOP, interframe, args);
             }
 
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_OVER_BODY, interframe, args);
+            body->draw(interstance, Body::ARM_BELOW_HEAD, interframe, args);
             body->draw(interstance, Body::ARM_BELOW_HEAD_OVER_MAIL, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_HEAD, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_HEAD, interframe, args);
             hair->draw(interstance, Hair::DEFAULT, interframe, args);
             equips.draw(Equipslot::SHIELD, interstance, Clothing::SHIELD_OVER_HAIR, interframe, args);
             equips.draw(Equipslot::EARRINGS, interstance, Clothing::EARRINGS, interframe, args);
@@ -184,21 +201,23 @@ namespace jrc
                 equips.draw(Equipslot::TOP, interstance, Clothing::MAILARM, interframe, args);
             }
 
-            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST, interframe, args);
             equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE, interframe, args);
-            equips.draw(Equipslot::WEAPON, interstance, Clothing::WEAPON_OVER_GLOVE, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST, interframe, args);
 
-            body->draw(interstance, Body::HAND_BELOW_WEAPON, interframe, args);
-
-            body->draw(interstance, Body::ARM_OVER_HAIR, interframe, args);
             body->draw(interstance, Body::ARM_OVER_HAIR_BELOW_WEAPON, interframe, args);
+            body->draw(interstance, Body::ARM_OVER_HAIR, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_MAILARM, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_MAILARM, interframe, args);
+            body->draw(interstance, Body::HAND_BELOW_WEAPON, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_WEAPON, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_WEAPON, interframe, args);
             equips.draw(Equipslot::WEAPON, interstance, Clothing::WEAPON_OVER_HAND, interframe, args);
             equips.draw(Equipslot::WEAPON, interstance, Clothing::WEAPON_OVER_BODY, interframe, args);
             body->draw(interstance, Body::HAND_OVER_HAIR, interframe, args);
-            body->draw(interstance, Body::HAND_OVER_WEAPON, interframe, args);
-
-            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_OVER_HAIR, interframe, args);
             equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_OVER_HAIR, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_OVER_HAIR, interframe, args);
+            equips.draw(Equipslot::WEAPON, interstance, Clothing::WEAPON_OVER_GLOVE, interframe, args);
+            body->draw(interstance, Body::HAND_OVER_WEAPON, interframe, args);
         }
     }
 

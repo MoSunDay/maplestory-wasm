@@ -26,7 +26,7 @@ const verifyNpcShop = process.env.E2E_NPC_SHOP === '1';
 const verifyImeChat = process.env.E2E_IME_CHAT === '1';
 const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
-const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 12);
+const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 
 const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5, cashShop: 6 });
@@ -606,7 +606,9 @@ try {
           gpuSeen: false,
           mapSeen: false,
           foregroundKeys: [],
-          rangeCalls: []
+          rangeCalls: [],
+          currentSample: 0,
+          attacks: []
         };
         lazy.requestForegroundFileRange = function (filepath, offset, length) {
           if (evidence.active && evidence.rangeCalls.length < 100) {
@@ -627,6 +629,17 @@ try {
           if (evidence.foregroundKeys.length === 0 && lazy.foregroundRequests.size > 0) {
             evidence.foregroundKeys = Array.from(lazy.foregroundRequests.keys());
           }
+          const stance = Module.ccall('msattack_stance', 'number', [], []);
+          if ([15, 16, 23, 24, 25].includes(stance)) {
+            const attack = evidence.attacks.find(entry => entry.sample === evidence.currentSample);
+            if (attack) {
+              if (!attack.stances.includes(stance)) attack.stances.push(stance);
+              const frame = Module.ccall('msattack_frame', 'number', [], []);
+              if (!attack.frames.includes(frame)) attack.frames.push(frame);
+              attack.presented ||= Module.ccall(
+                'msattack_afterimage_presented', 'number', [], []) !== 0;
+            }
+          }
           requestAnimationFrame(sample);
         };
         window.attackVisualEvidence = evidence;
@@ -634,6 +647,12 @@ try {
       })()`);
       const screencasts = [];
       for (let sample = 0; sample < attackSamples; sample += 1) {
+        await driver.evaluate(`(() => {
+          window.attackVisualEvidence.currentSample = ${sample + 1};
+          window.attackVisualEvidence.attacks.push({
+            sample: ${sample + 1}, stances: [], frames: [], presented: false
+          });
+        })()`);
         const prefix = `08d-attack-${String(sample + 1).padStart(2, '0')}`;
         await driver.startScreencast(prefix);
         // Hold the key across multiple game ticks so input observation does
@@ -658,7 +677,8 @@ try {
           gpuSeen: window.attackVisualEvidence.gpuSeen,
           mapSeen: window.attackVisualEvidence.mapSeen,
           foregroundKeys: window.attackVisualEvidence.foregroundKeys,
-          rangeCalls: window.attackVisualEvidence.rangeCalls
+          rangeCalls: window.attackVisualEvidence.rangeCalls,
+          attacks: window.attackVisualEvidence.attacks
         };
       })()`);
       fs.writeFileSync(
@@ -668,7 +688,16 @@ try {
       if (attackVisualEvidence.blockingSeen || attackVisualEvidence.overlaySeen) {
         throw new Error(`Attack unexpectedly blocked asset loading: ${JSON.stringify(attackVisualEvidence)}`);
       }
-      console.log(`CAPTURE  ${attackSamples} attack screencasts require visual slash/hit review`);
+      const observedAttacks = attackVisualEvidence.attacks.filter(attack => attack.stances.length > 0);
+      const missingPresentation = observedAttacks.filter(attack => !attack.presented);
+      const stabSeen = observedAttacks.some(attack => attack.stances.some(stance => [15, 16].includes(stance)));
+      const swingSeen = observedAttacks.some(attack => attack.stances.some(stance => [23, 24, 25].includes(stance)));
+      if (missingPresentation.length > 0 || !stabSeen || !swingSeen) {
+        throw new Error(`Attack afterimage presentation failed: ${JSON.stringify({
+          missingPresentation, stabSeen, swingSeen, observedAttacks
+        })}`);
+      }
+      console.log(`PASS  ${observedAttacks.length} attacks presented afterimages (stab and swing)`);
     }
 
     if (stopAtGame) throw new Error('__GAME_COMPLETE__');
