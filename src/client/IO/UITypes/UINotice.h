@@ -98,7 +98,7 @@ namespace jrc
     {
     public:
         UIEnterNumber(std::string question, std::function<void(int32_t number)> numhandler,
-            int32_t min, int32_t max, int32_t def);
+            int32_t min, int32_t max, int32_t def, bool clamp_max_on_input = false);
 
         void draw(float alpha) const override;
         void update() override;
@@ -121,5 +121,6 @@ namespace jrc
         Textfield numfield;
         int32_t min;
         int32_t max;
+        bool clamp_max_on_input;
     };
 }
