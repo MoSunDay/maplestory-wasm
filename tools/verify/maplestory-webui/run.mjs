@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 
 const browserBinary = process.env.CHROME_BIN || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : 'google-chrome');
 const debugPort = Number(process.env.E2E_DEBUG_PORT || 9231);
@@ -20,6 +21,7 @@ const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
 const verifyCashShop = process.env.E2E_CASH_SHOP === '1';
+const verifyNpcShop = process.env.E2E_NPC_SHOP === '1';
 const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 12);
@@ -500,6 +502,11 @@ try {
     })}`);
     await driver.screenshot('08-in-game');
 
+    if (verifyNpcShop) {
+      await verifyNpcShopFlow(driver);
+      throw new Error('__NPC_SHOP_COMPLETE__');
+    }
+
     if (verifyCashShop) {
       // StatusBar2 BtCashShop occupies x=569..625, y=554..589 at 800x600.
       // Use the visible button because account keymaps may rebind the shortcut.
@@ -744,6 +751,9 @@ try {
     assertRuntimeHealthy();
     passed = true;
   } else if (verifyCashShop && error.message === '__CASH_SHOP_COMPLETE__') {
+    assertRuntimeHealthy();
+    passed = true;
+  } else if (verifyNpcShop && error.message === '__NPC_SHOP_COMPLETE__') {
     assertRuntimeHealthy();
     passed = true;
   } else if (logoutToLogin && error.message === '__LOGOUT_COMPLETE__') {
