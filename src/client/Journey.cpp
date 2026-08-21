@@ -245,6 +245,21 @@ namespace jrc
         }) != 0;
     }
 
+    extern "C" EMSCRIPTEN_KEEPALIVE int msattack_stance()
+    {
+        return static_cast<int>(Stage::get().get_player().get_look().get_stance());
+    }
+
+    extern "C" EMSCRIPTEN_KEEPALIVE int msattack_frame()
+    {
+        return Stage::get().get_player().get_look().get_frame();
+    }
+
+    extern "C" EMSCRIPTEN_KEEPALIVE int msattack_afterimage_presented()
+    {
+        return Stage::get().get_player().get_afterimage().has_presented() ? 1 : 0;
+    }
+
     static int64_t timestep = Constants::TIMESTEP * 1000;
     static int64_t accumulator = timestep;
     static int64_t period = 0;

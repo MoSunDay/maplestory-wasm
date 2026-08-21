@@ -154,7 +154,8 @@ namespace jrc
                     cues.push_back({
                         std::move(animation),
                         *frame,
-                        afterimage::PlaybackPhase::WAITING_FOR_TRIGGER
+                        afterimage::PlaybackPhase::WAITING_FOR_TRIGGER,
+                        false
                     });
                 }
             }
@@ -192,18 +193,27 @@ namespace jrc
                 reached_now
             ))
             {
-                cue.animation.draw_effect(args, alpha);
+                cue.presented = cue.animation.draw_effect(args, alpha) ||
+                    cue.presented;
             }
         }
     }
 
-    void Afterimage::update(uint8_t stframe, uint16_t timestep)
+    void Afterimage::update(
+        uint8_t previous_stframe,
+        uint8_t stframe,
+        uint16_t timestep
+    )
     {
         for (Cue& cue : cues)
         {
             cue.phase = afterimage::latch_trigger(
                 cue.phase,
-                stframe >= cue.firstframe
+                afterimage::reached_trigger(
+                    previous_stframe,
+                    stframe,
+                    cue.firstframe
+                )
             );
             bool ready = cue.animation.is_ready();
             if (!ready && cue.phase != afterimage::PlaybackPhase::WAITING_FOR_TRIGGER &&
@@ -221,7 +231,8 @@ namespace jrc
             if (afterimage::should_advance(
                 phase_before_assets,
                 cue.phase,
-                ready
+                ready,
+                cue.presented
             ))
             {
                 cue.phase = afterimage::finish(
@@ -229,6 +240,16 @@ namespace jrc
                     cue.animation.update(timestep)
                 );
             }
+        }
+    }
+
+    void Afterimage::restart()
+    {
+        for (Cue& cue : cues)
+        {
+            cue.animation.reset();
+            cue.phase = afterimage::PlaybackPhase::WAITING_FOR_TRIGGER;
+            cue.presented = false;
         }
     }
 
@@ -240,5 +261,12 @@ namespace jrc
     Rectangle<int16_t> Afterimage::get_range() const
     {
         return range;
+    }
+
+    bool Afterimage::has_presented() const
+    {
+        return std::any_of(cues.begin(), cues.end(), [](const Cue& cue) {
+            return cue.presented;
+        });
     }
 }
