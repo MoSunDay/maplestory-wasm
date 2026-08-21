@@ -92,7 +92,6 @@ namespace jrc
         Texture impossible;
         Texture meso;
         Text mesolabel;
-        Text sellalllabel;
 
         Slider buyslider;
         Slider sellslider;
