@@ -1,4 +1,4 @@
-Commit: b6cde97b087a8c94bf9ace910bb726776bec6d23
+Commit: d484de5f30c73b3b55c1c5f1ed9816ffe133fabd
 
 # 网络层
 
@@ -56,6 +56,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 其他玩家的可见 Buff 按掩码位序完整解析后一次性提交到角色状态；截断封包在 `InPacket` 报错时不会留下部分斗气或属性充能状态。
 
+其他玩家出生包 `SPAWN_PLAYER` 的头部由独立解析器读取 `charId:int`、`level:short` 和 `name:string`。linked server 的 custom-client 模式使用 16 位等级；若按旧版单字节读取，后续姓名长度会错位并使整个远端玩家出生包被丢弃，表现为能看到怪物和掉落变化但看不到具体玩家。
+
 ### 注册复用登录协议
 
 游戏内注册不引入新 opcode：`UIRegister` 校验账号为 4–12 位 ASCII 字母数字、密码为 4–12 位非空白可打印 ASCII 后发送现有 `LOGIN_PASSWORD`。服务端对不存在的合法账号自动建号并返回 `LOGIN_STATUS=23`，客户端自动发送 `ACCEPT_TOS`，随后沿用登录成功和世界列表流程。注册失败由 `LoginHandlers` 回填到注册表单，不落入通用登录位图提示。
@@ -68,13 +70,15 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 登录 `CHARLIST` / 新建角色 / 进入地图复用 `LoginParser::parse_stats`。其字段宽度必须与 linked server 的 `addCharStats` 一致：角色名固定 13 字节，custom-client 模式的等级为 short；Evan 职业（2001、2200–2218）的剩余 SP 为多池表，其余职业为单个 short。宠物、队伍、戒指和现金礼物的 Java 定长字段遵循同一字节宽度规则。
 
-角色创建在最终 `CREATE_CHAR` 前再次发送 `CHECK_CHAR_NAME`，避免外观定制期间名称被占用。创建 payload 严格按 linked server 合约写入名称、`job/face/hair/hairColor/skin/top/bottom/shoes/weapon` 九个整数和性别字节，基础发型与颜色偏移在线上独立传输；纯编码函数为字段顺序和字节宽度提供回归边界。服务端对名称不可用或角色槽已满可能静默返回，对数据库插入失败则复用 `DELETE_CHAR_RESPONSE(state=9)`；`UICharCreation` 与 `DeleteCharResponseHandler` 会把这些结果收敛为可恢复状态，重新开放输入或定制控件。
+角色创建在最终 `CREATE_CHAR` 前再次发送 `CHECK_CHAR_NAME`，避免外观定制期间名称被占用。创建 payload 严格按 linked server 当前 `USE_CUSTOM_CLIENT=true` 合约写入名称、`job/face/packedHair/skin/top/bottom/shoes/weapon` 八个整数和性别字节，其中 `packedHair = baseHair + hairColor`；纯编码函数为字段顺序和字节宽度提供回归边界。服务端对名称不可用或角色槽已满可能静默返回，对数据库插入失败则复用 `DELETE_CHAR_RESPONSE(state=9)`；`UICharCreation` 与 `DeleteCharResponseHandler` 会把这些结果收敛为可恢复状态，重新开放输入或定制控件。
 
 `CharacterDataParser` 消费 `SET_FIELD` 的小游戏、三类戒指和新年贺卡附加数据。linked server 当前小游戏列表固定为空，非零计数属于不支持的合约变更并立即抛出 `PacketError`；新年贺卡无论是否为空都完整消费，保证后续区域信息与尾字段保持对齐。
 
 自然恢复通过 `HEAL_OVER_TIME` 上报 HP/MP 增量；物品椅子使用 `USE_CHAIR`/`CANCEL_CHAIR`，其他角色的椅子外观由 `SHOW_CHAIR` 同步。本地 `CANCEL_CHAIR` 回执通过不回发封包的状态入口应用，避免服务端取消与客户端取消相互回声。
 
-现金商城使用 `ENTER_CASHSHOP` 进入，由 `SET_CASH_SHOP` 建立完整角色快照和特殊商品状态；`QUERY_CASH_RESULT` 同步三类余额，`CASHSHOP_OPERATION` 处理商城仓库初始化、单品/礼包购买、仓库双向转移和明确错误。现金物品解析保留服务端唯一 `cash_id`，作为转移请求的稳定标识。
+现金商城使用 `ENTER_CASHSHOP` 进入，由 `SET_CASH_SHOP` 建立完整角色快照和特殊商品状态；`QUERY_CASH_RESULT` 同步三类余额，`CASHSHOP_OPERATION` 处理商城仓库初始化、单品/礼包购买、仓库双向转移和明确错误。现金物品解析保留服务端唯一 `cash_id`，作为转移请求的稳定标识；取出响应若因物品分类未携带现金标志，则只在该响应上下文中沿用请求对应的 `cash_id`，同时仍按线上标志决定封包字段宽度，避免后续存回失去身份或解析错位。
+
+NPC 商店操作 `NPC_SHOP_ACTION` 在原购买、单件出售、补充和退出模式后追加 mode 4，负载为当前物品栏分类字节；服务端以 `CONFIRM_SHOP_TRANSACTION(0x132)` 返回一次批量操作结果。客户端注册该回包，0/8 静默成功，现金物品出售等失败显示明确提示。
 
 ## 封包流程
 
