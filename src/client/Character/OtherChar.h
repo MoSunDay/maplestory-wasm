@@ -30,7 +30,7 @@ namespace jrc
     class OtherChar : public Char
     {
     public:
-        OtherChar(int32_t charid, const CharLook& look, uint8_t level,
+        OtherChar(int32_t charid, const CharLook& look, uint16_t level,
             int16_t job, const std::string& name, int8_t stance, Point<int16_t> position);
 
         // Update the character.
