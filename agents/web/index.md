@@ -1,4 +1,4 @@
-Commit: 62348ef7079246e1eedc88edecad4a310b337420
+Commit: 802f41b5f43829f8f6d2af45334d37e3fac95596
 
 # Web 基础设施
 
@@ -24,7 +24,9 @@ Commit: 62348ef7079246e1eedc88edecad4a310b337420
 
 三个服务默认绑定 IPv6 通配地址 `::`，并显式关闭 `IPV6_V6ONLY`，因此同一端口同时接受 IPv4 与 IPv6；显式传入其他 `--bind` 地址时维持单地址族监听。
 
-对外制品下载另由 `nx-nginx-dl` 提供 `:48562`，配置基线为 `docker/artifact-nginx.conf`：站点根目录固定为 `/data00/maplestory-wasm-deploy/public-artifacts`，只列出 `JourneyClient.js`、`JourneyClient.wasm`、`MapleStory-Server.jar` 和 Linux x86-64 `ws-proxy`，不暴露源码仓库。WASM 两项通过只读符号链接指向 `current/build`，会跟随 release 原子切换；Java 与代理制品由全量源码编译和 release 构建显式发布到稳定目录，不受 `current` 切换影响。
+对外制品下载另由 `nx-nginx-dl` 提供 `:48562`，配置基线为 `docker/artifact-nginx.conf`，站点根目录固定为 `/data00/maplestory-wasm-deploy/public-artifacts`。根目录的稳定文件名均是指向 `versions/<client-sha>-<server-sha>/` 的原子符号链接：包括 WASM/JS、`web-index.html`、IME 与加载脚本、三个 Linux x86-64 Rust 服务、`MapleStory-Server.jar`、客户端包和完整部署包。根目录保留 autoindex，因此页面入口对外命名为 `web-index.html` 而不是 `index.html`。
+
+完整部署包内含 `build/`、`web/`、`bin/`、服务端 JAR 及其 `cores/` 依赖；`VERSION` 同时记录客户端和 linked server 提交。`MANIFEST.sha256` 校验稳定下载名，包内 `BUNDLE-MANIFEST.sha256` 校验解压内容。新版本发布前保留旧公开制品到 `versions/legacy-before-*`，不暴露源码、数据库配置或凭据。
 
 ## 关键服务
 
