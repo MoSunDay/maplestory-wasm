@@ -7,8 +7,10 @@
 //! game server.
 
 use std::io;
+use std::net::Shutdown;
 
 use futures_util::{SinkExt, StreamExt};
+use socket2::SockRef;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::signal;
@@ -145,7 +147,7 @@ pub async fn handle_connection(mut ws: WebSocketStream<TcpStream>, map: &DockerM
 
     info!("[WebSocket] Client requested connection to {host}:{port}");
     info!("[TCP] Connecting to {host}:{port}");
-    let tcp = match TcpStream::connect((host, port)).await {
+    let mut tcp = match TcpStream::connect((host, port)).await {
         Ok(tcp) => tcp,
         Err(err) if err.kind() == io::ErrorKind::ConnectionRefused => {
             warn!("[TCP] Connection refused to {host}:{port}");
@@ -160,16 +162,24 @@ pub async fn handle_connection(mut ws: WebSocketStream<TcpStream>, map: &DockerM
     info!("[TCP] Connected to target server");
 
     let (ws_tx, ws_rx) = ws.split();
-    let (tcp_read, tcp_write) = tcp.into_split();
+    {
+        let (tcp_read, tcp_write) = tcp.split();
+        let ws_to_tcp = forward_ws_to_tcp(ws_rx, tcp_write);
+        let tcp_to_ws = forward_tcp_to_ws(tcp_read, ws_tx);
 
-    let ws_to_tcp = forward_ws_to_tcp(ws_rx, tcp_write);
-    let tcp_to_ws = forward_tcp_to_ws(tcp_read, ws_tx);
+        // As soon as one direction finishes the connection is over; dropping
+        // the other future cancels it.
+        tokio::select! {
+            _ = ws_to_tcp => {}
+            _ = tcp_to_ws => {}
+        }
+    }
 
-    // As soon as one direction finishes the connection is over; dropping the
-    // other future cancels it.
-    tokio::select! {
-        _ = ws_to_tcp => {}
-        _ = tcp_to_ws => {}
+    // Do not rely on split-half drop timing here. In particular, a browser
+    // close must synchronously tear down both directions of the Java socket so
+    // the game server observes EOF and runs its disconnect/save path now.
+    if let Err(err) = SockRef::from(&tcp).shutdown(Shutdown::Both) {
+        warn!("[TCP] Failed to shut down target connection: {err}");
     }
 }
 
@@ -179,7 +189,7 @@ pub async fn handle_connection(mut ws: WebSocketStream<TcpStream>, map: &DockerM
 /// protocol violations and are dropped with a warning.
 async fn forward_ws_to_tcp(
     mut ws_rx: futures_util::stream::SplitStream<WebSocketStream<TcpStream>>,
-    mut tcp: tokio::net::tcp::OwnedWriteHalf,
+    mut tcp: tokio::net::tcp::WriteHalf<'_>,
 ) {
     while let Some(result) = ws_rx.next().await {
         match result {
@@ -213,7 +223,7 @@ async fn forward_ws_to_tcp(
 /// Each read becomes its own frame (see `TCP_READ_SIZE`) so frame boundaries
 /// from the game server are preserved for the client.
 async fn forward_tcp_to_ws(
-    mut tcp: tokio::net::tcp::OwnedReadHalf,
+    mut tcp: tokio::net::tcp::ReadHalf<'_>,
     mut ws_tx: futures_util::stream::SplitSink<WebSocketStream<TcpStream>, Message>,
 ) {
     let mut buffer = vec![0u8; TCP_READ_SIZE];
