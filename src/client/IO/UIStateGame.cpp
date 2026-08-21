@@ -32,6 +32,7 @@
 #include "UITypes/UISkillBook.h"
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIWorldMap.h"
+#include "Field/UIFieldClock.h"
 
 #include "../Constants.h"
 #include "../Character/Inventory/InventoryType.h"
@@ -85,6 +86,7 @@ namespace jrc
         emplace<UINpcTalk>();
         emplace<UIShop>(look, inventory);
         emplace<UIStorage>(inventory);
+        emplace<UIFieldClock>();
 
     }
 

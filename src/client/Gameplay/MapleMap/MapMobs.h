@@ -70,6 +70,8 @@ namespace jrc
         Point<int16_t> get_mob_body_position(int32_t oid) const;
         // Return the head position of a mob.
         Point<int16_t> get_mob_head_position(int32_t oid) const;
+        // Return the number of instantiated mobs on the map.
+        size_t size() const;
 
     private:
         std::vector<int32_t> find_closest(Rectangle<int16_t> range, Point<int16_t> origin, uint8_t mobcount) const;

@@ -30,6 +30,7 @@
 #include "../../Graphics/GraphicsGL.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UICharSelect.h"
+#include "../../IO/Field/UIFieldClock.h"
 #include "../../IO/Window.h"
 
 
@@ -296,6 +297,26 @@ namespace jrc
     void FieldEffectHandler::handle(InPacket& recv) const
     {
         int8_t mode = recv.read_byte();
+        if (mode == 2)
+        {
+            std::string name = recv.read_string();
+            if (name.empty())
+            {
+                Console::get().print("[FieldEffectHandler] Received empty object name for mode 2");
+                return;
+            }
+
+            const size_t changed = Stage::get().set_named_object_active(name, false);
+            if (changed == 0)
+            {
+                Console::get().print(
+                    "[FieldEffectHandler] Named field object not found: " + name +
+                    ", map: " + std::to_string(Stage::get().get_mapid())
+                );
+            }
+            return;
+        }
+
         if (mode == 3)
         {
             std::string path = recv.read_string();
@@ -309,9 +330,59 @@ namespace jrc
             return;
         }
 
+        if (mode == 4)
+        {
+            std::string path = recv.read_string();
+            if (!Sound::play_field(path))
+            {
+                Console::get().print(
+                    "[FieldEffectHandler] Field sound could not be resolved: " + path
+                );
+            }
+            return;
+        }
+
         Console::get().print(
             "[FieldEffectHandler] Unhandled field effect mode: " + std::to_string(mode) +
             ", remaining bytes: " + std::to_string(recv.length())
         );
+    }
+
+    void ClockHandler::handle(InPacket& recv) const
+    {
+        auto clock = UI::get().get_element<UIFieldClock>();
+        if (!clock)
+        {
+            Console::get().print("[ClockHandler] Gameplay clock UI is unavailable");
+            return;
+        }
+
+        const int8_t type = recv.read_byte();
+        if (type == 1)
+        {
+            const auto hours = static_cast<uint8_t>(recv.read_byte());
+            const auto minutes = static_cast<uint8_t>(recv.read_byte());
+            const auto seconds = static_cast<uint8_t>(recv.read_byte());
+            clock->set_wall_clock(hours, minutes, seconds);
+            return;
+        }
+        if (type == 2)
+        {
+            clock->set_countdown(recv.read_int());
+            return;
+        }
+
+        Console::get().print(
+            "[ClockHandler] Unsupported clock type: " + std::to_string(type) +
+            ", remaining bytes: " + std::to_string(recv.length())
+        );
+    }
+
+    void StopClockHandler::handle(InPacket&) const
+    {
+        if (auto clock = UI::get().get_element<UIFieldClock>())
+        {
+            clock->stop();
+        }
     }
 }

@@ -21,6 +21,8 @@
 
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
+#include <limits>
+
 namespace jrc
 {
     void MapNpcs::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
@@ -95,5 +97,46 @@ namespace jrc
             }
         }
         return Cursor::IDLE;
+    }
+
+    bool MapNpcs::talk_to_nearest(Point<int16_t> player_position)
+    {
+        constexpr int32_t MAX_HORIZONTAL_DISTANCE = 120;
+        constexpr int32_t MAX_VERTICAL_DISTANCE = 80;
+
+        Npc* nearest = nullptr;
+        int32_t nearest_distance = std::numeric_limits<int32_t>::max();
+        for (auto& map_object : npcs)
+        {
+            Npc* npc = static_cast<Npc*>(map_object.second.get());
+            if (!npc || !npc->accepts_keyboard_talk())
+            {
+                continue;
+            }
+
+            const Point<int16_t> position = npc->get_position();
+            const int32_t horizontal = position.x() - player_position.x();
+            const int32_t vertical = position.y() - player_position.y();
+            if (horizontal < -MAX_HORIZONTAL_DISTANCE || horizontal > MAX_HORIZONTAL_DISTANCE ||
+                vertical < -MAX_VERTICAL_DISTANCE || vertical > MAX_VERTICAL_DISTANCE)
+            {
+                continue;
+            }
+
+            const int32_t distance = horizontal * horizontal + vertical * vertical;
+            if (distance < nearest_distance)
+            {
+                nearest = npc;
+                nearest_distance = distance;
+            }
+        }
+
+        if (!nearest)
+        {
+            return false;
+        }
+
+        TalkToNPCPacket(nearest->get_oid()).dispatch();
+        return true;
     }
 }

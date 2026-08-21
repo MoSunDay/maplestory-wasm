@@ -273,4 +273,9 @@ namespace jrc
             return {};
         }
     }
+
+    size_t MapMobs::size() const
+    {
+        return mobs.size();
+    }
 }
