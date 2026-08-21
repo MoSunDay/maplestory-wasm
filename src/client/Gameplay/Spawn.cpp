@@ -106,7 +106,7 @@ namespace jrc
 
     CharSpawn::CharSpawn(int32_t c,
                          const LookEntry& lk,
-                         uint8_t l,
+                         uint16_t l,
                          int16_t j,
                          const std::string& nm,
                          int8_t st,
