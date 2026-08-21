@@ -49,4 +49,16 @@ namespace jrc
     public:
         void handle(InPacket& recv) const override;
     };
+
+    class ClockHandler : public PacketHandler
+    {
+    public:
+        void handle(InPacket& recv) const override;
+    };
+
+    class StopClockHandler : public PacketHandler
+    {
+    public:
+        void handle(InPacket& recv) const override;
+    };
 }

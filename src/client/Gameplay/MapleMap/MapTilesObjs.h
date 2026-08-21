@@ -24,6 +24,8 @@
 
 #include <vector>
 #include <map>
+#include <cstddef>
+#include <string>
 
 namespace jrc
 {
@@ -37,6 +39,8 @@ namespace jrc
         void draw(Point<int16_t> viewpos, float alpha) const;
         void prepare_visible(Point<int16_t> viewpos, float alpha) const;
         void update();
+        size_t set_named_object_active(const std::string& name, bool active);
+        size_t count_active_named_objects(const std::string& name) const;
 
     private:
         std::multimap<uint8_t, Tile> tiles;
@@ -54,6 +58,8 @@ namespace jrc
         void draw(Layer::Id layer, Point<int16_t> viewpos, float alpha) const;
         void prepare_visible(Point<int16_t> viewpos, float alpha) const;
         void update();
+        size_t set_named_object_active(const std::string& name, bool active);
+        size_t count_active_named_objects(const std::string& name) const;
 
     private:
         EnumMap<Layer::Id, TilesObjs> layers;

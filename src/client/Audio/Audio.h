@@ -55,6 +55,7 @@ namespace jrc
         Sound();
 
         void play() const;
+        static bool play_field(const std::string& path);
 
         static Error init();
         static void close();

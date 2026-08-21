@@ -240,6 +240,16 @@ namespace jrc
         }
     }
 
+    size_t Stage::set_named_object_active(const std::string& name, bool active)
+    {
+        return tilesobjs.set_named_object_active(name, active);
+    }
+
+    size_t Stage::count_active_named_objects(const std::string& name) const
+    {
+        return tilesobjs.count_active_named_objects(name);
+    }
+
     void Stage::check_portals()
     {
         if (player.is_attacking())
@@ -419,6 +429,9 @@ namespace jrc
                 case KeyAction::PICKUP:
                     // Immediate pickup on key press
                     check_drops();
+                    break;
+                case KeyAction::NPCCHAT:
+                    npcs.talk_to_nearest(player.get_position());
                     break;
                 default:
                     break;
