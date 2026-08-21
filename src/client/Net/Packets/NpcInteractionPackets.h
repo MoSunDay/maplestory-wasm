@@ -93,10 +93,18 @@ namespace jrc
         NpcShopActionPacket()
             : NpcShopActionPacket(LEAVE) {}
 
+        // Requests selling every non-cash item in an inventory tab.
+        static NpcShopActionPacket sell_all(InventoryType::Id type)
+        {
+            NpcShopActionPacket packet(SELL_ALL);
+            packet.write_byte(static_cast<int8_t>(type));
+            return packet;
+        }
+
     protected:
         enum Mode : int8_t
         {
-            BUY, SELL, RECHARGE, LEAVE
+            BUY, SELL, RECHARGE, LEAVE, SELL_ALL
         };
 
         NpcShopActionPacket(Mode mode) : OutPacket(NPC_SHOP_ACTION)
