@@ -44,7 +44,7 @@ namespace jrc
 
         buttons[BUY_ITEM]  = std::make_unique<MapleButton>(src["BtBuy"]);
         buttons[SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"]);
-        buttons[SELL_ALL]  = std::make_unique<MapleButton>(src["BtSell"], 0, 20);
+        buttons[SELL_ALL]  = std::make_unique<MapleButton>(src["BtSell"], 0, -20);
         buttons[EXIT]      = std::make_unique<MapleButton>(src["BtExit"]);
         if (nl::node rechargenode = src["BtRecharge"])
         {
@@ -85,7 +85,6 @@ namespace jrc
         meso       = src["meso"];
 
         mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
-        sellalllabel = { Text::A11M, Text::RIGHT, Text::DARKGREY, "全部" };
 
         buyslider  = {
             11, { 115, 308 }, 214, 5, 1,
@@ -130,8 +129,6 @@ namespace jrc
         );
 
         mesolabel.draw(position + Point<int16_t>(450, 62));
-        sellalllabel.draw(position + Point<int16_t>(388, 68));
-
         buystate.draw(position, selection);
         sellstate.draw(position, selection);
 

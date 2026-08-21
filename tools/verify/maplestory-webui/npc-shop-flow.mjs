@@ -43,8 +43,8 @@ export async function verifyNpcShopFlow(driver) {
 
   await sleep(500);
   let sellAllOpened = false;
-  for (const [x, y] of [[570, 156], [588, 156], [606, 156],
-                        [570, 164], [588, 164], [606, 164]]) {
+  for (const [x, y] of [[570, 116], [588, 116], [606, 116],
+                        [570, 124], [588, 124], [606, 124]]) {
     await driver.click(x, y);
     await sleep(250);
     const notice = await driver.evaluate(
