@@ -32,7 +32,7 @@ namespace jrc
         ~Texture();
 
         void draw(const DrawArgument& args) const;
-        void draw_effect(const DrawArgument& args) const;
+        bool draw_effect(const DrawArgument& args) const;
         void prepare_visible() const;
         void prepare_map_required() const;
         void prepare_effect() const;
@@ -52,7 +52,7 @@ namespace jrc
             TRANSIENT_EFFECT
         };
 
-        void draw_with_load_class(const DrawArgument& args, DrawLoadClass load_class) const;
+        bool draw_with_load_class(const DrawArgument& args, DrawLoadClass load_class) const;
 
         nl::bitmap bitmap;
         Point<int16_t> origin;

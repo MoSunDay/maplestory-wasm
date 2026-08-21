@@ -60,24 +60,24 @@ namespace jrc
         draw_with_load_class(args, DrawLoadClass::BLOCKING_VISIBLE);
     }
 
-    void Texture::draw_effect(const DrawArgument& args) const
+    bool Texture::draw_effect(const DrawArgument& args) const
     {
-        draw_with_load_class(args, DrawLoadClass::TRANSIENT_EFFECT);
+        return draw_with_load_class(args, DrawLoadClass::TRANSIENT_EFFECT);
     }
 
-    void Texture::draw_with_load_class(
+    bool Texture::draw_with_load_class(
         const DrawArgument& args,
         DrawLoadClass load_class
     ) const
     {
         size_t id = bitmap.id();
-        if (id == 0)
-            return;
+        if (id == 0 || args.get_color().a() <= 0.0f)
+            return false;
 
         const Rectangle<int16_t> destination = args.get_rectangle(origin, dimensions);
         if (!GraphicsGL::get().isonscreen(destination))
         {
-            return;
+            return false;
         }
 
         if (!GraphicsGL::get().hasbitmap(bitmap))
@@ -91,7 +91,7 @@ namespace jrc
                     ? GraphicsGL::BitmapLoadClass::BLOCKING_VISIBLE
                     : GraphicsGL::BitmapLoadClass::TRANSIENT_EFFECT
             );
-            return;
+            return false;
 #else
             GraphicsGL::get().addbitmap(bitmap);
 #endif
@@ -99,6 +99,7 @@ namespace jrc
 
         GraphicsGL::get()
             .draw(bitmap, destination, args.get_color(), args.get_angle());
+        return true;
     }
 
     void Texture::prepare_visible() const

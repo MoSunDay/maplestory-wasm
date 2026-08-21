@@ -140,8 +140,10 @@ namespace jrc
         {
             stancespeed = static_cast<uint16_t>(Constants::TIMESTEP * speed);
         }
-        afterimage.update(look.get_frame(), stancespeed);
-        return look.update(stancespeed);
+        uint8_t previous_frame = look.get_frame();
+        bool animation_ended = look.update(stancespeed);
+        afterimage.update(previous_frame, look.get_frame(), stancespeed);
+        return animation_ended;
     }
 
     float Char::get_stancespeed() const
@@ -373,6 +375,7 @@ namespace jrc
             if (prepared != regular_afterimages.end())
             {
                 afterimage = prepared->second;
+                afterimage.restart();
                 return;
             }
         }
@@ -380,6 +383,7 @@ namespace jrc
         int16_t weapon_level = weapon.get_equipdata().get_reqstat(Maplestat::LEVEL);
         const std::string& ai_name = weapon.get_afterimage();
         afterimage = { skill_id, ai_name, stance_name, weapon_level };
+        afterimage.restart();
     }
 
     const Afterimage& Char::get_afterimage() const

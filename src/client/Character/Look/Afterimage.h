@@ -40,10 +40,12 @@ namespace jrc
         Afterimage();
 
         void draw(uint8_t stframe, const DrawArgument& args, float alpha) const;
-        void update(uint8_t stframe, uint16_t timestep);
+        void update(uint8_t previous_stframe, uint8_t stframe, uint16_t timestep);
+        void restart();
 
         uint8_t get_first_frame() const;
         Rectangle<int16_t> get_range() const;
+        bool has_presented() const;
 
     private:
         struct Cue
@@ -51,6 +53,7 @@ namespace jrc
             Animation animation;
             uint8_t firstframe;
             afterimage::PlaybackPhase phase;
+            mutable bool presented;
         };
 
         std::vector<Cue> cues;
