@@ -16,6 +16,7 @@
 - 远端 Buff 掩码顺序：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
 - 世界选择单频道策略与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
+- 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
 - Cosmic 远端玩家出生头（custom-client short 等级与角色名对齐）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-player-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnPlayerHeader.cpp -o /tmp/spawn-player-parser && /tmp/spawn-player-parser`
 - Cosmic 完整角色数据（Java 定长 UTF-8、戒指、新年贺卡、小游戏门禁）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-data-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/CharacterDataParser.cpp -o /tmp/character-data-parser && /tmp/character-data-parser`
