@@ -1,4 +1,4 @@
-Commit: d484de5f30c73b3b55c1c5f1ed9816ffe133fabd
+Commit: 62348ef7079246e1eedc88edecad4a310b337420
 
 # UI 系统
 
@@ -100,6 +100,10 @@ WASM 下把文本输入委托给浏览器隐藏 textarea（`web/index.html` 的
 `#ime-input`），由浏览器原生输入法提供候选词窗口。C++ 通过
 `EM_ASM` 调 JS 的 `MapleWasmIME.onFocus/onBlur/onText`，JS 通过导出函数
 `msime_input`（整段文本 + UTF-16 光标）与 `msime_key`（白名单控制键）回传。
+浏览器侧实现位于 `web/ime_input.js`：`compositionstart` 到候选词确认期间，
+`input` 和 `selectionchange` 只保留 DOM preedit，不调用 `msime_input`；
+`compositionend` 后以最终非合成 `input` 为主、下一任务为兼容回退同步候选结果。
+合成期的物理键事件不向 GLFW 窗口气泡，回显快照去重避免 DOM/C++ 循环同步。
 密码字段（`crypt > 0`）不走桥接，保持纯键盘路径。非 WASM 平台为空实现。
 
 ## 依赖关系
