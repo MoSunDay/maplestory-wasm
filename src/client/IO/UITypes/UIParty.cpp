@@ -4,6 +4,7 @@
 #include "../UI.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Gameplay/Stage.h"
 
 #include "UIStatusBar.h"
 
@@ -50,24 +51,28 @@ namespace jrc
 	}
 
 	UIParty::UIParty()
-		: UIDragElement<PosPARTY>(Point<int16_t>(300, 22)), background(300, 230, Geometry::BLACK, 0.80f), header(300, 22, Geometry::WHITE, 0.12f), divider(260, 1, Geometry::WHITE, 0.25f), title(Text::A12B, Text::LEFT, Text::WHITE, "Party"), party_info(Text::A11M, Text::LEFT, Text::WHITE, ""), invite_info(Text::A11M, Text::LEFT, Text::YELLOW, ""), invite_label(Text::A11M, Text::LEFT, Text::WHITE, "Invite:"),
+		: UIDragElement<PosPARTY>(Point<int16_t>(300, 22)), background(300, 260, Geometry::BLACK, 0.80f), header(300, 22, Geometry::WHITE, 0.12f), divider(260, 1, Geometry::WHITE, 0.25f), title(Text::A12B, Text::LEFT, Text::WHITE, "Party"), party_info(Text::A11M, Text::LEFT, Text::WHITE, ""), invite_info(Text::A11M, Text::LEFT, Text::YELLOW, ""), invite_label(Text::A11M, Text::LEFT, Text::WHITE, "Invite:"),
 		  help_info(Text::A11M, Text::LEFT, Text::LIGHTGREY, "Tip: /party list, /party leader <name>"), party_id(-1), party_leader_id(-1), pending_party_invite_id(-1)
 	{
-		dimension = Point<int16_t>(300, 230);
+		dimension = Point<int16_t>(300, 260);
 
 		nl::node basic = nl::nx::ui["Basic.img"];
 		buttons[BT_CLOSE] = std::make_unique<MapleButton>(basic["BtClose"], Point<int16_t>(276, 4));
-		buttons[BT_CREATE] = std::make_unique<MapleButton>(basic["BtOK4"], Point<int16_t>(20, 190));
-		buttons[BT_LEAVE] = std::make_unique<MapleButton>(basic["BtCancel4"], Point<int16_t>(90, 190));
-		buttons[BT_ACCEPT] = std::make_unique<MapleButton>(basic["BtOK4"], Point<int16_t>(160, 190));
-		buttons[BT_DENY] = std::make_unique<MapleButton>(basic["BtCancel4"], Point<int16_t>(230, 190));
+		buttons[BT_CREATE] = std::make_unique<MapleButton>(basic["BtOK4"], Point<int16_t>(20, 220));
+		buttons[BT_LEAVE] = std::make_unique<MapleButton>(basic["BtCancel4"], Point<int16_t>(90, 220));
+		buttons[BT_ACCEPT] = std::make_unique<MapleButton>(basic["BtOK4"], Point<int16_t>(160, 220));
+		buttons[BT_DENY] = std::make_unique<MapleButton>(basic["BtCancel4"], Point<int16_t>(230, 220));
 		buttons[BT_INVITE] = std::make_unique<MapleButton>(basic["BtOK4"], Point<int16_t>(240, 157));
+		buttons[BT_KICK] = std::make_unique<MapleButton>(basic["BtCancel4"], Point<int16_t>(160, 190));
+		buttons[BT_LEADER] = std::make_unique<MapleButton>(basic["BtOK4"], Point<int16_t>(230, 190));
 
 		button_labels[BT_CREATE] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Create");
 		button_labels[BT_LEAVE] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Leave");
 		button_labels[BT_ACCEPT] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Accept");
 		button_labels[BT_DENY] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Deny");
 		button_labels[BT_INVITE] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Invite");
+		button_labels[BT_KICK] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Kick");
+		button_labels[BT_LEADER] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Leader");
 
 		invite_field = Textfield(
 			Text::A11M,
@@ -123,7 +128,7 @@ namespace jrc
 
 		invite_info.draw(position + Point<int16_t>(20, 132));
 		invite_label.draw(position + Point<int16_t>(20, 160));
-		help_info.draw(position + Point<int16_t>(20, 214));
+		help_info.draw(position + Point<int16_t>(20, 245));
 		draw_button_labels();
 	}
 
@@ -138,6 +143,21 @@ namespace jrc
 		if (dragged)
 		{
 			return UIDragElement::send_cursor(clicked, cursorpos);
+		}
+
+		if (clicked)
+		{
+			Point<int16_t> relative = cursorpos - position;
+			if (relative.x() >= 16 && relative.x() <= 282 && relative.y() >= 46 && relative.y() < 142)
+			{
+				size_t index = static_cast<size_t>((relative.y() - 46) / 16);
+				if (index < party_members.size())
+				{
+					selected_member_id = party_members[index].id;
+					sync_text();
+					return { Cursor::CLICKING, true };
+				}
+			}
 		}
 
 		if (invite_field.get_state() != Textfield::DISABLED)
@@ -190,6 +210,12 @@ namespace jrc
 		party_id = in_party_id;
 		party_leader_id = leader_id;
 		party_members = members;
+		if (std::none_of(party_members.begin(), party_members.end(), [this](const auto& member) {
+			return member.id == selected_member_id;
+		}))
+		{
+			selected_member_id = -1;
+		}
 
 		if (pending_party_invite_id == in_party_id)
 		{
@@ -204,6 +230,7 @@ namespace jrc
 		party_id = -1;
 		party_leader_id = -1;
 		party_members.clear();
+		selected_member_id = -1;
 		sync_text();
 	}
 
@@ -225,6 +252,30 @@ namespace jrc
 				return;
 			}
 		}
+	}
+
+	void UIParty::select_player_target(int32_t id, const std::string& name, uint16_t level)
+	{
+		auto member = std::find_if(party_members.begin(), party_members.end(), [id](const auto& value) {
+			return value.id == id;
+		});
+		if (member != party_members.end())
+		{
+			selected_member_id = id;
+			send_status_line("[Party] Selected party member " + member->name + ".");
+		}
+		else
+		{
+			selected_member_id = -1;
+			invite_field.change_text(name);
+			invite_field.select_all();
+			invite_field.set_state(Textfield::FOCUSED);
+			send_status_line(
+				"[Party] Selected " + name + " Lv." + std::to_string(level) +
+				". Click Invite to send a request."
+			);
+		}
+		sync_text();
 	}
 
 	Button::State UIParty::button_pressed(uint16_t buttonid)
@@ -274,6 +325,20 @@ namespace jrc
 				break;
 			case BT_INVITE:
 				send_invite();
+				break;
+			case BT_KICK:
+				if (selected_member_id > 0)
+				{
+					ExpelFromPartyPacket(selected_member_id).dispatch();
+					send_status_line("[Party] Sent expel request.");
+				}
+				break;
+			case BT_LEADER:
+				if (selected_member_id > 0)
+				{
+					ChangePartyLeaderPacket(selected_member_id).dispatch();
+					send_status_line("[Party] Sent leadership transfer request.");
+				}
 				break;
 			default:
 				break;
@@ -342,8 +407,26 @@ namespace jrc
 			}
 
 			member_lines[i].change_color(member.channel >= 0 ? Text::WHITE : Text::LIGHTGREY);
-			member_lines[i].change_text(member.name + " Lv." + std::to_string(member.level) + leader_tag + hp_tag);
+			std::string marker = member.id == selected_member_id ? "> " : "  ";
+			member_lines[i].change_text(marker + member.name + " Lv." + std::to_string(member.level) + leader_tag + hp_tag);
 		}
+		sync_buttons();
+	}
+
+	void UIParty::sync_buttons()
+	{
+		const int32_t self_id = Stage::get().get_player().get_oid();
+		const bool in_party = party_id > 0;
+		const bool is_leader = in_party && party_leader_id == self_id;
+		const bool selected_other = selected_member_id > 0 && selected_member_id != self_id;
+		buttons[BT_CREATE]->set_active(!in_party);
+		buttons[BT_LEAVE]->set_active(in_party);
+		// Cosmic creates a party automatically when a solo player sends an invite.
+		buttons[BT_INVITE]->set_active(!in_party || party_members.size() < PARTY_SIZE);
+		buttons[BT_ACCEPT]->set_active(pending_party_invite_id > 0 && !in_party);
+		buttons[BT_DENY]->set_active(pending_party_invite_id > 0 && !in_party);
+		buttons[BT_KICK]->set_active(is_leader && selected_other);
+		buttons[BT_LEADER]->set_active(is_leader && selected_other);
 	}
 
 	void UIParty::draw_button_labels() const

@@ -53,9 +53,30 @@ namespace jrc
         using Loot = std::pair<int32_t, Point<int16_t>>;
         Loot find_loot_at(Point<int16_t> playerpos);
 
+        struct PetLootQuery
+        {
+            Point<int16_t> origin;
+            int32_t character_id = 0;
+            int32_t party_id = -1;
+            int16_t range = 150;
+            bool meso_magnet = false;
+            bool item_pouch = false;
+            bool magic_scales = false;
+        };
+
+        struct PetLootTarget
+        {
+            int32_t oid = 0;
+            Point<int16_t> position;
+        };
+
+        PetLootTarget find_pet_loot(const PetLootQuery& query) const;
+        bool has_drop(int32_t oid) const;
+
     private:
         void try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos,
             int32_t& closest_distance_sq, Loot& closest_loot) const;
+        static bool pet_can_target(const Drop& drop, const PetLootQuery& query);
 
         MapObjects drops;
 

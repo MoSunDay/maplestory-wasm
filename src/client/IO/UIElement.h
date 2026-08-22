@@ -73,11 +73,15 @@ namespace jrc
             EQUIPINVENTORY,
             SKILLBOOK,
             KEYCONFIG,
+            BUDDY,
             PARTY,
+            PETOPTIONS,
             MINIMAP,
             WORLDMAP,
             CASHSHOP,
             FIELDCLOCK,
+            PLAYER_CONTEXT,
+            TRADE,
             NUM_TYPES
         };
 

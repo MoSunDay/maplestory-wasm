@@ -58,7 +58,9 @@ namespace jrc
         Cryptography cryptography;
         PacketSwitch packetswitch;
 
+        int8_t header[HEADER_LENGTH];
         int8_t buffer[MAX_PACKET_LENGTH];
+        size_t header_pos;
         size_t length;
         size_t pos;
         bool connected;

@@ -21,9 +21,13 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Gameplay/Pet/PetAutomation.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 
 #include "nlnx/nx.hpp"
+
+#include <array>
 
 namespace jrc
 {
@@ -91,6 +95,26 @@ namespace jrc
             {
                 texture.draw(position_pet);
             }
+
+            const auto& automation = Stage::get().get_pet_automation();
+            draw_pet_item(automation.get_hp_item(), { 194, 43 });
+            draw_pet_item(automation.get_mp_item(), { 234, 43 });
+
+            constexpr std::array<int32_t, 5> ABILITIES = {
+                pet_automation::MESO_MAGNET,
+                pet_automation::ITEM_POUCH,
+                pet_automation::AUTO_HP_POUCH,
+                pet_automation::AUTO_MP_POUCH,
+                pet_automation::WING_BOOTS
+            };
+            constexpr std::array<Point<int16_t>, 5> POSITIONS = {
+                Point<int16_t>(194, 88), Point<int16_t>(230, 88),
+                Point<int16_t>(266, 88), Point<int16_t>(212, 124),
+                Point<int16_t>(248, 124)
+            };
+            for (size_t index = 0; index < ABILITIES.size(); ++index)
+                if (inventory.has_equipped_item(ABILITIES[index]))
+                    draw_pet_item(ABILITIES[index], POSITIONS[index]);
         }
     }
 
@@ -104,6 +128,16 @@ namespace jrc
         default:
             return Button::PRESSED;
         }
+    }
+
+    bool UIEquipInventory::is_in_range(Point<int16_t> cursorpos) const
+    {
+        if (UIElement::is_in_range(cursorpos))
+            return true;
+        return showpetequips && Rectangle<int16_t>(
+            position + Point<int16_t>(184, 0),
+            position + Point<int16_t>(304, 185)
+        ).contains(cursorpos);
     }
 
     void UIEquipInventory::update_slot(Equipslot::Id slot)
@@ -179,10 +213,35 @@ namespace jrc
 
     void UIEquipInventory::send_icon(const Icon& icon, Point<int16_t> cursorpos)
     {
+        if (int8_t potion = pet_potion_by_position(cursorpos))
+        {
+            icon.drop_on_pet_potion(potion == 1);
+            return;
+        }
         if (Equipslot::Id slot = slot_by_position(cursorpos))
         {
             icon.drop_on_equips(slot);
         }
+    }
+
+    int8_t UIEquipInventory::pet_potion_by_position(Point<int16_t> cursorpos) const
+    {
+        if (!showpetequips)
+            return 0;
+        Rectangle<int16_t> hp(position + Point<int16_t>(194, 43),
+            position + Point<int16_t>(226, 75));
+        Rectangle<int16_t> mp(position + Point<int16_t>(234, 43),
+            position + Point<int16_t>(266, 75));
+        return hp.contains(cursorpos) ? 1 : mp.contains(cursorpos) ? 2 : 0;
+    }
+
+    void UIEquipInventory::draw_pet_item(int32_t item_id, Point<int16_t> relative) const
+    {
+        if (item_id <= 0)
+            return;
+        const ItemData& item = ItemData::get(item_id);
+        if (item)
+            item.get_icon(false).draw(position + relative + Point<int16_t>(0, 32));
     }
 
     void UIEquipInventory::toggle_active()

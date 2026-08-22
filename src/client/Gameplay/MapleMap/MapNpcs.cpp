@@ -99,6 +99,19 @@ namespace jrc
         return Cursor::IDLE;
     }
 
+    bool MapNpcs::contains_cursor(Point<int16_t> position, Point<int16_t> viewpos) const
+    {
+        for (const auto& mmo : npcs)
+        {
+            const Npc* npc = static_cast<const Npc*>(mmo.second.get());
+            if (npc && npc->is_active() && npc->inrange(position, viewpos))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool MapNpcs::talk_to_nearest(Point<int16_t> player_position)
     {
         constexpr int32_t MAX_HORIZONTAL_DISTANCE = 120;

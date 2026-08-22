@@ -32,6 +32,12 @@ namespace jrc
         void expire(int8_t, const PhysicsObject*);
 
         Rectangle<int16_t> bounds() const;
+        int32_t get_owner() const;
+        int8_t get_pickup_type() const;
+        bool is_player_drop() const;
+        void update_ownership(int32_t owner, int8_t pickup_type, bool player_drop);
+        virtual bool is_meso() const = 0;
+        virtual int32_t get_item_id() const = 0;
 
     protected:
         Drop(int32_t oid, int32_t owner, Point<int16_t> start,
@@ -60,4 +66,3 @@ namespace jrc
         double moved;
     };
 }
-

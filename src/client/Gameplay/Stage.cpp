@@ -19,11 +19,16 @@
 #include "Input/ActionTrigger.h"
 
 #include "../Audio/Audio.h"
+#include "../Data/ItemData.h"
 #include "../IO/KeyAction.h"
 #include "../IO/Messages.h"
+#include "../IO/UI.h"
+#include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
+#include "../Net/Packets/PetPackets.h"
 #include "../Util/Misc.h"
+#include "Pet/PetSettingsStore.h"
 
 #include "nlnx/nx.hpp"
 
@@ -34,17 +39,35 @@ namespace jrc
     namespace
     {
         constexpr uint32_t PICKUP_INTERVAL_MS = 100;
+        constexpr uint16_t PET_LOOT_WAIT_FRAMES = 45;
+        constexpr uint16_t PET_LOOT_RETRY_FRAMES = 45;
+        constexpr uint8_t PET_MOVEMENT_SYNC_FRAMES = 6;
+
+        int32_t current_party_id()
+        {
+            if (Optional<UIStatusbar> statusbar = UI::get().get_element<UIStatusbar>())
+                return statusbar->get_party_id();
+            return -1;
+        }
     }
 
     Stage::Stage()
         : combat(player, chars, mobs, physics)
         , last_pickup_time(0)
+        , pet_automation()
+        , pet_loot_target_oid(0)
+        , pet_loot_target_frames(0)
+        , pet_loot_cooldown(0)
+        , pet_movement_sync_frames(0)
         , pending_intro_warp_mapid(-1)
         , pending_intro_warp_delay_ms(0)
         , asset_generation(0)
     {
         state = INACTIVE;
         mapid = 0;
+        pet_settings::Thresholds thresholds = pet_settings::load();
+        pet_automation.set_hp_threshold(thresholds.hp);
+        pet_automation.set_mp_threshold(thresholds.mp);
     }
 
     void Stage::init()
@@ -81,6 +104,11 @@ namespace jrc
         mobs.clear();
         drops.clear();
         reactors.clear();
+        pet_loot_target_oid = 0;
+        pet_loot_target_frames = 0;
+        pet_loot_cooldown = 0;
+        pet_movement_sync_frames = 0;
+        last_pet_movement = Movement();
     }
 
     void Stage::load_map(int32_t mapid)
@@ -174,6 +202,8 @@ namespace jrc
         chars.update(physics);
         drops.update(physics);
         player.update(physics);
+        update_pet_automation();
+        update_pet_movement();
         if (is_intro_input_locked())
         {
             // Direction3-style intro scenes present the actor facing left and
@@ -354,6 +384,125 @@ namespace jrc
         }
     }
 
+    void Stage::update_pet_automation()
+    {
+        pet_automation.tick();
+        if (pet_loot_cooldown > 0)
+            --pet_loot_cooldown;
+
+        PetLook* pet = player.get_pet(0);
+        if (!pet)
+        {
+            pet_loot_target_oid = 0;
+            pet_loot_target_frames = 0;
+            return;
+        }
+
+        const Inventory& inventory = player.get_inventory();
+        const CharStats& stats = player.get_stats();
+        int16_t hp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_hp_item());
+        int16_t mp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_mp_item());
+        const ItemData& hp_item = ItemData::get(pet_automation.get_hp_item());
+        const ItemData& mp_item = ItemData::get(pet_automation.get_mp_item());
+        jrc::pet_automation::AutoPotInputs inputs = {
+            stats.get_stat(Maplestat::HP),
+            stats.get_stat(Maplestat::MAXHP),
+            stats.get_stat(Maplestat::MP),
+            stats.get_stat(Maplestat::MAXMP),
+            stats.get_stat(Maplestat::HP) > 0,
+            true,
+            inventory.has_equipped_item(jrc::pet_automation::AUTO_HP_POUCH),
+            inventory.has_equipped_item(jrc::pet_automation::AUTO_MP_POUCH),
+            hp_slot > 0 && hp_item && hp_item.restores_hp(),
+            mp_slot > 0 && mp_item && mp_item.restores_mp()
+        };
+
+        jrc::pet_automation::AutoPotDecisions decisions = pet_automation.decide(inputs);
+        for (size_t i = 0; i < decisions.count; ++i)
+        {
+            int32_t item_id = decisions.requests[i].item_id;
+            int16_t slot = inventory.find_item(InventoryType::USE, item_id);
+            if (slot > 0)
+                PetAutoPotPacket(0, pet->get_uniqueid(), slot, item_id).dispatch();
+        }
+
+        bool has_boots = inventory.has_equipped_item(jrc::pet_automation::WING_BOOTS);
+        if (!has_boots)
+        {
+            pet->clear_loot_target();
+            pet_loot_target_oid = 0;
+            pet_loot_target_frames = 0;
+            return;
+        }
+
+        if (pet_loot_target_oid && !drops.has_drop(pet_loot_target_oid))
+        {
+            pet->clear_loot_target();
+            pet_loot_target_oid = 0;
+            pet_loot_target_frames = 0;
+        }
+
+        if (!pet_loot_target_oid && pet_loot_cooldown == 0)
+        {
+            MapDrops::PetLootQuery query = {
+                player.get_position(),
+                player.get_oid(),
+                current_party_id(),
+                300,
+                inventory.has_equipped_item(jrc::pet_automation::MESO_MAGNET),
+                inventory.has_equipped_item(jrc::pet_automation::ITEM_POUCH),
+                inventory.has_equipped_item(jrc::pet_automation::MAGIC_SCALES)
+            };
+            MapDrops::PetLootTarget target = drops.find_pet_loot(query);
+            if (target.oid)
+            {
+                pet_loot_target_oid = target.oid;
+                pet_loot_target_position = target.position;
+                pet_loot_target_frames = 0;
+                pet->set_loot_target(target.position);
+            }
+        }
+
+        if (!pet_loot_target_oid)
+            return;
+
+        ++pet_loot_target_frames;
+        if (pet_loot_target_frames >= PET_LOOT_WAIT_FRAMES &&
+            pet->get_position().distance(pet_loot_target_position) <= 50)
+        {
+            PetLootPacket(pet->get_uniqueid(), pet_loot_target_oid).dispatch();
+            pet->clear_loot_target();
+            pet_loot_target_oid = 0;
+            pet_loot_target_frames = 0;
+            pet_loot_cooldown = PET_LOOT_RETRY_FRAMES;
+        }
+    }
+
+    void Stage::update_pet_movement()
+    {
+        PetLook* pet = player.get_pet(0);
+        if (!pet)
+        {
+            last_pet_movement = Movement();
+            pet_movement_sync_frames = 0;
+            return;
+        }
+
+        if (pet_movement_sync_frames > 0)
+        {
+            --pet_movement_sync_frames;
+            return;
+        }
+
+        Movement current = pet->get_movement();
+        if (last_pet_movement.type == Movement::NONE || last_pet_movement.hasmoved(current))
+        {
+            MovePetPacket(pet->get_uniqueid(), current).dispatch();
+            last_pet_movement = current;
+            pet_movement_sync_frames = PET_MOVEMENT_SYNC_FRAMES;
+        }
+    }
+
     bool Stage::is_intro_input_locked() const
     {
         return effect.blocks_player_input();
@@ -467,6 +616,20 @@ namespace jrc
         return npcs.send_cursor(pressed, position, camera.position());
     }
 
+    std::optional<PlayerTarget> Stage::find_player_target(Point<int16_t> position) const
+    {
+        if (state != ACTIVE)
+        {
+            return std::nullopt;
+        }
+        const Point<int16_t> view_position = camera.position();
+        if (npcs.contains_cursor(position, view_position))
+        {
+            return std::nullopt;
+        }
+        return chars.find_target(position, view_position);
+    }
+
     bool Stage::is_player(int32_t cid) const
     {
         return cid == player.get_oid();
@@ -510,6 +673,35 @@ namespace jrc
     Combat& Stage::get_combat()
     {
         return combat;
+    }
+
+    void Stage::set_pet_auto_hp_item(int32_t item_id)
+    {
+        pet_automation.set_hp_item(item_id);
+    }
+
+    void Stage::set_pet_auto_mp_item(int32_t item_id)
+    {
+        pet_automation.set_mp_item(item_id);
+    }
+
+    bool Stage::set_pet_auto_thresholds(uint8_t hp, uint8_t mp)
+    {
+        pet_settings::Thresholds thresholds = {
+            jrc::pet_automation::clamp_threshold(hp),
+            jrc::pet_automation::clamp_threshold(mp)
+        };
+        if (!pet_settings::save(thresholds))
+            return false;
+
+        pet_automation.set_hp_threshold(thresholds.hp);
+        pet_automation.set_mp_threshold(thresholds.mp);
+        return true;
+    }
+
+    const pet_automation::Controller& Stage::get_pet_automation() const
+    {
+        return pet_automation;
     }
 
     Optional<Char> Stage::get_character(int32_t cid)

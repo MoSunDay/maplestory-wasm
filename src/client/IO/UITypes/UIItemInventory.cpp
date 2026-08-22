@@ -21,10 +21,13 @@
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 #include "UIKeyConfig.h"
+#include "../Trade/UITrade.h"
 
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
+#include "../../Net/Packets/PetPackets.h"
+#include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
@@ -177,8 +180,8 @@ namespace jrc
     {
         icons.clear();
 
-        uint8_t numslots = inventory.get_slotmax(tab);
-        for (uint8_t i = 1; i < numslots; ++i)
+        int16_t numslots = inventory.get_slotmax(tab);
+        for (int16_t i = 1; i <= numslots; ++i)
         {
             update_slot(i);
         }
@@ -234,6 +237,13 @@ namespace jrc
         {
             if (int32_t item_id = inventory.get_item_id(tab, slot))
             {
+                if (auto trade = UI::get().get_element<UITrade>();
+                    trade && trade->is_active())
+                {
+                    trade->offer_inventory_item(tab, slot,
+                        inventory.get_item_count(tab, slot));
+                    return;
+                }
                 switch (tab)
                 {
                 case InventoryType::EQUIP:
@@ -253,6 +263,12 @@ namespace jrc
                     break;
                 case InventoryType::SETUP:
                     Stage::get().get_player().use_item(item_id);
+                    break;
+                case InventoryType::CASH:
+                    if (inventory.is_pet_item(tab, slot))
+                    {
+                        SpawnPetPacket(static_cast<int8_t>(slot)).dispatch();
+                    }
                     break;
                 default:
                     break;
@@ -562,6 +578,34 @@ namespace jrc
                 keyconfig->unstage_mapping(mapping);
             else
                 keyconfig->stage_mapping(cursorposition, mapping);
+        }
+    }
+
+    bool UIItemInventory::ItemIcon::drop_on_pet_potion(bool hp) const
+    {
+        if (sourcetab != InventoryType::USE)
+            return false;
+
+        const ItemData& item = ItemData::get(item_id);
+        if (!item || (hp ? !item.restores_hp() : !item.restores_mp()))
+            return false;
+
+        int32_t mode = hp ? 1 : 2;
+        ChangeKeyMapPacket(mode, item_id).dispatch();
+        if (hp)
+            Stage::get().set_pet_auto_hp_item(item_id);
+        else
+            Stage::get().set_pet_auto_mp_item(item_id);
+        return true;
+    }
+
+    void UIItemInventory::ItemIcon::drop_on_trade() const
+    {
+        if (auto trade = UI::get().get_element<UITrade>(); trade && trade->is_active())
+        {
+            const Inventory& inventory = Stage::get().get_player().get_inventory();
+            trade->offer_inventory_item(sourcetab, source,
+                inventory.get_item_count(sourcetab, source));
         }
     }
 }

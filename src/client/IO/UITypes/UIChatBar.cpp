@@ -4,18 +4,13 @@
 
 #include "../Components/MapleButton.h"
 
-#include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/MessagingPackets.h"
 
 #include "UIParty.h"
 #include "UIStatusMessenger.h"
+#include "../Social/UIBuddy.h"
 
 #include "nlnx/nx.hpp"
-
-#include <algorithm>
-#include <cctype>
-#include <list>
-#include <sstream>
 
 namespace jrc
 {
@@ -32,52 +27,6 @@ namespace jrc
             size_t last = value.find_last_not_of(' ');
             return value.substr(first, last - first + 1);
         }
-
-        std::string lowercase(std::string value)
-        {
-            std::transform(
-                value.begin(),
-                value.end(),
-                value.begin(),
-                [](unsigned char c)
-                {
-                    return static_cast<char>(std::tolower(c));
-                }
-            );
-            return value;
-        }
-
-        bool parse_int32(const std::string& value, int32_t& out)
-        {
-            if (value.empty())
-            {
-                return false;
-            }
-
-            size_t start = 0;
-            if (value[0] == '+' || value[0] == '-')
-            {
-                start = 1;
-            }
-
-            for (size_t i = start; i < value.size(); i++)
-            {
-                if (!std::isdigit(static_cast<unsigned char>(value[i])))
-                {
-                    return false;
-                }
-            }
-
-            try
-            {
-                out = std::stoi(value);
-            }
-            catch (...)
-            {
-                return false;
-            }
-            return true;
-        }
     }
 
     UIChatbar::UIChatbar(Point<int16_t> pos)
@@ -86,9 +35,6 @@ namespace jrc
         dimension = { 500, 60 };
         chatopen = true;
         chattarget = CHT_ALL;
-        party_id = -1;
-        party_leader_id = -1;
-        pending_party_invite_id = -1;
         chatrows = 4;
         rowpos = 0;
         rowmax = -1;
@@ -128,16 +74,18 @@ namespace jrc
             msg = trim(msg);
             if (msg.empty())
             {
+                chatfield.set_state(Textfield::NORMAL);
                 return;
             }
 
-            if (!handle_party_command(msg))
+            if (!handle_social_command(msg))
             {
                 send_chat_message(msg);
             }
 
             lastentered.push_back(msg);
             lastpos = lastentered.size();
+            chatfield.set_state(Textfield::NORMAL);
         });
         chatfield.set_key_callback(KeyAction::UP, [&](){
             if (lastpos > 0)
@@ -391,8 +339,7 @@ namespace jrc
 
     void UIChatbar::set_pending_party_invite(int32_t in_party_id, const std::string& inviter)
     {
-        pending_party_invite_id = in_party_id;
-        pending_party_inviter = inviter;
+        party_state = social::invite_to_party(party_state, in_party_id, inviter);
 
         if (auto messenger = UI::get().get_element<UIStatusMessenger>())
         {
@@ -402,8 +349,7 @@ namespace jrc
 
     void UIChatbar::clear_pending_party_invite()
     {
-        pending_party_invite_id = -1;
-        pending_party_inviter.clear();
+        party_state = social::clear_party_invite(party_state);
 
         if (auto party_window = UI::get().get_element<UIParty>())
         {
@@ -418,295 +364,149 @@ namespace jrc
 
     void UIChatbar::set_party_state(int32_t in_party_id, int32_t leader_id, const std::vector<PartyMember>& members)
     {
-        party_id = in_party_id;
-        party_leader_id = leader_id;
-        party_members = members;
-
-        if (pending_party_invite_id == in_party_id)
+        const bool clears_invite = party_state.pending_id == in_party_id;
+        party_state = social::replace_party(party_state, in_party_id, leader_id, members);
+        if (clears_invite)
         {
-            clear_pending_party_invite();
+            if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+            {
+                messenger->clear_party_invite();
+            }
         }
+    }
+
+    void UIChatbar::confirm_party_created(int32_t in_party_id)
+    {
+        party_state = social::confirm_party_created(party_state, in_party_id);
     }
 
     void UIChatbar::clear_party_state()
     {
-        party_id = -1;
-        party_leader_id = -1;
-        party_members.clear();
+        party_state = social::clear_party(party_state);
     }
 
     void UIChatbar::set_party_leader(int32_t leader_id)
     {
-        party_leader_id = leader_id;
+        party_state = social::update_party_leader(party_state, leader_id);
     }
 
     void UIChatbar::update_party_member_hp(int32_t cid, int32_t hp, int32_t max_hp)
     {
-        for (PartyMember& member : party_members)
-        {
-            if (member.id == cid)
-            {
-                member.hp = hp;
-                member.max_hp = max_hp;
-                return;
-            }
-        }
+        party_state = social::update_party_member_hp(party_state, cid, hp, max_hp);
     }
 
     int32_t UIChatbar::get_party_id() const
     {
-        return party_id;
+        return party_state.id;
     }
 
     int32_t UIChatbar::get_party_leader_id() const
     {
-        return party_leader_id;
+        return party_state.leader_id;
     }
 
     int32_t UIChatbar::get_pending_party_invite_id() const
     {
-        return pending_party_invite_id;
+        return party_state.pending_id;
     }
 
     const std::string& UIChatbar::get_pending_party_inviter() const
     {
-        return pending_party_inviter;
+        return party_state.pending_inviter;
     }
 
     const std::vector<UIChatbar::PartyMember>& UIChatbar::get_party_members() const
     {
-        return party_members;
+        return party_state.members;
     }
 
-    int32_t UIChatbar::resolve_party_member_id(const std::string& token) const
+    void UIChatbar::set_buddy_list(const std::vector<social::BuddyEntry>& entries)
     {
-        int32_t member_id = 0;
-        if (parse_int32(token, member_id))
+        buddy_state = social::replace_buddies(buddy_state, entries);
+        if (auto buddy_window = UI::get().get_element<UIBuddy>())
         {
-            return member_id;
+            buddy_window->set_state(buddy_state);
         }
-
-        std::string lowered = lowercase(token);
-        for (const PartyMember& member : party_members)
-        {
-            if (lowercase(member.name) == lowered)
-            {
-                return member.id;
-            }
-        }
-
-        return 0;
     }
 
-    bool UIChatbar::handle_party_command(const std::string& message)
+    void UIChatbar::set_pending_buddy_request(int32_t id, const std::string& name)
     {
-        if (message.empty() || message[0] != '/')
+        buddy_state = social::request_buddy(buddy_state, id, name);
+        if (auto buddy_window = UI::get().get_element<UIBuddy>())
         {
-            return false;
+            buddy_window->set_state(buddy_state);
         }
-
-        std::istringstream whole(message);
-        std::string command;
-        whole >> command;
-        command = lowercase(command);
-
-        std::string argument_block;
-        std::getline(whole, argument_block);
-        argument_block = trim(argument_block);
-
-        if (command == "/pt")
+        if (auto messenger = UI::get().get_element<UIStatusMessenger>())
         {
-            if (argument_block.empty())
-            {
-                send_line("[Party] Usage: /pt <message>", YELLOW);
-                return true;
-            }
-
-            send_party_message(argument_block);
-            return true;
+            messenger->show_buddy_request(id, name);
         }
-
-        if (command != "/party" && command != "/p")
-        {
-            return false;
-        }
-
-        if (argument_block.empty())
-        {
-            send_line("[Party] /party create | leave | invite <name> | join <partyId>", YELLOW);
-            send_line("[Party] /party expel <name|id> | leader <name|id> | accept | deny | list", YELLOW);
-            return true;
-        }
-
-        std::istringstream args(argument_block);
-        std::string action;
-        args >> action;
-        action = lowercase(action);
-
-        std::string argument;
-        std::getline(args, argument);
-        argument = trim(argument);
-
-        if (action == "create")
-        {
-            CreatePartyPacket().dispatch();
-            send_line("[Party] Sent create request.", YELLOW);
-            return true;
-        }
-
-        if (action == "leave")
-        {
-            LeavePartyPacket().dispatch();
-            send_line("[Party] Sent leave request.", YELLOW);
-            return true;
-        }
-
-        if (action == "join")
-        {
-            int32_t join_party_id = 0;
-            if (!parse_int32(argument, join_party_id))
-            {
-                send_line("[Party] Usage: /party join <partyId>", YELLOW);
-                return true;
-            }
-
-            JoinPartyPacket(join_party_id).dispatch();
-            send_line("[Party] Sent join request.", YELLOW);
-            return true;
-        }
-
-        if (action == "invite")
-        {
-            if (argument.empty())
-            {
-                send_line("[Party] Usage: /party invite <name>", YELLOW);
-                return true;
-            }
-
-            InviteToPartyPacket(argument).dispatch();
-            send_line("[Party] Sent invite request to " + argument + ".", YELLOW);
-            return true;
-        }
-
-        if (action == "expel" || action == "kick")
-        {
-            int32_t member_id = resolve_party_member_id(argument);
-            if (member_id <= 0)
-            {
-                send_line("[Party] Usage: /party expel <name|id>", YELLOW);
-                return true;
-            }
-
-            ExpelFromPartyPacket(member_id).dispatch();
-            send_line("[Party] Sent expel request.", YELLOW);
-            return true;
-        }
-
-        if (action == "leader" || action == "lead")
-        {
-            int32_t member_id = resolve_party_member_id(argument);
-            if (member_id <= 0)
-            {
-                send_line("[Party] Usage: /party leader <name|id>", YELLOW);
-                return true;
-            }
-
-            ChangePartyLeaderPacket(member_id).dispatch();
-            send_line("[Party] Sent leadership transfer request.", YELLOW);
-            return true;
-        }
-
-        if (action == "accept")
-        {
-            if (pending_party_invite_id <= 0)
-            {
-                send_line("[Party] There is no pending invitation.", YELLOW);
-                return true;
-            }
-
-            JoinPartyPacket(pending_party_invite_id).dispatch();
-            send_line("[Party] Sent invitation accept request.", YELLOW);
-            clear_pending_party_invite();
-            return true;
-        }
-
-        if (action == "deny")
-        {
-            if (pending_party_inviter.empty())
-            {
-                send_line("[Party] There is no pending invitation.", YELLOW);
-                return true;
-            }
-
-            DenyPartyInvitePacket(pending_party_inviter).dispatch();
-            send_line("[Party] Declined invitation from " + pending_party_inviter + ".", YELLOW);
-            clear_pending_party_invite();
-            return true;
-        }
-
-        if (action == "list")
-        {
-            if (party_members.empty())
-            {
-                send_line("[Party] No cached party members.", YELLOW);
-                return true;
-            }
-
-            send_line("[Party] Current members:", YELLOW);
-            for (const PartyMember& member : party_members)
-            {
-                std::string leader_tag = member.id == party_leader_id ? " (leader)" : "";
-                send_line(" - " + member.name + " Lv." + std::to_string(member.level) + leader_tag, WHITE);
-            }
-            return true;
-        }
-
-        send_line("[Party] Unknown command. Use /party for help.", YELLOW);
-        return true;
     }
 
-    void UIChatbar::send_targeted_message(const std::string& target, const std::string& message)
+    void UIChatbar::clear_pending_buddy_request()
     {
-        send_line("[To " + target + "] " + message, WHITE);
-    }
-
-    void UIChatbar::send_party_message(const std::string& message)
-    {
-        std::list<int32_t> recipients;
-        MultiChatPacket(MultiChatPacket::PARTY, recipients, message).dispatch();
-        send_targeted_message("Party", message);
-    }
-
-    void UIChatbar::send_chat_message(const std::string& message)
-    {
-        std::list<int32_t> recipients;
-
-        switch (chattarget)
+        buddy_state = social::clear_buddy_request(buddy_state);
+        if (auto buddy_window = UI::get().get_element<UIBuddy>())
         {
-        case CHT_ALL:
-            GeneralChatPacket(message, true).dispatch();
-            break;
-        case CHT_BUDDY:
-            MultiChatPacket(MultiChatPacket::BUDDY, recipients, message).dispatch();
-            send_targeted_message("Buddy", message);
-            break;
-        case CHT_GUILD:
-            MultiChatPacket(MultiChatPacket::GUILD, recipients, message).dispatch();
-            send_targeted_message("Guild", message);
-            break;
-        case CHT_ALLIANCE:
-            MultiChatPacket(MultiChatPacket::ALLIANCE, recipients, message).dispatch();
-            send_targeted_message("Alliance", message);
-            break;
-        case CHT_SQUAD:
-            // Most v83 servers route squad chat through party chat.
-            send_party_message(message);
-            break;
-        case CHT_PARTY:
-        default:
-            send_party_message(message);
-            break;
+            buddy_window->set_state(buddy_state);
         }
+        if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+        {
+            messenger->clear_buddy_request();
+        }
+    }
+
+    void UIChatbar::remove_buddy(int32_t id)
+    {
+        buddy_state = social::remove_buddy(buddy_state, id);
+        if (auto buddy_window = UI::get().get_element<UIBuddy>())
+        {
+            buddy_window->set_state(buddy_state);
+        }
+    }
+
+    void UIChatbar::begin_buddy_add(const std::string& name)
+    {
+        buddy_state = social::begin_buddy_add(buddy_state, name);
+    }
+
+    void UIChatbar::update_buddy_channel(int32_t id, int32_t channel)
+    {
+        buddy_state = social::update_buddy_channel(buddy_state, id, channel);
+        if (auto buddy_window = UI::get().get_element<UIBuddy>())
+        {
+            buddy_window->set_state(buddy_state);
+        }
+    }
+
+    void UIChatbar::set_buddy_capacity(uint8_t capacity)
+    {
+        buddy_state = social::update_buddy_capacity(buddy_state, capacity);
+        if (auto buddy_window = UI::get().get_element<UIBuddy>())
+        {
+            buddy_window->set_state(buddy_state);
+        }
+    }
+
+    const social::BuddyState& UIChatbar::get_buddy_state() const
+    {
+        return buddy_state;
+    }
+
+    void UIChatbar::record_multi_chat(uint8_t type)
+    {
+        if (type == MultiChatPacket::BUDDY)
+        {
+            buddy_state.received_messages++;
+        }
+        else if (type == MultiChatPacket::PARTY)
+        {
+            party_state.received_messages++;
+        }
+    }
+
+    uint32_t UIChatbar::get_party_message_count() const
+    {
+        return party_state.received_messages;
     }
 
     int16_t UIChatbar::getchattop() const
