@@ -22,6 +22,8 @@
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
+#include <cmath>
+
 namespace jrc
 {
     PetLook::PetLook(int32_t iid, std::string nm, int32_t uqid,
@@ -74,23 +76,31 @@ namespace jrc
         static const double PETFLYFORCE = 0.2;
 
         Point<int16_t> curpos = phobj.get_position();
+        Point<int16_t> followpos = loot_target.value_or(charpos);
+        if (loot_target && (std::abs(followpos.y() - curpos.y()) > 70 || curpos.distance(followpos) > 180))
+        {
+            set_stance(WARP);
+            set_position(followpos.x(), followpos.y());
+            curpos = followpos;
+        }
         switch (stance)
         {
         case STAND:
         case MOVE:
-            if (curpos.distance(charpos) > 150)
+            if (!loot_target && curpos.distance(charpos) > 150)
             {
                 set_position(charpos.x(), charpos.y());
             }
             else
             {
-                if (charpos.x() - curpos.x() > 50)
+                int16_t deadzone = loot_target ? 20 : 50;
+                if (followpos.x() - curpos.x() > deadzone)
                 {
                     phobj.hforce = PETWALKFORCE;
                     flip = true;
                     set_stance(MOVE);
                 }
-                else if (charpos.x() - curpos.x() < -50)
+                else if (followpos.x() - curpos.x() < -deadzone)
                 {
                     phobj.hforce = -PETWALKFORCE;
                     flip = false;
@@ -148,13 +158,15 @@ namespace jrc
             phobj.clear_flag(PhysicsObject::NOGRAVITY);
             break;
         default:
-            // TODO: Handle all the other cases
+            if (stance == WARP && animations[stance].update())
+                set_stance(STAND);
             break;
         }
 
         physics.move_object(phobj);
 
-        animations[stance].update();
+        if (stance != WARP)
+            animations[stance].update();
     }
 
     void PetLook::set_position(int16_t x, int16_t y)
@@ -178,9 +190,47 @@ namespace jrc
         stance = stancebyvalue(stancebyte);
     }
 
+    void PetLook::set_loot_target(Point<int16_t> position)
+    {
+        loot_target = position;
+    }
+
+    void PetLook::clear_loot_target()
+    {
+        loot_target.reset();
+    }
+
+    void PetLook::apply_movement(const Movement& movement)
+    {
+        set_position(movement.xpos, movement.ypos);
+        phobj.fhid = movement.fh;
+        set_stance(movement.newstate);
+    }
+
     int32_t PetLook::get_itemid() const
     {
         return itemid;
+    }
+
+    int32_t PetLook::get_uniqueid() const
+    {
+        return uniqueid;
+    }
+
+    Point<int16_t> PetLook::get_position() const
+    {
+        return phobj.get_position();
+    }
+
+    bool PetLook::has_loot_target() const
+    {
+        return loot_target.has_value();
+    }
+
+    Movement PetLook::get_movement() const
+    {
+        uint8_t state = static_cast<uint8_t>(stance) * 2 + (flip ? 1 : 0);
+        return Movement(phobj, state);
     }
 
     PetLook::Stance PetLook::get_stance() const

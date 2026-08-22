@@ -54,6 +54,16 @@ namespace jrc
         }
     }
 
+    void AutoHpPotHandler::handle(InPacket& recv) const
+    {
+        Stage::get().set_pet_auto_hp_item(recv.read_int());
+    }
+
+    void AutoMpPotHandler::handle(InPacket& recv) const
+    {
+        Stage::get().set_pet_auto_mp_item(recv.read_int());
+    }
+
 
     void SkillMacrosHandler::handle(InPacket& recv) const
     {

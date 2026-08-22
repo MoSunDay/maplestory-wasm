@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Job.h"
+#include "JobProgression.h"
 
 namespace jrc
 {
@@ -34,26 +35,7 @@ namespace jrc
         id   = i;
         name = get_name(id);
 
-        if (id == 0)
-        {
-            level = BEGINNER;
-        }
-        else if (id % 100 == 0)
-        {
-            level = FIRST;
-        }
-        else if (id % 10 == 0)
-        {
-            level = SECOND;
-        }
-        else if (id % 10 == 1)
-        {
-            level = THIRD;
-        }
-        else
-        {
-            level = FOURTH;
-        }
+        level = static_cast<Level>(job_progression::stage_for(id));
     }
 
     bool Job::is_sub_job(uint16_t subid) const
@@ -61,7 +43,9 @@ namespace jrc
         for (int32_t lvit = BEGINNER; lvit <= FOURTH; ++lvit)
         {
             Level lv = static_cast<Level>(lvit);
-            if (subid == get_subjob(lv))
+            uint16_t stage_job = get_subjob(lv);
+            bool explorer_beginner = lv == BEGINNER && id < 1000;
+            if (subid == stage_job && (stage_job != 0 || explorer_beginner))
             {
                 return true;
             }
@@ -83,23 +67,10 @@ namespace jrc
 
     uint16_t Job::get_subjob(Level lv) const
     {
-        if (lv <= level)
-        {
-            switch (lv)
-            {
-            case BEGINNER:
-                return 0;
-            case FIRST:
-                return (id / 100) * 100;
-            case SECOND:
-                return (id / 10) * 10;
-            case THIRD:
-                return (level == FOURTH) ? id - 1 : id;
-            case FOURTH:
-                return id;
-            }
-        }
-        return 0;
+        return job_progression::job_for_stage(
+            id,
+            static_cast<job_progression::Stage>(lv)
+        );
     }
 
     const std::string& Job::get_name() const
@@ -200,6 +171,48 @@ namespace jrc
             return "Outlaw";
         case 522:
             return "Corsair";
+        case 1000:
+            return "Noblesse";
+        case 1100:
+            return "Dawn Warrior";
+        case 1110:
+            return "Dawn Warrior (2nd)";
+        case 1111:
+            return "Dawn Warrior (3rd)";
+        case 1112:
+            return "Dawn Warrior (4th)";
+        case 1200:
+            return "Blaze Wizard";
+        case 1210:
+            return "Blaze Wizard (2nd)";
+        case 1211:
+            return "Blaze Wizard (3rd)";
+        case 1212:
+            return "Blaze Wizard (4th)";
+        case 1300:
+            return "Wind Archer";
+        case 1310:
+            return "Wind Archer (2nd)";
+        case 1311:
+            return "Wind Archer (3rd)";
+        case 1312:
+            return "Wind Archer (4th)";
+        case 1400:
+            return "Night Walker";
+        case 1410:
+            return "Night Walker (2nd)";
+        case 1411:
+            return "Night Walker (3rd)";
+        case 1412:
+            return "Night Walker (4th)";
+        case 1500:
+            return "Thunder Breaker";
+        case 1510:
+            return "Thunder Breaker (2nd)";
+        case 1511:
+            return "Thunder Breaker (3rd)";
+        case 1512:
+            return "Thunder Breaker (4th)";
         case 2000:
         case 2100:
         case 2110:
@@ -213,7 +226,7 @@ namespace jrc
 
     Equipstat::Id Job::get_primary(Weapon::Type weapontype) const
     {
-        switch (id / 100)
+        switch (job_progression::archetype_for(id))
         {
         case 2:
             return Equipstat::INT;
@@ -230,7 +243,7 @@ namespace jrc
 
     Equipstat::Id Job::get_secondary(Weapon::Type weapontype) const
     {
-        switch (id / 100)
+        switch (job_progression::archetype_for(id))
         {
         case 2:
             return Equipstat::LUK;

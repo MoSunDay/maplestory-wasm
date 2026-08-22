@@ -36,6 +36,16 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    class AutoHpPotHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+    class AutoMpPotHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
 
     // Parses skill macros.
     class SkillMacrosHandler : public PacketHandler

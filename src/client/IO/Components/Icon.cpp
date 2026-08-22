@@ -76,6 +76,16 @@ namespace jrc
         type->drop_on_bindings(cursorpos, remove);
     }
 
+    bool Icon::drop_on_pet_potion(bool hp) const
+    {
+        return type->drop_on_pet_potion(hp);
+    }
+
+    void Icon::drop_on_trade() const
+    {
+        type->drop_on_trade();
+    }
+
     void Icon::start_drag(Point<int16_t> offset)
     {
         cursoroffset = offset;

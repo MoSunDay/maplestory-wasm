@@ -32,6 +32,8 @@
 
 namespace jrc
 {
+    struct PlayerTarget;
+
     class UIStateGame : public UIState
     {
     public:
@@ -67,6 +69,7 @@ namespace jrc
     private:
         void clear_cursors(bool clicked, Point<int16_t> pos, UIElement::Type except);
         void drop_icon(const Icon& icon, Point<int16_t> pos);
+        void select_player_target(const PlayerTarget& target);
         template <class T, typename...Args>
         void emplace(Args&&...args);
 

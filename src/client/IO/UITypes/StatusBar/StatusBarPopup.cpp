@@ -36,7 +36,7 @@ namespace jrc
         });
         initialize_panel(system, main_bar["System"], {
             { "BtChannel", Action::NONE },
-            { "BtGameOption", Action::NONE },
+            { "BtGameOption", Action::PET_OPTIONS },
             { "BtSystemOption", Action::NONE },
             { "BtKeySetting", Action::KEY_CONFIG },
             { "BtJoyPad", Action::NONE },

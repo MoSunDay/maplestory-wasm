@@ -279,6 +279,16 @@ namespace jrc
         PosPARTY() : PointEntry("PosPARTY", "(160,120)") {}
     };
 
+    struct PosBUDDY : public Configuration::PointEntry
+    {
+        PosBUDDY() : PointEntry("PosBUDDY", "(480,120)") {}
+    };
+
+    struct PosTRADE : public Configuration::PointEntry
+    {
+        PosTRADE() : PointEntry("PosTRADE", "(72,20)") {}
+    };
+
     struct PosMAP : public Configuration::PointEntry
     {
         PosMAP() : PointEntry("PosMAP", "(124,2)") {}

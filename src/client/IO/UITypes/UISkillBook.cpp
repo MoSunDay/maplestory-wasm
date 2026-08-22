@@ -22,6 +22,7 @@
 #include "UIKeyConfig.h"
 
 #include "../../Character/SkillId.h"
+#include "../../Character/JobProgression.h"
 #include "../../Data/JobData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
@@ -431,7 +432,7 @@ namespace jrc
 
     void UISkillbook::update_skills(int32_t skill_id)
     {
-        if (skill_id / 10000 == job.get_id())
+        if (job.is_sub_job(static_cast<uint16_t>(skill_id / 10000)))
         {
             change_tab(tab, true);
         }
@@ -471,9 +472,12 @@ namespace jrc
             remaining = 6;
         }
 
-        remaining -= skillbook.get_level(SkillId::THREE_SNAILS);
-        remaining -= skillbook.get_level(SkillId::HEAL);
-        remaining -= skillbook.get_level(SkillId::FEATHER);
+        for (uint8_t index = 0; index < 3; ++index)
+        {
+            remaining -= skillbook.get_level(
+                job_progression::beginner_skill_for(job.get_id(), index)
+            );
+        }
 
         return remaining > 0 ? remaining : 0;
     }

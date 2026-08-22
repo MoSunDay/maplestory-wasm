@@ -44,6 +44,14 @@ namespace jrc
     };
 
 
+    // Move a summoned pet.
+    // Opcode: MOVE_PET(170)
+    class PetMovedHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+
     // Move a character.
     // Opcode: CHAR_MOVED(185)
     class CharMovedHandler : public PacketHandler

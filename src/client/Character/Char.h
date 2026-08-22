@@ -18,6 +18,7 @@
 #include "../Util/TimedBool.h"
 
 #include <unordered_map>
+#include <vector>
 
 namespace jrc
 {
@@ -123,6 +124,9 @@ namespace jrc
         );
         /// Remove a pet with the specified index and reason.
         void remove_pet(uint8_t index, bool hunger);
+        PetLook* get_pet(uint8_t index);
+        const PetLook* get_pet(uint8_t index) const;
+        void move_pet(uint8_t index, const std::vector<Movement>& movements);
 
         /// Return if the character is facing left.
         bool getflip() const;

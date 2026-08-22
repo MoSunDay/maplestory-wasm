@@ -191,11 +191,11 @@ namespace jrc
 
         for (auto inv : toparse)
         {
-            int8_t pos = recv.read_byte();
+            int16_t pos = static_cast<uint8_t>(recv.read_byte());
             while (pos != 0)
             {
                 ItemParser::parse_item(recv, inv, pos, invent);
-                pos = recv.read_byte();
+                pos = static_cast<uint8_t>(recv.read_byte());
             }
         }
     }

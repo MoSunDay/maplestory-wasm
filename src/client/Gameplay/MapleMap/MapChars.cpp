@@ -88,6 +88,30 @@ namespace jrc
         }
     }
 
+    std::optional<PlayerTarget> MapChars::find_target(
+        Point<int16_t> cursor,
+        Point<int16_t> view_position) const
+    {
+        std::vector<PlayerTarget> candidates;
+        candidates.reserve(chars.size());
+
+        for (const auto& iter : chars)
+        {
+            const OtherChar* character = static_cast<const OtherChar*>(iter.second.get());
+            if (character && character->is_active())
+            {
+                candidates.push_back({
+                    character->get_oid(),
+                    character->get_name(),
+                    character->get_level(),
+                    character->get_position()
+                });
+            }
+        }
+
+        return pick_player_target(candidates, cursor, view_position);
+    }
+
     void MapChars::set_visual_buff(int32_t cid, Buffstat::Id stat, int16_t value)
     {
         if (Optional<OtherChar> character = get_char(cid))

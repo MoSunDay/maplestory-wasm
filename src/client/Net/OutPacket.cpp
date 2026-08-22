@@ -98,4 +98,9 @@ namespace jrc
             write_byte(str[i]);
         }
     }
+
+    void OutPacket::write_bytes(const std::vector<int8_t>& values)
+    {
+        bytes.insert(bytes.end(), values.begin(), values.end());
+    }
 }
