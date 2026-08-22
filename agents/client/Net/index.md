@@ -1,4 +1,4 @@
-Commit: 311ec226ae11fd785db5ef8ea74684703e28c971
+Commit: 433b49886dde8113137b3739b6f045e5c5fb5e04
 
 # 网络层
 
@@ -23,7 +23,7 @@ Commit: 311ec226ae11fd785db5ef8ea74684703e28c971
 - `disconnect()`: 主动关闭当前 WebSocket/TCP 连接并清空接收缓冲状态；系统菜单登出先发送标准 `PLAYER_DC(0x0C)`，再调用该入口关闭传输并结束客户端循环
 - `is_connected()`: 连接状态
 
-内部维护接收缓冲区、位置指针、连接状态，以及 `connection_changed` 标志：`reconnect()` 末尾置位，`process()` 在解出一个封包后检查，若已置位则丢弃缓冲区剩余字节并复位——防止在 `forward()` 期间触发重连后，用新加密上下文继续解密旧连接的尾部字节（跨连接污染）。使用 ASIO (非 WASM) 或 Winsock 作为底层 socket 实现。
+内部独立缓存 4 字节封包头和封包体，可在任意接收分片边界上继续解析，并拒绝小于 opcode 或超过最大缓冲区的长度。`connection_changed` 在 `reconnect()` 末尾置位，`process()` 在解出一个封包后检查，若已置位则丢弃旧连接剩余字节并复位，避免用新加密上下文解密旧流。使用 ASIO (非 WASM) 或 Winsock 作为底层 socket 实现。
 
 WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP` 构造 IPv4、域名或带 URI 方括号的 IPv6 URL；每 25 秒发送一个零长度二进制 WebSocket 帧，只维持传输层活动，不向游戏 TCP 流注入数据。游戏协议仍由服务端 `PING` 和客户端 `PONG` 保活；若 Session 非主动断开，主循环停止并通过页面级一次性提示告知游戏已经退出。
 
@@ -60,6 +60,18 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 场地包 `CLOCK` / `STOP_CLOCK` 驱动游戏内场地计时器；`FIELD_EFFECT` 的 2、3、4 模式分别处理具名地图对象关闭、一次性视觉效果和场地音效。服务端 `Party1/Clear`、`Party1/Failed` 会按 `Sound.nx/Field.img` 兼容路径解析，组队任务开门则按地图对象的 `name` 精确停用。
 
+怪物出生包 `SPAWN_MONSTER` / `SPAWN_MONSTER_CONTROL` 共用无应用状态依赖的 `SpawnMobPayload` 解析器。linked server 在坐标前固定写入 22 字节出生状态块；假怪显形包额外写入 6 字节。解析器按已存在的怪物 oid 区分显形布局，并完整消费坐标、姿态、foothold、出生特效、父怪物、队伍和物品特效尾段；未知布局或截断封包直接抛出 `PacketError`，不会以默认坐标生成怪物。
+
+### 好友与组队协议
+
+`Handlers/Social` 处理 `BUDDYLIST(0x3F)`、`PARTY_OPERATION(0x3E)`、队伍值和成员 HP。好友解析器明确支持全量列表 mode 7、请求 mode 9、频道变化 mode 20 和容量 mode 21；添加、接受、拒绝/删除统一通过 `BUDDYLIST_MODIFY(0x82)` 发出。队伍处理器消费创建、邀请、成员快照、退出/踢出、队长变化和错误状态，并把窗口无关的完整状态提交给状态栏。
+
+好友聊天 `MULTI_CHAT(0x77)` 携带当前好友角色 ID 列表；队伍聊天由服务端依据当前队伍路由。收到 `MULTICHAT` 后按类型更新消息计数并显示聊天行。好友与队伍的解析/状态转换可通过 `SocialProtocol` 和 `SocialState` 在不启动 UI 的情况下验证。
+
+### 玩家交易协议
+
+`PLAYER_INTERACTION(0x7B)` 复用 v83 交易模式：创建房间、邀请地图内角色、接受/拒绝、聊天、放入物品/金币、确认和退出。`TradeHandler` 消费 `PLAYER_INTERACTION(0x13A)` 的房间、参与者、物品、金币、确认与结束事件；交易物品负载由 `TradeProtocol` 完整消费普通物品、装备和宠物分支。所有成功或失败结论以服务端结果为准，客户端只维护展示状态和发送意图。
+
 ### 注册复用登录协议
 
 游戏内注册不引入新 opcode：`UIRegister` 校验账号为 4–12 位 ASCII 字母数字、密码为 4–12 位非空白可打印 ASCII 后发送现有 `LOGIN_PASSWORD`。服务端对不存在的合法账号自动建号并返回 `LOGIN_STATUS=23`，客户端自动发送 `ACCEPT_TOS`，随后沿用登录成功和世界列表流程。注册失败由 `LoginHandlers` 回填到注册表单，不落入通用登录位图提示。
@@ -82,6 +94,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 NPC 商店操作 `NPC_SHOP_ACTION` 在原购买、单件出售、补充和退出模式后追加 mode 4，负载为当前物品栏分类字节；服务端以 `CONFIRM_SHOP_TRANSACTION(0x132)` 返回一次批量操作结果。客户端注册该回包，0/8 静默成功，现金物品出售等失败显示明确提示。
 
+宠物链路使用 v83 原有协议：`SPAWN_PET(0x62)` 发送现金栏字节槽位，`MOVE_PET(0xA7)` 携带宠物唯一 ID 与标准移动片段，`PET_LOOT(0xAA)` 携带唯一 ID 和掉落 oid，`PET_AUTO_POT(0xAB)` 携带宠物索引、唯一 ID、USE 槽和物品 ID。`AUTO_HP_POT(0x150)` / `AUTO_MP_POT(0x151)` 回包恢复角色级药水选择；客户端只负责意图与显示，linked server 对每次拾取和服药做最终校验。
+
 ## 封包流程
 
 ### 发送流程
@@ -101,9 +115,10 @@ linked MapleStory Server → Socket::read() → Session::read()
 
 | 目录 | 职责 |
 |------|------|
-| `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, NpcInteraction, CashShop 等) |
+| `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, Social, Trade, NpcInteraction, CashShop 等) |
 | `Handlers/Helpers/` | 封包解析辅助 (CharacterDataParser, ItemParser, LoginParser, MovementParser) |
-| `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets, CashShopPackets 等)；`CharacterCreation/` 保存可独立验证的建角 payload 编码 |
+| `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets, SocialPackets, TradePackets, CashShopPackets 等)；`CharacterCreation/` 保存可独立验证的建角 payload 编码 |
+| `Protocol/` | 可独立验证的协议解析与编码，包括好友事件、远端玩家和怪物出生负载 |
 
 ## 依赖关系
 
