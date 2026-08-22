@@ -7,6 +7,7 @@
 - 位图加载分类（后台、阻塞可见、短时特效）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/bitmap-load-class.cpp -o /tmp/bitmap-load-class && /tmp/bitmap-load-class`
 - 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`
 - 自然恢复规则：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/natural-recovery.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/natural-recovery && /tmp/natural-recovery`
+- 宠物自动补给阈值、能力门禁、单次药水与冷却：`c++ -std=c++17 tools/verify/pet-automation.cpp src/client/Gameplay/Pet/PetAutomation.cpp -o /tmp/pet-automation && /tmp/pet-automation`
 - 浏览器恢复帧时间限制：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/runtime/frame-timing.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/frame-timing && /tmp/frame-timing`
 - 死亡幽灵轨迹：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-orbit.cpp -o /tmp/death-tomb-orbit && /tmp/death-tomb-orbit`
 - 死亡墓碑落地点：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-ground.cpp -o /tmp/death-tomb-ground && /tmp/death-tomb-ground`
@@ -20,6 +21,14 @@
 - 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
 - Cosmic 远端玩家出生头（custom-client short 等级与角色名对齐）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-player-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnPlayerHeader.cpp -o /tmp/spawn-player-parser && /tmp/spawn-player-parser`
+- linked server 怪物出生负载（固定状态块、坐标/foothold、出生特效、假怪显形与截断拒绝）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-mob-payload.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnMobPayload.cpp -o /tmp/spawn-mob-payload && /tmp/spawn-mob-payload`
+- 地图玩家点击命中（摄像机偏移、重叠人物最近目标、输入顺序无关）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/player-targeting.cpp src/client/Gameplay/Targeting/PlayerTargeting.cpp -o /tmp/player-targeting && /tmp/player-targeting`
+- 多职业阶段、新手技能族与主副属性映射：`c++ -std=c++17 -Isrc/client tools/verify/job-progression.cpp src/client/Character/JobProgression.cpp src/client/Character/Job.cpp -o /tmp/job-progression && /tmp/job-progression`
+- 面对面交易纯状态（9 格物品、金币、聊天、双方确认）：`c++ -std=c++17 -Isrc/client tools/verify/trade-state.cpp src/client/IO/Trade/TradeState.cpp -o /tmp/trade-state && /tmp/trade-state`
+- 交易物品封包（普通物品、装备、宠物完整消费）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/trade-item-parser.cpp src/client/Net/Protocol/TradeProtocol.cpp src/client/Net/InPacket.cpp -o /tmp/trade-item-parser && /tmp/trade-item-parser`
+- 交易窗口 NX 素材契约：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/trade-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/trade-ui-nx && /tmp/trade-ui-nx UI.nx`
+- linked server 交易原子提交、合法性与 v83 opcode：`node tools/verify/trade-server-contract.mjs`
+- 好友封包编码、事件解析与好友/队伍纯状态转换：`c++ -std=c++17 -Wall -Wextra -Werror tools/verify/social-protocol.cpp src/client/IO/Social/SocialState.cpp src/client/Net/Protocol/SocialProtocol.cpp src/client/Net/InPacket.cpp -Isrc/client -Isrc -o /tmp/social-protocol && /tmp/social-protocol`
 - Cosmic 完整角色数据（Java 定长 UTF-8、戒指、新年贺卡、小游戏门禁）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-data-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/CharacterDataParser.cpp -o /tmp/character-data-parser && /tmp/character-data-parser`
 - 角色创建名称策略、最终确认与失败恢复状态：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-creation-flow.cpp -o /tmp/character-creation-flow && /tmp/character-creation-flow`
 - 角色创建请求字段顺序与宽度：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-creation-packet.cpp -o /tmp/character-creation-packet && /tmp/character-creation-packet`

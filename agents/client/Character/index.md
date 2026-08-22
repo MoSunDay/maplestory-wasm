@@ -1,4 +1,4 @@
-Commit: b42ba604e68b4f517c782a65c9b3994a0342ec60
+Commit: 433b49886dde8113137b3739b6f045e5c5fb5e04
 
 # 角色系统
 
@@ -26,6 +26,8 @@ Commit: b42ba604e68b4f517c782a65c9b3994a0342ec60
 
 Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 
+`JobProgression` 以纯函数统一 Explorer、Cygnus、Aran 的新手到四转阶段、各阶段职业 ID、新手技能族和主副属性原型。`Job` 与技能窗口共用该映射，因此当前角色可切换所有已经到达的技能页签，尚未转职的页签保持禁用。
+
 `reset_progress(StatsEntry)` 在服务端发送完整角色快照时重建属性、物品栏、技能、任务、瞬移石、怪物书、Buff 和冷却，避免商城回服后继续使用旧进度数据。`Inventory` 对现金物品额外保留服务端 `cash_id`，供商城仓库转移稳定定位；已装备现金物品不会直接暴露给仓库转移入口。
 
 ### Char (`Char.h`)
@@ -50,6 +52,10 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 ### NaturalRecovery (`Recovery/NaturalRecovery.h`)
 
 无副作用的自然恢复规则模块。`Player::update` 将当前姿态、HP/MP、等级、地图 `recovery` 倍率、技能 NX 数值和椅子 NX 数值组装为 `natural_recovery::Context`，按固定帧推进计时状态，再把产生的 HP/MP 增量交给网络封包发送。站立和坐下可恢复 HP，攀爬仅在 Endure 有等级时恢复 HP；存活状态持续计算 MP。技能与椅子只改变单次恢复量或攀爬间隔，HP 发送值按 linked server 的地图倍率动态校验上限约束，MP 发送值限制为 999。
+
+### JobProgression (`JobProgression.h`)
+
+无 UI 依赖的职业映射模块统一解析冒险家、骑士团和战神的转职阶段、新手职业、阶段职业 ID、新手技能族与主副属性职业原型。骑士团职业去除 1000 前缀后按冒险家原型取属性；战神 2000–2112 归入战士原型，避免用 `jobId / 100` 直接计算时落入未知分支。
 
 ### CharLook (`Look/`)
 

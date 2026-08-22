@@ -1,4 +1,4 @@
-Commit: c2cd3682d8a2cf5216e4be0890c6f1712e81d031
+Commit: 433b49886dde8113137b3739b6f045e5c5fb5e04
 
 # 游戏世界
 
@@ -26,6 +26,7 @@ Commit: c2cd3682d8a2cf5216e4be0890c6f1712e81d031
 - `update()`: 每帧更新所有实体
 - `draw(alpha)`: 渲染所有实体
 - `send_key()`: 分发键盘输入
+- `find_player_target()`: 在 NPC 优先的前提下，把屏幕坐标和摄像机偏移交给纯命中策略选择远端玩家
 
 Stage 内部组合了所有地图实体管理器。
 
@@ -37,12 +38,18 @@ Stage 内部组合了所有地图实体管理器。
 | `MapTilesObjs` | 图块和静态对象渲染 |
 | `MapBackgrounds` | 背景层渲染 |
 | `MapPortals` | 传送门管理 |
-| `MapChars` | 其他玩家角色管理（不含自身） |
+| `MapChars` | 其他玩家角色管理（不含自身），向 UI 提供当前可见玩家的点击目标 |
 | `MapMobs` | 怪物管理（生成、移动、状态） |
 | `MapNpcs` | NPC 管理（对话、商店） |
 | `MapReactors` | 反应器管理（可交互物体） |
 | `MapDrops` | 掉落物管理（物品、Meso） |
 | `MapEffect` | 地图级特效（如天气效果） |
+
+### 宠物自动化 (`Pet/`)
+
+- `PetAutomation::Controller` 以无 UI、无网络依赖的纯状态机判断 HP/MP 阈值、能力门禁、单次药水请求和冷却；阈值固定钳制到 1%–99%。
+- `PetSettingsStore` 在 WASM 下把 HP/MP 阈值保存到浏览器本地存储，读取失败回到 50%，写入失败由调用方直接提示。
+- `Stage` 只驱动已召唤的首只宠物：选择有权限且匹配金币磁铁/物品袋能力的最近掉落，设置追踪目标并限频同步宠物移动；发出拾取或自动补给请求前仍以当前背包、能力和角色状态重新判断。
 
 ### Physics (`Physics.h`)
 
@@ -92,6 +99,16 @@ Stage::load(new_mapid)
 → respawn(portalid)
 → LOADING 安全门（服务端仍保持 mapTransitioning）
 → PLAYER_UPDATE → ACTIVE
+```
+
+### 宠物拾取与自动补给
+
+```
+Stage::update_pet_automation()
+→ PetAutomation::Controller 判断单次 HP/MP 请求
+→ MapDrops 按掉落类型、归属与宠物能力选择目标
+→ PetLook 跟随目标并由 Stage 限频同步移动
+→ linked server 复核宠物身份、距离、归属、能力与实时库存后执行
 ```
 
 ## 依赖关系
