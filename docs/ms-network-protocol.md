@@ -1542,9 +1542,11 @@ Server responds with `CHAR_INFO` (0x3D).
 **Purpose:** Client summons or dismisses a pet.
 
 ```
-Field    Type    Notes
-slot     byte    Inventory slot of the pet item
-action   bool    True = summon, false = dismiss
+Field      Type    Notes
+timestamp  int     Client tick value
+slot       ubyte   Cash inventory slot of the pet item
+[byte]     byte    Reserved, 0
+lead       bool    True shifts this pet into the lead slot
 ```
 
 ---
@@ -1686,7 +1688,8 @@ message  string  Message content
 ```
 Field       Type    Notes
 type        byte    0=buddy, 1=party, 2=guild, 3=alliance
-[targets]   —       List of target character IDs (for buddy/party)
+count       byte    Number of explicit target character IDs
+targets     int[]   Buddy recipients; party chat normally sends count 0
 message     string  Chat text
 ```
 
@@ -1730,15 +1733,16 @@ operation    byte    Action type (see PlayerInteractionHandler)
 [varies]     —       Depends on operation
 ```
 
-Key operations:
-- `0x01` = Open mini-game
-- `0x02` = Invite to shop/game
-- `0x03` = Accept invite
-- `0x04` = Decline invite
-- `0x06` = Chat in trade window
-- `0x10` = Open player shop
-- `0x16` = Add item to trade
-- `0x1A` = Confirm trade
+Trade operations used by the client:
+- `0x00` = Create room; payload `roomType: byte` (`3` for trade)
+- `0x02` = Invite; payload `characterId: int`
+- `0x03` = Decline invitation
+- `0x04` = Accept/visit trade
+- `0x06` = Chat; payload `message: string`
+- `0x0A` = Exit/cancel
+- `0x0F` = Add item; payload `inventoryType: byte, sourceSlot: short, quantity: short, targetSlot: byte`
+- `0x10` = Add mesos; payload `amount: int`
+- `0x11` = Confirm and lock the offer
 
 ---
 
@@ -1803,6 +1807,7 @@ Field       Type    Notes
 operation   byte    1=add, 2=accept, 3=delete
 [If add:]
   name      string  Target character name
+  group     string  Buddy group name (fixed-width server output supports 13 bytes)
 [If accept/delete:]
   charId    int     Character ID
 ```
@@ -1844,12 +1849,15 @@ toTown   bool    True = go to town door, False = go back to dungeon door
 
 ```
 Field      Type    Notes
-[skip]     byte[4]
-count      int     Number of changed bindings
-[Per entry:]
-  key      int     Key code
-  type     byte    Binding type (0=none, 1=skill, 2=item, 4=special)
-  actionId int     Skill ID, item ID, or action ID depending on type
+mode       int     0=ordinary keymap, 1=pet auto-HP item, 2=pet auto-MP item
+[If mode 0:]
+  count    int     Number of changed bindings
+  [Per entry:]
+    key      int   Key code
+    type     byte  Binding type (0=none, 1=skill, 2=item, 4=special)
+    actionId int   Skill ID, item ID, or action ID depending on type
+[If mode 1 or 2:]
+  itemId   int     Selected potion item ID; 0 clears the selection
 ```
 
 ---
@@ -1937,8 +1945,8 @@ Field    Type   Notes
 
 ```
 Field             Type     Notes
-petId             long     Pet unique ID
-petSlot           byte     Pet slot (0, 1, or 2)
+petId             int      Pet unique ID
+[skip]            byte[8]  Legacy movement header
 movementData      byte[]   Movement fragment list (see §11.4)
 ```
 
@@ -1976,25 +1984,30 @@ command   byte    Command index
 **Purpose:** Pet picks up an item drop.
 
 ```
-Field    Type   Notes
-petSlot  byte   Pet slot
-oid      int    Object ID of the item to pick up
+Field      Type      Notes
+petId      int       Pet unique ID
+[skip]     byte[13]  Legacy pickup movement fields
+oid        int       Object ID of the drop to pick up
 ```
 
 ---
 
 ### 0x00AB — PET_AUTO_POT
 
-**Purpose:** Pet auto-pot settings.
+**Purpose:** Pet requests consumption of one selected potion.
 
 ```
-Field      Type    Notes
-petSlot    byte    Pet slot
-type       byte    0=HP, 1=MP
-threshold  short   Percentage threshold to trigger auto-pot
-itemId     int     Item to use for auto-potting
-slot       short   Inventory slot of the item
+Field       Type    Notes
+petSlot     byte    Summoned pet slot (0, 1, or 2)
+petId       long    Pet unique ID
+timestamp   int     Client tick value
+slot        short   Current USE inventory slot of the potion
+itemId      int     Selected potion item ID
 ```
+
+The server accepts exactly one potion per request and validates the summoned
+pet, the mode 1/2 keymap selection, the matching pet ability equip, live slot
+contents, and whether the item restores the selected resource.
 
 ---
 
@@ -2669,18 +2682,30 @@ Key operations sent to client:
 
 ### 0x003F — BUDDYLIST
 
-**Purpose:** Full buddy list update.
+**Purpose:** Buddy list snapshot and incremental state updates.
 
 ```
-Field        Type    Notes
-operation    byte    7=load list, 9=online notify, 10=offline notify
-count        byte    Buddy count (for load)
-[Per buddy:]
-  charId     int
-  name       string  (padded to 13 chars)
-  [byte]     byte    0
-  channel    int     Channel (-1 if offline)
-  [bytes]    byte[3] Zeros
+Field          Type      Notes
+operation      byte      7=list, 9=request, 20=channel update, 21=capacity
+[If list:]
+  count        byte      Visible buddy count
+  [Per buddy:]
+    charId     int
+    name       byte[13]  Zero-padded UTF-8
+    [byte]     byte      0
+    channel    int       Zero-based channel; -1 if offline
+    group      byte[13]  Zero-padded UTF-8
+    mapId      int
+  mapIds       int[]     One trailing map field per visible buddy
+[If request:]
+  charId       int
+  name         string
+[If channel:]
+  charId       int
+  [byte]       byte      0
+  channel      int       Zero-based channel; -1 if offline
+[If capacity:]
+  capacity     byte
 ```
 
 ---
@@ -2958,18 +2983,34 @@ whiteScroll      bool   True = White Scroll was used
 **Purpose:** Spawns a pet for a character.
 
 ```
-Field        Type    Notes
-charId       int
-petSlot      byte    0, 1, or 2
-name         string
-petItemId    int
-petUniqueId  long
-posX         short
-posY         short
-stance       byte
-fh           short
-nameTag      bool    True if name tag equipped
-chatBubble   bool    True if chat bubble equipped
+Field          Type    Notes
+charId         int
+petSlot        byte    0, 1, or 2
+present        byte    1=spawn, 0=remove
+[If spawn:]
+  [byte]       byte    Reserved, 0
+  petItemId    int
+  name         string
+  petUniqueId  long
+  position     pos
+  stance       byte
+  fh           int
+[If remove:]
+  hunger       bool
+```
+
+---
+
+### 0x00AA — MOVE_PET
+
+**Purpose:** Broadcasts a summoned pet's server-accepted movement.
+
+```
+Field          Type     Notes
+charId         int      Pet owner character ID
+petSlot        byte     0, 1, or 2
+petId          int      Pet unique ID
+movementData   byte[]   Movement fragment list (see §11.4)
 ```
 
 ---
@@ -3259,7 +3300,7 @@ Field         Type    Notes
 mobOid        int     Object ID
 [byte]        byte    5 (if real) or controller indicator
 mobId         int     Monster template ID
-[statusMask]  int[4]  16 bytes of zeroed status (non-controller spawn)
+[spawnState]  byte[22] Fixed block: 15 zero bytes, `0x88`, then 6 zero bytes
 pos           pos
 stance        byte
 startFh       short   0 (origin foothold, unused)
@@ -3273,6 +3314,11 @@ team          byte    Team ID (0xFF for none)
 - Parent mob present and alive: `byte(-3)`, `int(parentMobOid)`
 - No parent, `effect > 0`: `byte(effect)`, `byte(0)`, `short(0)`, [if effect==15: `byte(0)`], then `byte(-2 or -1)`
 - No parent, no effect: `byte(-2)` = fade in, `byte(-1)` = instant
+- Fake monster: optional positive-effect prefix, then `short(-2)`
+
+`makeMonsterReal` also uses `SPAWN_MONSTER`, but appends another 6 zero bytes to
+`spawnState` and terminates with `short(-1), int(0)` instead of the normal
+effect/team/item-effect tail.
 
 ---
 
@@ -3676,6 +3722,21 @@ code     byte   0/8=success, 1=no stock, 2=no mesos, 3=inventory full,
 
 **Purpose:** Player shop / trade / mini-game UI updates.
 
+Trade responses use the following actions:
+
+| Action | Payload |
+|--------|---------|
+| `0x02` invite | `roomType: byte`, `inviter: string`, 4-byte legacy trailer |
+| `0x04` participant joined | `slot: byte`, character look, `name: string` |
+| `0x05` room opened | `roomType: byte` (`3`), `capacity: byte`, `localSlot: byte`, participant entries, `0xFF` terminator; `roomType=0` carries an error byte |
+| `0x06` chat | `0x08`, `side: byte`, `message: string` |
+| `0x0A` exit/result | `side: byte`, `result: byte` |
+| `0x0F` item | `side: byte`, `targetSlot: byte`, v83 item info |
+| `0x10` mesos | `side: byte`, `totalMesos: int` |
+| `0x11` confirmation | no payload; the partner has confirmed |
+
+The linked server serializes both participants through one trade-session lock. Once either side confirms, neither side may change items or mesos. Item identity, quantity, tradeability and the 9-slot limit are rechecked while committing the inventory removal.
+
 ---
 
 ### 0x0142 — PARCEL (Duey)
@@ -3736,7 +3797,7 @@ Field     Type    Notes
 
 ### 0x0150 — AUTO_HP_POT
 
-**Purpose:** Notifies client that the pet automatically used an HP potion.
+**Purpose:** Synchronizes the character's selected auto-HP potion after login.
 
 ```
 Field    Type   Notes
@@ -3747,7 +3808,7 @@ itemId   int    Potion item ID
 
 ### 0x0151 — AUTO_MP_POT
 
-**Purpose:** Same as AUTO_HP_POT but for MP.
+**Purpose:** Synchronizes the character's selected auto-MP potion after login.
 
 ---
 
