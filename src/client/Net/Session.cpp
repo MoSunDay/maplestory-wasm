@@ -23,6 +23,10 @@
 #include "../Util/Misc.h"
 #endif
 
+#include <algorithm>
+#include <cstring>
+#include <string>
+
 namespace jrc
 {
     namespace
@@ -58,6 +62,7 @@ namespace jrc
     {
         connected         = false;
         connection_changed = false;
+        header_pos        = 0;
         length            = 0;
         pos               = 0;
     }
@@ -122,6 +127,10 @@ namespace jrc
         // Close the current connection and open a new one.
         bool success = socket.close();
 
+        header_pos = 0;
+        length = 0;
+        pos = 0;
+
         if (success)
         {
             init(target_address.c_str(), target_port);
@@ -144,6 +153,7 @@ namespace jrc
         }
 
         connected = false;
+        header_pos = 0;
         length = 0;
         pos = 0;
         connection_changed = true;
@@ -151,33 +161,44 @@ namespace jrc
 
     void Session::process(const int8_t* bytes, size_t available)
     {
-        if (pos == 0)
+        while (available > 0)
         {
-            // Pos is 0, meaning this is the start of a new packet.
-            // Start by determining length.
-            length = cryptography.check_length(bytes);
-            // Reading the length means we processed the header.
-            // Move forward by the header length.
-            bytes = bytes + HEADER_LENGTH;
-            available -= HEADER_LENGTH;
-        }
+            if (length == 0)
+            {
+                const size_t header_remaining = HEADER_LENGTH - header_pos;
+                const size_t header_bytes = std::min(header_remaining, available);
+                memcpy(header + header_pos, bytes, header_bytes);
+                header_pos += header_bytes;
+                bytes += header_bytes;
+                available -= header_bytes;
 
-        // Determine how much we can write. Write data into the buffer.
-        size_t towrite = length - pos;
+                if (header_pos < HEADER_LENGTH)
+                {
+                    return;
+                }
 
-        if (towrite > available)
-        {
-            towrite = available;
-        }
+                length = cryptography.check_length(header);
+                header_pos = 0;
+                if (length < OPCODE_LENGTH || length > MAX_PACKET_LENGTH)
+                {
+                    Console::get().print("Invalid packet length: " + std::to_string(length));
+                    disconnect();
+                    return;
+                }
+            }
 
-        memcpy(buffer + pos, bytes, towrite);
-        pos += towrite;
+            const size_t body_bytes = std::min(length - pos, available);
+            memcpy(buffer + pos, bytes, body_bytes);
+            pos += body_bytes;
+            bytes += body_bytes;
+            available -= body_bytes;
 
-        // Check if the current packet has been fully processed.
-        if (pos >= length)
-        {
+            if (pos < length)
+            {
+                return;
+            }
+
             cryptography.decrypt(buffer, length);
-
             try
             {
                 packetswitch.forward(buffer, length);
@@ -197,15 +218,6 @@ namespace jrc
             {
                 connection_changed = false;
                 return;
-            }
-
-            // Check if there is more available.
-            size_t remaining = available - towrite;
-
-            if (remaining >= MIN_PACKET_LENGTH)
-            {
-                // More packets are available, so we start over.
-                process(bytes + towrite, remaining);
             }
         }
     }
@@ -231,7 +243,7 @@ namespace jrc
         //     4 bytes(header) + 2 bytes(opcode) = 6.
         size_t result = socket.receive(&connected);
 
-        if (result >= MIN_PACKET_LENGTH || length > 0)
+        if (result > 0)
         {
             // Retrieve buffer from the socket and process it.
             const int8_t* bytes = socket.get_buffer();

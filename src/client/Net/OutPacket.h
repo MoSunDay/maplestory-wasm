@@ -55,6 +55,7 @@ namespace jrc
         // Write a string. Writes the length as a short
         // and then each individual character as a byte.
         void write_string(const std::string& str);
+        void write_bytes(const std::vector<int8_t>& values);
 
     private:
         std::vector<int8_t> bytes;
@@ -98,6 +99,8 @@ namespace jrc
         GENERAL_CHAT = 49,
         MULTI_CHAT   = 119,
         SPOUSE_CHAT  = 121,
+        PLAYER_INTERACTION = 123,
+        BUDDYLIST_MODIFY = 130,
 
         // Npc Interaction
         TALK_TO_NPC     = 58,
@@ -116,6 +119,7 @@ namespace jrc
         SPEND_AP = 87,
         HEAL_OVER_TIME = 89,
         SPEND_SP = 90,
+        SPAWN_PET = 0x62,
         CHANGE_KEYMAP = 135,
 
         // Skill
@@ -124,6 +128,9 @@ namespace jrc
         // Gameplay 2
         PARTY_OPERATION    = 124,
         DENY_PARTY_REQUEST = 125,
+        MOVE_PET           = 0xA7,
+        PET_LOOT           = 0xAA,
+        PET_AUTO_POT       = 0xAB,
         MOVE_MONSTER       = 188,
         PICKUP_ITEM        = 202,
         PLAYER_UPDATE      = 0xCF,

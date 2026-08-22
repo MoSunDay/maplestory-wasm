@@ -284,6 +284,8 @@ namespace jrc
                 UIElement::EQUIPINVENTORY,
                 UIElement::SKILLBOOK,
                 UIElement::PARTY,
+                UIElement::TRADE,
+                UIElement::PLAYER_CONTEXT,
                 UIElement::STATSINFO,
                 UIElement::NOTICE
             };
@@ -346,6 +348,12 @@ namespace jrc
                 // Some server keymaps leave Party unbound; keep the expected
                 // default hotkey behavior for opening the Party UI.
                 state->send_key(KeyType::MENU, KeyAction::PARTY, true, false);
+            }
+            else if (pressed && keycode == GLFW_KEY_R)
+            {
+                // Keep the default Buddy shortcut available when a legacy
+                // server keymap omits the menu binding.
+                state->send_key(KeyType::MENU, KeyAction::BUDDYLIST, true, false);
             }
         }
 

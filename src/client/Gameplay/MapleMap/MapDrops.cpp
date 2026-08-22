@@ -78,8 +78,9 @@ namespace jrc
             const DropSpawn& spawn = spawns.front();
 
             int32_t oid = spawn.get_oid();
-            if (Optional<MapObject> drop = drops.get(oid))
+            if (Optional<Drop> drop = drops.get(oid))
             {
+                drop->update_ownership(spawn.get_owner(), spawn.get_drop_type(), spawn.is_player_drop());
                 drop->makeactive();
             }
             else
@@ -171,5 +172,46 @@ namespace jrc
         }
 
         return closest_loot;
+    }
+
+    bool MapDrops::pet_can_target(const Drop& drop, const PetLootQuery& query)
+    {
+        if (drop.is_player_drop())
+            return false;
+        if (drop.is_meso() ? !query.meso_magnet : !query.item_pouch)
+            return false;
+
+        int32_t owner = drop.get_owner();
+        bool free_for_all = owner <= 0 || drop.get_pickup_type() == 2 || drop.get_pickup_type() == 3;
+        bool owned = owner == query.character_id || owner == query.party_id;
+        return free_for_all || owned || query.magic_scales;
+    }
+
+    MapDrops::PetLootTarget MapDrops::find_pet_loot(const PetLootQuery& query) const
+    {
+        int32_t closest_distance_sq = static_cast<int32_t>(query.range) * query.range + 1;
+        PetLootTarget target;
+        for (const auto& entry : drops)
+        {
+            Optional<const Drop> drop = entry.second.get();
+            if (!drop || !pet_can_target(*drop, query))
+                continue;
+
+            Point<int16_t> position = drop->get_position() + Point<int16_t>(16, 16);
+            int32_t dx = static_cast<int32_t>(position.x()) - query.origin.x();
+            int32_t dy = static_cast<int32_t>(position.y()) - query.origin.y();
+            int32_t distance_sq = dx * dx + dy * dy;
+            if (distance_sq < closest_distance_sq)
+            {
+                closest_distance_sq = distance_sq;
+                target = { entry.first, position };
+            }
+        }
+        return target;
+    }
+
+    bool MapDrops::has_drop(int32_t oid) const
+    {
+        return static_cast<bool>(drops.get(oid));
     }
 }

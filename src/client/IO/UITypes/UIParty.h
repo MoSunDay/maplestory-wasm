@@ -35,6 +35,7 @@ namespace jrc
 		void clear_party_state();
 		void set_party_leader(int32_t leader_id);
 		void update_party_member_hp(int32_t cid, int32_t hp, int32_t max_hp);
+		void select_player_target(int32_t id, const std::string& name, uint16_t level);
 
 	  protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -42,6 +43,7 @@ namespace jrc
 	  private:
 		void send_invite();
 		void sync_text();
+		void sync_buttons();
 		void draw_button_labels() const;
 
 		enum Buttons : uint16_t
@@ -51,7 +53,9 @@ namespace jrc
 			BT_LEAVE,
 			BT_ACCEPT,
 			BT_DENY,
-			BT_INVITE
+			BT_INVITE,
+			BT_KICK,
+			BT_LEADER
 		};
 
 		static constexpr size_t PARTY_SIZE = 6;
@@ -75,5 +79,6 @@ namespace jrc
 		int32_t pending_party_invite_id;
 		std::string pending_party_inviter;
 		std::vector<UIChatbar::PartyMember> party_members;
+		int32_t selected_member_id = -1;
 	};
 }

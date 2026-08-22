@@ -19,8 +19,8 @@
 
 #include "Helpers/LoginParser.h"
 #include "Helpers/ForeignBuffMask.h"
-#include "Helpers/MobTemporaryStatMasks.h"
 #include "Helpers/MovementParser.h"
+#include "../Protocol/SpawnMobPayload.h"
 #include "../Protocol/SpawnPlayerHeader.h"
 
 #include "../../Audio/Audio.h"
@@ -34,114 +34,24 @@ namespace jrc
 {
     namespace
     {
-        bool has_mob_temporary_status(
-            const std::array<int32_t, MobTemporaryStatMasks::MASK_COUNT>& masks,
-            const MobTemporaryStatMasks::Descriptor& status)
+        void spawn_mob_from_packet(
+            InPacket& recv,
+            int32_t oid,
+            int32_t id,
+            int8_t mode,
+            spawn_mob::Layout layout = spawn_mob::Layout::STANDARD)
         {
-            size_t index = status.first_mask
-                ? MobTemporaryStatMasks::FIRST_MASK_INDEX
-                : MobTemporaryStatMasks::SECOND_MASK_INDEX;
-            return (masks[index] & status.value) != 0;
-        }
-
-        void skip_mob_temporary_data(InPacket& recv)
-        {
-            // Cosmic writes a 16-byte mask here and then appends per-status payloads.
-            // Skipping a fixed size shifts the mob position whenever the status block changes.
-            std::array<int32_t, MobTemporaryStatMasks::MASK_COUNT> masks{{
-                recv.read_int(),
-                recv.read_int(),
-                recv.read_int(),
-                recv.read_int()
-            }};
-
-            bool has_weapon_reflect = false;
-            bool has_magic_reflect = false;
-
-            for (const auto& status : MobTemporaryStatMasks::ALL)
-            {
-                if (!has_mob_temporary_status(masks, status))
-                {
-                    continue;
-                }
-
-                recv.skip(MobTemporaryStatMasks::STATUS_PAYLOAD_SIZE);
-
-                if (status.value == MobTemporaryStatMasks::WEAPON_REFLECT)
-                {
-                    has_weapon_reflect = true;
-                }
-                else if (status.value == MobTemporaryStatMasks::MAGIC_REFLECT)
-                {
-                    has_magic_reflect = true;
-                }
-            }
-
-            if (has_weapon_reflect)
-            {
-                recv.skip(MobTemporaryStatMasks::REFLECT_COUNTER_SIZE);
-            }
-
-            if (has_magic_reflect)
-            {
-                recv.skip(MobTemporaryStatMasks::REFLECT_COUNTER_SIZE);
-            }
-
-            if (has_weapon_reflect || has_magic_reflect)
-            {
-                recv.skip(MobTemporaryStatMasks::REFLECT_COUNTER_SIZE);
-            }
-        }
-
-        void spawn_mob_from_packet(InPacket& recv, int32_t oid, int32_t id, int8_t mode)
-        {
-            skip_mob_temporary_data(recv);
-
-            Point<int16_t> position = recv.read_point();
-            int8_t stance = recv.read_byte();
-
-            if (recv.length() >= 2)
-            {
-                recv.skip(2); // origin foothold
-            }
-
-            uint16_t fh = recv.length() >= 2 ? recv.read_short() : 0;
-            int8_t effect = 0;
-            int8_t team = -1;
-
-            // Fake mobs use a short here instead of the regular spawn-effect byte.
-            if (recv.length() == 7 && recv.inspect_short() == -2)
-            {
-                effect = static_cast<int8_t>(recv.read_short());
-                team = recv.length() >= 1 ? recv.read_byte() : -1;
-            }
-            else if (recv.length() >= 1)
-            {
-                effect = recv.read_byte();
-
-                if (effect == -3 && recv.length() >= 4)
-                {
-                    recv.read_int(); // parent mob oid
-                }
-                else if (effect > 0 && recv.length() >= 3)
-                {
-                    recv.skip(3);
-                    if (effect == 15 && recv.length() >= 1)
-                    {
-                        recv.skip(1);
-                    }
-                }
-
-                team = recv.length() >= 1 ? recv.read_byte() : -1;
-            }
-
-            if (recv.length() >= 4)
-            {
-                recv.skip(4); // item effect
-            }
+            const spawn_mob::Payload payload = spawn_mob::parse_payload(recv, layout);
 
             Stage::get().get_mobs().spawn({
-                oid, id, mode, stance, fh, effect == -2, team, position
+                oid,
+                id,
+                mode,
+                payload.stance,
+                payload.foothold,
+                payload.new_spawn,
+                payload.team,
+                payload.position
             });
         }
     }
@@ -277,6 +187,18 @@ namespace jrc
     }
 
 
+    void PetMovedHandler::handle(InPacket& recv) const
+    {
+        int32_t cid = recv.read_int();
+        uint8_t petindex = recv.read_byte();
+        recv.read_int(); // pet unique id
+        std::vector<Movement> movements = MovementParser::parse_movements(recv);
+
+        if (Optional<Char> character = Stage::get().get_character(cid))
+            character->move_pet(petindex, movements);
+    }
+
+
     void CharMovedHandler::handle(InPacket& recv) const
     {
         int32_t cid = recv.read_int();
@@ -395,7 +317,10 @@ namespace jrc
         int32_t oid = recv.read_int();
         recv.read_byte(); // 5 if controller == null
         int32_t id = recv.read_int();
-        spawn_mob_from_packet(recv, oid, id, 0);
+        const spawn_mob::Layout layout = Stage::get().get_mobs().contains(oid)
+            ? spawn_mob::Layout::MAKE_REAL
+            : spawn_mob::Layout::STANDARD;
+        spawn_mob_from_packet(recv, oid, id, 0, layout);
     }
 
 

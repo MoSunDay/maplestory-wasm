@@ -37,6 +37,7 @@ namespace jrc
         UIEquipInventory(const Inventory& inventory);
 
         void draw(float inter) const override;
+        bool is_in_range(Point<int16_t> position) const override;
 
         void toggle_active() override;
         void doubleclick(Point<int16_t> position) override;
@@ -55,6 +56,8 @@ namespace jrc
         void load_icons();
         void update_slot(Equipslot::Id slot);
         Equipslot::Id slot_by_position(Point<int16_t> position) const;
+        int8_t pet_potion_by_position(Point<int16_t> position) const;
+        void draw_pet_item(int32_t item_id, Point<int16_t> relative) const;
 
         class EquipIcon : public Icon::Type
         {

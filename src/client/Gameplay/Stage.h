@@ -32,6 +32,7 @@
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapDrops.h"
 #include "Physics/Physics.h"
+#include "Pet/PetAutomation.h"
 
 #include "../Character/Player.h"
 #include "../IO/KeyType.h"
@@ -39,7 +40,10 @@
 #include "../Template/Singleton.h"
 
 #include <cstdint>
+#include <cstddef>
 #include <functional>
+#include <optional>
+#include <string>
 
 
 namespace jrc
@@ -79,6 +83,8 @@ namespace jrc
         void release_actions();
         // Send mouse input to the stage.
         Cursor::State send_cursor(bool pressed, Point<int16_t> position);
+        // Return the visible remote player under a screen-space cursor.
+        std::optional<PlayerTarget> find_player_target(Point<int16_t> position) const;
 
         // Check if the specified id is the player's id.
         bool is_player(int32_t cid) const;
@@ -102,6 +108,11 @@ namespace jrc
         // Return a reference to the attack and buff component.
         Combat& get_combat();
 
+        void set_pet_auto_hp_item(int32_t item_id);
+        void set_pet_auto_mp_item(int32_t item_id);
+        bool set_pet_auto_thresholds(uint8_t hp, uint8_t mp);
+        const pet_automation::Controller& get_pet_automation() const;
+
         // Return a pointer to a character, possibly the player.
         Optional<Char> get_character(int32_t cid);
 
@@ -115,6 +126,8 @@ namespace jrc
         void handle_directional_context(KeyAction::Id action, bool down);
         void update_directional_context();
         void check_drops();
+        void update_pet_automation();
+        void update_pet_movement();
         void update_intro_warp();
         void begin_loading(std::function<void()> onready);
         void end_loading();
@@ -139,6 +152,13 @@ namespace jrc
         int32_t mapid;
 
         uint64_t last_pickup_time;
+        pet_automation::Controller pet_automation;
+        Movement last_pet_movement;
+        int32_t pet_loot_target_oid;
+        Point<int16_t> pet_loot_target_position;
+        uint16_t pet_loot_target_frames;
+        uint16_t pet_loot_cooldown;
+        uint8_t pet_movement_sync_frames;
 
         MapInfo mapinfo;
         MapTilesObjs tilesobjs;

@@ -28,11 +28,13 @@
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIEquipInventory.h"
 #include "UITypes/UIParty.h"
+#include "Social/UIBuddy.h"
 #include "UITypes/UIMiniMap.h"
 #include "UITypes/UISkillBook.h"
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIWorldMap.h"
 #include "Field/UIFieldClock.h"
+#include "Trade/UIPlayerContext.h"
 
 #include "../Constants.h"
 #include "../Character/Inventory/InventoryType.h"
@@ -163,6 +165,10 @@ namespace jrc
         {
             front->rightclick(pos);
         }
+        else if (const auto target = Stage::get().find_player_target(pos))
+        {
+            emplace<UIPlayerContext>(*target, pos);
+        }
     }
 
     void UIStateGame::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
@@ -279,6 +285,9 @@ namespace jrc
                     break;
                 case KeyAction::PARTY:
                     emplace<UIParty>();
+                    break;
+                case KeyAction::BUDDYLIST:
+                    emplace<UIBuddy>();
                     break;
                 case KeyAction::CASHSHOP:
                     if (auto statusbar = UI::get().get_element<UIStatusbar>())
@@ -403,10 +412,42 @@ namespace jrc
                 {
                     cursor_captured = UIElement::NONE;
                     clear_cursors(clicked, pos, UIElement::NONE);
+                    if (const auto target = Stage::get().find_player_target(pos))
+                    {
+                        if (clicked)
+                        {
+                            select_player_target(*target);
+                            return Cursor::CLICKING;
+                        }
+                        return Cursor::CANCLICK;
+                    }
                     return Stage::get().send_cursor(clicked, pos);
                 }
             }
         }
+    }
+
+    void UIStateGame::select_player_target(const PlayerTarget& target)
+    {
+        auto party = static_cast<UIParty*>(get(UIElement::PARTY));
+        if (!party)
+        {
+            emplace<UIParty>();
+            party = static_cast<UIParty*>(get(UIElement::PARTY));
+        }
+        else if (!party->is_active())
+        {
+            party->makeactive();
+        }
+
+        if (!party)
+        {
+            return;
+        }
+
+        elementorder.remove(UIElement::PARTY);
+        elementorder.push_back(UIElement::PARTY);
+        party->select_player_target(target.id, target.name, target.level);
     }
 
     void UIStateGame::send_scroll(Point<int16_t> pos, double yoffset)

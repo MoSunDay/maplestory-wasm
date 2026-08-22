@@ -38,6 +38,8 @@ namespace jrc
         int32_t get_price() const;
         int32_t get_recovery_hp() const;
         int32_t get_recovery_mp() const;
+        bool restores_hp() const;
+        bool restores_mp() const;
         // Returns the item's name loaded from the String.nx file.
         const std::string& get_name() const;
         // Returns the item's description loaded from the String.nx file.
@@ -60,6 +62,8 @@ namespace jrc
         int32_t price;
         int32_t recovery_hp;
         int32_t recovery_mp;
+        bool recovery_hp_rate;
+        bool recovery_mp_rate;
         std::string name;
         std::string desc;
         std::string category;

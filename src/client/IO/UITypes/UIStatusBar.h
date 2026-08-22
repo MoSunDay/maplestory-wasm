@@ -60,6 +60,7 @@ namespace jrc
         void set_pending_party_invite(int32_t party_id, const std::string& inviter);
         void clear_pending_party_invite();
         void set_party_state(int32_t party_id, int32_t leader_id, const std::vector<UIChatbar::PartyMember>& members);
+        void confirm_party_created(int32_t party_id);
         void clear_party_state();
         void set_party_leader(int32_t leader_id);
         void update_party_member_hp(int32_t cid, int32_t hp, int32_t max_hp);
@@ -68,6 +69,16 @@ namespace jrc
         int32_t get_pending_party_invite_id() const;
         const std::string& get_pending_party_inviter() const;
         const std::vector<UIChatbar::PartyMember>& get_party_members() const;
+        void set_buddy_list(const std::vector<social::BuddyEntry>& entries);
+        void set_pending_buddy_request(int32_t id, const std::string& name);
+        void clear_pending_buddy_request();
+        void begin_buddy_add(const std::string& name);
+        void remove_buddy(int32_t id);
+        void update_buddy_channel(int32_t id, int32_t channel);
+        void set_buddy_capacity(uint8_t capacity);
+        const social::BuddyState& get_buddy_state() const;
+        void record_multi_chat(uint8_t type);
+        uint32_t get_party_message_count() const;
         void toggle_menu_popup();
         void open_system_popup();
         bool activate_popup_selection();

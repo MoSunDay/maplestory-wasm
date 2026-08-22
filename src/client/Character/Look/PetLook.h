@@ -25,6 +25,9 @@
 #include <cstdint>
 #include <string>
 #include <map>
+#include <optional>
+
+#include "../../Gameplay/Movement.h"
 
 namespace jrc
 {
@@ -60,8 +63,15 @@ namespace jrc
         void set_position(int16_t xpos, int16_t ypos);
         void set_stance(Stance stance);
         void set_stance(uint8_t stancebyte);
+        void set_loot_target(Point<int16_t> position);
+        void clear_loot_target();
+        void apply_movement(const Movement& movement);
 
         int32_t get_itemid() const;
+        int32_t get_uniqueid() const;
+        Point<int16_t> get_position() const;
+        bool has_loot_target() const;
+        Movement get_movement() const;
         Stance get_stance() const;
 
     private:
@@ -73,6 +83,7 @@ namespace jrc
 
         EnumMap<Stance, Animation> animations;
         PhysicsObject phobj;
+        std::optional<Point<int16_t>> loot_target;
         Text namelabel;
     };
 }

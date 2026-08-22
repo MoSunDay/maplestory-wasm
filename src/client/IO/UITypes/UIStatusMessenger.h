@@ -46,6 +46,8 @@ namespace jrc
         void show_status(Text::Color color, const std::string& message);
         void show_party_invite(int32_t party_id, const std::string& inviter);
         void clear_party_invite();
+        void show_buddy_request(int32_t buddy_id, const std::string& requester);
+        void clear_buddy_request();
 
         bool is_in_range(Point<int16_t> cursorpos) const override;
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override;
@@ -55,6 +57,7 @@ namespace jrc
 
     private:
         void update_layout();
+        void refresh_prompt();
         void draw_party_invite(float alpha) const;
         void draw_button_labels() const;
 
@@ -77,6 +80,9 @@ namespace jrc
         bool has_party_invite;
         int32_t pending_party_invite_id;
         std::string pending_party_inviter;
+        bool has_buddy_request;
+        int32_t pending_buddy_id;
+        std::string pending_buddy_name;
         ColorBox invite_background;
         ColorBox invite_header;
         ColorLine invite_divider;

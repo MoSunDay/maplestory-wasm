@@ -4,6 +4,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Net/Packets/SocialPackets.h"
 #include "../../Constants.h"
 
 #include "UIParty.h"
@@ -45,6 +46,8 @@ namespace jrc
           screen_height(Constants::viewheight()),
           has_party_invite(false),
           pending_party_invite_id(-1),
+          has_buddy_request(false),
+          pending_buddy_id(-1),
           invite_background(INVITE_WIDTH, INVITE_HEIGHT, Geometry::BLACK, 0.82f),
           invite_header(INVITE_WIDTH, 22, Geometry::WHITE, 0.12f),
           invite_divider(INVITE_WIDTH - 24, Geometry::WHITE, 0.20f),
@@ -73,7 +76,7 @@ namespace jrc
             infopos.shift_y(-16);
         }
 
-        if (has_party_invite)
+        if (has_party_invite || has_buddy_request)
         {
             draw_party_invite(inter);
         }
@@ -114,23 +117,7 @@ namespace jrc
         pending_party_invite_id = party_id;
         pending_party_inviter = inviter;
         has_party_invite = true;
-
-        std::string inviter_text = inviter.empty() ? "Someone" : inviter;
-        invite_message.change_text(inviter_text + " invited you to join a party.");
-
-        if (auto it = buttons.find(BT_ACCEPT); it != buttons.end() && it->second)
-        {
-            it->second->set_active(true);
-            it->second->set_state(Button::NORMAL);
-        }
-
-        if (auto it = buttons.find(BT_DECLINE); it != buttons.end() && it->second)
-        {
-            it->second->set_active(true);
-            it->second->set_state(Button::NORMAL);
-        }
-
-        update_layout();
+        refresh_prompt();
     }
 
     void UIStatusMessenger::clear_party_invite()
@@ -138,17 +125,55 @@ namespace jrc
         has_party_invite = false;
         pending_party_invite_id = -1;
         pending_party_inviter.clear();
-        invite_message.change_text("");
+        refresh_prompt();
+    }
+
+    void UIStatusMessenger::show_buddy_request(int32_t buddy_id, const std::string& requester)
+    {
+        has_buddy_request = true;
+        pending_buddy_id = buddy_id;
+        pending_buddy_name = requester;
+        refresh_prompt();
+    }
+
+    void UIStatusMessenger::clear_buddy_request()
+    {
+        has_buddy_request = false;
+        pending_buddy_id = -1;
+        pending_buddy_name.clear();
+        refresh_prompt();
+    }
+
+    void UIStatusMessenger::refresh_prompt()
+    {
+        const bool visible = has_buddy_request || has_party_invite;
+        if (has_buddy_request)
+        {
+            invite_title.change_text("Buddy Request");
+            const std::string requester = pending_buddy_name.empty() ? "Someone" : pending_buddy_name;
+            invite_message.change_text(requester + " wants to add you as a buddy.");
+        }
+        else if (has_party_invite)
+        {
+            invite_title.change_text("Party Invitation");
+            const std::string inviter = pending_party_inviter.empty() ? "Someone" : pending_party_inviter;
+            invite_message.change_text(inviter + " invited you to join a party.");
+        }
+        else
+        {
+            invite_title.change_text("");
+            invite_message.change_text("");
+        }
 
         if (auto it = buttons.find(BT_ACCEPT); it != buttons.end() && it->second)
         {
-            it->second->set_active(false);
+            it->second->set_active(visible);
             it->second->set_state(Button::NORMAL);
         }
 
         if (auto it = buttons.find(BT_DECLINE); it != buttons.end() && it->second)
         {
-            it->second->set_active(false);
+            it->second->set_active(visible);
             it->second->set_state(Button::NORMAL);
         }
 
@@ -157,7 +182,7 @@ namespace jrc
 
     bool UIStatusMessenger::is_in_range(Point<int16_t> cursorpos) const
     {
-        if (!has_party_invite)
+        if (!has_party_invite && !has_buddy_request)
         {
             return false;
         }
@@ -186,9 +211,35 @@ namespace jrc
 
     Button::State UIStatusMessenger::button_pressed(uint16_t buttonid)
     {
-        if (!has_party_invite)
+        if (!has_party_invite && !has_buddy_request)
         {
             return Button::NORMAL;
+        }
+
+        if (has_buddy_request)
+        {
+            const int32_t buddy_id = pending_buddy_id;
+            const std::string buddy_name = pending_buddy_name;
+            if (buttonid == BT_ACCEPT && buddy_id > 0)
+            {
+                AcceptBuddyPacket(buddy_id).dispatch();
+            }
+            else if (buttonid == BT_DECLINE && buddy_id > 0)
+            {
+                DeleteBuddyPacket(buddy_id).dispatch();
+            }
+
+            if (auto statusbar = UI::get().get_element<UIStatusbar>())
+            {
+                const std::string action = buttonid == BT_ACCEPT ? "Accepted " : "Declined ";
+                statusbar->send_chatline("[Buddy] " + action + buddy_name + ".", UIChatbar::YELLOW);
+                statusbar->clear_pending_buddy_request();
+            }
+            else
+            {
+                clear_buddy_request();
+            }
+            return Button::PRESSED;
         }
 
         std::string inviter = pending_party_inviter;
@@ -252,7 +303,7 @@ namespace jrc
             static_cast<int32_t>(SCREEN_PADDING),
             static_cast<int32_t>(screen_width) - SCREEN_PADDING
         );
-        int32_t status_y = has_party_invite ?
+        int32_t status_y = (has_party_invite || has_buddy_request) ?
             static_cast<int32_t>(position.y()) - 10 :
             static_cast<int32_t>(screen_height) - 100;
         status_y = std::max(status_y, static_cast<int32_t>(SCREEN_PADDING + 16));

@@ -93,6 +93,21 @@ namespace jrc
         return oid;
     }
 
+    int32_t DropSpawn::get_owner() const
+    {
+        return owner;
+    }
+
+    int8_t DropSpawn::get_drop_type() const
+    {
+        return droptype;
+    }
+
+    bool DropSpawn::is_player_drop() const
+    {
+        return playerdrop;
+    }
+
     std::unique_ptr<MapObject> DropSpawn::instantiate(const Animation& icon) const
     {
         return std::make_unique<MesoDrop>(oid, owner, start, dest, droptype, mode, playerdrop, icon);
