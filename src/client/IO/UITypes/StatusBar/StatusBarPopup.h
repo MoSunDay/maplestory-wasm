@@ -27,6 +27,7 @@ namespace jrc
             ITEMS,
             SKILLS,
             KEY_CONFIG,
+            PET_OPTIONS,
             LOGOUT
         };
 

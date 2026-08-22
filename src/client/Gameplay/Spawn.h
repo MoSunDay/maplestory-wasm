@@ -111,6 +111,9 @@ namespace jrc
         bool is_meso() const;
         int32_t get_itemid() const;
         int32_t get_oid() const;
+        int32_t get_owner() const;
+        int8_t get_drop_type() const;
+        bool is_player_drop() const;
         std::unique_ptr<MapObject> instantiate(const Animation& icon) const;
         std::unique_ptr<MapObject> instantiate(const Texture& icon) const;
 

@@ -19,6 +19,7 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "Pet/UIPetOptions.h"
 
 #include "../../Character/ExpTable.h"
 #include "../../Console.h"
@@ -318,6 +319,9 @@ namespace jrc
         case StatusBarPopup::Action::KEY_CONFIG:
             UI::get().send_menu(KeyAction::KEYCONFIG);
             break;
+        case StatusBarPopup::Action::PET_OPTIONS:
+            UI::get().emplace<UIPetOptions>();
+            break;
         case StatusBarPopup::Action::LOGOUT:
         {
             PlayerDisconnectPacket().dispatch();
@@ -372,6 +376,11 @@ namespace jrc
         chatbar.set_party_state(party_id, leader_id, members);
     }
 
+    void UIStatusbar::confirm_party_created(int32_t party_id)
+    {
+        chatbar.confirm_party_created(party_id);
+    }
+
     void UIStatusbar::clear_party_state()
     {
         chatbar.clear_party_state();
@@ -410,6 +419,56 @@ namespace jrc
     const std::vector<UIChatbar::PartyMember>& UIStatusbar::get_party_members() const
     {
         return chatbar.get_party_members();
+    }
+
+    void UIStatusbar::set_buddy_list(const std::vector<social::BuddyEntry>& entries)
+    {
+        chatbar.set_buddy_list(entries);
+    }
+
+    void UIStatusbar::set_pending_buddy_request(int32_t id, const std::string& name)
+    {
+        chatbar.set_pending_buddy_request(id, name);
+    }
+
+    void UIStatusbar::clear_pending_buddy_request()
+    {
+        chatbar.clear_pending_buddy_request();
+    }
+
+    void UIStatusbar::remove_buddy(int32_t id)
+    {
+        chatbar.remove_buddy(id);
+    }
+
+    void UIStatusbar::begin_buddy_add(const std::string& name)
+    {
+        chatbar.begin_buddy_add(name);
+    }
+
+    void UIStatusbar::update_buddy_channel(int32_t id, int32_t channel)
+    {
+        chatbar.update_buddy_channel(id, channel);
+    }
+
+    void UIStatusbar::set_buddy_capacity(uint8_t capacity)
+    {
+        chatbar.set_buddy_capacity(capacity);
+    }
+
+    const social::BuddyState& UIStatusbar::get_buddy_state() const
+    {
+        return chatbar.get_buddy_state();
+    }
+
+    void UIStatusbar::record_multi_chat(uint8_t type)
+    {
+        chatbar.record_multi_chat(type);
+    }
+
+    uint32_t UIStatusbar::get_party_message_count() const
+    {
+        return chatbar.get_party_message_count();
     }
 
     void UIStatusbar::display_message(Messages::Type line, UIChatbar::LineType type)

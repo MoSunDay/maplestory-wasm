@@ -131,4 +131,26 @@ namespace jrc
         auto rb = lt + Point<int16_t>(32, 32);
         return Rectangle<int16_t>(lt, rb);
     }
+
+    int32_t Drop::get_owner() const
+    {
+        return owner;
+    }
+
+    int8_t Drop::get_pickup_type() const
+    {
+        return pickuptype;
+    }
+
+    bool Drop::is_player_drop() const
+    {
+        return playerdrop;
+    }
+
+    void Drop::update_ownership(int32_t new_owner, int8_t pickup_type, bool player_drop)
+    {
+        owner = new_owner;
+        pickuptype = pickup_type;
+        playerdrop = player_drop;
+    }
 }

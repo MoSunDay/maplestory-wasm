@@ -40,6 +40,8 @@ export class BrowserDriver {
       '--no-sandbox', '--enable-webgl', '--ignore-gpu-blocklist',
       '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio',
       '--no-proxy-server', '--proxy-bypass-list=*', '--remote-allow-origins=*',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
       `--user-data-dir=${this.profileDir}`,
       `--remote-debugging-port=${this.debugPort}`, '--window-size=820,640',
       ...extraArgs, ...this.extraArgs, 'about:blank'

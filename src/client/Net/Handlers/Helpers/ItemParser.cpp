@@ -173,5 +173,6 @@ namespace jrc
             parse_item_body(recv, type, slot, iid, inventory, forced_cash_id);
             return type;
         }
+
     }
 }

@@ -25,8 +25,10 @@
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/InventoryHandlers.h"
 #include "Handlers/MessagingHandlers.h"
+#include "Handlers/Social/SocialHandlers.h"
 #include "Handlers/NpcInteractionHandlers.h"
 #include "Handlers/CashShopHandlers.h"
+#include "Handlers/TradeHandlers.h"
 
 #include "../Console.h"
 
@@ -112,6 +114,7 @@ namespace jrc
 
         // Mapobject
         SPAWN_PET  = 168,
+        MOVE_PET   = 170,
         CHAR_MOVED = 185,
 
         // Attack
@@ -155,6 +158,7 @@ namespace jrc
         OPEN_NPC_SHOP    = 305,
         SHOP_TRANSACTION = 306,
         STORAGE          = 309,
+        PLAYER_INTERACTION = 314,
 
         KEYMAP      = 335,
         AUTO_HP_POT = 336,
@@ -194,6 +198,7 @@ namespace jrc
         emplace<CANCEL_FOREIGN_BUFF, CancelForeignBuffHandler>();
         emplace<REMOVE_CHAR, RemoveCharHandler>();
         emplace<SPAWN_PET, SpawnPetHandler>();
+        emplace<MOVE_PET, PetMovedHandler>();
         emplace<SPAWN_NPC, SpawnNpcHandler>();
         emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();
         emplace<SPAWN_MOB, SpawnMobHandler>();
@@ -222,10 +227,13 @@ namespace jrc
         emplace<UPDATE_SKILL, UpdateSkillHandler>();
         emplace<ADD_COOLDOWN, AddCooldownHandler>();
         emplace<ADMIN_RESULT, AdminResultHandler>();
+        emplace<AUTO_HP_POT, AutoHpPotHandler>();
+        emplace<AUTO_MP_POT, AutoMpPotHandler>();
 
         // Messaging handlers
         emplace<SHOW_STATUS_INFO, ShowStatusInfoHandler>();
         emplace<PARTY_OPERATION, PartyOperationHandler>();
+        emplace<BUDDY_LIST, BuddyListHandler>();
         emplace<PARTY_VALUE, PartyValueHandler>();
         emplace<CHAT_RECEIVED, ChatReceivedHandler>();
         emplace<MULTI_CHAT, MultiChatReceivedHandler>();
@@ -245,6 +253,7 @@ namespace jrc
         emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
         emplace<SHOP_TRANSACTION, ShopTransactionHandler>();
         emplace<STORAGE, StorageHandler>();
+        emplace<PLAYER_INTERACTION, TradeHandler>();
 
         // Cash Shop handlers
         emplace<QUERY_CASH_RESULT, QueryCashHandler>();
@@ -255,7 +264,6 @@ namespace jrc
         emplace<MEMO_RESULT, NullHandler>();
         emplace<ENABLE_REPORT, NullHandler>();
         emplace<FAMILY_INFO_RESULT, NullHandler>();
-        emplace<BUDDY_LIST, NullHandler>();
         emplace<GUILD_OPERATION, NullHandler>();
         emplace<FAMILY_PRIV_LIST, NullHandler>();
         emplace<SCRIPT_PROGRESS_MESSAGE, NullHandler>();
@@ -268,8 +276,6 @@ namespace jrc
         emplace<LOCK_UI, NullHandler>();
         emplace<TOGGLE_UI, NullHandler>();
         emplace<MAKE_NPC_SCRIPTED, NullHandler>();
-        emplace<AUTO_HP_POT, NullHandler>();
-        emplace<AUTO_MP_POT, NullHandler>();
 
         // Ignored
         emplace<SELECT_WORLD, NullHandler>();

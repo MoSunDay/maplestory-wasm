@@ -334,7 +334,7 @@ namespace jrc
 
             counter++;
         }
-        return counter < slotmaxima[type] ? counter : 0;
+        return counter <= slotmaxima[type] ? counter : 0;
     }
 
     int16_t Inventory::find_item(InventoryType::Id type, int32_t itemid) const
@@ -377,6 +377,38 @@ namespace jrc
     {
         auto iter = inventories[type].find(slot);
         return iter != inventories[type].end() && iter->second.cash;
+    }
+
+    bool Inventory::is_pet_item(InventoryType::Id type, int16_t slot) const
+    {
+        auto iter = inventories[type].find(slot);
+        return type == InventoryType::CASH && iter != inventories[type].end() &&
+            iter->second.item_id / 1000 == 5000 &&
+            pets.find(iter->second.unique_id) != pets.end();
+    }
+
+    int64_t Inventory::get_cash_id(InventoryType::Id type, int16_t slot) const
+    {
+        auto iter = inventories[type].find(slot);
+        return iter == inventories[type].end() ? 0 : iter->second.cash_id;
+    }
+
+    bool Inventory::has_equipped_item(int32_t item_id) const
+    {
+        for (const auto& entry : inventories[InventoryType::EQUIPPED])
+        {
+            if (entry.second.item_id == item_id)
+                return true;
+        }
+        // The v83 inventory packet serializes cash-equipped items in a
+        // separate list. SetfieldHandler preserves those as hidden EQUIP
+        // slots at 100+, so they cannot collide with ordinary bag items.
+        for (const auto& entry : inventories[InventoryType::EQUIP])
+        {
+            if (entry.first >= 100 && entry.second.item_id == item_id)
+                return true;
+        }
+        return false;
     }
 
     Optional<const Equip> Inventory::get_equip(InventoryType::Id type, int16_t slot) const

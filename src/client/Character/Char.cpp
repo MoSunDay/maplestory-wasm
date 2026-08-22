@@ -438,6 +438,25 @@ namespace jrc
         }
     }
 
+    PetLook* Char::get_pet(uint8_t index)
+    {
+        return index < 3 && pets[index].get_itemid() ? &pets[index] : nullptr;
+    }
+
+    const PetLook* Char::get_pet(uint8_t index) const
+    {
+        return index < 3 && pets[index].get_itemid() ? &pets[index] : nullptr;
+    }
+
+    void Char::move_pet(uint8_t index, const std::vector<Movement>& movements)
+    {
+        PetLook* pet = get_pet(index);
+        if (!pet || movements.empty())
+            return;
+
+        pet->apply_movement(movements.back());
+    }
+
     bool Char::is_invincible() const
     {
         return invincible == true;

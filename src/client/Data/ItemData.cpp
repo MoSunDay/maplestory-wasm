@@ -23,10 +23,12 @@
 namespace jrc
 {
     ItemData::ItemData(int32_t id)
-        : itemid(id), price(0), recovery_hp(0), recovery_mp(0), valid(false) {
+        : itemid(id), price(0), recovery_hp(0), recovery_mp(0),
+          recovery_hp_rate(false), recovery_mp_rate(false), valid(false) {
 
         nl::node src;
         nl::node strsrc;
+        nl::node specsrc;
 
         std::string strprefix = "0" + std::to_string(itemid / 10000);
         std::string strid = "0" + std::to_string(itemid);
@@ -40,7 +42,11 @@ namespace jrc
             break;
         case 2:
             category = "Consume";
-            src = nl::nx::item["Consume"][strprefix + ".img"][strid]["info"];
+            {
+                nl::node item = nl::nx::item["Consume"][strprefix + ".img"][strid];
+                src = item["info"];
+                specsrc = item["spec"];
+            }
             strsrc = nl::nx::string["Consume.img"][std::to_string(itemid)];
             break;
         case 3:
@@ -54,9 +60,19 @@ namespace jrc
             strsrc = nl::nx::string["Etc.img"]["Etc"][std::to_string(itemid)];
             break;
         case 5:
-            category = "Cash";
-            src = nl::nx::item["Cash"][strprefix + ".img"][strid]["info"];
-            strsrc = nl::nx::string["Cash.img"][std::to_string(itemid)];
+            if (itemid / 1000 == 5000)
+            {
+                category = "Pet";
+                std::string petid = std::to_string(itemid);
+                src = nl::nx::item["Pet"][petid + ".img"]["info"];
+                strsrc = nl::nx::string["Pet.img"][petid];
+            }
+            else
+            {
+                category = "Cash";
+                src = nl::nx::item["Cash"][strprefix + ".img"][strid]["info"];
+                strsrc = nl::nx::string["Cash.img"][std::to_string(itemid)];
+            }
             break;
         }
 
@@ -65,8 +81,10 @@ namespace jrc
             icons[false] = Texture(src["icon"]);
             icons[true] = Texture(src["iconRaw"]);
             price = src["price"];
-            recovery_hp = src["recoveryHP"];
-            recovery_mp = src["recoveryMP"];
+            recovery_hp = specsrc["hp"];
+            recovery_mp = specsrc["mp"];
+            recovery_hp_rate = specsrc["hpR"].get_real() > 0.0;
+            recovery_mp_rate = specsrc["mpR"].get_real() > 0.0;
 
             name = strsrc["name"].get_string();
             desc = strsrc["desc"].get_string();
@@ -81,6 +99,11 @@ namespace jrc
 
     std::string ItemData::get_eqcategory(int32_t id) const
     {
+        if (id / 10000 == 181)
+        {
+            return "PetEquip";
+        }
+
         constexpr char const* categorynames[15] =
         {
             "Cap",      "Accessory", "Accessory", "Accessory", "Coat",
@@ -131,6 +154,16 @@ namespace jrc
     int32_t ItemData::get_recovery_mp() const
     {
         return recovery_mp;
+    }
+
+    bool ItemData::restores_hp() const
+    {
+        return recovery_hp > 0 || recovery_hp_rate;
+    }
+
+    bool ItemData::restores_mp() const
+    {
+        return recovery_mp > 0 || recovery_mp_rate;
     }
 
     const std::string& ItemData::get_name() const

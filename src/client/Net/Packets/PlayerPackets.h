@@ -69,5 +69,12 @@ namespace jrc
                 write_int(std::get<2>(entry)); // action
             }
         }
+
+        ChangeKeyMapPacket(int32_t mode, int32_t item_id)
+            : OutPacket(CHANGE_KEYMAP)
+        {
+            write_int(mode);
+            write_int(item_id);
+        }
     };
 }

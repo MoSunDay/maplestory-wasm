@@ -29,6 +29,8 @@ namespace jrc
             int8_t type, int8_t mode, int32_t iid, bool playerdrop, const Texture& icon);
 
         void draw(double viewx, double viewy, float alpha) const override;
+        bool is_meso() const override { return false; }
+        int32_t get_item_id() const override { return itemid; }
 
     private:
         const Texture& icon;

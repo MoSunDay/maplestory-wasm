@@ -44,6 +44,8 @@ namespace jrc
 
         // Send mouse input to clickable npcs.
         Cursor::State send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos);
+        // Check whether an active npc owns the screen-space cursor.
+        bool contains_cursor(Point<int16_t> position, Point<int16_t> viewpos) const;
         // Talk to the nearest keyboard-accessible NPC in interaction range.
         bool talk_to_nearest(Point<int16_t> player_position);
 
