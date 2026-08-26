@@ -18,6 +18,7 @@
 #include "PlayerStates.h"
 
 #include "../Audio/Audio.h"
+#include "../Gameplay/Input/ActionTrigger.h"
 
 
 namespace jrc
@@ -330,14 +331,24 @@ namespace jrc
                 player.set_state(Char::WALK);
                 break;
             case KeyAction::JUMP:
-                if (try_jump_down(player))
+                switch (action_trigger::prone_jump_action(
+                    player.is_attacking(),
+                    player.get_phobj().enablejd,
+                    player.is_key_down(KeyAction::DOWN)))
                 {
-                    play_jumpsound();
-                }
-                else
-                {
+                case action_trigger::ProneJumpAction::BLOCKED:
+                    break;
+                case action_trigger::ProneJumpAction::JUMP_DOWN:
+                    if (try_jump_down(player))
+                    {
+                        play_jumpsound();
+                    }
+                    break;
+                case action_trigger::ProneJumpAction::JUMP_UP:
                     player.set_state(Char::STAND);
-                    player.send_action(ka, down);
+                    play_jumpsound();
+                    player.get_phobj().vforce = -player.get_jumpforce();
+                    break;
                 }
                 break;
             default:
