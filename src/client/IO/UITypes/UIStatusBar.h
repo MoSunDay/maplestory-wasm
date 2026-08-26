@@ -33,6 +33,7 @@
 #include "../../Graphics/Text.h"
 
 #include <vector>
+#include <optional>
 
 namespace jrc
 {
@@ -84,6 +85,7 @@ namespace jrc
         bool activate_popup_selection();
         void close_popup();
         void request_cash_shop();
+        std::optional<Point<int16_t>> popup_action_center(StatusBarPopup::Action action) const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;

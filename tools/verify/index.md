@@ -7,7 +7,7 @@
 - 位图加载分类（后台、阻塞可见、短时特效）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/bitmap-load-class.cpp -o /tmp/bitmap-load-class && /tmp/bitmap-load-class`
 - 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`
 - 自然恢复规则：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/natural-recovery.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/natural-recovery && /tmp/natural-recovery`
-- 宠物自动补给阈值、能力门禁、单次药水与冷却：`c++ -std=c++17 tools/verify/pet-automation.cpp src/client/Gameplay/Pet/PetAutomation.cpp -o /tmp/pet-automation && /tmp/pet-automation`
+- 宠物药品选择、自动补给、拾取重试与稳定跟随策略：`c++ -std=c++17 -Isrc tools/verify/pet-automation.cpp src/client/Gameplay/Pet/PetAutomation.cpp src/client/Gameplay/Pet/PetFollowPolicy.cpp src/client/Gameplay/Pet/PetLootPolicy.cpp -o /tmp/pet-automation && /tmp/pet-automation`
 - 浏览器恢复帧时间限制：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/runtime/frame-timing.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/frame-timing && /tmp/frame-timing`
 - 死亡幽灵轨迹：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-orbit.cpp -o /tmp/death-tomb-orbit && /tmp/death-tomb-orbit`
 - 死亡墓碑落地点：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-ground.cpp -o /tmp/death-tomb-ground && /tmp/death-tomb-ground`

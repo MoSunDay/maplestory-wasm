@@ -49,7 +49,10 @@ export class BrowserDriver {
     if (this.headed !== true && process.env.E2E_HEADED !== '1') browserArgs.unshift('--headless=new');
     this.process = spawn(this.binary, browserArgs, { stdio: 'ignore' });
 
-    for (let attempt = 0; attempt < 60; attempt += 1) {
+    // Large Chromium test bundles can take more than 15 seconds to page in on
+    // a busy build host. Keep polling the exact debug endpoint long enough to
+    // distinguish slow startup from a failed launch.
+    for (let attempt = 0; attempt < 180; attempt += 1) {
       await sleep(250);
       try {
         const targets = await (await fetch(`http://127.0.0.1:${this.debugPort}/json/list`)).json();

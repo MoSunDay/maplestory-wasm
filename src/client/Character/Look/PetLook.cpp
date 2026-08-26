@@ -18,22 +18,27 @@
 #include "PetLook.h"
 
 #include "../../Constants.h"
+#include "../../Gameplay/Pet/PetFollowPolicy.h"
 
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
-#include <cmath>
+#include <algorithm>
+#include <utility>
 
 namespace jrc
 {
     PetLook::PetLook(int32_t iid, std::string nm, int32_t uqid,
-        Point<int16_t> pos, uint8_t st, int32_t) {
+        Point<int16_t> pos, uint8_t st, int32_t fhid) {
 
         itemid   = iid;
-        name     = nm;
+        name     = std::move(nm);
         uniqueid = uqid;
+        stance = stancebyvalue(st);
+        flip = st % 2 == 1;
         set_position(pos.x(), pos.y());
-        set_stance(st);
+        phobj.fhid = static_cast<uint16_t>(std::max(fhid, 0));
+        last_progress_position = pos;
 
         namelabel = { Text::A13M, Text::CENTER, Text::WHITE, Text::NAMETAG, name };
 
@@ -52,14 +57,12 @@ namespace jrc
         nl::node effsrc = nl::nx::effect["PetEff.img"][strid];
 
         animations[WARP] = effsrc["warp"];
+        animations[stance].reset();
     }
 
     PetLook::PetLook()
     {
-        itemid   = 0;
-        name     = "";
-        uniqueid = 0;
-        stance   = Stance::STAND;
+        name = "";
     }
 
     void PetLook::draw(double viewx, double viewy, float alpha) const
@@ -76,45 +79,68 @@ namespace jrc
         static const double PETFLYFORCE = 0.2;
 
         Point<int16_t> curpos = phobj.get_position();
-        Point<int16_t> followpos = loot_target.value_or(charpos);
-        if (loot_target && (std::abs(followpos.y() - curpos.y()) > 70 || curpos.distance(followpos) > 180))
+        if (stance == WARP)
         {
-            set_stance(WARP);
-            set_position(followpos.x(), followpos.y());
-            curpos = followpos;
+            physics.move_object(phobj);
+            if (!animations[WARP].is_valid() || animations[WARP].update())
+                set_stance(STAND);
+            return;
         }
+
         switch (stance)
         {
         case STAND:
         case MOVE:
-            if (!loot_target && curpos.distance(charpos) > 150)
+        {
+            Point<int16_t> followpos = loot_target.value_or(charpos);
+            if (stance == MOVE)
             {
-                set_position(charpos.x(), charpos.y());
+                if (curpos.distance(last_progress_position) >= 4)
+                {
+                    last_progress_position = curpos;
+                    stalled_frames = 0;
+                }
+                else if (stalled_frames < UINT16_MAX)
+                {
+                    ++stalled_frames;
+                }
             }
             else
             {
-                int16_t deadzone = loot_target ? 20 : 50;
-                if (followpos.x() - curpos.x() > deadzone)
-                {
-                    phobj.hforce = PETWALKFORCE;
-                    flip = true;
-                    set_stance(MOVE);
-                }
-                else if (followpos.x() - curpos.x() < -deadzone)
-                {
-                    phobj.hforce = -PETWALKFORCE;
-                    flip = false;
-                    set_stance(MOVE);
-                }
-                else
-                {
-                    phobj.hforce = 0.0;
-                    set_stance(STAND);
-                }
+                stalled_frames = 0;
+                last_progress_position = curpos;
+            }
+
+            pet_follow::Action action = pet_follow::decide({
+                curpos, followpos, loot_target.has_value(), stance == MOVE, stalled_frames
+            });
+            if (action == pet_follow::Action::WARP)
+            {
+                Point<int16_t> destination = loot_target
+                    ? followpos
+                    : Point<int16_t>(static_cast<int16_t>(followpos.x() - 35), followpos.y());
+                warp_to(destination);
+                break;
+            }
+            if (action == pet_follow::Action::MOVE_RIGHT ||
+                action == pet_follow::Action::MOVE_LEFT)
+            {
+                bool right = action == pet_follow::Action::MOVE_RIGHT;
+                phobj.hforce = right ? PETWALKFORCE : -PETWALKFORCE;
+                flip = right;
+                set_stance(MOVE);
+            }
+            else
+            {
+                phobj.hforce = 0.0;
+                phobj.hspeed = 0.0;
+                phobj.hacc = 0.0;
+                set_stance(STAND);
             }
             phobj.type = PhysicsObject::NORMAL;
             phobj.clear_flag(PhysicsObject::NOGRAVITY);
             break;
+        }
         case HANG:
             set_position(charpos.x(), charpos.y());
             phobj.set_flag(PhysicsObject::NOGRAVITY);
@@ -158,8 +184,6 @@ namespace jrc
             phobj.clear_flag(PhysicsObject::NOGRAVITY);
             break;
         default:
-            if (stance == WARP && animations[stance].update())
-                set_stance(STAND);
             break;
         }
 
@@ -187,11 +211,16 @@ namespace jrc
     void PetLook::set_stance(uint8_t stancebyte)
     {
         flip = stancebyte % 2 == 1;
-        stance = stancebyvalue(stancebyte);
+        set_stance(stancebyvalue(stancebyte));
     }
 
     void PetLook::set_loot_target(Point<int16_t> position)
     {
+        if (!loot_target || loot_target->x() != position.x() || loot_target->y() != position.y())
+        {
+            stalled_frames = 0;
+            last_progress_position = phobj.get_position();
+        }
         loot_target = position;
     }
 
@@ -225,6 +254,35 @@ namespace jrc
     bool PetLook::has_loot_target() const
     {
         return loot_target.has_value();
+    }
+
+    bool PetLook::consume_urgent_movement()
+    {
+        bool result = urgent_movement;
+        urgent_movement = false;
+        return result;
+    }
+
+    void PetLook::reset_motion()
+    {
+        phobj.hforce = 0.0;
+        phobj.vforce = 0.0;
+        phobj.hacc = 0.0;
+        phobj.vacc = 0.0;
+        phobj.hspeed = 0.0;
+        phobj.vspeed = 0.0;
+    }
+
+    void PetLook::warp_to(Point<int16_t> position)
+    {
+        set_position(position.x(), position.y());
+        reset_motion();
+        phobj.type = PhysicsObject::NORMAL;
+        phobj.clear_flag(PhysicsObject::NOGRAVITY);
+        stalled_frames = 0;
+        last_progress_position = position;
+        urgent_movement = true;
+        set_stance(WARP);
     }
 
     Movement PetLook::get_movement() const

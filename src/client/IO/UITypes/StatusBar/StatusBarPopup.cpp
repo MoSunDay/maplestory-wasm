@@ -169,6 +169,25 @@ namespace jrc
         return is_open() && panel_bounds(active_data()).contains(cursor_position);
     }
 
+    std::optional<Point<int16_t>> StatusBarPopup::action_center(Action action) const
+    {
+        if (!is_open())
+            return std::nullopt;
+
+        const PanelData& panel = active_data();
+        for (const Entry& entry : panel.entries)
+        {
+            if (entry.action != action || !entry.button->is_active())
+                continue;
+            Rectangle<int16_t> bounds = entry.button->bounds(panel.position);
+            return Point<int16_t>(
+                static_cast<int16_t>(bounds.l() + bounds.width() / 2),
+                static_cast<int16_t>(bounds.t() + bounds.height() / 2)
+            );
+        }
+        return std::nullopt;
+    }
+
     Rectangle<int16_t> StatusBarPopup::panel_bounds(const PanelData& panel)
     {
         return {
