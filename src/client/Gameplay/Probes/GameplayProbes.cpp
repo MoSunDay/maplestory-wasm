@@ -4,8 +4,11 @@
 #include "../../IO/Field/UIFieldClock.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UINpcTalk.h"
+#include "../../IO/UITypes/Pet/UIPetOptions.h"
+#include "../../IO/UITypes/UIStatusBar.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace
@@ -76,6 +79,88 @@ extern "C"
     int msmob_count()
     {
         return static_cast<int>(jrc::Stage::get().get_mobs().size());
+    }
+
+    int mspet_active()
+    {
+        return jrc::Stage::get().get_player().get_pet(0) ? 1 : 0;
+    }
+
+    int mspet_x()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? pet->get_position().x() : MISSING_COORDINATE;
+    }
+
+    int mspet_y()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? pet->get_position().y() : MISSING_COORDINATE;
+    }
+
+    int mspet_stance()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? static_cast<int>(pet->get_stance()) : -1;
+    }
+
+    int mspet_has_loot_target()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet && pet->has_loot_target() ? 1 : 0;
+    }
+
+    int mspet_options_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::PETOPTIONS) ? 1 : 0;
+    }
+
+    int mspet_options_hp_item()
+    {
+        auto options = jrc::UI::get().get_element<jrc::UIPetOptions>();
+        return options ? options->selected_hp_item() : -1;
+    }
+
+    int mspet_options_mp_item()
+    {
+        auto options = jrc::UI::get().get_element<jrc::UIPetOptions>();
+        return options ? options->selected_mp_item() : -1;
+    }
+
+    int mspet_options_menu_x()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        auto point = statusbar
+            ? statusbar->popup_action_center(jrc::StatusBarPopup::Action::PET_OPTIONS)
+            : std::nullopt;
+        return point ? point->x() : MISSING_COORDINATE;
+    }
+
+    int mspet_options_menu_y()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        auto point = statusbar
+            ? statusbar->popup_action_center(jrc::StatusBarPopup::Action::PET_OPTIONS)
+            : std::nullopt;
+        return point ? point->y() : MISSING_COORDINATE;
+    }
+
+    int msitems_menu_x()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        auto point = statusbar
+            ? statusbar->popup_action_center(jrc::StatusBarPopup::Action::ITEMS)
+            : std::nullopt;
+        return point ? point->x() : MISSING_COORDINATE;
+    }
+
+    int msitems_menu_y()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        auto point = statusbar
+            ? statusbar->popup_action_center(jrc::StatusBarPopup::Action::ITEMS)
+            : std::nullopt;
+        return point ? point->y() : MISSING_COORDINATE;
     }
 
     int msinventory_quantity(int32_t item_id)

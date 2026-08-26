@@ -4,6 +4,7 @@
 #include "../../../Graphics/Texture.h"
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace jrc
@@ -49,6 +50,7 @@ namespace jrc
         bool is_open() const;
         Action selected_action() const;
         bool contains(Point<int16_t> cursor_position) const;
+        std::optional<Point<int16_t>> action_center(Action action) const;
 
         CursorResult send_cursor(bool pressed, Point<int16_t> cursor_position);
         void remove_cursor();

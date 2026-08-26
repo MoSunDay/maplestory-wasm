@@ -1,4 +1,4 @@
-Commit: 433b49886dde8113137b3739b6f045e5c5fb5e04
+Commit: 78a9f1bd7b0aa0588bf4b5f50325189cba261276
 
 # UI 系统
 
@@ -71,7 +71,7 @@ UI 状态接口。三个具体实现:
 | `UISkillBook` | 技能书窗口；使用与四行技能布局匹配的 175×289 紧凑 NX 面板，并按 Explorer/Cygnus/Aran 的实际转职阶段开放可切换页签 |
 | `UIEquipInventory` | 装备栏窗口；宠物页显示已选择的 HP/MP 药水及服务端下发的隐藏宠物能力，接受 USE 药水拖放 |
 | `UIItemInventory` | 物品栏窗口；现金栏宠物可双击召唤，USE 药水可拖到宠物 HP/MP 槽并同步服务端角色键位选择 |
-| `Pet/UIPetOptions` | 宠物自动补给阈值窗口；复用 `UIWindow2.img/OptionMenu` 素材，分别设置并持久化 1%–99% 的 HP/MP 阈值 |
+| `Pet/UIPetOptions` | 独立高对比宠物自动补给面板；分别设置并本地持久化 1%–99% 的 HP/MP 阈值，从当前 USE 背包候选中选择恢复药品或 `OFF`，确认时重新校验并通过既有键位协议持久化角色药品选择 |
 | `UIBuffList` | Buff 列表显示 |
 | `UIMiniMap` / `UIWorldMap` | 小地图/世界地图 |
 | `Social/UIBuddy` | 独立好友窗口；展示容量、在线状态和待处理请求，提供添加、接受、拒绝、选择与删除入口，默认快捷键为 R |

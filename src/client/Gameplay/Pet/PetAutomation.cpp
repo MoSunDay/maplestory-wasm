@@ -17,6 +17,22 @@ namespace jrc::pet_automation
             static_cast<int64_t>(maximum) * clamp_threshold(threshold);
     }
 
+    int32_t select_next_item(const std::vector<int32_t>& candidates,
+        int32_t current_item, int32_t direction)
+    {
+        if (candidates.empty())
+            return 0;
+
+        auto current = std::find(candidates.begin(), candidates.end(), current_item);
+        if (current == candidates.end())
+            return candidates.front();
+
+        const int64_t size = static_cast<int64_t>(candidates.size());
+        const int64_t index = std::distance(candidates.begin(), current);
+        const int64_t step = direction < 0 ? -1 : 1;
+        return candidates[static_cast<size_t>((index + step + size) % size)];
+    }
+
     Controller::Controller(uint8_t hp_value, uint8_t mp_value)
         : hp_threshold(clamp_threshold(hp_value)),
           mp_threshold(clamp_threshold(mp_value))

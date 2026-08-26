@@ -28,6 +28,8 @@ export async function resolvePageUrl() {
 export function createRuntimeProbes(driver) {
   const number = name =>
     driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', [], [])`);
+  const numberArgument = (name, value) =>
+    driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', ['number'], [${Number(value)}])`);
   return {
     currentUiState: () => number('msui_state'),
     loginNoticeActive: () => number('msui_login_notice_active'),
@@ -40,6 +42,19 @@ export function createRuntimeProbes(driver) {
     mobCount: () => number('msmob_count'),
     playerX: () => number('msplayer_x'),
     playerY: () => number('msplayer_y'),
+    petActive: () => number('mspet_active'),
+    petX: () => number('mspet_x'),
+    petY: () => number('mspet_y'),
+    petStance: () => number('mspet_stance'),
+    petHasLootTarget: () => number('mspet_has_loot_target'),
+    petOptionsActive: () => number('mspet_options_active'),
+    petOptionsHpItem: () => number('mspet_options_hp_item'),
+    petOptionsMpItem: () => number('mspet_options_mp_item'),
+    petOptionsMenuX: () => number('mspet_options_menu_x'),
+    petOptionsMenuY: () => number('mspet_options_menu_y'),
+    itemsMenuX: () => number('msitems_menu_x'),
+    itemsMenuY: () => number('msitems_menu_y'),
+    inventorySlot: itemId => numberArgument('msinventory_slot', itemId),
     cashShopProbe: name => number(name)
   };
 }
