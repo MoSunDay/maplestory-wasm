@@ -1,4 +1,4 @@
-Commit: 433b49886dde8113137b3739b6f045e5c5fb5e04
+Commit: 197feb9330cc3a19c2c46aa667be2766edbc0bc1
 
 # 角色系统
 
@@ -48,6 +48,14 @@ Player 继承 `Playable`（可操控）和 `Char`（角色基类）。
 - 基础属性和总属性（装备+Buff 加成）
 - `recalc_stats(equipchanged)`: 重新计算总属性
 - 过期 HP/MP 跟踪
+- 怪物物理/魔法攻击分别使用 WDEF/MDEF 计算受击预测，防御为零时保持安全下限；服务端仍负责最终 HP/MP 结算。
+
+### 怪物疾病与 ActiveBuffs
+
+- `SLOW` 和 `DARKNESS` 分别进入速度、命中属性重算；其余疾病由 `Stage` 或 linked server 执行行为约束。
+- `STUN`/`SEDUCE` 阻止动作和技能，`SEAL` 阻止技能，`CONFUSE` 反转左右输入，`WEAKEN` 阻止跳跃，`FEAR` 缩小可见区域。混乱方向在 key-down 时锁存到对应 key-up，疾病中途解除不会抬起错误方向；切图会释放并清空持续动作状态。
+- `POTION_LOCK` 由 linked server 同时拦截恢复/净化消耗品与宠物自动补给；`SHADOW` 由服务端按每个完整静止秒造成伤害；`ZOMBIFY`、`CURSE` 和既有疾病沿用服务端规则。
+- 新疾病追加在服务端 `MapleDisease` 枚举末尾，避免改变持久化 ordinal；客户端 Buff 掩码与服务端 first/second mask 保持一致。
 
 ### NaturalRecovery (`Recovery/NaturalRecovery.h`)
 

@@ -1,4 +1,4 @@
-Commit: 433b49886dde8113137b3739b6f045e5c5fb5e04
+Commit: 197feb9330cc3a19c2c46aa667be2766edbc0bc1
 
 # 功能能力索引
 
@@ -43,7 +43,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **攻击特效**: 支持多段/多目标命中、斗气终结和属性充能特效；一次按键只发起一次攻击
 - **伤害数字显示**: 伤害数值渲染
 - **Buff 管理**: 增益/减益效果
-- **怪物 AI**: 怪物移动和行为
+- **[怪物仇恨战斗](mob-combat/)**: 怪物受击后按累计伤害锁定目标并持续追击，在范围内使用普通攻击或服务端授权技能，完整呈现状态、疾病和雾效果
 
 相关模块: [游戏世界](../agents/client/Gameplay/index.md), [角色系统](../agents/client/Character/index.md)
 

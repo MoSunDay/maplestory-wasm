@@ -15,7 +15,7 @@
 - 武器残影档位与播放状态：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/afterimage-playback.cpp -o /tmp/afterimage-playback && /tmp/afterimage-playback`
 - 动画单端透明度语义：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/animation-frame-properties.cpp -o /tmp/animation-frame-properties && /tmp/animation-frame-properties`
 - 普通攻击姿态预热集合：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/regular-attack-stances.cpp -o /tmp/regular-attack-stances && /tmp/regular-attack-stances`
-- 远端 Buff 掩码顺序：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
+- Buff 掩码位序、重复位选择与未知位拒绝：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
 - 世界选择单频道策略与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
@@ -39,3 +39,7 @@
 - 场地计时器倒计时、跨日时钟与格式化：`c++ -std=c++17 -Isrc tools/verify/field-clock.cpp src/client/IO/Field/FieldClockModel.cpp -o /tmp/field-clock && /tmp/field-clock`
 - 废弃都市组队任务门对象与成功/失败音效素材：`c++ -std=c++17 -Isrc -Isrc/client -Isrc/nlnx tools/verify/kerning-pq-field-assets.cpp src/client/Audio/FieldSoundPath.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/kerning-pq-field-assets && /tmp/kerning-pq-field-assets`
 - 废弃都市组队任务服务端脚本、地图、怪物、掉落、计时与奖励契约：`node tools/verify/kerning-pq-contract.mjs`
+- 怪物仇恨决策、攻击/技能优先级、命中范围与动作编码：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client -Isrc tools/verify/mob-action.cpp src/client/Gameplay/MobCombat/MobAction.cpp -o /tmp/mob-action && /tmp/mob-action`
+- 混乱状态跨 key-down/key-up 的方向映射锁存：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc tools/verify/confused-input.cpp -o /tmp/confused-input && /tmp/confused-input`
+- 暴击伤害高位编码与无符号伤害还原：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc tools/verify/damage-encoding.cpp -o /tmp/damage-encoding && /tmp/damage-encoding`
+- 怪物攻击范围、技能绑定、动作资源与服务端技能覆盖 NX 审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/mob-combat-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/mob-combat-nx && /tmp/mob-combat-nx Mob.nx Skill.nx`

@@ -50,7 +50,7 @@ namespace jrc
 
         void change_job(uint16_t id);
 
-        int32_t calculate_damage(int32_t mobatk) const;
+        int32_t calculate_damage(int32_t mobatk, bool magic = false) const;
 
         bool is_damage_buffed() const;
         uint16_t get_stat(Maplestat::Id stat) const;

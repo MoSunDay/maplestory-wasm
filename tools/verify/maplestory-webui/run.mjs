@@ -2,6 +2,12 @@ import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
+import {
+  createAssetIdleWaiter,
+  createRuntimeProbes,
+  enterTutorialMobMap,
+  resolvePageUrl
+} from './runtime-flow.mjs';
 
 const browserBinary = process.env.CHROME_BIN || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : 'google-chrome');
 const debugPort = Number(process.env.E2E_DEBUG_PORT || 9231);
@@ -25,6 +31,8 @@ const verifyCashShop = process.env.E2E_CASH_SHOP === '1';
 const verifyNpcShop = process.env.E2E_NPC_SHOP === '1';
 const verifyImeChat = process.env.E2E_IME_CHAT === '1';
 const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
+const requireMobs = process.env.E2E_REQUIRE_MOBS === '1';
+const routeTutorialMobMap = process.env.E2E_ROUTE_TUTORIAL_MOB_MAP === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
@@ -45,83 +53,17 @@ async function requireState(name, predicate, timeoutSeconds = 30) {
   throw new Error(`Timed out: ${name}`);
 }
 
-async function isReachable(url) {
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-}
-
-async function resolvePageUrl() {
-  if (process.env.E2E_URL) {
-    if (!await isReachable(process.env.E2E_URL)) {
-      throw new Error(`E2E_URL is not reachable: ${process.env.E2E_URL}`);
-    }
-    return process.env.E2E_URL;
-  }
-
-  const candidates = [
-    'http://127.0.0.1:8000/web/index.html',
-    'http://127.0.0.1:8001/web/index.html'
-  ];
-  for (const candidate of candidates) {
-    if (await isReachable(candidate)) return candidate;
-  }
-  throw new Error(`No loopback WebUI endpoint; checked: ${candidates.join(', ')}. Set E2E_URL for a custom bind.`);
-}
-
-function currentUiState() {
-  return driver.evaluate("Module.ccall('msui_state', 'number', [], [])");
-}
-
-function loginNoticeActive() {
-  return driver.evaluate("Module.ccall('msui_login_notice_active', 'number', [], [])");
-}
-
-function loginNoticeMessage() {
-  return driver.evaluate("Module.ccall('msui_login_notice_message', 'number', [], [])");
-}
-
-function characterCreationCustomizing() {
-  return driver.evaluate("Module.ccall('msui_character_creation_customizing', 'number', [], [])");
-}
-
-function noticeActive() {
-  return driver.evaluate("Module.ccall('msui_notice_active', 'number', [], [])");
-}
-
-function mapAssetLoading() {
-  return driver.evaluate("Module.ccall('msstage_loading', 'number', [], [])");
-}
-
-function assetBlocking() {
-  return driver.evaluate("Module.ccall('msasset_blocking', 'number', [], [])");
-}
-
-function cashShopProbe(name) {
-  return driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', [], [])`);
-}
+const {
+  currentUiState, loginNoticeActive, loginNoticeMessage,
+  characterCreationCustomizing, noticeActive, mapAssetLoading,
+  assetBlocking, mapId, mobCount, playerX, playerY, cashShopProbe
+} = createRuntimeProbes(driver);
 
 function requireUiState(name, expected, timeoutSeconds = 30) {
   return requireState(name, async () => await currentUiState() === expected, timeoutSeconds);
 }
 
-async function requireAssetIdle(name = 'foreground assets ready') {
-  let hiddenSince = null;
-  await sleep(250);
-  return requireState(name, async () => {
-    const hidden = await driver.evaluate(
-      "document.getElementById('asset-loading-screen').classList.contains('is-hidden')");
-    if (!hidden) {
-      hiddenSince = null;
-      return false;
-    }
-    if (hiddenSince === null) hiddenSince = Date.now();
-    return Date.now() - hiddenSince >= 1000;
-  }, 45);
-}
+const requireAssetIdle = createAssetIdleWaiter(driver, requireState);
 
 function fatalRuntimeLogs() {
   return driver.logs.filter(line =>
@@ -157,7 +99,8 @@ try {
   await driver.setNetworkLatency(process.env.E2E_ASSET_ONLY === '1' ? 0 : 500);
   await driver.navigate(pageUrl);
   await requireState('loading font ready', async () =>
-    await driver.evaluate("document.fonts.check('16px Maple CJK')"));
+    await driver.evaluate(`document.fonts.status === 'loaded' &&
+      getComputedStyle(document.body).fontFamily.includes('Noto Sans CJK SC')`));
   const loadingScreen = await driver.evaluate(`(() => {
     const screen = document.getElementById('loading-screen');
     return screen && {
@@ -220,11 +163,15 @@ try {
     const lazy = Module.LazyFS;
     window.assetTestOriginalPrefetch = lazy.prefetchFileRange;
     window.assetTestAttempts = 0;
-    lazy.prefetchFileRange = () => new Promise((resolve, reject) => {
-      window.assetTestAttempts++;
-      window.assetTestResolve = resolve;
-      window.assetTestReject = reject;
-    });
+    lazy.prefetchFileRange = function(filename, ...args) {
+      if (filename !== '__overlay-test__.nx')
+        return window.assetTestOriginalPrefetch.call(this, filename, ...args);
+      return new Promise((resolve, reject) => {
+        window.assetTestAttempts++;
+        window.assetTestResolve = resolve;
+        window.assetTestReject = reject;
+      });
+    };
     lazy.requestForegroundFileRange('__overlay-test__.nx', 0, 1);
   })()`);
   const assetOverlayLoading = await driver.evaluate(`(() => {
@@ -445,11 +392,19 @@ try {
       const lazy = Module.LazyFS;
       const screen = document.getElementById('asset-loading-screen');
       const original = lazy.requestForegroundFileRange;
+      let evictedMapChunks = 0;
+      for (const key of Array.from(lazy.chunkCache.keys())) {
+        if (key.startsWith('Map.nx:')) {
+          lazy.chunkCache.delete(key);
+          evictedMapChunks += 1;
+        }
+      }
       const evidence = {
         totalCalls: 0,
         missingCalls: 0,
         sampleCalls: [],
         overlayShown: !screen.classList.contains('is-hidden'),
+        evictedMapChunks,
         startedAt: performance.now()
       };
       lazy.requestForegroundFileRange = function (filepath, offset, length) {
@@ -473,11 +428,24 @@ try {
     })()`);
     await driver.click(650, 400);
     await requireUiState('in-game UI active', uiState.game, 60);
+    await requireState('map field initialized', async () => await mapId() > 0, 60);
     await requireState('map asset safety gate released', async () =>
       await mapAssetLoading() === 0, 60);
     await requireState('all blocking assets released', async () =>
       await assetBlocking() === 0, 60);
     await requireAssetIdle('in-game foreground assets ready');
+    if (requireMobs) {
+      const initialMapId = await mapId();
+      const initialMobCount = await mobCount();
+      console.log(`INFO  mob runtime entry map=${initialMapId} count=${initialMobCount}`);
+      if (initialMobCount === 0 && routeTutorialMobMap && initialMapId === 10000)
+        await enterTutorialMobMap(driver, {
+          mapId, playerX, playerY, mapAssetLoading
+        }, requireState);
+      await requireState('map monsters instantiated', async () =>
+        await mobCount() > 0, 30);
+      console.log(`PASS  map monster runtime count ${await mobCount()}`);
+    }
     const naturalAssetEvidence = await driver.evaluate(`(() => {
       const evidence = window.naturalAssetEvidence;
       evidence.restore();
@@ -486,6 +454,7 @@ try {
         missingCalls: evidence.missingCalls,
         sampleCalls: evidence.sampleCalls,
         overlayShown: evidence.overlayShown,
+        evictedMapChunks: evidence.evictedMapChunks,
         elapsedMs: performance.now() - evidence.startedAt
       };
     })()`);
@@ -494,7 +463,8 @@ try {
       `${driver.artifactDir}/natural-asset-loading.json`,
       `${JSON.stringify(naturalAssetEvidence, null, 2)}\n`
     );
-    if (!naturalAssetEvidence.overlayShown || naturalAssetEvidence.missingCalls === 0) {
+    if (!naturalAssetEvidence.overlayShown || naturalAssetEvidence.evictedMapChunks === 0
+        || naturalAssetEvidence.missingCalls === 0) {
       throw new Error(`Natural asset loading gate failed: ${JSON.stringify(naturalAssetEvidence)}`);
     }
     console.log(`PASS  natural in-game asset loading ${JSON.stringify({

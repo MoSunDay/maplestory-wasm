@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "PlayerHandlers.h"
 
+#include "Helpers/BuffMaskOrder.h"
+
 #include "../../Character/Buff.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -221,20 +223,16 @@ namespace jrc
             return;
         }
 
-        for (auto& iter : Buffstat::first_codes)
-        {
-            if (firstmask & iter.second)
-            {
-                handle_buff(recv, iter.first);
-            }
-        }
-        for (auto& iter : Buffstat::second_codes)
-        {
-            if (secondmask & iter.second)
-            {
-                handle_buff(recv, iter.first);
-            }
-        }
+        const auto first = buff_mask::ordered_ids<Buffstat::Id>(
+            firstmask, Buffstat::first_codes);
+        const auto second = buff_mask::ordered_ids<Buffstat::Id>(
+            secondmask, Buffstat::second_codes);
+        if (first.unsupported != 0 || second.unsupported != 0)
+            throw PacketError("Unsupported local buff mask");
+        for (Buffstat::Id stat : first.ids)
+            handle_buff(recv, stat);
+        for (Buffstat::Id stat : second.ids)
+            handle_buff(recv, stat);
 
         Stage::get().get_player().recalc_stats(false);
     }
@@ -242,6 +240,26 @@ namespace jrc
     void ApplyBuffHandler::handle_buff(InPacket& recv, Buffstat::Id bs) const
     {
         int16_t value = recv.read_short();
+        const bool disease = bs == Buffstat::SEDUCE || bs == Buffstat::ZOMBIFY
+            || bs == Buffstat::SLOW || bs == Buffstat::CURSE
+            || bs == Buffstat::CONFUSE || bs == Buffstat::STUN
+            || bs == Buffstat::POISON || bs == Buffstat::SEAL
+            || bs == Buffstat::DARKNESS || bs == Buffstat::WEAKEN
+            || bs == Buffstat::POTION_LOCK || bs == Buffstat::SHADOW
+            || bs == Buffstat::FEAR;
+        if (disease)
+        {
+            const int16_t mob_skill_id = recv.read_short();
+            const int16_t mob_skill_level = recv.read_short();
+            const int32_t duration = recv.read_int();
+            const int32_t source = -(
+                static_cast<int32_t>(mob_skill_id) * 100 + mob_skill_level);
+            Stage& stage = Stage::get();
+            stage.get_player().give_buff({ bs, value, source, duration });
+            if (bs == Buffstat::STUN || bs == Buffstat::SEDUCE)
+                stage.release_actions();
+            return;
+        }
         int32_t skillid = recv.read_int();
         int32_t duration = recv.read_int();
 

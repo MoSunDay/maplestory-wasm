@@ -123,6 +123,33 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    // Confirms a controlled mob movement and optionally authorizes one skill.
+    // Opcode: MOVE_MOB_RESPONSE(240)
+    class MoveMobResponseHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+    class ApplyMobStatusHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+    class CancelMobStatusHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+    class SpawnMistHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+    class RemoveMistHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
 
     // Updates a mob's hp with the client.
     // Opcode: SHOW_MOB_HP(250)

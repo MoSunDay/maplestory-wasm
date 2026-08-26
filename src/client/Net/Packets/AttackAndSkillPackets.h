@@ -19,6 +19,7 @@
 #include "../OutPacket.h"
 
 #include "../../Gameplay/Combat/Attack.h"
+#include "../../Gameplay/MobCombat/DamageEncoding.h"
 
 namespace jrc
 {
@@ -69,8 +70,8 @@ namespace jrc
 
                 for (auto& singledamage : damagetomob.second)
                 {
-                    write_int(singledamage.first);
-                    // add critical here
+                    write_int(damage_encoding::encode(
+                        singledamage.first, singledamage.second));
                 }
 
                 if (attack.skill != 5221004)
@@ -101,7 +102,8 @@ namespace jrc
     public:
         enum From : int8_t
         {
-            TOUCH = -1
+            TOUCH = -1,
+            ATTACK_1 = 0
         };
 
         TakeDamagePacket(int8_t from, uint8_t element, int32_t damage,
@@ -119,6 +121,10 @@ namespace jrc
         // From mob attack result.
         TakeDamagePacket(const MobAttackResult& result, From from)
             : TakeDamagePacket(from, 0, result.damage, result.mobid, result.oid, result.direction) {}
+
+        TakeDamagePacket(const MobAttackResult& result, uint8_t attack_index)
+            : TakeDamagePacket(static_cast<int8_t>(attack_index), 0, result.damage,
+                               result.mobid, result.oid, result.direction) {}
     };
 
 

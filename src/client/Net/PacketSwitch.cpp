@@ -144,12 +144,16 @@ namespace jrc
         SPAWN_MOB_C       = 238,
         MOB_MOVED         = 239,
         MOVE_MOB_RESPONSE = 240,
+        APPLY_MOB_STATUS   = 242,
+        CANCEL_MOB_STATUS  = 243,
         SHOW_MOB_HP       = 250,
         SPAWN_NPC         = 257,
         SPAWN_NPC_C       = 259,
         MAKE_NPC_SCRIPTED = 263,
         DROP_LOOT         = 268,
         REMOVE_LOOT       = 269,
+        SPAWN_MIST        = 273,
+        REMOVE_MIST       = 274,
         SPAWN_REACTOR     = 279,
         REMOVE_REACTOR    = 280,
 
@@ -204,10 +208,15 @@ namespace jrc
         emplace<SPAWN_MOB, SpawnMobHandler>();
         emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
         emplace<MOB_MOVED, MobMovedHandler>();
+        emplace<MOVE_MOB_RESPONSE, MoveMobResponseHandler>();
+        emplace<APPLY_MOB_STATUS, ApplyMobStatusHandler>();
+        emplace<CANCEL_MOB_STATUS, CancelMobStatusHandler>();
         emplace<SHOW_MOB_HP, ShowMobHpHandler>();
         emplace<KILL_MOB, KillMobHandler>();
         emplace<DROP_LOOT, DropLootHandler>();
         emplace<REMOVE_LOOT, RemoveLootHandler>();
+        emplace<SPAWN_MIST, SpawnMistHandler>();
+        emplace<REMOVE_MIST, RemoveMistHandler>();
         emplace<SPAWN_REACTOR, SpawnReactorHandler>();
         emplace<REMOVE_REACTOR, RemoveReactorHandler>();
 
@@ -260,7 +269,6 @@ namespace jrc
         emplace<CASHSHOP_OPERATION, CashShopOperationHandler>();
 
         // TODO
-        emplace<MOVE_MOB_RESPONSE, NullHandler>();
         emplace<MEMO_RESULT, NullHandler>();
         emplace<ENABLE_REPORT, NullHandler>();
         emplace<FAMILY_INFO_RESULT, NullHandler>();

@@ -985,7 +985,7 @@ projectile         int     0 for melee
   mobOid           int     Object ID of the mob
   [byte]           byte    0
   [Per hit line:]
-    damage         int     Damage dealt (or negative for miss/critical indicators)
+    damage         int     Bit 31 marks a critical hit; bits 0–30 contain non-negative damage
 ```
 
 ---
@@ -1028,7 +1028,7 @@ damage     int    Damage dealt
 ```
 Field          Type   Notes
 [int]          int    Client timestamp (ignored)
-damagefrom     byte   Attack type: -1 = touch dmg, -2 = mob skill, -3 = fall dmg, -4 = poison/DoT field
+damagefrom     byte   -1=touch, 0–8=authorized attack1–attack9, -2=legacy mob skill, -3=fall, -4=poison/DoT
 element        byte   Elemental type of the attack
 damage         int    Amount of damage taken
 [If damagefrom != -3 and != -4:]
@@ -1037,7 +1037,10 @@ damage         int    Amount of damage taken
   direction    byte   Direction the attack came from
 ```
 
-Server validates, applies damage to character HP/MP, and rebroadcasts `DAMAGE_PLAYER` (0xC0) to all players on the map.
+For normal mob actions (`damagefrom` 0–8), the server requires an unexpired
+attack window for the same mob/action, validates WZ range again, and permits at
+most one hit per character. It then applies HP/MP damage and rebroadcasts
+`DAMAGE_PLAYER` (0xC0) to all players on the map.
 
 ---
 
@@ -2113,16 +2116,24 @@ quickslots  int[8]   Eight quick-slot bindings (skill/item IDs, 0 = empty)
 Field           Type    Notes
 mobOid          int     Monster object ID
 moveId          short   Movement sequence number
-skillPossible   bool    Can the monster use a skill now?
-skill           byte    Skill flag
-skillId         byte    Skill type ID
+optionNibbles   byte    Non-zero prevents a new skill suggestion
+rawActivity     byte    24–41=attack1–attack9; 42–59=skill action1–action9; low bit is facing
+skillId         byte    Mob skill ID when rawActivity is a skill action
 skillLevel      byte    Skill level
 pOption         short   Movement option flags
+[reserved]      byte[8] Legacy movement metadata
+[reserved]      byte    Legacy movement metadata
+clientTick      int     Client tick value
 startPos        pos     Monster starting position
 movementData    byte[]  Movement fragment list
 ```
 
-Server validates and responds with `MOVE_MONSTER_RESPONSE` (0xF0).
+The server accepts this packet only from the current controller and only when
+`moveId` advances monotonically (including 16-bit wraparound). Normal attacks
+are checked against WZ range, MP, cooldown and the current busy window. Skills
+must exactly consume the one-use suggestion from the preceding
+`MOVE_MONSTER_RESPONSE`. The server responds with `MOVE_MONSTER_RESPONSE`
+(0xF0) after every accepted movement.
 
 ---
 
@@ -2496,6 +2507,10 @@ updateMask   int    Bitmask of which stats changed (see §12)
 
 **Purpose:** Applies a buff or debuff to the local character.
 
+Values are serialized and consumed in first-mask then second-mask order, with
+the active bits in each mask ordered from least to most significant. Unknown
+local buff bits are rejected instead of allowing the remainder to misalign.
+
 ```
 Field          Type    Notes
 firstMask      long    Bitmask for first 64 buff stats
@@ -2537,7 +2552,8 @@ secondMask   long   Buff stat second mask
 [byte]       byte   1
 ```
 
-For debuff cancellation, firstMask = 0 and secondMask contains the disease mask.
+For debuff cancellation, either mask can contain disease bits. Potion lock,
+shadow and fear use `firstMask`; legacy diseases use `secondMask`.
 
 ---
 
@@ -3357,7 +3373,7 @@ Field           Type   Notes
 mobOid          int
 [byte]          byte   0
 skillPossible   bool
-skill           byte
+rawActivity     byte   Same attack/skill action encoding as MOVE_LIFE
 skillId         byte
 skillLevel      byte
 pOption         short
@@ -3375,11 +3391,15 @@ startPos        pos
 Field       Type   Notes
 mobOid      int
 moveId      short  Movement sequence number echoed back
-useSkills   bool
+hasAggro    bool   Server-authoritative controller aggro state
 currentMp   short  Monster's current MP
-skillId     byte   Skill to use (0 if none)
+skillId     byte   One-use authorized skill suggestion (0 if none)
 skillLevel  byte
 ```
+
+The suggestion is bound to `moveId`, controller identity, WZ action, MP,
+cooldown, HP threshold and range. It can only be consumed by a later accepted
+movement sequence.
 
 ---
 
@@ -3397,6 +3417,10 @@ mobOid     int
   duration short   -1 (display only)
 [reflect]  —       Optional pCounter/mCounter/nCounterProb if reflect is active
 ```
+
+Per-status entries use canonical mask order: ascending bits from the first
+mask, followed by ascending bits from the second mask. Consumers must not
+depend on map insertion order.
 
 ---
 
@@ -3545,13 +3569,16 @@ objectId    int
 ```
 Field       Type   Notes
 mistOid     int
-isMobMist   bool   True if spawned by a monster, false if by player
-sourceId    int    Skill/mob ID
+mistType    int    0=mob, 1=player poison, 2=smokescreen, 4=recovery
+ownerCid    int    Owning character ID, or mob owner encoding
+skillId     int    Source skill ID
+skillLevel  byte   Source skill level
+skillDelay  short  WZ visual delay
 posLeft     int    Bounding box left
 posTop      int    Bounding box top
 posRight    int    Bounding box right
 posBottom   int    Bounding box bottom
-[short]     short  Remaining duration (seconds)
+[int]       int    Reserved, 0
 ```
 
 ---
@@ -4269,6 +4296,20 @@ Notable buffs:
 | BODY_PRESSURE     | Aran Body Pressure counter          |
 | COMBO_BARRIER     | Aran Combo Barrier (dmg reduction)  |
 
+Mob disease masks used by this client/server pair:
+
+| Mask half | Value               | Name        | Runtime effect |
+|-----------|---------------------|-------------|----------------|
+| first     | 0x0000080000000000  | POTION_LOCK | Blocks restorative/cleanse consumables and pet auto-pot |
+| first     | 0x0000100000000000  | SHADOW      | Damages the player once per stationary second |
+| first     | 0x0000200000000000  | FEAR        | Restricts the visible viewport |
+| second    | 0x0000000000000001  | SLOW        | Reduces movement speed |
+| second    | 0x0000000000000080  | SEDUCE      | Blocks player actions/skills |
+| second    | 0x0000000000004000  | ZOMBIFY     | Reduces healing effectiveness |
+| second    | 0x0000000000080000  | CONFUSE     | Reverses horizontal input |
+| second    | 0x4000000000000000  | WEAKEN      | Blocks jumping |
+| second    | 0x8000000000000000  | CURSE       | Applies the legacy EXP penalty |
+
 ### Monster Status Bits (MonsterStatus — used in APPLY_MONSTER_STATUS)
 
 Stored as 4 × int32 (128 bits):
@@ -4295,6 +4336,7 @@ Stored as 4 × int32 (128 bits):
 | SHADOW_WEB       | Slowed movement                      |
 | WEAPON_IMMUNITY  | Immune to physical attacks           |
 | MAGIC_IMMUNITY   | Immune to magic attacks              |
+| HARD_SKIN        | Accepts critical damage only          |
 
 ---
 
