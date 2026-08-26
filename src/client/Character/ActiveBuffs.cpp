@@ -65,6 +65,8 @@ namespace jrc
         buffs[Buffstat::MDEF] = std::make_unique<SimpleStatBuff<Equipstat::MDEF>>();
         buffs[Buffstat::SPEED] = std::make_unique<SimpleStatBuff<Equipstat::SPEED>>();
         buffs[Buffstat::JUMP] = std::make_unique<SimpleStatBuff<Equipstat::JUMP>>();
+        buffs[Buffstat::SLOW] = std::make_unique<SimpleStatBuff<Equipstat::SPEED>>();
+        buffs[Buffstat::DARKNESS] = std::make_unique<SimpleStatBuff<Equipstat::ACC>>();
         buffs[Buffstat::HYPERBODYHP] = std::make_unique<PercentageStatBuff<Equipstat::HP>>();
         buffs[Buffstat::HYPERBODYMP] = std::make_unique<PercentageStatBuff<Equipstat::MP>>();
     }

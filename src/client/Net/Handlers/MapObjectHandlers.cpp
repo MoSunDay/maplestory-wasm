@@ -18,7 +18,7 @@
 #include "MapObjectHandlers.h"
 
 #include "Helpers/LoginParser.h"
-#include "Helpers/ForeignBuffMask.h"
+#include "Helpers/BuffMaskOrder.h"
 #include "Helpers/MovementParser.h"
 #include "../Protocol/SpawnMobPayload.h"
 #include "../Protocol/SpawnPlayerHeader.h"
@@ -282,7 +282,7 @@ namespace jrc
         // Parse the complete packet before mutating character state. A
         // truncated packet must not leave half of a multi-buff update applied.
         auto collect_mask_values = [&](uint64_t mask, bool first) {
-            for (uint64_t flag : foreign_buff::ordered_flags(mask))
+            for (uint64_t flag : buff_mask::ordered_flags(mask))
             {
                 int16_t value = recv.read_short();
                 if (!first && flag == Buffstat::second_codes.at(Buffstat::COMBO))
@@ -362,18 +362,95 @@ namespace jrc
     {
         int32_t oid = recv.read_int();
 
-        recv.read_byte();
-        recv.read_byte(); // useskill
-        recv.read_byte(); // skill
-        recv.read_byte(); // skill 1
-        recv.read_byte(); // skill 2
-        recv.read_byte(); // skill 3
-        recv.read_byte(); // skill 4
+        recv.read_byte(); // reserved
+        recv.read_byte(); // can use a skill on the next movement
+        uint8_t raw_activity = recv.read_byte();
+        uint8_t skill_id = recv.read_byte();
+        uint8_t skill_level = recv.read_byte();
+        recv.read_short(); // option
 
         Point<int16_t> position = recv.read_point();
         std::vector<Movement> movements = MovementParser::parse_movements(recv);
 
-        Stage::get().get_mobs().send_movement(oid, position, std::move(movements));
+        Stage::get().get_mobs().send_movement(
+            oid, position, raw_activity, skill_id, skill_level, std::move(movements));
+    }
+
+    void MoveMobResponseHandler::handle(InPacket& recv) const
+    {
+        const int32_t oid = recv.read_int();
+        const int16_t moveid = recv.read_short();
+        const bool aggro = recv.read_bool();
+        recv.read_short(); // authoritative MP; the client only consumes suggestions
+        const uint8_t skill_id = recv.read_byte();
+        const uint8_t skill_level = recv.read_byte();
+        Stage::get().get_mobs().suggest_skill(
+            oid, moveid, aggro, skill_id, skill_level);
+    }
+
+    void ApplyMobStatusHandler::handle(InPacket& recv) const
+    {
+        const int32_t oid = recv.read_int();
+        recv.skip(8);
+        const uint32_t first_mask = static_cast<uint32_t>(recv.read_int());
+        const uint32_t second_mask = static_cast<uint32_t>(recv.read_int());
+        const size_t status_count = static_cast<size_t>(
+            __builtin_popcount(first_mask) + __builtin_popcount(second_mask));
+        if (recv.length() < status_count * 8 + 5)
+        {
+            throw PacketError("Truncated APPLY_MONSTER_STATUS payload");
+        }
+
+        std::vector<int16_t> values;
+        values.reserve(status_count);
+        for (size_t index = 0; index < status_count; ++index)
+        {
+            values.push_back(recv.read_short());
+            const uint16_t source_low = static_cast<uint16_t>(recv.read_short());
+            const uint16_t source_high = static_cast<uint16_t>(recv.read_short());
+            recv.read_short();
+            if (source_low >= 100 && source_low <= 200 && source_high > 0 && source_high < 100)
+            {
+                Stage::get().get_mobs().show_status_skill(
+                    oid, source_low, source_high);
+            }
+        }
+        Stage::get().get_mobs().apply_status(oid, first_mask, second_mask, values);
+    }
+
+    void CancelMobStatusHandler::handle(InPacket& recv) const
+    {
+        const int32_t oid = recv.read_int();
+        recv.skip(8);
+        const uint32_t first_mask = static_cast<uint32_t>(recv.read_int());
+        const uint32_t second_mask = static_cast<uint32_t>(recv.read_int());
+        Stage::get().get_mobs().cancel_status(oid, first_mask, second_mask);
+    }
+
+    void SpawnMistHandler::handle(InPacket& recv) const
+    {
+        if (recv.length() < 39)
+        {
+            throw PacketError("Truncated SPAWN_MIST payload");
+        }
+        const int32_t oid = recv.read_int();
+        const int32_t type = recv.read_int();
+        const int32_t owner = recv.read_int();
+        const int32_t skill = recv.read_int();
+        const uint8_t level = static_cast<uint8_t>(recv.read_byte());
+        recv.read_short();
+        const int32_t left = recv.read_int();
+        const int32_t top = recv.read_int();
+        const int32_t right = recv.read_int();
+        const int32_t bottom = recv.read_int();
+        recv.read_int();
+        Stage::get().get_mists().spawn(
+            oid, type, owner, skill, level, left, top, right, bottom);
+    }
+
+    void RemoveMistHandler::handle(InPacket& recv) const
+    {
+        Stage::get().get_mists().remove(recv.read_int());
     }
 
 

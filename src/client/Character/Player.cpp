@@ -494,7 +494,8 @@ namespace jrc
 
     MobAttackResult Player::damage(const MobAttack& attack)
     {
-        int32_t damage = stats.calculate_damage(attack.watk);
+        const bool magic = attack.type == Attack::MAGIC;
+        int32_t damage = stats.calculate_damage(magic ? attack.matk : attack.watk, magic);
         show_damage(damage);
 
         bool fromleft = attack.origin.x() > phobj.get_x();

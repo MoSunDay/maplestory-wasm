@@ -16,14 +16,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Stage.h"
-#include "Input/ActionTrigger.h"
 
-#include "../Audio/Audio.h"
 #include "../Data/ItemData.h"
-#include "../IO/KeyAction.h"
 #include "../IO/Messages.h"
 #include "../IO/UI.h"
 #include "../IO/UITypes/UIStatusBar.h"
+#include "../Graphics/GraphicsGL.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/PetPackets.h"
@@ -32,13 +30,12 @@
 
 #include "nlnx/nx.hpp"
 
-#include <chrono>
+#include <algorithm>
 
 namespace jrc
 {
     namespace
     {
-        constexpr uint32_t PICKUP_INTERVAL_MS = 100;
         constexpr uint16_t PET_LOOT_WAIT_FRAMES = 45;
         constexpr uint16_t PET_LOOT_RETRY_FRAMES = 45;
         constexpr uint8_t PET_MOVEMENT_SYNC_FRAMES = 6;
@@ -103,6 +100,7 @@ namespace jrc
         npcs.clear();
         mobs.clear();
         drops.clear();
+        mists.clear();
         reactors.clear();
         pet_loot_target_oid = 0;
         pet_loot_target_frames = 0;
@@ -166,6 +164,10 @@ namespace jrc
         for (auto id : Layer::IDs)
         {
             tilesobjs.draw(id, viewpos, alpha);
+            if (id == Layer::ONE)
+            {
+                mists.draw(viewx, viewy);
+            }
             reactors.draw(id, viewx, viewy, alpha);
             npcs.draw(id, viewx, viewy, alpha);
             mobs.draw(id, viewx, viewy, alpha);
@@ -177,6 +179,23 @@ namespace jrc
         portals.draw(viewpos, alpha);
         backgrounds.drawforegrounds(viewx, viewy, alpha);
         effect.draw();
+
+        if (player.has_buff(Buffstat::FEAR))
+        {
+            const int16_t width = Constants::viewwidth();
+            const int16_t height = Constants::viewheight();
+            const int16_t center_x = static_cast<int16_t>(player.get_position().x() + viewx);
+            const int16_t center_y = static_cast<int16_t>(player.get_position().y() + viewy);
+            const int16_t left = std::clamp<int16_t>(center_x - 200, 0, width);
+            const int16_t right = std::clamp<int16_t>(center_x + 200, 0, width);
+            const int16_t top = std::clamp<int16_t>(center_y - 200, 0, height);
+            const int16_t bottom = std::clamp<int16_t>(center_y + 200, 0, height);
+            GraphicsGL& graphics = GraphicsGL::get();
+            graphics.drawrectangle(0, -Constants::VIEWYOFFSET, width, top, 0, 0, 0, 0.92f);
+            graphics.drawrectangle(0, top, left, bottom - top, 0, 0, 0, 0.92f);
+            graphics.drawrectangle(right, top, width - right, bottom - top, 0, 0, 0, 0.92f);
+            graphics.drawrectangle(0, bottom, width, height - bottom, 0, 0, 0, 0.92f);
+        }
     }
 
     void Stage::update()
@@ -198,7 +217,7 @@ namespace jrc
 
         reactors.update(physics);
         npcs.update(physics);
-        mobs.update(physics);
+        mobs.update(physics, player.get_position());
         chars.update(physics);
         drops.update(physics);
         player.update(physics);
@@ -217,8 +236,16 @@ namespace jrc
         portals.update(player.get_position());
         camera.update(player.get_position());
 
+        MobAttack action_attack = mobs.poll_action_attack(player.get_position());
         if (player.is_invincible())
         {
+            return;
+        }
+
+        if (action_attack)
+        {
+            MobAttackResult result = player.damage(action_attack);
+            TakeDamagePacket(result, result.attack_index).dispatch();
             return;
         }
 
@@ -228,36 +255,6 @@ namespace jrc
             {
                 MobAttackResult result = player.damage(attack);
                 TakeDamagePacket(result, TakeDamagePacket::TOUCH).dispatch();
-            }
-        }
-    }
-
-    void Stage::handle_held_actions()
-    {
-        if (!playable)
-        {
-            return;
-        }
-
-        // Jump remains a held action. Attacks are edge-triggered in send_key;
-        // repeating them here makes a single press restart combat forever if
-        // a browser or focus transition loses the corresponding key-up event.
-        if (player.is_key_down(KeyAction::JUMP))
-        {
-            playable->send_action(KeyAction::JUMP, true);
-        }
-
-        // Time-based pickup retry system
-        if (player.is_key_down(KeyAction::PICKUP))
-        {
-            uint64_t current_time =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch()).count();
-
-            if (current_time - last_pickup_time >= PICKUP_INTERVAL_MS)
-            {
-                last_pickup_time = current_time;
-                check_drops();
             }
         }
     }
@@ -278,110 +275,6 @@ namespace jrc
     size_t Stage::count_active_named_objects(const std::string& name) const
     {
         return tilesobjs.count_active_named_objects(name);
-    }
-
-    void Stage::check_portals()
-    {
-        if (player.is_attacking())
-        {
-            return;
-        }
-
-        Point<int16_t> playerpos  = player.get_position();
-        Portal::WarpInfo warpinfo = portals.find_warp_at(playerpos);
-        if (warpinfo.intramap)
-        {
-            Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname);
-            Point<int16_t> startpos   = physics.get_y_below(spawnpoint);
-            player.respawn(startpos, mapinfo.is_underwater());
-        }
-        else if (warpinfo.valid)
-        {
-            ChangeMapPacket(false, -1, warpinfo.name, false).dispatch();
-            if (warpinfo.has_target_map())
-            {
-                player.get_stats().set_mapid(warpinfo.mapid);
-            }
-            Sound(Sound::PORTAL).play();
-        }
-    }
-
-    void Stage::check_seats()
-    {
-        if (player.is_sitting() || player.is_attacking())
-        {
-            return;
-        }
-
-        Optional<const Seat> seat = mapinfo.findseat(player.get_position());
-        player.set_seat(seat);
-    }
-
-    void Stage::check_ladders(bool up)
-    {
-        if (player.is_climbing() || player.is_attacking())
-        {
-            return;
-        }
-
-        Optional<const Ladder> ladder = mapinfo.findladder(player.get_position(), up);
-        player.set_ladder(ladder);
-    }
-
-    void Stage::handle_directional_context(KeyAction::Id action, bool down)
-    {
-        if (!down)
-        {
-            return;
-        }
-
-        switch (action)
-        {
-        case KeyAction::UP:
-            check_ladders(true);
-            check_portals();
-            break;
-        case KeyAction::DOWN:
-            check_ladders(false);
-            break;
-        case KeyAction::LEFT:
-        case KeyAction::RIGHT:
-            // Re-evaluate ladder attachment using the currently held vertical intent
-            // so mixed directional combos behave the same regardless of press order.
-            if (player.is_key_down(KeyAction::UP))
-            {
-                check_ladders(true);
-            }
-            else if (player.is_key_down(KeyAction::DOWN))
-            {
-                check_ladders(false);
-            }
-            break;
-        default:
-            break;
-        }
-    }
-
-    void Stage::update_directional_context()
-    {
-        if (player.is_key_down(KeyAction::UP))
-        {
-            check_ladders(true);
-        }
-        else if (player.is_key_down(KeyAction::DOWN))
-        {
-            check_ladders(false);
-        }
-    }
-
-    void Stage::check_drops()
-    {
-        Point<int16_t> playerpos = player.get_position();
-        MapDrops::Loot loot      = drops.find_loot_at(playerpos);
-        if (loot.first)
-        {
-            PickupItemPacket(loot.first, loot.second).dispatch();
-        }
     }
 
     void Stage::update_pet_automation()
@@ -503,110 +396,6 @@ namespace jrc
         }
     }
 
-    bool Stage::is_intro_input_locked() const
-    {
-        return effect.blocks_player_input();
-    }
-
-    void Stage::release_actions()
-    {
-        if (!playable)
-        {
-            return;
-        }
-
-        static constexpr std::array<KeyAction::Id, 8> RELEASABLE_ACTIONS =
-        {
-            KeyAction::LEFT,
-            KeyAction::RIGHT,
-            KeyAction::UP,
-            KeyAction::DOWN,
-            KeyAction::JUMP,
-            KeyAction::ATTACK,
-            KeyAction::PICKUP,
-            KeyAction::SIT
-        };
-
-        for (KeyAction::Id action : RELEASABLE_ACTIONS)
-        {
-            if (player.is_key_down(action))
-            {
-                playable->send_action(action, false);
-            }
-        }
-    }
-
-    void Stage::send_key(KeyType::Id type, int32_t action, bool down)
-    {
-        if (state != ACTIVE || !playable)
-        {
-            return;
-        }
-
-        if (is_intro_input_locked())
-        {
-            switch (type)
-            {
-            case KeyType::ACTION:
-            case KeyType::SKILL:
-            case KeyType::ITEM:
-            case KeyType::FACE:
-                return;
-            default:
-                break;
-            }
-        }
-
-        switch (type)
-        {
-        case KeyType::ACTION:
-        {
-            KeyAction::Id keyaction = KeyAction::actionbyid(action);
-            bool repeated_hold = down && player.is_key_down(keyaction);
-
-            handle_directional_context(keyaction, down);
-            if (action_trigger::pressed_once(down, repeated_hold))
-            {
-                switch (action)
-                {
-                case KeyAction::SIT:
-                    check_seats();
-                    break;
-                case KeyAction::ATTACK:
-                    combat.use_move(0);
-                    break;
-                case KeyAction::PICKUP:
-                    // Immediate pickup on key press
-                    check_drops();
-                    break;
-                case KeyAction::NPCCHAT:
-                    npcs.talk_to_nearest(player.get_position());
-                    break;
-                default:
-                    break;
-                }
-            }
-
-            if (!repeated_hold || (keyaction != KeyAction::ATTACK && keyaction != KeyAction::JUMP))
-            {
-                playable->send_action(keyaction, down);
-            }
-            break;
-        }
-        case KeyType::SKILL:
-            combat.use_move(action);
-            break;
-        case KeyType::ITEM:
-            player.use_item(action);
-            break;
-        case KeyType::FACE:
-            player.set_expression(action);
-            break;
-        default:
-            break;
-        }
-    }
-
     Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
     {
         if (state != ACTIVE)
@@ -658,6 +447,11 @@ namespace jrc
     MapDrops& Stage::get_drops()
     {
         return drops;
+    }
+
+    MapMists& Stage::get_mists()
+    {
+        return mists;
     }
 
     Player& Stage::get_player()

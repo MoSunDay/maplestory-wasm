@@ -18,6 +18,7 @@
 #include "AttackHandlers.h"
 
 #include "../../Character/SkillId.h"
+#include "../../Gameplay/MobCombat/DamageEncoding.h"
 #include "../../Gameplay/Stage.h"
 
 #include <unordered_map>
@@ -64,9 +65,9 @@ namespace jrc
             uint8_t length = (attack.skill == SkillId::MESO_EXPLOSION) ? recv.read_byte() : attack.hitcount;
             for (uint8_t j = 0; j < length; j++)
             {
-                int32_t damage = recv.read_int();
-                bool critical = false; // todo
-                auto singledamage = std::make_pair(damage, critical);
+                const damage_encoding::Decoded decoded =
+                    damage_encoding::decode(recv.read_int());
+                auto singledamage = std::make_pair(decoded.damage, decoded.critical);
                 attack.damagelines[oid].push_back(singledamage);
             }
         }
