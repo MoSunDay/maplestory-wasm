@@ -23,6 +23,7 @@
 #include "../Spawn.h"
 
 #include <queue>
+#include <optional>
 
 
 namespace jrc
@@ -82,6 +83,9 @@ namespace jrc
         Point<int16_t> get_mob_head_position(int32_t oid) const;
         // Return the number of instantiated mobs on the map.
         size_t size() const;
+        // Return the horizontally closest live mob on the same platform band.
+        std::optional<Point<int16_t>> find_nearest_position(
+            Point<int16_t> origin, int16_t max_vertical_distance) const;
 
     private:
         std::vector<int32_t> find_closest(Rectangle<int16_t> range, Point<int16_t> origin, uint8_t mobcount) const;

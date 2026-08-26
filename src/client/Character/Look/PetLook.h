@@ -89,7 +89,7 @@ namespace jrc
         PhysicsObject phobj;
         std::optional<Point<int16_t>> loot_target;
         Text namelabel;
-        Point<int16_t> last_progress_position;
+        int32_t last_progress_distance = 0;
         uint16_t stalled_frames = 0;
         bool urgent_movement = false;
     };

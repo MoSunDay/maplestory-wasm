@@ -323,8 +323,17 @@ export class BrowserDriver {
   }
 
   async stop() {
+    const exited = this.process?.exitCode !== null
+      ? Promise.resolve()
+      : new Promise(resolve => this.process?.once('exit', resolve));
+    try {
+      await Promise.race([this.send('Browser.close'), sleep(2000)]);
+    } catch (error) {}
+    await Promise.race([exited, sleep(5000)]);
     try { this.socket?.close(); } catch (error) {}
-    try { this.process?.kill('SIGKILL'); } catch (error) {}
+    if (this.process?.exitCode === null) {
+      try { this.process.kill('SIGKILL'); } catch (error) {}
+    }
   }
 }
 

@@ -38,7 +38,6 @@ namespace jrc
         flip = st % 2 == 1;
         set_position(pos.x(), pos.y());
         phobj.fhid = static_cast<uint16_t>(std::max(fhid, 0));
-        last_progress_position = pos;
 
         namelabel = { Text::A13M, Text::CENTER, Text::WHITE, Text::NAMETAG, name };
 
@@ -93,11 +92,12 @@ namespace jrc
         case MOVE:
         {
             Point<int16_t> followpos = loot_target.value_or(charpos);
+            int32_t follow_distance = curpos.distance(followpos);
             if (stance == MOVE)
             {
-                if (curpos.distance(last_progress_position) >= 4)
+                if (pet_follow::made_progress(last_progress_distance, follow_distance))
                 {
-                    last_progress_position = curpos;
+                    last_progress_distance = follow_distance;
                     stalled_frames = 0;
                 }
                 else if (stalled_frames < UINT16_MAX)
@@ -108,7 +108,7 @@ namespace jrc
             else
             {
                 stalled_frames = 0;
-                last_progress_position = curpos;
+                last_progress_distance = follow_distance;
             }
 
             pet_follow::Action action = pet_follow::decide({
@@ -219,7 +219,7 @@ namespace jrc
         if (!loot_target || loot_target->x() != position.x() || loot_target->y() != position.y())
         {
             stalled_frames = 0;
-            last_progress_position = phobj.get_position();
+            last_progress_distance = 0;
         }
         loot_target = position;
     }
@@ -227,6 +227,7 @@ namespace jrc
     void PetLook::clear_loot_target()
     {
         loot_target.reset();
+        last_progress_distance = 0;
     }
 
     void PetLook::apply_movement(const Movement& movement)
@@ -280,7 +281,7 @@ namespace jrc
         phobj.type = PhysicsObject::NORMAL;
         phobj.clear_flag(PhysicsObject::NOGRAVITY);
         stalled_frames = 0;
-        last_progress_position = position;
+        last_progress_distance = 0;
         urgent_movement = true;
         set_stance(WARP);
     }

@@ -38,6 +38,7 @@ namespace jrc
     }
 
     MapDrops::MapDrops()
+        : confirmed_pet_pickups(0)
     {
         lootenabled = false;
     }
@@ -108,10 +109,13 @@ namespace jrc
         spawns.emplace(std::move(spawn));
     }
 
-    void MapDrops::remove(int32_t oid, int8_t mode, const PhysicsObject* looter)
+    void MapDrops::remove(int32_t oid, int8_t mode, const PhysicsObject* looter,
+        bool local_pet_pickup)
     {
         if (Optional<Drop> drop = drops.get(oid))
         {
+            if (local_pet_pickup)
+                ++confirmed_pet_pickups;
             drop->expire(mode, looter);
         }
     }
@@ -119,6 +123,7 @@ namespace jrc
     void MapDrops::clear()
     {
         drops.clear();
+        confirmed_pet_pickups = 0;
     }
 
     void MapDrops::try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos, int32_t& closest_distance_sq, Loot& closest_loot) const
@@ -213,5 +218,15 @@ namespace jrc
     bool MapDrops::has_drop(int32_t oid) const
     {
         return static_cast<bool>(drops.get(oid));
+    }
+
+    size_t MapDrops::size() const
+    {
+        return drops.size();
+    }
+
+    uint32_t MapDrops::pet_pickup_count() const
+    {
+        return confirmed_pet_pickups;
     }
 }
