@@ -20,7 +20,9 @@
 #include "Mob.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <map>
 
 
@@ -339,5 +341,33 @@ namespace jrc
     size_t MapMobs::size() const
     {
         return mobs.size();
+    }
+
+    std::optional<Point<int16_t>> MapMobs::find_nearest_position(
+        Point<int16_t> origin, int16_t max_vertical_distance) const
+    {
+        const Mob* nearest = nullptr;
+        int32_t nearest_distance = std::numeric_limits<int32_t>::max();
+        for (const auto& entry : mobs)
+        {
+            const Mob* mob = static_cast<const Mob*>(entry.second.get());
+            if (!mob || !mob->is_alive())
+                continue;
+
+            Point<int16_t> position = mob->get_body_position();
+            if (std::abs(static_cast<int32_t>(position.y()) - origin.y()) >
+                max_vertical_distance)
+                continue;
+
+            int32_t distance = std::abs(static_cast<int32_t>(position.x()) - origin.x());
+            if (distance < nearest_distance)
+            {
+                nearest = mob;
+                nearest_distance = distance;
+            }
+        }
+        return nearest
+            ? std::optional<Point<int16_t>>(nearest->get_body_position())
+            : std::nullopt;
     }
 }

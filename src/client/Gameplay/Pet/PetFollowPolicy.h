@@ -24,4 +24,5 @@ namespace jrc::pet_follow
     };
 
     Action decide(const Inputs& inputs);
+    bool made_progress(int32_t previous_distance, int32_t current_distance);
 }

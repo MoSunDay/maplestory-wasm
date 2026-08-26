@@ -431,6 +431,18 @@ namespace jrc
         }
     }
 
+    int32_t UIShop::visible_buy_item(int16_t row) const
+    {
+        return buystate.visible_item(row);
+    }
+
+    Point<int16_t> UIShop::visible_buy_center(int16_t row) const
+    {
+        if (row < 0 || row >= 5)
+            return { -32768, -32768 };
+        return position + Point<int16_t>(108, static_cast<int16_t>(134 + 42 * row));
+    }
+
     void UIShop::add_item(int32_t id,
                           int32_t price,
                           int32_t pitch,
@@ -637,6 +649,14 @@ namespace jrc
         {
             selection = slot;
         }
+    }
+
+    int32_t UIShop::BuyState::visible_item(int16_t row) const
+    {
+        int16_t slot = static_cast<int16_t>(row + offset);
+        return row >= 0 && row < 5 && slot >= 0 && slot < lastslot
+            ? items[slot].get_id()
+            : 0;
     }
 
 
