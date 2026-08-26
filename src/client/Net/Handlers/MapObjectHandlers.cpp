@@ -550,12 +550,14 @@ namespace jrc
         int32_t oid = recv.read_int();
 
         Optional<PhysicsObject> looter;
+        bool local_pet_pickup = false;
         if (mode > 1)
         {
             int32_t cid = recv.read_int();
             if (recv.length() > 0)
             {
                 recv.read_byte(); // pet
+                local_pet_pickup = mode == 5 && Stage::get().is_player(cid);
             }
             else if (auto character = Stage::get().get_character(cid))
             {
@@ -565,7 +567,7 @@ namespace jrc
             Sound(Sound::PICKUP).play();
         }
 
-        Stage::get().get_drops().remove(oid, mode, looter.get());
+        Stage::get().get_drops().remove(oid, mode, looter.get(), local_pet_pickup);
     }
 
 

@@ -5,6 +5,7 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/Pet/UIPetOptions.h"
+#include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 
 #include <cstdint>
@@ -81,6 +82,22 @@ extern "C"
         return static_cast<int>(jrc::Stage::get().get_mobs().size());
     }
 
+    int msnearest_mob_x()
+    {
+        auto& stage = jrc::Stage::get();
+        auto position = stage.get_mobs().find_nearest_position(
+            stage.get_player().get_position(), 100);
+        return position ? position->x() : MISSING_COORDINATE;
+    }
+
+    int msnearest_mob_y()
+    {
+        auto& stage = jrc::Stage::get();
+        auto position = stage.get_mobs().find_nearest_position(
+            stage.get_player().get_position(), 100);
+        return position ? position->y() : MISSING_COORDINATE;
+    }
+
     int mspet_active()
     {
         return jrc::Stage::get().get_player().get_pet(0) ? 1 : 0;
@@ -108,6 +125,61 @@ extern "C"
     {
         const auto* pet = jrc::Stage::get().get_player().get_pet(0);
         return pet && pet->has_loot_target() ? 1 : 0;
+    }
+
+    int mspet_confirmed_pickups()
+    {
+        return static_cast<int>(jrc::Stage::get().get_drops().pet_pickup_count());
+    }
+
+    int msdrop_count()
+    {
+        return static_cast<int>(jrc::Stage::get().get_drops().size());
+    }
+
+    int msplayer_hp()
+    {
+        return jrc::Stage::get().get_player().get_stats().get_stat(jrc::Maplestat::HP);
+    }
+
+    int msplayer_max_hp()
+    {
+        return jrc::Stage::get().get_player().get_stats().get_stat(jrc::Maplestat::MAXHP);
+    }
+
+    int msplayer_mp()
+    {
+        return jrc::Stage::get().get_player().get_stats().get_stat(jrc::Maplestat::MP);
+    }
+
+    int msplayer_max_mp()
+    {
+        return jrc::Stage::get().get_player().get_stats().get_stat(jrc::Maplestat::MAXMP);
+    }
+
+    int msplayer_meso()
+    {
+        return static_cast<int>(jrc::Stage::get().get_player().get_inventory().get_meso());
+    }
+
+    int mspet_auto_hp_item()
+    {
+        return jrc::Stage::get().get_pet_automation().get_hp_item();
+    }
+
+    int mspet_auto_mp_item()
+    {
+        return jrc::Stage::get().get_pet_automation().get_mp_item();
+    }
+
+    int mspet_auto_hp_threshold()
+    {
+        return jrc::Stage::get().get_pet_automation().get_hp_threshold();
+    }
+
+    int mspet_auto_mp_threshold()
+    {
+        return jrc::Stage::get().get_pet_automation().get_mp_threshold();
     }
 
     int mspet_options_active()
@@ -161,6 +233,29 @@ extern "C"
             ? statusbar->popup_action_center(jrc::StatusBarPopup::Action::ITEMS)
             : std::nullopt;
         return point ? point->y() : MISSING_COORDINATE;
+    }
+
+    int msshop_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::SHOP) ? 1 : 0;
+    }
+
+    int msshop_buy_item(int16_t row)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop ? shop->visible_buy_item(row) : 0;
+    }
+
+    int msshop_buy_x(int16_t row)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop ? shop->visible_buy_center(row).x() : MISSING_COORDINATE;
+    }
+
+    int msshop_buy_y(int16_t row)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop ? shop->visible_buy_center(row).y() : MISSING_COORDINATE;
     }
 
     int msinventory_quantity(int32_t item_id)

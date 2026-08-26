@@ -74,6 +74,10 @@ int main()
     ok &= expect(jrc::pet_follow::decide(Inputs{{ -32768, -32768 },
         { 32767, 32767 }, false, false, 0}) == Action::WARP,
         "follow distance remains safe at coordinate extremes");
+    ok &= expect(jrc::pet_follow::made_progress(120, 116),
+        "moving at least four pixels closer counts as progress");
+    ok &= expect(!jrc::pet_follow::made_progress(120, 121),
+        "moving without getting closer does not mask a stall");
     ok &= expect(!jrc::pet_loot::should_attempt(50, 0, true),
         "server drop lock is respected");
     ok &= expect(jrc::pet_loot::should_attempt(55, 0, true),
