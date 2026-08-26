@@ -52,6 +52,8 @@ namespace jrc
             int32_t time, int16_t chargeprice, int16_t buyable);
 
         void modify(InventoryType::Id type);
+        int32_t visible_buy_item(int16_t row) const;
+        Point<int16_t> visible_buy_center(int16_t row) const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
@@ -156,6 +158,7 @@ namespace jrc
             void add(BuyItem item);
             void buy() const;
             void select(int16_t selected);
+            int32_t visible_item(int16_t row) const;
         };
         BuyState buystate;
 

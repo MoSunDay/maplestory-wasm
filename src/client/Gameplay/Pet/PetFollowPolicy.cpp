@@ -4,6 +4,13 @@
 
 namespace jrc::pet_follow
 {
+    bool made_progress(int32_t previous_distance, int32_t current_distance)
+    {
+        constexpr int32_t MINIMUM_PROGRESS = 4;
+        return previous_distance <= 0 ||
+            current_distance <= previous_distance - MINIMUM_PROGRESS;
+    }
+
     Action decide(const Inputs& inputs)
     {
         const int32_t dx = static_cast<int32_t>(inputs.target_position.x()) -

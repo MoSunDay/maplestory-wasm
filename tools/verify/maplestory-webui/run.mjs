@@ -2,6 +2,7 @@ import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
+import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
 import {
   createAssetIdleWaiter,
   createRuntimeProbes,
@@ -34,7 +35,8 @@ const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
 const requireMobs = process.env.E2E_REQUIRE_MOBS === '1';
 const routeTutorialMobMap = process.env.E2E_ROUTE_TUTORIAL_MOB_MAP === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
-const verifyPetOptions = process.env.E2E_PET_OPTIONS === '1';
+const petOptionsMode = process.env.E2E_PET_OPTIONS || '';
+const verifyPetOptions = ['1', 'configure', 'runtime'].includes(petOptionsMode);
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 
@@ -42,7 +44,9 @@ const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCre
 
 const driver = new BrowserDriver({
   binary: browserBinary,
-  debugPort
+  debugPort,
+  artifactDir: process.env.E2E_ARTIFACT_DIR || undefined,
+  profileDir: process.env.E2E_PROFILE_DIR || undefined
 });
 let passed = false;
 
@@ -57,6 +61,7 @@ async function requireState(name, predicate, timeoutSeconds = 30) {
   throw new Error(`Timed out: ${name}`);
 }
 
+const probes = createRuntimeProbes(driver);
 const {
   currentUiState, loginNoticeActive, loginNoticeMessage,
   characterCreationCustomizing, noticeActive, mapAssetLoading,
@@ -64,7 +69,7 @@ const {
   petStance, petHasLootTarget, petOptionsActive, petOptionsHpItem,
   petOptionsMpItem, petOptionsMenuX, petOptionsMenuY, itemsMenuX, itemsMenuY,
   inventorySlot, cashShopProbe
-} = createRuntimeProbes(driver);
+} = probes;
 
 function requireUiState(name, expected, timeoutSeconds = 30) {
   return requireState(name, async () => await currentUiState() === expected, timeoutSeconds);
@@ -678,71 +683,8 @@ try {
     }
 
     if (verifyPetOptions) {
-      await driver.click(400, 300);
-      await driver.key('Escape', 'Escape', 27);
-      await sleep(500);
-      await driver.screenshot('08e-pet-system-menu');
-      const optionsMenuPoint = { x: await petOptionsMenuX(), y: await petOptionsMenuY() };
-      if (!Number.isFinite(optionsMenuPoint.x) || !Number.isFinite(optionsMenuPoint.y) ||
-          optionsMenuPoint.x < 0 || optionsMenuPoint.y < 0)
-        throw new Error(`Pet options menu point unavailable: ${JSON.stringify(optionsMenuPoint)}`);
-      await driver.click(optionsMenuPoint.x, optionsMenuPoint.y);
-      await requireState('pet automation options active', async () =>
-        await petOptionsActive() === 1);
-      const selectedPotions = {
-        hp: await petOptionsHpItem(),
-        mp: await petOptionsMpItem()
-      };
-      if (selectedPotions.hp < 0 || selectedPotions.mp < 0) {
-        throw new Error(`Pet potion selectors unavailable: ${JSON.stringify(selectedPotions)}`);
-      }
-      await driver.screenshot('08f-pet-automation-options');
-      // UIPetOptions is centered in the 800x600 game viewport. Exercise the
-      // actual OK hit target so the acceptance path covers persisted settings,
-      // not only opening and dismissing the panel.
-      await driver.click(345, 516);
-      await requireState('pet automation options save and close', async () =>
-        await petOptionsActive() === 0);
-
-      if (await petActive() !== 1) {
-        const puppySlot = await inventorySlot(5000001);
-        if (puppySlot < 1 || puppySlot > 24) {
-          throw new Error(`Starter puppy is unavailable in the visible cash inventory: slot=${puppySlot}`);
-        }
-        await driver.click(711, 574);
-        await sleep(400);
-        await driver.screenshot('08h-pet-main-menu');
-        const itemsMenuPoint = { x: await itemsMenuX(), y: await itemsMenuY() };
-        if (!Number.isFinite(itemsMenuPoint.x) || !Number.isFinite(itemsMenuPoint.y) ||
-            itemsMenuPoint.x < 0 || itemsMenuPoint.y < 0)
-          throw new Error(`Items menu point unavailable: ${JSON.stringify(itemsMenuPoint)}`);
-        await driver.click(itemsMenuPoint.x, itemsMenuPoint.y);
-        await sleep(500);
-        await driver.screenshot('08i-pet-cash-inventory-before-tab');
-        await driver.click(438, 178);
-        await sleep(300);
-        await driver.screenshot('08j-pet-cash-inventory');
-        const puppyColumn = (puppySlot - 1) % 4;
-        const puppyRow = Math.floor((puppySlot - 1) / 4);
-        await driver.doubleClick(329 + puppyColumn * 36, 218 + puppyRow * 35);
-        await requireState('starter puppy summoned', async () => await petActive() === 1);
-        await driver.key('i', 'KeyI', 73, 'i');
-      }
-
-      const before = { playerX: await playerX(), petX: await petX() };
-      await driver.keyHold('ArrowRight', 'ArrowRight', 39, 2200);
-      await sleep(1500);
-      const after = {
-        playerX: await playerX(), playerY: await playerY(),
-        petX: await petX(), petY: await petY(), stance: await petStance(),
-        lootTarget: await petHasLootTarget()
-      };
-      const distance = Math.hypot(after.playerX - after.petX, after.playerY - after.petY);
-      if (after.playerX <= before.playerX || distance > 260) {
-        throw new Error(`Pet follow recovery failed: ${JSON.stringify({ before, after, distance })}`);
-      }
-      console.log(`PASS  pet options and follow recovery ${JSON.stringify({ selectedPotions, distance, after })}`);
-      await driver.screenshot('08g-pet-follow-recovered');
+      await verifyPetAutomationFlow(
+        driver, probes, requireState, petOptionsMode === '1' ? 'options' : petOptionsMode);
       throw new Error('__PET_OPTIONS_COMPLETE__');
     }
 
