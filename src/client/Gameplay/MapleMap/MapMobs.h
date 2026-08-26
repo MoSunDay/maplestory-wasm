@@ -34,7 +34,7 @@ namespace jrc
         // Draw all mobs on a layer.
         void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
         // Update all mobs.
-        void update(const Physics& physics);
+        void update(const Physics& physics, Point<int16_t> aggro_target);
         // Materialize queued spawns without advancing animation or physics.
         void instantiate_spawns();
 
@@ -50,7 +50,15 @@ namespace jrc
         // Update a mob's hp display.
         void send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel);
         // Update a mob's movements.
-        void send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement>&& movements);
+        void send_movement(int32_t oid, Point<int16_t> start, uint8_t raw_activity,
+                           uint8_t skill_id, uint8_t skill_level,
+                           std::vector<Movement>&& movements);
+        void suggest_skill(int32_t oid, int16_t moveid, bool aggro,
+                           uint8_t skill_id, uint8_t skill_level);
+        void apply_status(int32_t oid, uint32_t first_mask, uint32_t second_mask,
+                          const std::vector<int16_t>& values);
+        void cancel_status(int32_t oid, uint32_t first_mask, uint32_t second_mask);
+        void show_status_skill(int32_t oid, uint16_t skill_id, uint16_t skill_level);
 
         // Calculate the results of an attack.
         AttackResult send_attack(const Attack& attack);
@@ -64,6 +72,8 @@ namespace jrc
         int32_t find_colliding(const MovingObject& moveobj) const;
         // Create an attack by the specified mob.
         MobAttack create_attack(int32_t oid) const;
+        // Poll the first animated mob action which hits the local player.
+        MobAttack poll_action_attack(Point<int16_t> player_position);
         // Return the position of a mob.
         Point<int16_t> get_mob_position(int32_t oid) const;
         // Return the body-center position used for combat targeting.

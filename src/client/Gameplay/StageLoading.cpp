@@ -67,6 +67,7 @@ namespace jrc
 
     void Stage::begin_loading(std::function<void()> onready)
     {
+        release_actions();
         asset_generation = GraphicsGL::get().beginbitmapbatch();
         loading_ready = std::move(onready);
         state = LOADING;

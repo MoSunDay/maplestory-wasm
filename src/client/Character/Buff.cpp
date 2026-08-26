@@ -35,12 +35,17 @@ namespace jrc
             { ENERGY_CHARGE, 0x4000000000000L },
             { MONSTER_RIDING, 0x20000000000000L },
             { HOMING_BEACON, 0x80000000000000L },
-            { SPEED_INFUSION, 0x100000000000000L }
+            { SPEED_INFUSION, 0x100000000000000L },
+            { POTION_LOCK, 0x80000000000L },
+            { SHADOW, 0x100000000000L },
+            { FEAR, 0x200000000000L }
         };
 
         const std::unordered_map<Id, uint64_t> second_codes =
         {
             { NONE, 0x0 },
+            { SLOW, 0x1 },
+            { SEDUCE, 0x80 },
             { MORPH, 0x2 },
             { RECOVERY, 0x4 },
             { MAPLE_WARRIOR, 0x8 },
@@ -54,6 +59,7 @@ namespace jrc
             { BLIND, 0x1000 },
             { CONCENTRATE, 0x2000 },
             { ECHO_OF_HERO, 0x8000 },
+            { ZOMBIFY, 0x4000 },
             { GHOST_MORPH, 0x20000 },
             { AURA, 0x40000 },
             { CONFUSE, 0x80000 },
@@ -94,7 +100,8 @@ namespace jrc
             { PICKPOCKET, 0x800000000000000L },
             { PUPPET, 0x800000000000000L },
             { MESOGUARD, 0x1000000000000000L },
-            { WEAKEN, 0x4000000000000000L }
+            { WEAKEN, 0x4000000000000000L },
+            { CURSE, 0x8000000000000000L }
         };
     }
 }
