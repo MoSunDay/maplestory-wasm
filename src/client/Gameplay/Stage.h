@@ -129,6 +129,7 @@ namespace jrc
         void handle_directional_context(KeyAction::Id action, bool down);
         void update_directional_context();
         void check_drops();
+        void clear_pet_loot_target(PetLook* pet);
         void update_pet_automation();
         void update_pet_movement();
         void update_intro_warp();
@@ -161,6 +162,7 @@ namespace jrc
         Point<int16_t> pet_loot_target_position;
         uint16_t pet_loot_target_frames;
         uint16_t pet_loot_cooldown;
+        uint8_t pet_loot_attempts;
         uint8_t pet_movement_sync_frames;
 
         MapInfo mapinfo;

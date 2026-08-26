@@ -27,6 +27,7 @@
 #include "../Net/Packets/PetPackets.h"
 #include "../Util/Misc.h"
 #include "Pet/PetSettingsStore.h"
+#include "Pet/PetLootPolicy.h"
 
 #include "nlnx/nx.hpp"
 
@@ -36,8 +37,7 @@ namespace jrc
 {
     namespace
     {
-        constexpr uint16_t PET_LOOT_WAIT_FRAMES = 45;
-        constexpr uint16_t PET_LOOT_RETRY_FRAMES = 45;
+        constexpr uint16_t PET_LOOT_COOLDOWN_FRAMES = 45;
         constexpr uint8_t PET_MOVEMENT_SYNC_FRAMES = 6;
 
         int32_t current_party_id()
@@ -55,6 +55,7 @@ namespace jrc
         , pet_loot_target_oid(0)
         , pet_loot_target_frames(0)
         , pet_loot_cooldown(0)
+        , pet_loot_attempts(0)
         , pet_movement_sync_frames(0)
         , pending_intro_warp_mapid(-1)
         , pending_intro_warp_delay_ms(0)
@@ -105,6 +106,7 @@ namespace jrc
         pet_loot_target_oid = 0;
         pet_loot_target_frames = 0;
         pet_loot_cooldown = 0;
+        pet_loot_attempts = 0;
         pet_movement_sync_frames = 0;
         last_pet_movement = Movement();
     }
@@ -221,8 +223,8 @@ namespace jrc
         chars.update(physics);
         drops.update(physics);
         player.update(physics);
-        update_pet_automation();
         update_pet_movement();
+        update_pet_automation();
         if (is_intro_input_locked())
         {
             // Direction3-style intro scenes present the actor facing left and
@@ -277,6 +279,15 @@ namespace jrc
         return tilesobjs.count_active_named_objects(name);
     }
 
+    void Stage::clear_pet_loot_target(PetLook* pet)
+    {
+        if (pet)
+            pet->clear_loot_target();
+        pet_loot_target_oid = 0;
+        pet_loot_target_frames = 0;
+        pet_loot_attempts = 0;
+    }
+
     void Stage::update_pet_automation()
     {
         pet_automation.tick();
@@ -286,8 +297,7 @@ namespace jrc
         PetLook* pet = player.get_pet(0);
         if (!pet)
         {
-            pet_loot_target_oid = 0;
-            pet_loot_target_frames = 0;
+            clear_pet_loot_target(nullptr);
             return;
         }
 
@@ -322,17 +332,13 @@ namespace jrc
         bool has_boots = inventory.has_equipped_item(jrc::pet_automation::WING_BOOTS);
         if (!has_boots)
         {
-            pet->clear_loot_target();
-            pet_loot_target_oid = 0;
-            pet_loot_target_frames = 0;
+            clear_pet_loot_target(pet);
             return;
         }
 
         if (pet_loot_target_oid && !drops.has_drop(pet_loot_target_oid))
         {
-            pet->clear_loot_target();
-            pet_loot_target_oid = 0;
-            pet_loot_target_frames = 0;
+            clear_pet_loot_target(pet);
         }
 
         if (!pet_loot_target_oid && pet_loot_cooldown == 0)
@@ -352,6 +358,7 @@ namespace jrc
                 pet_loot_target_oid = target.oid;
                 pet_loot_target_position = target.position;
                 pet_loot_target_frames = 0;
+                pet_loot_attempts = 0;
                 pet->set_loot_target(target.position);
             }
         }
@@ -360,14 +367,17 @@ namespace jrc
             return;
 
         ++pet_loot_target_frames;
-        if (pet_loot_target_frames >= PET_LOOT_WAIT_FRAMES &&
-            pet->get_position().distance(pet_loot_target_position) <= 50)
+        bool pet_in_range = pet->get_position().distance(pet_loot_target_position) <= 50;
+        if (pet_loot::should_attempt(pet_loot_target_frames,
+            pet_loot_attempts, pet_in_range))
         {
             PetLootPacket(pet->get_uniqueid(), pet_loot_target_oid).dispatch();
-            pet->clear_loot_target();
-            pet_loot_target_oid = 0;
-            pet_loot_target_frames = 0;
-            pet_loot_cooldown = PET_LOOT_RETRY_FRAMES;
+            ++pet_loot_attempts;
+            if (pet_loot::attempts_exhausted(pet_loot_attempts))
+            {
+                clear_pet_loot_target(pet);
+                pet_loot_cooldown = PET_LOOT_COOLDOWN_FRAMES;
+            }
         }
     }
 
@@ -381,14 +391,16 @@ namespace jrc
             return;
         }
 
-        if (pet_movement_sync_frames > 0)
+        bool urgent = pet->consume_urgent_movement();
+        if (!urgent && pet_movement_sync_frames > 0)
         {
             --pet_movement_sync_frames;
             return;
         }
 
         Movement current = pet->get_movement();
-        if (last_pet_movement.type == Movement::NONE || last_pet_movement.hasmoved(current))
+        if (urgent || last_pet_movement.type == Movement::NONE ||
+            last_pet_movement.hasmoved(current))
         {
             MovePetPacket(pet->get_uniqueid(), current).dispatch();
             last_pet_movement = current;
