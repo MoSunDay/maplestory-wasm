@@ -290,6 +290,12 @@ namespace jrc
         popup.close();
     }
 
+    std::optional<Point<int16_t>> UIStatusbar::popup_action_center(
+        StatusBarPopup::Action action) const
+    {
+        return popup.action_center(action);
+    }
+
     void UIStatusbar::request_cash_shop()
     {
         if (cashshop_request_cooldown > 0)

@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace jrc::pet_automation
 {
@@ -49,6 +50,8 @@ namespace jrc::pet_automation
 
     uint8_t clamp_threshold(int32_t value);
     bool at_or_below_threshold(int32_t current, int32_t maximum, uint8_t threshold);
+    int32_t select_next_item(const std::vector<int32_t>& candidates,
+        int32_t current_item, int32_t direction);
 
     class Controller
     {

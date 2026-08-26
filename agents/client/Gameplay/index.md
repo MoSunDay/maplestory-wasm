@@ -1,4 +1,4 @@
-Commit: b2922f3eef7e2afa16fe954cee477d1ca3831e00
+Commit: 78a9f1bd7b0aa0588bf4b5f50325189cba261276
 
 # 游戏世界
 
@@ -58,8 +58,9 @@ Stage 内部组合了所有地图实体管理器。
 ### 宠物自动化 (`Pet/`)
 
 - `PetAutomation::Controller` 以无 UI、无网络依赖的纯状态机判断 HP/MP 阈值、能力门禁、单次药水请求和冷却；阈值固定钳制到 1%–99%。
+- `PetFollowPolicy` 以启停迟滞、垂直/距离上限和连续无进展帧数输出待机、左右移动或脱困传送；`PetLootPolicy` 把服务端 400ms 新掉落保护期、拾取重试间隔和最多三次尝试集中为纯时序规则。
 - `PetSettingsStore` 在 WASM 下把 HP/MP 阈值保存到浏览器本地存储，读取失败回到 50%，写入失败由调用方直接提示。
-- `Stage` 只驱动已召唤的首只宠物：选择有权限且匹配金币磁铁/物品袋能力的最近掉落，设置追踪目标并限频同步宠物移动；发出拾取或自动补给请求前仍以当前背包、能力和角色状态重新判断。
+- `Stage` 只驱动已召唤的首只宠物：选择有权限且匹配金币磁铁/物品袋能力的最近掉落，设置追踪目标并限频同步宠物移动；脱困位置会跳过常规限频立即同步，且移动同步先于同帧拾取请求。发出拾取或自动补给请求前仍以当前背包、能力和角色状态重新判断。
 
 ### Physics (`Physics.h`)
 
@@ -117,7 +118,8 @@ Stage::load(new_mapid)
 Stage::update_pet_automation()
 → PetAutomation::Controller 判断单次 HP/MP 请求
 → MapDrops 按掉落类型、归属与宠物能力选择目标
-→ PetLook 跟随目标并由 Stage 限频同步移动
+→ PetFollowPolicy 驱动 PetLook 迟滞跟随或脱困
+→ Stage 先同步移动，再按 PetLootPolicy 等待保护期并限次重试拾取
 → linked server 复核宠物身份、距离、归属、能力与实时库存后执行
 ```
 

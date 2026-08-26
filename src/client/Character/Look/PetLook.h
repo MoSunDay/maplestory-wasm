@@ -71,19 +71,26 @@ namespace jrc
         int32_t get_uniqueid() const;
         Point<int16_t> get_position() const;
         bool has_loot_target() const;
+        bool consume_urgent_movement();
         Movement get_movement() const;
         Stance get_stance() const;
 
     private:
-        int32_t itemid;
+        void reset_motion();
+        void warp_to(Point<int16_t> position);
+
+        int32_t itemid = 0;
         std::string name;
-        int32_t uniqueid;
-        Stance stance;
-        bool flip;
+        int32_t uniqueid = 0;
+        Stance stance = STAND;
+        bool flip = false;
 
         EnumMap<Stance, Animation> animations;
         PhysicsObject phobj;
         std::optional<Point<int16_t>> loot_target;
         Text namelabel;
+        Point<int16_t> last_progress_position;
+        uint16_t stalled_frames = 0;
+        bool urgent_movement = false;
     };
 }
