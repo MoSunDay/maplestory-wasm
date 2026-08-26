@@ -6,11 +6,21 @@
 int main()
 {
     using jrc::attack_effect::HitIndex;
+    using jrc::action_trigger::ProneJumpAction;
 
     assert(jrc::action_trigger::pressed_once(true, false));
     assert(!jrc::action_trigger::pressed_once(true, true));
     assert(!jrc::action_trigger::pressed_once(false, true));
     assert(!jrc::action_trigger::pressed_once(false, false));
+
+    assert(jrc::action_trigger::prone_jump_action(true, false, false) == ProneJumpAction::BLOCKED);
+    assert(jrc::action_trigger::prone_jump_action(true, false, true) == ProneJumpAction::BLOCKED);
+    assert(jrc::action_trigger::prone_jump_action(true, true, false) == ProneJumpAction::BLOCKED);
+    assert(jrc::action_trigger::prone_jump_action(true, true, true) == ProneJumpAction::BLOCKED);
+    assert(jrc::action_trigger::prone_jump_action(false, true, true) == ProneJumpAction::JUMP_DOWN);
+    assert(jrc::action_trigger::prone_jump_action(false, false, false) == ProneJumpAction::JUMP_UP);
+    assert(jrc::action_trigger::prone_jump_action(false, false, true) == ProneJumpAction::JUMP_UP);
+    assert(jrc::action_trigger::prone_jump_action(false, true, false) == ProneJumpAction::JUMP_UP);
 
     assert(!jrc::attack_effect::indexed_hit(1, 1, 1));
     assert(jrc::attack_effect::indexed_hit(2, 2, 6) == HitIndex::HIT);
