@@ -31,9 +31,16 @@ namespace jrc
         mobs.draw(layer, viewx, viewy, alpha);
     }
 
-    void MapMobs::update(const Physics& physics)
+    void MapMobs::update(const Physics& physics, Point<int16_t> aggro_target)
     {
         instantiate_spawns();
+        for (auto& entry : mobs)
+        {
+            if (Optional<Mob> mob = entry.second.get())
+            {
+                mob->set_aggro_target(aggro_target);
+            }
+        }
         mobs.update(physics);
     }
 
@@ -99,14 +106,54 @@ namespace jrc
         }
     }
 
-    void MapMobs::send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement>&& movements)
+    void MapMobs::send_movement(int32_t oid, Point<int16_t> start, uint8_t raw_activity,
+                                uint8_t skill_id, uint8_t skill_level,
+                                std::vector<Movement>&& movements)
     {
         if (Optional<Mob> mob = mobs.get(oid))
         {
             mob->send_movement(
-                start,
+                start, raw_activity, skill_id, skill_level,
                 std::move(movements)
             );
+        }
+    }
+
+    void MapMobs::suggest_skill(int32_t oid, int16_t moveid, bool aggro,
+                                uint8_t skill_id,
+                                uint8_t skill_level)
+    {
+        if (Optional<Mob> mob = mobs.get(oid))
+        {
+            mob->suggest_skill(moveid, aggro, skill_id, skill_level);
+        }
+    }
+
+    void MapMobs::apply_status(int32_t oid, uint32_t first_mask,
+                               uint32_t second_mask,
+                               const std::vector<int16_t>& values)
+    {
+        if (Optional<Mob> mob = mobs.get(oid))
+        {
+            mob->apply_status(first_mask, second_mask, values);
+        }
+    }
+
+    void MapMobs::cancel_status(int32_t oid, uint32_t first_mask,
+                                uint32_t second_mask)
+    {
+        if (Optional<Mob> mob = mobs.get(oid))
+        {
+            mob->cancel_status(first_mask, second_mask);
+        }
+    }
+
+    void MapMobs::show_status_skill(int32_t oid, uint16_t skill_id,
+                                    uint16_t skill_level)
+    {
+        if (Optional<Mob> mob = mobs.get(oid))
+        {
+            mob->show_status_skill(skill_id, skill_level);
         }
     }
 
@@ -236,6 +283,21 @@ namespace jrc
         {
             return {};
         }
+    }
+
+    MobAttack MapMobs::poll_action_attack(Point<int16_t> player_position)
+    {
+        for (auto& entry : mobs)
+        {
+            if (Optional<Mob> mob = entry.second.get())
+            {
+                if (MobAttack attack = mob->poll_action_attack(player_position))
+                {
+                    return attack;
+                }
+            }
+        }
+        return {};
     }
 
     Point<int16_t> MapMobs::get_mob_position(int32_t oid) const

@@ -75,16 +75,23 @@ namespace jrc
         int32_t mobid     = 0;
         int32_t oid       = 0;
         Point<int16_t> origin;
+        uint8_t attack_index = 0;
         bool valid = false;
 
-        // Create a mob attack for touch damage.
-        MobAttack(int32_t watk,
+        // Create a mob attack for touch or an animated mob action.
+        MobAttack(Attack::Type type,
+                  int32_t watk,
+                  int32_t matk,
                   Point<int16_t> origin,
                   int32_t mobid,
-                  int32_t oid)
-            : type(Attack::CLOSE), watk(watk), mobid(mobid), oid(oid),
-              origin(origin),      valid(true)
+                  int32_t oid,
+                  uint8_t attack_index = 0)
+            : type(type), watk(watk), matk(matk), mobid(mobid), oid(oid),
+              origin(origin), attack_index(attack_index), valid(true)
             {}
+
+        MobAttack(int32_t watk, Point<int16_t> origin, int32_t mobid, int32_t oid)
+            : MobAttack(Attack::CLOSE, watk, 0, origin, mobid, oid) {}
 
         MobAttack()
             : valid(false) {}
@@ -102,12 +109,13 @@ namespace jrc
         int32_t mobid;
         int32_t oid;
         uint8_t direction;
+        uint8_t attack_index;
 
         MobAttackResult(const MobAttack& attack,
                         int32_t damage,
                         uint8_t direction)
             : damage(damage), mobid(attack.mobid), oid(attack.oid),
-              direction(direction)
+              direction(direction), attack_index(attack.attack_index)
             {}
     };
 

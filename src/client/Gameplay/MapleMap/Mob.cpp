@@ -24,7 +24,7 @@ namespace jrc
              Point<int16_t> position)
         : LivingObject(oid, { true, false, false })
     {
-
+        id = mid;
         std::string strid  = string_format::extend_id(mid, 7);
         const nl::node src = nl::nx::mob[strid + ".img"];
 
@@ -187,6 +187,8 @@ namespace jrc
             animations[DIE] = animations[MOVE];
         }
 
+        load_combat(src, animsrc);
+
         name = nl::nx::string["Mob.img"][std::to_string(mid)]["name"].get_string();
 
         nl::node sndsrc = nl::nx::sound["Mob.img"][strid];
@@ -205,10 +207,10 @@ namespace jrc
             phobj.type = PhysicsObject::FLYING;
         }
 
-        id   = mid;
         team = tm;
         set_position(position);
-        set_control(mode);
+        control = mode > 0;
+        aggro = mode == 2;
         phobj.fhid = fh;
         phobj.set_flag(PhysicsObject::TURNATEDGES);
 
@@ -221,6 +223,18 @@ namespace jrc
         set_stance(stancebyte);
         flydirection = STRAIGHT;
         counter      = 0;
+        moveid       = 0;
+        suggested_skill_id = 0;
+        suggested_skill_level = 0;
+        next_attack = 0;
+        active_action_pos = 0;
+        action_elapsed = 0;
+        action_hit_delay = 0;
+        action_hit_pending = false;
+        action_kind = ActionKind::NONE;
+        status_first_mask = 0;
+        status_second_mask = 0;
+        aggro_target = position;
 
         namelabel = { Text::A13M, Text::CENTER, Text::WHITE, Text::NAMETAG, name };
 
@@ -285,7 +299,18 @@ namespace jrc
             return phobj.fhlayer;
         }
 
-        bool aniend = animations.at(stance).update();
+        for (uint16_t& cooldown : attack_cooldowns)
+        {
+            cooldown = cooldown > Constants::TIMESTEP ?
+                static_cast<uint16_t>(cooldown - Constants::TIMESTEP) : 0;
+        }
+        if (action_kind != ActionKind::NONE || action_hit_pending)
+        {
+            action_elapsed = static_cast<uint16_t>(
+                std::min<uint32_t>(UINT16_MAX, action_elapsed + Constants::TIMESTEP));
+        }
+
+        bool aniend = current_animation().update();
         if (aniend && stance == DIE)
         {
             dead = true;
@@ -336,12 +361,28 @@ namespace jrc
                 }
             }
 
-            switch (stance)
+            if (control && aggro && action_kind == ActionKind::NONE
+                && !action_hit_pending)
+            {
+                update_aggro_action();
+            }
+
+            if (action_kind != ActionKind::NONE)
+            {
+                phobj.hforce = 0.0;
+                if (canfly)
+                {
+                    phobj.vforce = 0.0;
+                }
+            }
+            else switch (stance)
             {
             case MOVE:
                 if (canfly)
                 {
-                    phobj.hforce = flip ? flyspeed : -flyspeed;
+                    const float status_speed = std::clamp(
+                        1.0f + status_value(0x40) / 100.0f, 0.1f, 2.0f);
+                    phobj.hforce = (flip ? flyspeed : -flyspeed) * status_speed;
                     switch (flydirection)
                     {
                     case UPWARDS:
@@ -356,7 +397,9 @@ namespace jrc
                 }
                 else
                 {
-                    phobj.hforce = flip ? speed : -speed;
+                    const float status_speed = std::clamp(
+                        1.0f + status_value(0x40) / 100.0f, 0.1f, 2.0f);
+                    phobj.hforce = (flip ? speed : -speed) * status_speed;
                 }
                 break;
             case HIT:
@@ -375,9 +418,33 @@ namespace jrc
 
             physics.move_object(phobj);
 
+            if (action_kind != ActionKind::NONE)
+            {
+                if (aniend)
+                {
+                    finish_action();
+                    if (control)
+                    {
+                        update_movement();
+                    }
+                    counter = 0;
+                }
+                return phobj.fhlayer;
+            }
+
             if (control)
             {
                 counter++;
+
+                if (aggro)
+                {
+                    if (counter >= 30)
+                    {
+                        update_movement();
+                        counter = 0;
+                    }
+                    return phobj.fhlayer;
+                }
 
                 bool next;
                 switch (stance)
@@ -462,201 +529,11 @@ namespace jrc
         }
     }
 
-    void Mob::update_movement()
-    {
-        MoveMobPacket(
-            oid,
-            1, 0, 0, 0, 0, 0, 0,
-            get_position(),
-            Movement(phobj, value_of(stance, flip))
-        ).dispatch();
-    }
-
-    void Mob::draw(double viewx, double viewy, float alpha) const
-    {
-        Point<int16_t> absp    = phobj.get_absolute(viewx, viewy, alpha);
-        Point<int16_t> headpos = get_head_position(absp);
-
-        effects.drawbelow(absp, alpha);
-
-        if (!dead)
-        {
-            float interopc = opacity.get(alpha);
-
-            animations.at(stance).draw(
-                DrawArgument(absp, flip && !noflip, interopc),
-                alpha
-            );
-
-            if (showhp)
-            {
-                namelabel.draw(absp);
-
-                if (!dying && hppercent > 0)
-                {
-                    hpbar.draw(headpos, hppercent);
-                }
-            }
-        }
-
-        effects.drawabove(absp, alpha);
-    }
-
-    void Mob::set_control(int8_t mode)
-    {
-        control = mode > 0;
-        aggro   = mode == 2;
-    }
-
-    void Mob::send_movement(Point<int16_t> start, std::vector<Movement>&& in_movements)
-    {
-        if (control)
-        {
-            return;
-        }
-
-        set_position(start);
-
-        movements = std::forward<decltype(in_movements)>(in_movements);
-
-        if (movements.empty())
-        {
-            return;
-        }
-
-        const Movement& lastmove = movements.front();
-
-        uint8_t laststance = lastmove.newstate;
-        set_stance(laststance);
-
-        phobj.fhid = lastmove.fh;
-    }
-
-    Rectangle<int16_t> Mob::get_bounds(Point<int16_t> position) const
-    {
-        Rectangle<int16_t> bounds = animations.at(stance).get_bounds();
-        if (flip && !noflip)
-        {
-            bounds = {
-                static_cast<int16_t>(-bounds.r()),
-                static_cast<int16_t>(-bounds.l()),
-                bounds.t(),
-                bounds.b()
-            };
-        }
-
-        bounds.shift(position);
-        return bounds;
-    }
-
-    Point<int16_t> Mob::get_body_position(Point<int16_t> position) const
-    {
-        // The NX "head" marker is appropriate for overhead UI, but combat
-        // impacts read better when they track the sprite's occupied bounds.
-        Rectangle<int16_t> bounds = get_bounds(position);
-        if (bounds.straight())
-        {
-            return get_head_position(position);
-        }
-
-        int32_t center_x = static_cast<int32_t>(bounds.l()) + bounds.r();
-        int32_t center_y = static_cast<int32_t>(bounds.t()) + bounds.b();
-        return {
-            static_cast<int16_t>(center_x / 2),
-            static_cast<int16_t>(center_y / 2)
-        };
-    }
-
-    Point<int16_t> Mob::get_head_position(Point<int16_t> position) const
-    {
-        Point<int16_t> head = animations.at(stance).get_head();
-        position.shift_x((flip && !noflip) ? -head.x() : head.x());
-        position.shift_y(head.y());
-
-        return position;
-    }
-
-    void Mob::kill(int8_t animation)
-    {
-        switch (animation)
-        {
-        case 0:
-            active = false;
-            break;
-        case 1:
-            dying = true;
-            if (awaitdeath)
-            {
-                apply_death();
-            }
-            break;
-        case 2:
-            fading = true;
-            dying = true;
-            break;
-        default:
-            break;
-        }
-    }
-
-    void Mob::show_hp(int8_t percent, uint16_t playerlevel)
-    {
-        if (hppercent == 0)
-        {
-            int16_t delta = playerlevel - level;
-            if (delta > 9)
-            {
-                namelabel.change_color(Text::YELLOW);
-            }
-            else if (delta < -9)
-            {
-                namelabel.change_color(Text::RED);
-            }
-        }
-
-        if (percent > 100)
-        {
-            percent = 100;
-        }
-        else if (percent < 0)
-        {
-            percent = 0;
-        }
-        hppercent = percent;
-        showhp.set_for(2000);
-    }
-
-    void Mob::show_effect(const Animation& animation, int8_t pos, int8_t z, bool f)
-    {
-        if (!active)
-        {
-            return;
-        }
-
-        Point<int16_t> shift;
-        switch (pos)
-        {
-        case 0:
-            shift = get_body_position({});
-            break;
-        case 1:
-            break;
-        case 2:
-            break;
-        case 3:
-            break;
-        case 4:
-            break;
-        default:
-            break;
-        }
-        effects.add(animation, { shift, f }, z);
-    }
-
     float Mob::calculate_hitchance(int16_t leveldelta, int32_t player_accuracy) const
     {
         auto faccuracy = static_cast<float>(player_accuracy);
-        float hitchance = faccuracy / (((1.84f + 0.07f * leveldelta) * avoid) + 1.0f);
+        const int32_t effective_avoid = std::max<int32_t>(0, avoid + status_value(0x20));
+        float hitchance = faccuracy / (((1.84f + 0.07f * leveldelta) * effective_avoid) + 1.0f);
         if (hitchance < 0.01f)
         {
             hitchance = 0.01f;
@@ -667,24 +544,37 @@ namespace jrc
 
     double Mob::calculate_mindamage(int16_t leveldelta, double damage, bool magic) const
     {
+        const int32_t defense = magic
+            ? std::max<int32_t>(0, mdef + status_value(0x8) + status_value(0x8000))
+            : std::max<int32_t>(0, wdef + status_value(0x2) + status_value(0x2000));
         double mindamage = magic ?
-            damage - (1 + 0.01 * leveldelta) * mdef * 0.6 :
-            damage * (1 - 0.01 * leveldelta) - wdef * 0.6;
+            damage - (1 + 0.01 * leveldelta) * defense * 0.6 :
+            damage * (1 - 0.01 * leveldelta) - defense * 0.6;
 
         return mindamage < 1.0 ? 1.0 : mindamage;
     }
 
     double Mob::calculate_maxdamage(int16_t leveldelta, double damage, bool magic) const
     {
+        const int32_t defense = magic
+            ? std::max<int32_t>(0, mdef + status_value(0x8) + status_value(0x8000))
+            : std::max<int32_t>(0, wdef + status_value(0x2) + status_value(0x2000));
         double maxdamage = magic ?
-            damage - (1 + 0.01 * leveldelta) * mdef * 0.5 :
-            damage * (1 - 0.01 * leveldelta) - wdef * 0.5;
+            damage - (1 + 0.01 * leveldelta) * defense * 0.5 :
+            damage * (1 - 0.01 * leveldelta) - defense * 0.5;
 
         return maxdamage < 1.0 ? 1.0 : maxdamage;
     }
 
     std::vector<std::pair<int32_t, bool>> Mob::calculate_damage(const Attack& attack)
     {
+        const bool magic_attack = attack.damagetype == Attack::DMG_MAGIC;
+        const uint32_t immunity = magic_attack ? 0x80000 : 0x40000;
+        if ((status_second_mask & immunity) != 0)
+        {
+            return std::vector<std::pair<int32_t, bool>>(attack.hitcount, { 0, false });
+        }
+
         double mindamage;
         double maxdamage;
         float hitchance;
@@ -736,6 +626,10 @@ namespace jrc
 
         double damage = randomizer.next_real(mindamage, maxdamage);
         bool iscritical = randomizer.below(critical);
+        if ((status_second_mask & 0x200000) != 0 && !iscritical)
+        {
+            return { 0, false };
+        }
         if (iscritical)
         {
             damage *= 1.5;
@@ -780,14 +674,17 @@ namespace jrc
             return {};
         }
 
-        auto minattack = static_cast<int32_t>(watk * 0.8f);
-        int32_t maxattack = watk;
+        const int32_t effective_watk = std::max<int32_t>(0,
+            watk + status_value(0x1) + status_value(0x1000));
+        auto minattack = static_cast<int32_t>(effective_watk * 0.8f);
+        int32_t maxattack = effective_watk;
         int32_t attack = randomizer.next_int(minattack, maxattack);
         return { attack, get_position(), id, oid };
     }
 
     void Mob::apply_death()
     {
+        cancel_action();
         set_stance(DIE);
         diesound.play();
         dying = true;
@@ -810,15 +707,4 @@ namespace jrc
         return range.overlaps(bounds);
     }
 
-    Point<int16_t> Mob::get_body_position() const
-    {
-        Point<int16_t> position = get_position();
-        return get_body_position(position);
-    }
-
-    Point<int16_t> Mob::get_head_position() const
-    {
-        Point<int16_t> position = get_position();
-        return get_head_position(position);
-    }
 }

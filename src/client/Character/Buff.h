@@ -95,6 +95,13 @@ namespace jrc
             MONSTER_RIDING,
             HOMING_BEACON,
             SPEED_INFUSION,
+            POTION_LOCK,
+            SHADOW,
+            FEAR,
+            SEDUCE,
+            ZOMBIFY,
+            SLOW,
+            CURSE,
 
             LENGTH
         };

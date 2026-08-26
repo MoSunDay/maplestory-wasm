@@ -19,6 +19,8 @@
 
 #include "StatCaps.h"
 
+#include <algorithm>
+
 namespace jrc
 {
     CharStats::CharStats(const StatsEntry& s)
@@ -220,11 +222,13 @@ namespace jrc
         job.change_job(id);
     }
 
-    int32_t CharStats::calculate_damage(int32_t mobatk) const
+    int32_t CharStats::calculate_damage(int32_t mobatk, bool magic) const
     {
-        // random stuff, need to find the actual formula somewhere
-        int32_t reduceatk = mobatk / 2 + mobatk / get_total(Equipstat::WDEF);
-        return reduceatk - static_cast<int32_t>(reduceatk * reducedamage);
+        const Equipstat::Id defense_stat = magic ? Equipstat::MDEF : Equipstat::WDEF;
+        const int32_t defense = std::max<int32_t>(1, get_total(defense_stat));
+        const int32_t reduced_attack = mobatk / 2 + mobatk / defense;
+        return std::max<int32_t>(1,
+            reduced_attack - static_cast<int32_t>(reduced_attack * reducedamage));
     }
 
     bool CharStats::is_damage_buffed() const

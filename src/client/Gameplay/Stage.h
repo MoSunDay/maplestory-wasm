@@ -23,6 +23,7 @@
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapEffect.h"
 #include "Loading/MapAssetGate.h"
+#include "Input/ConfusedInput.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
 #include "MapleMap/MapPortals.h"
@@ -33,6 +34,7 @@
 #include "MapleMap/MapDrops.h"
 #include "Physics/Physics.h"
 #include "Pet/PetAutomation.h"
+#include "Mist/MapMists.h"
 
 #include "../Character/Player.h"
 #include "../IO/KeyType.h"
@@ -99,6 +101,7 @@ namespace jrc
         MapReactors& get_reactors();
         // Returns a reference to the drops on the current map.
         MapDrops& get_drops();
+        MapMists& get_mists();
         // Returns a reference to the Player.
         Player& get_player();
         // Returns the id of the current map.
@@ -169,6 +172,7 @@ namespace jrc
         MapChars chars;
         MapMobs mobs;
         MapDrops drops;
+        MapMists mists;
         MapEffect effect;
 
         Combat combat;
@@ -177,5 +181,6 @@ namespace jrc
         uint64_t asset_generation;
         map_asset_gate::State asset_gate;
         std::function<void()> loading_ready;
+        confused_input::State confused_direction_state;
     };
 }
