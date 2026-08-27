@@ -1,4 +1,4 @@
-Commit: 31fe7db09f74d8c7baa70a68f598de8084e90dac
+Commit: 18144286a501ba0db7bdd12eb80b3842db39d0ac
 
 # 网络层
 
@@ -87,7 +87,7 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 ### CHARLIST 事务边界
 
-`CharlistHandler` 在移除 `WORLDSELECT` 前完整消费并校验角色列表尾部：槽位必须覆盖角色数且不超过字节范围，PIC/槽位后不允许残留字节。解析进度记录当前角色、剩余字节和失败阶段；成功后先安装不访问 NX 的 `UICharSelect` 壳并确认元素存在，才移除来源 UI。人物静态资源和预览资源因此只会在可观测的 CHARSELECT state 3 内加载。
+`CharlistHandler` 完整消费并校验角色列表尾部：槽位必须覆盖角色数且不超过字节范围，PIC/槽位后不允许残留字节。解析进度记录当前角色、剩余字节和失败阶段；成功后先安装不访问 NX 的 `UICharSelect` 壳，来源 `WORLDSELECT` / `CHARCREATION` 保留到全部人物预览进入 `READY` 或 `FAILED` 后才释放。解析、安装、静态资源或顶层更新失败时移除或停用失败壳，重新激活来源 UI、复位世界选择 CHARLIST 请求门闩并恢复输入，因此同一入口可重试。单个角色的外观构造、更新或绘制失败只影响该角色预览，不阻断其他预览收敛和选角进入游戏。
 
 ### InPacket / OutPacket
 
