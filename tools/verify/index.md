@@ -16,11 +16,11 @@
 - 动画单端透明度语义：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/animation-frame-properties.cpp -o /tmp/animation-frame-properties && /tmp/animation-frame-properties`
 - 普通攻击姿态预热集合：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/regular-attack-stances.cpp -o /tmp/regular-attack-stances && /tmp/regular-attack-stances`
 - Buff 掩码位序、重复位选择与未知位拒绝：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
-- 世界选择单频道策略与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
+- 世界选择单频道策略、CHARLIST 失败后的请求门闩恢复与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
-- 角色选择预览按帧顺序与失败收敛（选中角色、当前页、其余角色，含越界保护及失败计入完成）：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client tools/verify/character-preview-policy.cpp src/client/IO/CharacterSelect/PreviewLoadPolicy.cpp -o /tmp/character-preview-policy && /tmp/character-preview-policy`
+- 角色选择预览按帧顺序、真实异常捕获、来源 UI 恢复决策与失败收敛（选中角色、当前页、其余角色，含越界保护及失败计入完成）：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client tools/verify/character-preview-policy.cpp src/client/IO/CharacterSelect/PreviewLoadPolicy.cpp -o /tmp/character-preview-policy && /tmp/character-preview-policy`
 - Cosmic 远端玩家出生头（custom-client short 等级与角色名对齐）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-player-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnPlayerHeader.cpp -o /tmp/spawn-player-parser && /tmp/spawn-player-parser`
 - linked server 怪物出生负载（固定状态块、坐标/foothold、出生特效、假怪显形与截断拒绝）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-mob-payload.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnMobPayload.cpp -o /tmp/spawn-mob-payload && /tmp/spawn-mob-payload`
 - 地图玩家点击命中（摄像机偏移、重叠人物最近目标、输入顺序无关）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/player-targeting.cpp src/client/Gameplay/Targeting/PlayerTargeting.cpp -o /tmp/player-targeting && /tmp/player-targeting`

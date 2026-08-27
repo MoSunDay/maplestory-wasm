@@ -19,6 +19,7 @@
 
 #include "Helpers/LoginParser.h"
 #include "../Login/CharlistTransition.h"
+#include "../../IO/CharacterSelect/CharlistRecovery.h"
 
 #include "../Session.h"
 #include "../../Console.h"
@@ -36,6 +37,15 @@
 
 namespace jrc
 {
+    namespace
+    {
+        void recover_charlist_handler_failure()
+        {
+            UI::get().remove(UIElement::CHARSELECT);
+            charlist_recovery::restore_source_ui();
+        }
+    }
+
     void LoginResultHandler::handle(InPacket& recv) const
     {
         // Remove previous UIs.
@@ -201,8 +211,6 @@ namespace jrc
             }
 
             charlist_transition::set_phase(Phase::UI_MOUNTED);
-            UI::get().remove(UIElement::WORLDSELECT);
-            UI::get().remove(UIElement::CHARCREATION);
             UI::get().disable();
         }
         catch (const PacketError&)
@@ -211,11 +219,13 @@ namespace jrc
             charlist_transition::set_phase(
                 phase == Phase::PARSING ? Phase::FAILED_PARSE : Phase::FAILED_UI
             );
+            recover_charlist_handler_failure();
             throw;
         }
         catch (const std::exception& error)
         {
             charlist_transition::set_phase(Phase::FAILED_UI);
+            recover_charlist_handler_failure();
             throw PacketError(
                 std::string("CHARLIST transition failed: ") + error.what()
             );
@@ -223,6 +233,7 @@ namespace jrc
         catch (...)
         {
             charlist_transition::set_phase(Phase::FAILED_UI);
+            recover_charlist_handler_failure();
             throw PacketError("CHARLIST transition failed: unknown exception");
         }
     }

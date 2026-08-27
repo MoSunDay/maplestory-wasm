@@ -60,6 +60,7 @@ namespace jrc
         page              = selected_absolute / PAGESIZE;
 
         charlooks.resize(characters.size());
+        preview_draw_failed.resize(characters.size(), false);
         preview_states.resize(
             characters.size(),
             character_preview::LoadState::PENDING
@@ -179,10 +180,7 @@ namespace jrc
             Point<int16_t> charpos = get_char_pos(i);
             uint8_t index = i + page * PAGESIZE;
             charplatform.draw(charpos, alpha);
-            if (index < charlooks.size() && charlooks[index])
-            {
-                charlooks[index]->draw(charpos, alpha);
-            }
+            draw_preview(index, charpos, alpha);
             nametags[index].draw(charpos);
         }
 
@@ -250,114 +248,26 @@ namespace jrc
         emptyslot.update();
         charplatform.update();
 
-        for (auto& chit : charlooks)
+        for (size_t index = 0; index < charlooks.size(); ++index)
         {
-            if (chit)
+            if (!charlooks[index])
             {
-                chit->update(Constants::TIMESTEP);
+                continue;
+            }
+
+            try
+            {
+                charlooks[index]->update(Constants::TIMESTEP);
+            }
+            catch (const std::exception& error)
+            {
+                fail_preview(index, error.what());
+            }
+            catch (...)
+            {
+                fail_preview(index, "unknown exception during update");
             }
         }
-    }
-
-    void UICharSelect::load_next_preview()
-    {
-        const auto next = character_preview::next_index(
-            preview_states,
-            selected_absolute,
-            page,
-            PAGESIZE
-        );
-        if (!next)
-        {
-            complete_previews_if_ready();
-            return;
-        }
-
-        const size_t index = *next;
-        charlist_transition::set_character(index, 0);
-        try
-        {
-            charlooks[index].emplace(
-                characters[index].look,
-                Texture::LoadMode::DEFERRED,
-                [](int32_t equip_id) {
-                    charlist_transition::set_equip(equip_id);
-                }
-            );
-            if (index == selected_absolute)
-            {
-                charlooks[index]->set_stance(Stance::WALK1);
-            }
-            resolve_preview(index, character_preview::LoadState::READY);
-        }
-        catch (const std::exception& error)
-        {
-            fail_preview(index, error.what());
-        }
-        catch (...)
-        {
-            fail_preview(index, "unknown exception");
-        }
-    }
-
-    void UICharSelect::resolve_preview(
-        size_t index,
-        character_preview::LoadState state
-    ) {
-        preview_states[index] = state;
-        preview_ready = character_preview::resolved_count(preview_states);
-        charlist_transition::set_preview_progress(
-            preview_ready,
-            preview_states.size()
-        );
-        complete_previews_if_ready();
-    }
-
-    void UICharSelect::complete_previews_if_ready()
-    {
-        if (!character_preview::should_announce_completion(
-                preview_states,
-                preview_completion_announced
-            ))
-        {
-            return;
-        }
-
-        preview_completion_announced = true;
-        charlist_transition::set_preview_progress(
-            preview_ready,
-            preview_states.size()
-        );
-        charlist_transition::set_phase(charlist_transition::Phase::READY);
-        UI::get().enable();
-    }
-
-    void UICharSelect::fail_preview(size_t index, const std::string& message)
-    {
-        const int32_t equip_id = charlist_transition::snapshot().equip_id;
-        charlooks[index].reset();
-        Console::get().print(
-            "Warning: Character preview " + std::to_string(index) +
-            " (cid " + std::to_string(characters[index].cid) +
-            ", equip " + std::to_string(equip_id) +
-            ") failed: " + message
-        );
-        resolve_preview(index, character_preview::LoadState::FAILED);
-    }
-
-    void UICharSelect::fail_ui(const std::exception& error)
-    {
-        fail_ui(error.what());
-    }
-
-    void UICharSelect::fail_ui(const std::string& message)
-    {
-        ui_failed = true;
-        charlist_transition::set_phase(charlist_transition::Phase::FAILED_UI);
-        Console::get().print(
-            std::string("[UICharSelect] Character preview load failed: ") +
-            message
-        );
     }
 
     Button::State UICharSelect::button_pressed(uint16_t bid)
@@ -657,6 +567,7 @@ namespace jrc
         const CharEntry& created_character = characters.back();
         charlooks.emplace_back(std::nullopt);
         preview_states.emplace_back(character_preview::LoadState::PENDING);
+        preview_draw_failed.push_back(false);
         preview_completion_announced = false;
         UI::get().disable();
         nametags.emplace_back(nametag, Text::A13M, Text::WHITE, created_character.stats.name);
@@ -707,6 +618,7 @@ namespace jrc
         characters.erase(characters.begin() + index);
         charlooks.erase(charlooks.begin() + index);
         preview_states.erase(preview_states.begin() + index);
+        preview_draw_failed.erase(preview_draw_failed.begin() + index);
         nametags.erase(nametags.begin() + index);
 
         charcount_absolute--;

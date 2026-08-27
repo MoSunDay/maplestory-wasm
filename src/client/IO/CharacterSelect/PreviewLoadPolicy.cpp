@@ -1,12 +1,30 @@
 #include "PreviewLoadPolicy.h"
 
 #include <algorithm>
+#include <exception>
 
 namespace jrc::character_preview
 {
     bool is_resolved(LoadState state)
     {
         return state != LoadState::PENDING;
+    }
+
+    LoadResult attempt_load(const std::function<void()>& loader)
+    {
+        try
+        {
+            loader();
+            return { LoadState::READY, "" };
+        }
+        catch (const std::exception& error)
+        {
+            return { LoadState::FAILED, error.what() };
+        }
+        catch (...)
+        {
+            return { LoadState::FAILED, "unknown exception" };
+        }
     }
 
     size_t resolved_count(const std::vector<LoadState>& states)
