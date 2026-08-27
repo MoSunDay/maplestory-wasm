@@ -87,6 +87,11 @@ int main(int argc, char** argv)
     bool target_found = false;
     std::set<std::string> target_layers;
 
+    if (jrc::Clothing::glove_layer_by_name("futureUnknownGloveLayer"))
+    {
+        failures.push_back("unknown glove labels must be rejected for safe skip");
+    }
+
     for (nl::node entry : zmap)
     {
         std::string name = entry.name();

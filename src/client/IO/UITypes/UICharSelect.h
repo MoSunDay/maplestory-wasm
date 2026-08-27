@@ -75,6 +75,7 @@ namespace jrc
         void fail_preview(size_t index, const std::string& message);
         void fail_ui(const std::exception& error);
         void fail_ui(const std::string& message);
+        void draw_preview(size_t index, Point<int16_t> position, float alpha) const;
         void update_selection();
         void update_counts();
         std::string get_label_string(size_t label) const;
@@ -108,6 +109,7 @@ namespace jrc
         std::vector<CharEntry> characters;
         std::vector<std::optional<CharLook>> charlooks;
         std::vector<character_preview::LoadState> preview_states;
+        mutable std::vector<bool> preview_draw_failed;
         std::vector<Nametag> nametags;
         int8_t require_pic;
         uint8_t channel_id;

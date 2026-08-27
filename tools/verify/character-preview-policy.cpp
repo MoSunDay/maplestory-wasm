@@ -1,16 +1,37 @@
 #include "IO/CharacterSelect/PreviewLoadPolicy.h"
+#include "IO/CharacterSelect/CharlistRecovery.h"
 
 #include <cassert>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <vector>
 
 int main()
 {
     using jrc::character_preview::LoadState;
+    using jrc::character_preview::attempt_load;
     using jrc::character_preview::next_index;
     using jrc::character_preview::resolved_count;
     using jrc::character_preview::should_announce_completion;
+    using jrc::charlist_recovery::SourceUi;
+    using jrc::charlist_recovery::choose_source;
+
+    static_assert(choose_source(true, false) == SourceUi::WORLD_SELECT);
+    static_assert(choose_source(true, true) == SourceUi::WORLD_SELECT);
+    static_assert(choose_source(false, true) == SourceUi::CHARACTER_CREATION);
+    static_assert(choose_source(false, false) == SourceUi::NONE);
+
+    const auto loaded = attempt_load([] {});
+    assert(loaded.state == LoadState::READY && loaded.error.empty());
+    const auto failed = attempt_load([] {
+        throw std::runtime_error("invalid appearance");
+    });
+    assert(failed.state == LoadState::FAILED &&
+        failed.error == "invalid appearance");
+    const auto unknown_failure = attempt_load([] { throw 7; });
+    assert(unknown_failure.state == LoadState::FAILED &&
+        unknown_failure.error == "unknown exception");
 
     std::vector<LoadState> states(12, LoadState::PENDING);
     assert(next_index(states, 10, 1, 8) == 10);

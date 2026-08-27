@@ -43,8 +43,7 @@ namespace jrc
         : UIElement({ 0, 0 }, { 800, 600 }),
           worldid(0),
           channelid(world_select::selected_channel_id()),
-          channelcount(0),
-          request_pending(false) {
+          channelcount(0) {
 
         nl::node back = nl::nx::map["Back"]["login.img"]["back"];
         nl::node worldsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtWorld"]["release"];
@@ -124,7 +123,7 @@ namespace jrc
 
     bool UIWorldSelect::enter_selected_channel()
     {
-        if (request_pending)
+        if (request_gate.is_pending())
             return true;
 
         if (channelcount == 0 || channelid >= channelcount)
@@ -146,10 +145,20 @@ namespace jrc
 
         // Both GLFW mouse-down and the browser compatibility bridge can see
         // one physical click. Mark the request first so only one packet leaves.
-        request_pending = true;
+        request_gate.try_begin();
         UI::get().disable();
         CharlistRequestPacket(worldid, channelid).dispatch();
         return true;
+    }
+
+    void UIWorldSelect::recover_charlist_request()
+    {
+        request_gate.recover();
+        makeactive();
+        if (channelcount > 0)
+        {
+            buttons[BT_ENTERWORLD]->set_state(Button::NORMAL);
+        }
     }
 
     Button::State UIWorldSelect::button_pressed(uint16_t id)

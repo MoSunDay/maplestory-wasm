@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace jrc::character_preview
@@ -13,7 +15,14 @@ namespace jrc::character_preview
         FAILED
     };
 
+    struct LoadResult
+    {
+        LoadState state;
+        std::string error;
+    };
+
     bool is_resolved(LoadState state);
+    LoadResult attempt_load(const std::function<void()>& loader);
     size_t resolved_count(const std::vector<LoadState>& states);
     bool should_announce_completion(
         const std::vector<LoadState>& states,
