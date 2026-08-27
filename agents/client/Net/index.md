@@ -1,4 +1,4 @@
-Commit: b2922f3eef7e2afa16fe954cee477d1ca3831e00
+Commit: 31fe7db09f74d8c7baa70a68f598de8084e90dac
 
 # 网络层
 
@@ -85,10 +85,14 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 游戏内注册不引入新 opcode：`UIRegister` 校验账号为 4–12 位 ASCII 字母数字、密码为 4–12 位非空白可打印 ASCII 后发送现有 `LOGIN_PASSWORD`。服务端对不存在的合法账号自动建号并返回 `LOGIN_STATUS=23`，客户端自动发送 `ACCEPT_TOS`，随后沿用登录成功和世界列表流程。注册失败由 `LoginHandlers` 回填到注册表单，不落入通用登录位图提示。
 
+### CHARLIST 事务边界
+
+`CharlistHandler` 在移除 `WORLDSELECT` 前完整消费并校验角色列表尾部：槽位必须覆盖角色数且不超过字节范围，PIC/槽位后不允许残留字节。解析进度记录当前角色、剩余字节和失败阶段；成功后先安装不访问 NX 的 `UICharSelect` 壳并确认元素存在，才移除来源 UI。人物静态资源和预览资源因此只会在可观测的 CHARSELECT state 3 内加载。
+
 ### InPacket / OutPacket
 
 封包读写辅助:
-- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)；读取数值前先整体检查剩余长度，linked server 的 Java 定长 UTF-8 字段先编码再补零到固定字节数，客户端必须按线上字节宽度消费
+- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)，并通过 `position()` 暴露只读消费位置供协议诊断；读取数值前先整体检查剩余长度，linked server 的 Java 定长 UTF-8 字段先编码再补零到固定字节数，客户端必须按线上字节宽度消费
 - `OutPacket`: 构建封包字节流 (`write_byte()`, `write_int()`, `write_string()` 等)
 
 登录 `CHARLIST` / 新建角色 / 进入地图复用 `LoginParser::parse_stats`。其字段宽度必须与 linked server 的 `addCharStats` 一致：角色名固定 13 字节，custom-client 模式的等级为 short；Evan 职业（2001、2200–2218）的剩余 SP 为多池表，其余职业为单个 short。宠物、队伍、戒指和现金礼物的 Java 定长字段遵循同一字节宽度规则。
