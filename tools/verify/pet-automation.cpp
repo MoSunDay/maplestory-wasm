@@ -1,4 +1,5 @@
 #include "../../src/client/Gameplay/Pet/PetAutomation.h"
+#include "../../src/client/Gameplay/Pet/PetCapabilityPolicy.h"
 #include "../../src/client/Gameplay/Pet/PetFollowPolicy.h"
 #include "../../src/client/Gameplay/Pet/PetLootPolicy.h"
 
@@ -59,21 +60,57 @@ int main()
     inactive.set_hp_item(2000000);
     ok &= expect(inactive.decide(inputs).count == 0, "inactive pet blocks auto potion");
 
+    using jrc::pet_capability::Capabilities;
+    using jrc::pet_capability::EquippedAbilities;
+    Capabilities starter = jrc::pet_capability::resolve(
+        jrc::pet_capability::STARTER_PUPPY, EquippedAbilities{});
+    ok &= expect(starter.meso_magnet && starter.item_pouch && starter.wing_boots,
+        "starter puppy has intrinsic pickup and movement abilities");
+    ok &= expect(!starter.auto_hp_pouch && !starter.auto_mp_pouch &&
+        !starter.magic_scales, "starter puppy does not gain unrelated abilities");
+    ok &= expect(starter.mask() == (jrc::pet_capability::MESO_MAGNET |
+        jrc::pet_capability::ITEM_POUCH | jrc::pet_capability::WING_BOOTS),
+        "starter capability mask is deterministic");
+    Capabilities ordinary = jrc::pet_capability::resolve(5000002,
+        EquippedAbilities{false, true, true, false, false, true});
+    ok &= expect(!ordinary.meso_magnet && ordinary.item_pouch &&
+        ordinary.auto_hp_pouch && ordinary.magic_scales && !ordinary.wing_boots,
+        "ordinary pets retain equipment-only abilities");
+
     using jrc::pet_follow::Action;
     using jrc::pet_follow::Inputs;
-    ok &= expect(jrc::pet_follow::decide(Inputs{{ 0, 0 }, { 50, 0 }, false, false, 0}) ==
+    ok &= expect(jrc::pet_follow::GROUND_WALK_FORCE == 0.16,
+        "ground pet matches normal walk force");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 50, 0 }, { 50, 0 }, false, false, 0}) ==
         Action::IDLE, "follow start deadzone");
-    ok &= expect(jrc::pet_follow::decide(Inputs{{ 0, 0 }, { 50, 0 }, false, true, 0}) ==
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 50, 0 }, { 50, 0 }, false, true, 0}) ==
         Action::MOVE_RIGHT, "follow movement hysteresis");
-    ok &= expect(jrc::pet_follow::decide(Inputs{{ 0, 0 }, { -80, 0 }, false, false, 0}) ==
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { -80, 0 }, { -80, 0 }, false, false, 0}) ==
         Action::MOVE_LEFT, "follow direction");
-    ok &= expect(jrc::pet_follow::decide(Inputs{{ 0, 0 }, { 10, 80 }, true, true, 0}) ==
-        Action::WARP, "unreachable loot warps");
-    ok &= expect(jrc::pet_follow::decide(Inputs{{ 0, 0 }, { 40, 0 }, true, true, 90}) ==
-        Action::WARP, "stalled pet recovers");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 10, 71 }, true, true, 0}) ==
+        Action::ABANDON_LOOT, "unreachable loot is abandoned without teleporting");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 40, 0 }, true, true, 90}) ==
+        Action::ABANDON_LOOT, "stalled loot pursuit is abandoned");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 40, 0 }, { 40, 0 }, false, true, 90}) ==
+        Action::WARP_TO_OWNER, "stalled owner follow warps to owner");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 150, 0 }, { 150, 0 }, false, false, 0}) !=
+        Action::WARP_TO_OWNER, "owner leash includes exactly 150 pixels");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 151, 0 }, { 151, 0 }, false, false, 0}) ==
+        Action::WARP_TO_OWNER, "owner leash warps beyond 150 pixels");
     ok &= expect(jrc::pet_follow::decide(Inputs{{ -32768, -32768 },
-        { 32767, 32767 }, false, false, 0}) == Action::WARP,
+        { 32767, 32767 }, { 32767, 32767 }, false, false, 0}) ==
+        Action::WARP_TO_OWNER,
         "follow distance remains safe at coordinate extremes");
+    ok &= expect(jrc::pet_follow::player_side_position({ -32768, 12 }) ==
+        jrc::Point<int16_t>(-32768, 12), "player-side warp destination is clamped");
     ok &= expect(jrc::pet_follow::made_progress(120, 116),
         "moving at least four pixels closer counts as progress");
     ok &= expect(!jrc::pet_follow::made_progress(120, 121),
@@ -90,6 +127,6 @@ int main()
         "failed target is eventually abandoned");
 
     if (ok)
-        std::cout << "PASS pet potion selection, automation, and stable follow rules\n";
+        std::cout << "PASS pet capabilities, automation, pickup, and leash rules\n";
     return ok ? 0 : 1;
 }

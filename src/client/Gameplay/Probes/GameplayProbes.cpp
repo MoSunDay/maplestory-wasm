@@ -103,6 +103,17 @@ extern "C"
         return jrc::Stage::get().get_player().get_pet(0) ? 1 : 0;
     }
 
+    int mspet_item_id()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? pet->get_itemid() : 0;
+    }
+
+    int mspet_capability_mask()
+    {
+        return jrc::Stage::get().get_pet_capabilities().mask();
+    }
+
     int mspet_x()
     {
         const auto* pet = jrc::Stage::get().get_player().get_pet(0);

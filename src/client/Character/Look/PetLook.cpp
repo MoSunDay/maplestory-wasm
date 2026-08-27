@@ -74,7 +74,6 @@ namespace jrc
 
     void PetLook::update(const Physics& physics, Point<int16_t> charpos)
     {
-        static const double PETWALKFORCE = 0.35;
         static const double PETFLYFORCE = 0.2;
 
         Point<int16_t> curpos = phobj.get_position();
@@ -112,21 +111,29 @@ namespace jrc
             }
 
             pet_follow::Action action = pet_follow::decide({
-                curpos, followpos, loot_target.has_value(), stance == MOVE, stalled_frames
+                curpos, charpos, followpos, loot_target.has_value(),
+                stance == MOVE, stalled_frames
             });
-            if (action == pet_follow::Action::WARP)
+            if (action == pet_follow::Action::WARP_TO_OWNER)
             {
-                Point<int16_t> destination = loot_target
-                    ? followpos
-                    : Point<int16_t>(static_cast<int16_t>(followpos.x() - 35), followpos.y());
-                warp_to(destination);
+                clear_loot_target();
+                warp_to(pet_follow::player_side_position(charpos));
+                break;
+            }
+            if (action == pet_follow::Action::ABANDON_LOOT)
+            {
+                clear_loot_target();
+                reset_motion();
+                set_stance(STAND);
                 break;
             }
             if (action == pet_follow::Action::MOVE_RIGHT ||
                 action == pet_follow::Action::MOVE_LEFT)
             {
                 bool right = action == pet_follow::Action::MOVE_RIGHT;
-                phobj.hforce = right ? PETWALKFORCE : -PETWALKFORCE;
+                phobj.hforce = right
+                    ? pet_follow::GROUND_WALK_FORCE
+                    : -pet_follow::GROUND_WALK_FORCE;
                 flip = right;
                 set_stance(MOVE);
             }
@@ -146,9 +153,11 @@ namespace jrc
             phobj.set_flag(PhysicsObject::NOGRAVITY);
             break;
         case FLY:
-            if ((charpos - curpos).length() > 250)
+            if (pet_follow::outside_owner_leash(curpos, charpos))
             {
-                set_position(charpos.x(), charpos.y());
+                clear_loot_target();
+                warp_to(pet_follow::player_side_position(charpos));
+                break;
             }
             else
             {
@@ -228,6 +237,7 @@ namespace jrc
     {
         loot_target.reset();
         last_progress_distance = 0;
+        stalled_frames = 0;
     }
 
     void PetLook::apply_movement(const Movement& movement)
