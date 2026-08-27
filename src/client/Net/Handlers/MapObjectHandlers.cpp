@@ -20,14 +20,17 @@
 #include "Helpers/LoginParser.h"
 #include "Helpers/BuffMaskOrder.h"
 #include "Helpers/MovementParser.h"
+#include "../Protocol/DropRemovalPayload.h"
 #include "../Protocol/SpawnMobPayload.h"
 #include "../Protocol/SpawnPlayerHeader.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Character/SkillId.h"
+#include "../../Console.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/Spawn.h"
 
+#include <optional>
 #include <vector>
 
 namespace jrc
@@ -546,28 +549,56 @@ namespace jrc
 
     void RemoveLootHandler::handle(InPacket& recv) const
     {
-        int8_t mode = recv.read_byte();
-        int32_t oid = recv.read_int();
+        const drop_removal::Payload payload = drop_removal::parse_payload(recv);
+        Stage& stage = Stage::get();
 
         Optional<PhysicsObject> looter;
-        bool local_pet_pickup = false;
-        if (mode > 1)
+        std::optional<Point<int16_t>> pickup_target;
+        if (payload.effect == drop_removal::Effect::PLAYER_PICKUP)
         {
-            int32_t cid = recv.read_int();
-            if (recv.length() > 0)
-            {
-                recv.read_byte(); // pet
-                local_pet_pickup = mode == 5 && Stage::get().is_player(cid);
-            }
-            else if (auto character = Stage::get().get_character(cid))
+            if (Optional<Char> character = stage.get_character(payload.character_id))
             {
                 looter = character->get_phobj();
             }
+        }
+        else if (payload.effect == drop_removal::Effect::PET_PICKUP)
+        {
+            if (Optional<Char> character = stage.get_character(payload.character_id))
+            {
+                const auto pet_index = static_cast<uint8_t>(payload.pet_index);
+                if (const PetLook* pet = character->get_pet(pet_index))
+                {
+                    pickup_target = pet->get_position();
+                }
+            }
+        }
 
+        if (payload.effect == drop_removal::Effect::PLAYER_PICKUP ||
+            payload.effect == drop_removal::Effect::PET_PICKUP ||
+            payload.mode == 4)
+        {
             Sound(Sound::PICKUP).play();
         }
 
-        Stage::get().get_drops().remove(oid, mode, looter.get(), local_pet_pickup);
+        if (!payload.known_mode)
+        {
+            Console::get().print(
+                "remove_drop: unknown mode " + std::to_string(payload.mode) +
+                " for oid " + std::to_string(payload.oid) +
+                "; erasing authoritative drop"
+            );
+        }
+
+        const bool local_pet_pickup =
+            payload.effect == drop_removal::Effect::PET_PICKUP &&
+            stage.is_player(payload.character_id);
+        stage.get_drops().remove(
+            payload.oid,
+            payload.effect,
+            looter.get(),
+            pickup_target,
+            local_pet_pickup
+        );
     }
 
 

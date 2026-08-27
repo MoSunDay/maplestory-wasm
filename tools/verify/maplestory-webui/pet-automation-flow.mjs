@@ -278,10 +278,28 @@ async function verifyRuntimePickup(driver, probes) {
     meso: await probes.playerMeso()
   };
   await driver.evaluate(`(() => {
-    const evidence = { active: true, targetSeen: false, maxDrops: 0 };
+    const evidence = {
+      active: true,
+      targetSeen: false,
+      maxDrops: 0,
+      targetOids: [],
+      lastNonzeroTargetOid: Module.ccall('mspet_loot_target_oid', 'number', [], []),
+      lastPickupCount: ${before.pickups},
+      confirmedTargetOid: 0
+    };
     const tick = () => {
       if (!evidence.active) return;
-      evidence.targetSeen ||= Module.ccall('mspet_has_loot_target', 'number', [], []) === 1;
+      const targetOid = Module.ccall('mspet_loot_target_oid', 'number', [], []);
+      const pickups = Module.ccall('mspet_confirmed_pickups', 'number', [], []);
+      evidence.targetSeen ||= targetOid !== 0;
+      if (pickups > evidence.lastPickupCount && evidence.confirmedTargetOid === 0)
+        evidence.confirmedTargetOid = evidence.lastNonzeroTargetOid || targetOid;
+      evidence.lastPickupCount = pickups;
+      if (targetOid !== 0) {
+        evidence.lastNonzeroTargetOid = targetOid;
+        if (evidence.targetOids.at(-1) !== targetOid)
+          evidence.targetOids.push(targetOid);
+      }
       evidence.maxDrops = Math.max(evidence.maxDrops,
         Module.ccall('msdrop_count', 'number', [], []));
       requestAnimationFrame(tick);
@@ -332,6 +350,23 @@ async function verifyRuntimePickup(driver, probes) {
   for (let second = 0; second < 15 &&
       await probes.petConfirmedPickups() === before.pickups; second += 1)
     await sleep(1000);
+  await sleep(100);
+  const pickupSample = await driver.evaluate('window.petLootEvidence');
+  const targetOid = pickupSample.confirmedTargetOid;
+  const removal = {
+    targetOid,
+    removed: false,
+    elapsedMs: 0,
+    finalTargetOid: await probes.petLootTargetOid()
+  };
+  if (targetOid > 0) {
+    const started = Date.now();
+    while (Date.now() - started < 2000 && await probes.dropExists(targetOid) === 1)
+      await sleep(50);
+    removal.elapsedMs = Date.now() - started;
+    removal.removed = await probes.dropExists(targetOid) === 0;
+    removal.finalTargetOid = await probes.petLootTargetOid();
+  }
   const sampled = await driver.evaluate(`(() => {
     window.petLootEvidence.active = false;
     return window.petLootEvidence;
@@ -341,13 +376,18 @@ async function verifyRuntimePickup(driver, probes) {
     meso: await probes.playerMeso()
   };
   fs.writeFileSync(`${driver.artifactDir}/pet-pickup-trace.json`,
-    `${JSON.stringify({ before, after, sampled, trace }, null, 2)}\n`);
+    `${JSON.stringify({ before, after, sampled, removal, trace }, null, 2)}\n`);
   if (after.pickups <= before.pickups)
     throw new Error(`Server-confirmed pet pickup was not observed: ${JSON.stringify({ after, sampled, trace })}`);
   console.log('PASS  server-confirmed pet pickup');
   if (!sampled.targetSeen || sampled.maxDrops < 1)
     throw new Error(`Pet loot target transition was not observed: ${JSON.stringify(sampled)}`);
-  return { before, after, ...sampled };
+  if (targetOid <= 0 || !removal.removed)
+    throw new Error(`Server-confirmed pet pickup did not erase its exact drop OID: ${JSON.stringify({ sampled, removal })}`);
+  if (removal.finalTargetOid === targetOid)
+    throw new Error(`Pet retained the removed drop OID as its loot target: ${JSON.stringify(removal)}`);
+  console.log(`PASS  pet pickup erased exact drop oid=${targetOid}`);
+  return { before, after, ...sampled, removal };
 }
 
 export async function verifyPetAutomationFlow(driver, probes, requireState, mode) {

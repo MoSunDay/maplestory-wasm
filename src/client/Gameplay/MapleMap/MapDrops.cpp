@@ -109,14 +109,20 @@ namespace jrc
         spawns.emplace(std::move(spawn));
     }
 
-    void MapDrops::remove(int32_t oid, int8_t mode, const PhysicsObject* looter,
-        bool local_pet_pickup)
+    void MapDrops::remove(int32_t oid, drop_removal::Effect effect,
+        const PhysicsObject* looter,
+        std::optional<Point<int16_t>> pickup_target, bool local_pet_pickup)
     {
         if (Optional<Drop> drop = drops.get(oid))
         {
             if (local_pet_pickup)
                 ++confirmed_pet_pickups;
-            drop->expire(mode, looter);
+            if (effect == drop_removal::Effect::IMMEDIATE_ERASE)
+            {
+                drops.remove(oid);
+                return;
+            }
+            drop->expire(effect, looter, pickup_target);
         }
     }
 
@@ -128,6 +134,9 @@ namespace jrc
 
     void MapDrops::try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos, int32_t& closest_distance_sq, Loot& closest_loot) const
     {
+        if (!drop.is_lootable())
+            return;
+
         Point<int16_t> position = drop.get_position();
         Point<int16_t> center = position + Point<int16_t>(16, 16);
 
@@ -199,7 +208,7 @@ namespace jrc
         for (const auto& entry : drops)
         {
             Optional<const Drop> drop = entry.second.get();
-            if (!drop || !pet_can_target(*drop, query))
+            if (!drop || !drop->is_lootable() || !pet_can_target(*drop, query))
                 continue;
 
             Point<int16_t> position = drop->get_position() + Point<int16_t>(16, 16);
@@ -218,6 +227,12 @@ namespace jrc
     bool MapDrops::has_drop(int32_t oid) const
     {
         return static_cast<bool>(drops.get(oid));
+    }
+
+    bool MapDrops::has_lootable_drop(int32_t oid) const
+    {
+        Optional<const Drop> drop = drops.get(oid);
+        return drop && drop->is_lootable();
     }
 
     size_t MapDrops::size() const
