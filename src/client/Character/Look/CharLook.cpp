@@ -84,6 +84,8 @@ namespace jrc
 
         if (Stance::is_climbing(interstance))
         {
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::BACK_GLOVE, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::BACK_WRIST, interframe, args);
             equips.draw(Equipslot::GLOVES, interstance, Clothing::GLOVE_BELOW_BODY, interframe, args);
             equips.draw(Equipslot::GLOVES, interstance, Clothing::WRIST_BELOW_BODY, interframe, args);
             body->draw(interstance, Body::BODY, interframe, args);
@@ -133,6 +135,8 @@ namespace jrc
         }
         else
         {
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::BACK_GLOVE, interframe, args);
+            equips.draw(Equipslot::GLOVES, interstance, Clothing::BACK_WRIST, interframe, args);
             hair->draw(interstance, Hair::BELOWBODY, interframe, args);
             equips.draw(Equipslot::CAPE, interstance, Clothing::CAPE, interframe, args);
             equips.draw(Equipslot::SHIELD, interstance, Clothing::SHIELD_BELOW_BODY, interframe, args);

@@ -89,6 +89,11 @@ namespace jrc
         enabled = false;
     }
 
+    bool UI::is_enabled() const
+    {
+        return enabled;
+    }
+
     bool UI::has_element(UIElement::Type type)
     {
         return state->get(type) != nullptr;

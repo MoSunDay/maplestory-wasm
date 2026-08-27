@@ -203,7 +203,7 @@ namespace jrc
             charlist_transition::set_phase(Phase::UI_MOUNTED);
             UI::get().remove(UIElement::WORLDSELECT);
             UI::get().remove(UIElement::CHARCREATION);
-            UI::get().enable();
+            UI::get().disable();
         }
         catch (const PacketError&)
         {
@@ -255,6 +255,7 @@ namespace jrc
         {
             charselect->add_character(std::move(character));
             charselect->makeactive();
+            return;
         }
 
         UI::get().enable();

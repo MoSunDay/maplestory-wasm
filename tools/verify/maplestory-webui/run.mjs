@@ -325,6 +325,7 @@ try {
     const probe = name => Module.ccall(name, 'number', [], []);
     const snapshot = () => ({
       state: state(),
+      uiEnabled: probe('msui_enabled'),
       phase: probe('mscharlist_phase'),
       characterIndex: probe('mscharlist_character_index'),
       equipId: probe('mscharlist_equip_id'),
@@ -396,6 +397,7 @@ try {
     const evidence = window.charSelectTransitionEvidence;
     evidence.states.push({
       state: Module.ccall('msui_state', 'number', [], []),
+      uiEnabled: Module.ccall('msui_enabled', 'number', [], []),
       phase: Module.ccall('mscharlist_phase', 'number', [], []),
       characterIndex: Module.ccall('mscharlist_character_index', 'number', [], []),
       equipId: Module.ccall('mscharlist_equip_id', 'number', [], []),
@@ -425,6 +427,18 @@ try {
   );
   if (!mountedOrLater) {
     throw new Error(`Character-select UI never reached the mounted phase: ${JSON.stringify(charSelectTransition.states)}`);
+  }
+  const finalPreview = charSelectTransition.states.at(-1);
+  if (finalPreview.phase !== 8
+      || finalPreview.previewReady !== finalPreview.previewTotal
+      || finalPreview.uiEnabled !== 1) {
+    throw new Error(`Character previews did not settle: ${JSON.stringify(finalPreview)}`);
+  }
+  const enabledWhileLoading = charSelectTransition.states.filter(
+    sample => sample.phase >= 5 && sample.phase < 8 && sample.uiEnabled !== 0
+  );
+  if (enabledWhileLoading.length > 0) {
+    throw new Error(`Character-select input unlocked before previews settled: ${JSON.stringify(enabledWhileLoading)}`);
   }
   const earlyCharacterRequests = charSelectTransition.characterRequests.filter(
     request => request.state !== uiState.charSelect
@@ -554,6 +568,14 @@ try {
       window.naturalAssetEvidence = evidence;
     })()`);
     await driver.click(650, 400);
+    const selectionLock = await driver.evaluate(`({
+      state: Module.ccall('msui_state', 'number', [], []),
+      uiEnabled: Module.ccall('msui_enabled', 'number', [], [])
+    })`);
+    if (selectionLock.state === uiState.charSelect && selectionLock.uiEnabled !== 0) {
+      throw new Error(`Character-select input unlocked while selection was pending: ${JSON.stringify(selectionLock)}`);
+    }
+    console.log(`PASS  character selection keeps input locked ${JSON.stringify(selectionLock)}`);
     await requireUiState('in-game UI active', uiState.game, 60);
     await requireState('map field initialized', async () => await mapId() > 0, 60);
     await requireState('map asset safety gate released', async () =>

@@ -20,7 +20,7 @@
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
-- 角色选择预览按帧顺序（选中角色、当前页、其余角色，含越界保护）：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client tools/verify/character-preview-policy.cpp src/client/IO/CharacterSelect/PreviewLoadPolicy.cpp -o /tmp/character-preview-policy && /tmp/character-preview-policy`
+- 角色选择预览按帧顺序与失败收敛（选中角色、当前页、其余角色，含越界保护及失败计入完成）：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client tools/verify/character-preview-policy.cpp src/client/IO/CharacterSelect/PreviewLoadPolicy.cpp -o /tmp/character-preview-policy && /tmp/character-preview-policy`
 - Cosmic 远端玩家出生头（custom-client short 等级与角色名对齐）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-player-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnPlayerHeader.cpp -o /tmp/spawn-player-parser && /tmp/spawn-player-parser`
 - linked server 怪物出生负载（固定状态块、坐标/foothold、出生特效、假怪显形与截断拒绝）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-mob-payload.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnMobPayload.cpp -o /tmp/spawn-mob-payload && /tmp/spawn-mob-payload`
 - 地图玩家点击命中（摄像机偏移、重叠人物最近目标、输入顺序无关）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/player-targeting.cpp src/client/Gameplay/Targeting/PlayerTargeting.cpp -o /tmp/player-targeting && /tmp/player-targeting`
@@ -36,7 +36,7 @@
 - NPC 商店售卖数量钳制、批量售卖 Tab 与现金物品过滤：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/npc-shop-sale.cpp -o /tmp/npc-shop-sale && /tmp/npc-shop-sale`
 - 攻击 NX 结构审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/attack-effect-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/attack-effect-nx && /tmp/attack-effect-nx Skill.nx`
 - 近战武器残影 NX 审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/weapon-afterimage-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/weapon-afterimage-nx && /tmp/weapon-afterimage-nx Character.nx`
-- 手套图层、`1082003` 重贴图样本与 Base zmap 一致性：`c++ -std=c++17 -Wall -Wextra -Werror -Wno-narrowing -Wno-unused-function -Isrc/client -Isrc -Isrc/nlnx tools/verify/glove-layering-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/glove-layering-nx && /tmp/glove-layering-nx Character.nx Base.nx`
+- 前后手套图层、`1082003` 重贴图样本与 Base zmap 一致性：`c++ -std=c++17 -Wall -Wextra -Werror -Wno-narrowing -Wno-unused-function -Isrc/client -Isrc -Isrc/nlnx tools/verify/glove-layering-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/glove-layering-nx && /tmp/glove-layering-nx Character.nx Base.nx`
 - 场地计时器倒计时、跨日时钟与格式化：`c++ -std=c++17 -Isrc tools/verify/field-clock.cpp src/client/IO/Field/FieldClockModel.cpp -o /tmp/field-clock && /tmp/field-clock`
 - 废弃都市组队任务门对象与成功/失败音效素材：`c++ -std=c++17 -Isrc -Isrc/client -Isrc/nlnx tools/verify/kerning-pq-field-assets.cpp src/client/Audio/FieldSoundPath.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/kerning-pq-field-assets && /tmp/kerning-pq-field-assets`
 - 废弃都市组队任务服务端脚本、地图、怪物、掉落、计时与奖励契约：`node tools/verify/kerning-pq-contract.mjs`

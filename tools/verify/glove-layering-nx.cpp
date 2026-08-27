@@ -20,6 +20,12 @@ namespace nl
 
 namespace
 {
+    bool is_glove_layer(const std::string& name)
+    {
+        return name.rfind("glove", 0) == 0 ||
+            name.rfind("backGlove", 0) == 0;
+    }
+
     void audit_node(
         nl::node node,
         const std::string& item,
@@ -31,7 +37,7 @@ namespace
         if (node.data_type() == nl::node::type::bitmap)
         {
             std::string name = node["z"].get_string();
-            if (name.rfind("glove", 0) != 0) return;
+            if (!is_glove_layer(name)) return;
             ++parts;
             observed.insert(name);
 
@@ -79,11 +85,12 @@ int main(int argc, char** argv)
     size_t parts = 0;
     size_t target_parts = 0;
     bool target_found = false;
+    std::set<std::string> target_layers;
 
     for (nl::node entry : zmap)
     {
         std::string name = entry.name();
-        if (name.rfind("glove", 0) != 0) continue;
+        if (!is_glove_layer(name)) continue;
         declared.insert(name);
         std::optional<jrc::Clothing::Layer> layer =
             jrc::Clothing::glove_layer_by_name(name);
@@ -105,16 +112,19 @@ int main(int argc, char** argv)
     {
         ++items;
         size_t item_parts = 0;
-        audit_node(item, item.name(), zmap, observed, failures, item_parts);
+        std::set<std::string> item_layers;
+        audit_node(item, item.name(), zmap, item_layers, failures, item_parts);
+        observed.insert(item_layers.begin(), item_layers.end());
         parts += item_parts;
         if (item.name() == TARGET_ITEM)
         {
             target_found = true;
             target_parts = item_parts;
+            target_layers = item_layers;
         }
     }
 
-    constexpr size_t EXPECTED_LABELS = 14;
+    constexpr size_t EXPECTED_LABELS = 16;
     if (declared.size() != EXPECTED_LABELS)
     {
         std::string labels;
@@ -124,7 +134,7 @@ int main(int argc, char** argv)
             labels += label;
         }
         failures.push_back(
-            "expected 14 Base glove z labels, found " +
+            "expected 16 Base glove z labels, found " +
             std::to_string(declared.size()) + ": " + labels
         );
     }
@@ -136,6 +146,12 @@ int main(int argc, char** argv)
     {
         failures.push_back(
             std::string(TARGET_ITEM) + " is missing or has no glove bitmap parts"
+        );
+    }
+    if (!target_layers.count("backGlove"))
+    {
+        failures.push_back(
+            std::string(TARGET_ITEM) + " does not exercise backGlove"
         );
     }
 

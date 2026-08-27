@@ -39,7 +39,7 @@ namespace jrc
             CAPE, SHOES, PANTS, TOP, MAIL, MAILARM,
             EARRINGS, FACEACC, EYEACC, PENDANT, BELT, MEDAL, RING,
             CAP, CAP_BELOW_BODY, CAP_OVER_HAIR,
-            GLOVE, WRIST,
+            GLOVE, WRIST, BACK_GLOVE, BACK_WRIST,
             GLOVE_BELOW_BODY, WRIST_BELOW_BODY,
             GLOVE_OVER_BODY, WRIST_OVER_BODY,
             GLOVE_BELOW_HEAD, WRIST_BELOW_HEAD,
@@ -86,6 +86,8 @@ namespace jrc
         ) {
             if (name == "glove") return GLOVE;
             if (name == "gloveWrist") return WRIST;
+            if (name == "backGlove") return BACK_GLOVE;
+            if (name == "backGloveWrist") return BACK_WRIST;
             if (name == "gloveBelowBody") return GLOVE_BELOW_BODY;
             if (name == "gloveWristBelowBody") return WRIST_BELOW_BODY;
             if (name == "gloveOverBody") return GLOVE_OVER_BODY;
@@ -107,6 +109,8 @@ namespace jrc
             {
             case GLOVE_BELOW_BODY: return 78;
             case WRIST_BELOW_BODY: return 77;
+            case BACK_GLOVE: return 109;
+            case BACK_WRIST: return 108;
             case GLOVE_OVER_BODY: return 75;
             case WRIST_OVER_BODY: return 63;
             case GLOVE_BELOW_HEAD: return 57;

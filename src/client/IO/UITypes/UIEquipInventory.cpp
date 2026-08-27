@@ -22,7 +22,6 @@
 
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Pet/PetAutomation.h"
-#include "../../Gameplay/Pet/PetCapabilityPolicy.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 
@@ -113,19 +112,8 @@ namespace jrc
                 Point<int16_t>(266, 88), Point<int16_t>(212, 124),
                 Point<int16_t>(248, 124)
             };
-            const int32_t starter_puppy = inventory.find_item(
-                InventoryType::CASH, pet_capability::STARTER_PUPPY) > 0
-                ? pet_capability::STARTER_PUPPY
-                : 0;
             const pet_capability::Capabilities capabilities =
-                pet_capability::resolve(starter_puppy, {
-                    inventory.has_equipped_item(pet_automation::MESO_MAGNET),
-                    inventory.has_equipped_item(pet_automation::ITEM_POUCH),
-                    inventory.has_equipped_item(pet_automation::AUTO_HP_POUCH),
-                    inventory.has_equipped_item(pet_automation::AUTO_MP_POUCH),
-                    inventory.has_equipped_item(pet_automation::WING_BOOTS),
-                    inventory.has_equipped_item(pet_automation::MAGIC_SCALES)
-                });
+                Stage::get().get_pet_capabilities();
             const std::array<bool, 5> ENABLED = {
                 capabilities.meso_magnet, capabilities.item_pouch,
                 capabilities.auto_hp_pouch, capabilities.auto_mp_pouch,

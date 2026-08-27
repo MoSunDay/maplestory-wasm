@@ -20,7 +20,6 @@
 #include "UISoftKey.h"
 #include "UICharCreation.h"
 #include "UILoginNotice.h"
-#include "../CharacterSelect/PreviewLoadPolicy.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -50,7 +49,8 @@ namespace jrc
                                int8_t p)
         : characters(std::move(cs)), require_pic(p), channel_id(ch),
           pending_pic_action(PicAction::NONE), pending_pic_cid(-1),
-          preview_ready(0), ui_initialized(false), ui_failed(false),
+          preview_ready(0), preview_completion_announced(false),
+          ui_initialized(false), ui_failed(false),
           charcount_absolute(static_cast<uint8_t>(characters.size())),
           charcount_relative(0), slots_absolute(s), slots_relative(0),
           selected_absolute(0), selected_relative(0), page(0)
@@ -60,6 +60,10 @@ namespace jrc
         page              = selected_absolute / PAGESIZE;
 
         charlooks.resize(characters.size());
+        preview_states.resize(
+            characters.size(),
+            character_preview::LoadState::PENDING
+        );
 
         position  = { 0, 0 };
         dimension = { 800, 600 };
@@ -257,44 +261,88 @@ namespace jrc
 
     void UICharSelect::load_next_preview()
     {
-        std::vector<bool> ready;
-        ready.reserve(charlooks.size());
-        for (const auto& look : charlooks)
-        {
-            ready.push_back(look.has_value());
-        }
-
         const auto next = character_preview::next_index(
-            ready,
+            preview_states,
             selected_absolute,
             page,
             PAGESIZE
         );
         if (!next)
         {
-            charlist_transition::set_preview_progress(
-                preview_ready,
-                charlooks.size()
-            );
-            charlist_transition::set_phase(charlist_transition::Phase::READY);
+            complete_previews_if_ready();
             return;
         }
 
         const size_t index = *next;
         charlist_transition::set_character(index, 0);
-        charlooks[index].emplace(
-            characters[index].look,
-            Texture::LoadMode::DEFERRED,
-            [](int32_t equip_id) {
-                charlist_transition::set_equip(equip_id);
-            }
-        );
-        ++preview_ready;
-        charlist_transition::set_preview_progress(preview_ready, charlooks.size());
-        if (index == selected_absolute)
+        try
         {
-            charlooks[index]->set_stance(Stance::WALK1);
+            charlooks[index].emplace(
+                characters[index].look,
+                Texture::LoadMode::DEFERRED,
+                [](int32_t equip_id) {
+                    charlist_transition::set_equip(equip_id);
+                }
+            );
+            if (index == selected_absolute)
+            {
+                charlooks[index]->set_stance(Stance::WALK1);
+            }
+            resolve_preview(index, character_preview::LoadState::READY);
         }
+        catch (const std::exception& error)
+        {
+            fail_preview(index, error.what());
+        }
+        catch (...)
+        {
+            fail_preview(index, "unknown exception");
+        }
+    }
+
+    void UICharSelect::resolve_preview(
+        size_t index,
+        character_preview::LoadState state
+    ) {
+        preview_states[index] = state;
+        preview_ready = character_preview::resolved_count(preview_states);
+        charlist_transition::set_preview_progress(
+            preview_ready,
+            preview_states.size()
+        );
+        complete_previews_if_ready();
+    }
+
+    void UICharSelect::complete_previews_if_ready()
+    {
+        if (!character_preview::should_announce_completion(
+                preview_states,
+                preview_completion_announced
+            ))
+        {
+            return;
+        }
+
+        preview_completion_announced = true;
+        charlist_transition::set_preview_progress(
+            preview_ready,
+            preview_states.size()
+        );
+        charlist_transition::set_phase(charlist_transition::Phase::READY);
+        UI::get().enable();
+    }
+
+    void UICharSelect::fail_preview(size_t index, const std::string& message)
+    {
+        const int32_t equip_id = charlist_transition::snapshot().equip_id;
+        charlooks[index].reset();
+        Console::get().print(
+            "Warning: Character preview " + std::to_string(index) +
+            " (cid " + std::to_string(characters[index].cid) +
+            ", equip " + std::to_string(equip_id) +
+            ") failed: " + message
+        );
+        resolve_preview(index, character_preview::LoadState::FAILED);
     }
 
     void UICharSelect::fail_ui(const std::exception& error)
@@ -608,6 +656,9 @@ namespace jrc
         characters.emplace_back(std::forward<CharEntry>(character));
         const CharEntry& created_character = characters.back();
         charlooks.emplace_back(std::nullopt);
+        preview_states.emplace_back(character_preview::LoadState::PENDING);
+        preview_completion_announced = false;
+        UI::get().disable();
         nametags.emplace_back(nametag, Text::A13M, Text::WHITE, created_character.stats.name);
 
         if (selected_absolute < charlooks.size() - 1)
@@ -653,19 +704,17 @@ namespace jrc
             return;
         }
 
-        if (charlooks[index] && preview_ready > 0)
-        {
-            --preview_ready;
-        }
-
         characters.erase(characters.begin() + index);
         charlooks.erase(charlooks.begin() + index);
+        preview_states.erase(preview_states.begin() + index);
         nametags.erase(nametags.begin() + index);
 
         charcount_absolute--;
+        preview_ready = character_preview::resolved_count(preview_states);
         update_counts();
         update_selection();
         charlist_transition::set_preview_progress(preview_ready, charlooks.size());
+        complete_previews_if_ready();
     }
 
     const CharEntry& UICharSelect::get_character(int32_t cid)
