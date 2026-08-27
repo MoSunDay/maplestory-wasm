@@ -1,4 +1,4 @@
-Commit: 18144286a501ba0db7bdd12eb80b3842db39d0ac
+Commit: f79ac092343f9cbdd17a486211f0f7768039c291
 
 # 网络层
 
@@ -57,6 +57,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 其他玩家的可见 Buff 按掩码位序完整解析后一次性提交到角色状态；截断封包在 `InPacket` 报错时不会留下部分斗气或属性充能状态。
 
 其他玩家出生包 `SPAWN_PLAYER` 的头部由独立解析器读取 `charId:int`、`level:short` 和 `name:string`。linked server 的 custom-client 模式使用 16 位等级；若按旧版单字节读取，后续姓名长度会错位并使整个远端玩家出生包被丢弃，表现为能看到怪物和掉落变化但看不到具体玩家。
+
+掉落移除包由无 UI 状态依赖的 `DropRemovalPayload` 解析器完整消费：mode 0/1 只含 oid，mode 2/4 追加角色 cid，mode 5 再追加宠物槽位。已知模式的截断或尾随字节会抛出 `PacketError`；未知模式记录警告并按服务端权威结论立即擦除对应 oid，不能让单个表现分支中断地图封包处理。mode 5 会解析拾取宠物的固定位置供动画使用；角色或宠物已离开可见范围时仍执行原地淡出和删除。
 
 场地包 `CLOCK` / `STOP_CLOCK` 驱动游戏内场地计时器；`FIELD_EFFECT` 的 2、3、4 模式分别处理具名地图对象关闭、一次性视觉效果和场地音效。服务端 `Party1/Clear`、`Party1/Failed` 会按 `Sound.nx/Field.img` 兼容路径解析，组队任务开门则按地图对象的 `name` 精确停用。
 
@@ -131,7 +133,7 @@ linked MapleStory Server → Socket::read() → Session::read()
 | `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, Social, Trade, NpcInteraction, CashShop 等) |
 | `Handlers/Helpers/` | 封包解析辅助 (CharacterDataParser, ItemParser, LoginParser, MovementParser) |
 | `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets, SocialPackets, TradePackets, CashShopPackets 等)；`CharacterCreation/` 保存可独立验证的建角 payload 编码 |
-| `Protocol/` | 可独立验证的协议解析与编码，包括好友事件、远端玩家和怪物出生负载 |
+| `Protocol/` | 可独立验证的协议解析与编码，包括好友事件、远端玩家/怪物出生负载和掉落移除负载 |
 
 ## 依赖关系
 
