@@ -302,6 +302,7 @@ namespace jrc
         }
 
         const Inventory& inventory = player.get_inventory();
+        const pet_capability::Capabilities capabilities = get_pet_capabilities();
         const CharStats& stats = player.get_stats();
         int16_t hp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_hp_item());
         int16_t mp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_mp_item());
@@ -314,8 +315,8 @@ namespace jrc
             stats.get_stat(Maplestat::MAXMP),
             stats.get_stat(Maplestat::HP) > 0,
             true,
-            inventory.has_equipped_item(jrc::pet_automation::AUTO_HP_POUCH),
-            inventory.has_equipped_item(jrc::pet_automation::AUTO_MP_POUCH),
+            capabilities.auto_hp_pouch,
+            capabilities.auto_mp_pouch,
             hp_slot > 0 && hp_item && hp_item.restores_hp(),
             mp_slot > 0 && mp_item && mp_item.restores_mp()
         };
@@ -329,8 +330,7 @@ namespace jrc
                 PetAutoPotPacket(0, pet->get_uniqueid(), slot, item_id).dispatch();
         }
 
-        bool has_boots = inventory.has_equipped_item(jrc::pet_automation::WING_BOOTS);
-        if (!has_boots)
+        if (!capabilities.wing_boots)
         {
             clear_pet_loot_target(pet);
             return;
@@ -341,16 +341,21 @@ namespace jrc
             clear_pet_loot_target(pet);
         }
 
+        if (pet_loot_target_oid && !pet->has_loot_target())
+        {
+            clear_pet_loot_target(pet);
+        }
+
         if (!pet_loot_target_oid && pet_loot_cooldown == 0)
         {
             MapDrops::PetLootQuery query = {
                 player.get_position(),
                 player.get_oid(),
                 current_party_id(),
-                300,
-                inventory.has_equipped_item(jrc::pet_automation::MESO_MAGNET),
-                inventory.has_equipped_item(jrc::pet_automation::ITEM_POUCH),
-                inventory.has_equipped_item(jrc::pet_automation::MAGIC_SCALES)
+                120,
+                capabilities.meso_magnet,
+                capabilities.item_pouch,
+                capabilities.magic_scales
             };
             MapDrops::PetLootTarget target = drops.find_pet_loot(query);
             if (target.oid)
@@ -508,6 +513,20 @@ namespace jrc
     const pet_automation::Controller& Stage::get_pet_automation() const
     {
         return pet_automation;
+    }
+
+    pet_capability::Capabilities Stage::get_pet_capabilities() const
+    {
+        const PetLook* pet = player.get_pet(0);
+        const Inventory& inventory = player.get_inventory();
+        return pet_capability::resolve(pet ? pet->get_itemid() : 0, {
+            inventory.has_equipped_item(pet_automation::MESO_MAGNET),
+            inventory.has_equipped_item(pet_automation::ITEM_POUCH),
+            inventory.has_equipped_item(pet_automation::AUTO_HP_POUCH),
+            inventory.has_equipped_item(pet_automation::AUTO_MP_POUCH),
+            inventory.has_equipped_item(pet_automation::WING_BOOTS),
+            inventory.has_equipped_item(pet_automation::MAGIC_SCALES)
+        });
     }
 
     Optional<Char> Stage::get_character(int32_t cid)

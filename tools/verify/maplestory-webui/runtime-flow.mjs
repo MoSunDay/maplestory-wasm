@@ -51,6 +51,8 @@ export function createRuntimeProbes(driver) {
     playerMaxMp: () => number('msplayer_max_mp'),
     playerMeso: () => number('msplayer_meso'),
     petActive: () => number('mspet_active'),
+    petItemId: () => number('mspet_item_id'),
+    petCapabilityMask: () => number('mspet_capability_mask'),
     petX: () => number('mspet_x'),
     petY: () => number('mspet_y'),
     petStance: () => number('mspet_stance'),
@@ -168,4 +170,9 @@ export async function enterTutorialMobMap(driver, probes, requireState) {
   ];
   for (const step of route)
     await walkRightThroughPortal(driver, probes, requireState, ...step);
+}
+
+export async function enterTutorialLootMap(driver, probes, requireState) {
+  await walkRightThroughPortal(driver, probes, requireState,
+    40000, 50000, 975, 151);
 }

@@ -1,6 +1,8 @@
 #include "PetFollowPolicy.h"
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace jrc::pet_follow
 {
@@ -11,25 +13,54 @@ namespace jrc::pet_follow
             current_distance <= previous_distance - MINIMUM_PROGRESS;
     }
 
+    bool outside_owner_leash(Point<int16_t> pet_position,
+        Point<int16_t> owner_position)
+    {
+        const int32_t dx = static_cast<int32_t>(owner_position.x()) -
+            pet_position.x();
+        const int32_t dy = static_cast<int32_t>(owner_position.y()) -
+            pet_position.y();
+        const int64_t distance_sq = static_cast<int64_t>(dx) * dx +
+            static_cast<int64_t>(dy) * dy;
+        return std::abs(dy) > OWNER_LEASH_HEIGHT ||
+            distance_sq > static_cast<int64_t>(OWNER_LEASH_DISTANCE) *
+                OWNER_LEASH_DISTANCE;
+    }
+
+    Point<int16_t> player_side_position(Point<int16_t> owner_position)
+    {
+        constexpr int32_t SIDE_OFFSET = 35;
+        const int32_t x = std::clamp(
+            static_cast<int32_t>(owner_position.x()) - SIDE_OFFSET,
+            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        return { static_cast<int16_t>(x), owner_position.y() };
+    }
+
     Action decide(const Inputs& inputs)
     {
         const int32_t dx = static_cast<int32_t>(inputs.target_position.x()) -
             inputs.pet_position.x();
-        const int32_t dy = static_cast<int32_t>(inputs.target_position.y()) -
+        const int32_t target_dy = static_cast<int32_t>(inputs.target_position.y()) -
             inputs.pet_position.y();
-        const int64_t distance_sq = static_cast<int64_t>(dx) * dx +
-            static_cast<int64_t>(dy) * dy;
-
-        const int32_t warp_distance = inputs.pursuing_loot ? 210 : 260;
-        const int32_t warp_height = inputs.pursuing_loot ? 70 : 90;
         const int32_t start_distance = inputs.pursuing_loot ? 32 : 65;
         const int32_t stop_distance = inputs.pursuing_loot ? 14 : 34;
 
-        if (std::abs(dy) > warp_height ||
-            distance_sq > warp_distance * warp_distance ||
-            (inputs.stalled_frames >= 90 && std::abs(dx) > stop_distance))
+        if (outside_owner_leash(inputs.pet_position, inputs.owner_position))
         {
-            return Action::WARP;
+            return Action::WARP_TO_OWNER;
+        }
+
+        if (inputs.pursuing_loot &&
+            (std::abs(target_dy) > 70 || inputs.stalled_frames >= 90))
+        {
+            return Action::ABANDON_LOOT;
+        }
+
+        if (!inputs.pursuing_loot && inputs.stalled_frames >= 90 &&
+            std::abs(dx) > stop_distance)
+        {
+            return Action::WARP_TO_OWNER;
         }
 
         const int32_t threshold = inputs.moving ? stop_distance : start_distance;

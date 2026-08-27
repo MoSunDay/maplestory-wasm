@@ -6,6 +6,7 @@ import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
 import {
   createAssetIdleWaiter,
   createRuntimeProbes,
+  enterTutorialLootMap,
   enterTutorialMobMap,
   resolvePageUrl
 } from './runtime-flow.mjs';
@@ -37,7 +38,7 @@ const requireMobs = process.env.E2E_REQUIRE_MOBS === '1';
 const routeTutorialMobMap = process.env.E2E_ROUTE_TUTORIAL_MOB_MAP === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const petOptionsMode = process.env.E2E_PET_OPTIONS || '';
-const verifyPetOptions = ['1', 'configure', 'runtime'].includes(petOptionsMode);
+const verifyPetOptions = ['1', 'configure', 'runtime', 'pickup'].includes(petOptionsMode);
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 
@@ -528,6 +529,10 @@ try {
       console.log(`INFO  mob runtime entry map=${initialMapId} count=${initialMobCount}`);
       if (initialMobCount === 0 && routeTutorialMobMap && initialMapId === 10000)
         await enterTutorialMobMap(driver, {
+          mapId, playerX, playerY, mapAssetLoading
+        }, requireState);
+      if (petOptionsMode === 'pickup' && await mapId() === 40000)
+        await enterTutorialLootMap(driver, {
           mapId, playerX, playerY, mapAssetLoading
         }, requireState);
       await requireState('map monsters instantiated', async () =>
