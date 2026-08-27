@@ -64,6 +64,7 @@ namespace
 
 int main(int argc, char** argv)
 {
+    constexpr const char* TARGET_ITEM = "01082003.img";
     const std::string character_path = argc > 1 ? argv[1] : "Character.nx";
     const std::string base_path = argc > 2 ? argv[2] : "Base.nx";
     nl::file character_file(character_path);
@@ -76,6 +77,8 @@ int main(int argc, char** argv)
     std::vector<std::string> failures;
     size_t items = 0;
     size_t parts = 0;
+    size_t target_parts = 0;
+    bool target_found = false;
 
     for (nl::node entry : zmap)
     {
@@ -101,7 +104,14 @@ int main(int argc, char** argv)
     for (nl::node item : gloves)
     {
         ++items;
-        audit_node(item, item.name(), zmap, observed, failures, parts);
+        size_t item_parts = 0;
+        audit_node(item, item.name(), zmap, observed, failures, item_parts);
+        parts += item_parts;
+        if (item.name() == TARGET_ITEM)
+        {
+            target_found = true;
+            target_parts = item_parts;
+        }
     }
 
     constexpr size_t EXPECTED_LABELS = 14;
@@ -122,6 +132,12 @@ int main(int argc, char** argv)
     {
         failures.push_back("no glove frame metadata was audited");
     }
+    if (!target_found || target_parts == 0)
+    {
+        failures.push_back(
+            std::string(TARGET_ITEM) + " is missing or has no glove bitmap parts"
+        );
+    }
 
     if (!failures.empty())
     {
@@ -129,6 +145,7 @@ int main(int argc, char** argv)
         return 1;
     }
     std::cout << "glove layering audit passed: " << items << " items, "
-              << parts << " parts, " << declared.size() << " z labels\n";
+              << parts << " parts, " << declared.size() << " z labels; "
+              << TARGET_ITEM << "=" << target_parts << " parts\n";
     return 0;
 }

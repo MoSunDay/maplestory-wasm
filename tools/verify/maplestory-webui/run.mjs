@@ -26,6 +26,7 @@ const chatMessage = process.env.E2E_CHAT || '中文聊天测试';
 const maxP95FrameMs = Number(process.env.E2E_MAX_P95_FRAME_MS || 34);
 const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
+const charSelectLatencyMs = Number(process.env.E2E_CHAR_SELECT_LATENCY_MS || 0);
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
 const verifyCashShop = process.env.E2E_CASH_SHOP === '1';
@@ -308,6 +309,39 @@ try {
   await driver.screenshot('02-world-select');
 
   await driver.screenshot('03-channel-one-only');
+  await driver.evaluate(`(() => {
+    const lazy = Module.LazyFS;
+    const originalForeground = lazy.requestForegroundFileRange;
+    const state = () => Module.ccall('msui_state', 'number', [], []);
+    const evidence = {
+      active: true,
+      states: [{ state: state(), at: performance.now() }],
+      characterRequests: []
+    };
+    lazy.requestForegroundFileRange = function(filepath, offset, length) {
+      if (evidence.active && filepath === 'Character.nx') {
+        evidence.characterRequests.push({
+          state: state(), offset, length, at: performance.now()
+        });
+      }
+      return originalForeground.call(this, filepath, offset, length);
+    };
+    const sample = () => {
+      if (!evidence.active) return;
+      evidence.states.push({ state: state(), at: performance.now() });
+      requestAnimationFrame(sample);
+    };
+    evidence.restore = () => {
+      evidence.active = false;
+      lazy.requestForegroundFileRange = originalForeground;
+    };
+    window.charSelectTransitionEvidence = evidence;
+    requestAnimationFrame(sample);
+  })()`);
+  if (!Number.isFinite(charSelectLatencyMs) || charSelectLatencyMs < 0) {
+    throw new Error(`Invalid E2E_CHAR_SELECT_LATENCY_MS: ${charSelectLatencyMs}`);
+  }
+  if (charSelectLatencyMs > 0) await driver.setNetworkLatency(charSelectLatencyMs);
   if (worldSelectAction === 'channel') {
     await driver.doubleClick(255, 260);
   } else if (worldSelectAction === 'dom-go') {
@@ -323,6 +357,39 @@ try {
   }
   await requireUiState('character-select UI active', uiState.charSelect, 45);
   await requireAssetIdle('character-select assets ready');
+  if (charSelectLatencyMs > 0) await driver.setNetworkLatency(0);
+  const charSelectTransition = await driver.evaluate(`(() => {
+    const evidence = window.charSelectTransitionEvidence;
+    evidence.states.push({
+      state: Module.ccall('msui_state', 'number', [], []),
+      at: performance.now()
+    });
+    evidence.restore();
+    return {
+      states: evidence.states,
+      characterRequests: evidence.characterRequests
+    };
+  })()`);
+  fs.writeFileSync(
+    `${driver.artifactDir}/char-select-transition.json`,
+    `${JSON.stringify(charSelectTransition, null, 2)}\n`
+  );
+  const transitionStates = charSelectTransition.states.map(sample => sample.state);
+  if (transitionStates[0] !== uiState.worldSelect
+      || transitionStates[transitionStates.length - 1] !== uiState.charSelect
+      || transitionStates.includes(0)) {
+    throw new Error(`Character-select transition crossed an invalid UI state: ${JSON.stringify(transitionStates)}`);
+  }
+  const earlyCharacterRequests = charSelectTransition.characterRequests.filter(
+    request => request.state !== uiState.charSelect
+  );
+  if (earlyCharacterRequests.length > 0) {
+    throw new Error(`Character bitmaps blocked before CHARSELECT installation: ${JSON.stringify(earlyCharacterRequests)}`);
+  }
+  console.log(`PASS  character-select transition remained mounted ${JSON.stringify({
+    samples: transitionStates.length,
+    characterRequests: charSelectTransition.characterRequests.length
+  })}`);
   await driver.screenshot('04-character-select-before');
   if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');
 
