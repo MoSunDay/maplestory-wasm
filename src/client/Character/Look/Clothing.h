@@ -54,11 +54,13 @@ namespace jrc
         };
 
         // Construct a new equip.
-        Clothing(int32_t itemid, const BodyDrawinfo& drawinfo);
+        Clothing(int32_t itemid, const BodyDrawinfo& drawinfo,
+                 Texture::LoadMode load_mode = Texture::LoadMode::BACKGROUND);
 
         // Draw the equip.
         void draw(Stance::Id stance, Layer layer, uint8_t frame, const DrawArgument& args) const;
         void prepare(Stance::Id stance) const;
+        void prepare_background() const;
         // Check if a part of the equip lies on the specified layer while in the specified stance.
         bool contains_layer(Stance::Id stance, Layer layer) const;
 

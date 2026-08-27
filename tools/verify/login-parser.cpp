@@ -110,9 +110,11 @@ namespace
 
         jrc::InPacket packet(bytes.data(), bytes.size());
         auto character = jrc::LoginParser::parse_charentry(packet);
+        assert(packet.position() == bytes.size() - 5);
         assert(packet.read_byte() == 0);
         assert(packet.read_int() == 6);
         assert(!packet.available());
+        assert(packet.position() == bytes.size());
         return character;
     }
 }

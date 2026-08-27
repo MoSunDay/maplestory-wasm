@@ -38,6 +38,8 @@ namespace jrc
         bool available() const;
         /// Return the remaining length in bytes.
         size_t length() const;
+        /// Return the number of bytes already consumed.
+        size_t position() const;
         /// Skip a number of bytes (by increasing the offset).
         void skip(size_t count);
 

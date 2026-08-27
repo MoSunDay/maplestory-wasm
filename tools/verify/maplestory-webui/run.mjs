@@ -321,29 +321,53 @@ try {
   await driver.screenshot('03-channel-one-only');
   await driver.evaluate(`(() => {
     const lazy = Module.LazyFS;
-    const originalForeground = lazy.requestForegroundFileRange;
     const state = () => Module.ccall('msui_state', 'number', [], []);
+    const probe = name => Module.ccall(name, 'number', [], []);
+    const snapshot = () => ({
+      state: state(),
+      phase: probe('mscharlist_phase'),
+      characterIndex: probe('mscharlist_character_index'),
+      equipId: probe('mscharlist_equip_id'),
+      remainingBytes: probe('mscharlist_remaining_bytes'),
+      previewReady: probe('mscharlist_preview_ready'),
+      previewTotal: probe('mscharlist_preview_total'),
+      at: performance.now()
+    });
+    const intercepted = [
+      'readFileData',
+      'prefetchFileRange',
+      'requestPriorityFileRange',
+      'requestForegroundFileRange'
+    ];
+    const originals = {};
     const evidence = {
       active: true,
-      states: [{ state: state(), at: performance.now() }],
+      states: [snapshot()],
       characterRequests: []
     };
-    lazy.requestForegroundFileRange = function(filepath, offset, length) {
-      if (evidence.active && filepath === 'Character.nx') {
-        evidence.characterRequests.push({
-          state: state(), offset, length, at: performance.now()
-        });
-      }
-      return originalForeground.call(this, filepath, offset, length);
-    };
+    for (const kind of intercepted) {
+      const original = lazy[kind];
+      if (typeof original !== 'function') continue;
+      originals[kind] = original;
+      lazy[kind] = function(filepath, offset, length) {
+        if (evidence.active && filepath === 'Character.nx') {
+          evidence.characterRequests.push({
+            kind, filepath, offset, length, ...snapshot()
+          });
+        }
+        return original.apply(this, arguments);
+      };
+    }
     const sample = () => {
       if (!evidence.active) return;
-      evidence.states.push({ state: state(), at: performance.now() });
+      evidence.states.push(snapshot());
       requestAnimationFrame(sample);
     };
     evidence.restore = () => {
       evidence.active = false;
-      lazy.requestForegroundFileRange = originalForeground;
+      for (const [kind, original] of Object.entries(originals)) {
+        lazy[kind] = original;
+      }
     };
     window.charSelectTransitionEvidence = evidence;
     requestAnimationFrame(sample);
@@ -372,6 +396,12 @@ try {
     const evidence = window.charSelectTransitionEvidence;
     evidence.states.push({
       state: Module.ccall('msui_state', 'number', [], []),
+      phase: Module.ccall('mscharlist_phase', 'number', [], []),
+      characterIndex: Module.ccall('mscharlist_character_index', 'number', [], []),
+      equipId: Module.ccall('mscharlist_equip_id', 'number', [], []),
+      remainingBytes: Module.ccall('mscharlist_remaining_bytes', 'number', [], []),
+      previewReady: Module.ccall('mscharlist_preview_ready', 'number', [], []),
+      previewTotal: Module.ccall('mscharlist_preview_total', 'number', [], []),
       at: performance.now()
     });
     evidence.restore();
@@ -390,15 +420,23 @@ try {
       || transitionStates.includes(0)) {
     throw new Error(`Character-select transition crossed an invalid UI state: ${JSON.stringify(transitionStates)}`);
   }
+  const mountedOrLater = charSelectTransition.states.some(
+    sample => sample.phase >= 5 && sample.phase <= 8
+  );
+  if (!mountedOrLater) {
+    throw new Error(`Character-select UI never reached the mounted phase: ${JSON.stringify(charSelectTransition.states)}`);
+  }
   const earlyCharacterRequests = charSelectTransition.characterRequests.filter(
     request => request.state !== uiState.charSelect
   );
   if (earlyCharacterRequests.length > 0) {
-    throw new Error(`Character bitmaps blocked before CHARSELECT installation: ${JSON.stringify(earlyCharacterRequests)}`);
+    throw new Error(`Character assets were read before CHARSELECT installation: ${JSON.stringify(earlyCharacterRequests)}`);
   }
   console.log(`PASS  character-select transition remained mounted ${JSON.stringify({
     samples: transitionStates.length,
-    characterRequests: charSelectTransition.characterRequests.length
+    characterRequests: charSelectTransition.characterRequests.length,
+    finalPhase: charSelectTransition.states.at(-1).phase,
+    previews: `${charSelectTransition.states.at(-1).previewReady}/${charSelectTransition.states.at(-1).previewTotal}`
   })}`);
   await driver.screenshot('04-character-select-before');
   if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');

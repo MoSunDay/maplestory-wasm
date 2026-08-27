@@ -46,7 +46,8 @@ namespace jrc
         }
     }
 
-    void CharEquips::add_equip(int32_t itemid, const BodyDrawinfo& drawinfo)
+    void CharEquips::add_equip(int32_t itemid, const BodyDrawinfo& drawinfo,
+                               Texture::LoadMode load_mode)
     {
         if (itemid <= 0)
             return;
@@ -57,8 +58,12 @@ namespace jrc
             iter = cloth_cache.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(itemid),
-                std::forward_as_tuple(itemid, drawinfo)
+                std::forward_as_tuple(itemid, drawinfo, load_mode)
             ).first;
+        }
+        else if (load_mode == Texture::LoadMode::BACKGROUND)
+        {
+            iter->second.prepare_background();
         }
         const Clothing& cloth = iter->second;
 

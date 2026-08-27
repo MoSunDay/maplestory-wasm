@@ -20,6 +20,7 @@
 #include "UISoftKey.h"
 #include "UICharCreation.h"
 #include "UILoginNotice.h"
+#include "../CharacterSelect/PreviewLoadPolicy.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -31,6 +32,7 @@
 #include "../../Console.h"
 #include "../../Character/Job.h"
 #include "../../Net/Packets/SelectCharPackets.h"
+#include "../../Net/Login/CharlistTransition.h"
 
 #include "nlnx/nx.hpp"
 
@@ -43,17 +45,29 @@ namespace jrc
     }
 
     UICharSelect::UICharSelect(std::vector<CharEntry> cs,
-                               uint8_t c,
                                uint8_t s,
-                               uint8_t channel_id,
+                               uint8_t ch,
                                int8_t p)
-        : characters(cs),        require_pic(p),
+        : characters(std::move(cs)), require_pic(p), channel_id(ch),
           pending_pic_action(PicAction::NONE), pending_pic_cid(-1),
-          charcount_absolute(c), slots_absolute(s)
+          preview_ready(0), ui_initialized(false), ui_failed(false),
+          charcount_absolute(static_cast<uint8_t>(characters.size())),
+          charcount_relative(0), slots_absolute(s), slots_relative(0),
+          selected_absolute(0), selected_relative(0), page(0)
     {
         selected_absolute = Setting<DefaultCharacter>::get().load();
         selected_relative = selected_absolute % PAGESIZE;
         page              = selected_absolute / PAGESIZE;
+
+        charlooks.resize(characters.size());
+
+        position  = { 0, 0 };
+        dimension = { 800, 600 };
+        active    = true;
+    }
+
+    void UICharSelect::initialize_ui()
+    {
 
         nl::node back       = nl::nx::map["Back"]["login.img"]["back"];
         nl::node title      = nl::nx::ui["Login.img"]["Title"];
@@ -136,23 +150,24 @@ namespace jrc
             infolabels[i] = { Text::A11M, Text::RIGHT };
         }
 
+        nametags.reserve(characters.size());
         for (const auto& entry : characters)
         {
-            charlooks.emplace_back(entry.look);
             nametags.emplace_back(nametag, Text::A13M, Text::WHITE, entry.stats.name);
         }
 
         update_counts();
         update_selection();
-
-        position  = { 0, 0 };
-        dimension = { 800, 600 };
-        active    = true;
     }
 
     void UICharSelect::draw(float alpha) const
     {
         UIElement::draw(alpha);
+        if (!ui_initialized)
+        {
+            return;
+        }
+
         slotcountlabel.draw(slotcountpos);
 
         for (uint8_t i = 0; i < charcount_relative; ++i)
@@ -160,7 +175,10 @@ namespace jrc
             Point<int16_t> charpos = get_char_pos(i);
             uint8_t index = i + page * PAGESIZE;
             charplatform.draw(charpos, alpha);
-            charlooks[index].draw(charpos, alpha);
+            if (index < charlooks.size() && charlooks[index])
+            {
+                charlooks[index]->draw(charpos, alpha);
+            }
             nametags[index].draw(charpos);
         }
 
@@ -193,24 +211,132 @@ namespace jrc
     {
         UIElement::update();
 
+        if (ui_failed)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!ui_initialized)
+            {
+                charlist_transition::set_phase(
+                    charlist_transition::Phase::STATIC_UI_LOADING
+                );
+                initialize_ui();
+                ui_initialized = true;
+                charlist_transition::set_phase(
+                    charlist_transition::Phase::PREVIEW_LOADING
+                );
+            }
+
+            load_next_preview();
+        }
+        catch (const std::exception& error)
+        {
+            fail_ui(error);
+            return;
+        }
+        catch (...)
+        {
+            fail_ui("unknown exception");
+            return;
+        }
+
         emptyslot.update();
         charplatform.update();
 
         for (auto& chit : charlooks)
         {
-            chit.update(Constants::TIMESTEP);
+            if (chit)
+            {
+                chit->update(Constants::TIMESTEP);
+            }
         }
+    }
+
+    void UICharSelect::load_next_preview()
+    {
+        std::vector<bool> ready;
+        ready.reserve(charlooks.size());
+        for (const auto& look : charlooks)
+        {
+            ready.push_back(look.has_value());
+        }
+
+        const auto next = character_preview::next_index(
+            ready,
+            selected_absolute,
+            page,
+            PAGESIZE
+        );
+        if (!next)
+        {
+            charlist_transition::set_preview_progress(
+                preview_ready,
+                charlooks.size()
+            );
+            charlist_transition::set_phase(charlist_transition::Phase::READY);
+            return;
+        }
+
+        const size_t index = *next;
+        charlist_transition::set_character(index, 0);
+        charlooks[index].emplace(
+            characters[index].look,
+            Texture::LoadMode::DEFERRED,
+            [](int32_t equip_id) {
+                charlist_transition::set_equip(equip_id);
+            }
+        );
+        ++preview_ready;
+        charlist_transition::set_preview_progress(preview_ready, charlooks.size());
+        if (index == selected_absolute)
+        {
+            charlooks[index]->set_stance(Stance::WALK1);
+        }
+    }
+
+    void UICharSelect::fail_ui(const std::exception& error)
+    {
+        fail_ui(error.what());
+    }
+
+    void UICharSelect::fail_ui(const std::string& message)
+    {
+        ui_failed = true;
+        charlist_transition::set_phase(charlist_transition::Phase::FAILED_UI);
+        Console::get().print(
+            std::string("[UICharSelect] Character preview load failed: ") +
+            message
+        );
     }
 
     Button::State UICharSelect::button_pressed(uint16_t bid)
     {
-        if (bid >= BT_CHAR0)
+        if (!ui_initialized || ui_failed)
         {
+            return Button::DISABLED;
+        }
+
+        if (bid >= BT_CHAR0 && bid < BT_CHAR0 + PAGESIZE)
+        {
+            const uint8_t next_relative = static_cast<uint8_t>(bid - BT_CHAR0);
+            if (next_relative >= charcount_relative ||
+                selected_absolute >= nametags.size())
+            {
+                return Button::DISABLED;
+            }
+
             nametags[selected_absolute].set_selected(false);
-            charlooks[selected_absolute].set_stance(Stance::STAND1);
+            if (selected_absolute < charlooks.size() &&
+                charlooks[selected_absolute])
+            {
+                charlooks[selected_absolute]->set_stance(Stance::STAND1);
+            }
             buttons[BT_CHAR0 + selected_relative]->set_state(Button::NORMAL);
 
-            selected_relative = static_cast<uint8_t>(bid - BT_CHAR0);
+            selected_relative = next_relative;
             selected_absolute = selected_relative + page * PAGESIZE;
             update_selection();
 
@@ -253,7 +379,17 @@ namespace jrc
             return;
         }
 
-        charlooks[selected_absolute].set_stance(Stance::WALK1);
+        if (selected_absolute >= characters.size() ||
+            selected_absolute >= charlooks.size() ||
+            selected_absolute >= nametags.size())
+        {
+            return;
+        }
+
+        if (charlooks[selected_absolute])
+        {
+            charlooks[selected_absolute]->set_stance(Stance::WALK1);
+        }
         nametags[selected_absolute].set_selected(true);
 
         buttons[BT_CHAR0 + selected_relative]->set_state(Button::PRESSED);
@@ -471,12 +607,15 @@ namespace jrc
     {
         characters.emplace_back(std::forward<CharEntry>(character));
         const CharEntry& created_character = characters.back();
-        charlooks.emplace_back(created_character.look);
+        charlooks.emplace_back(std::nullopt);
         nametags.emplace_back(nametag, Text::A13M, Text::WHITE, created_character.stats.name);
 
         if (selected_absolute < charlooks.size() - 1)
         {
-            charlooks[selected_absolute].set_stance(Stance::STAND1);
+            if (charlooks[selected_absolute])
+            {
+                charlooks[selected_absolute]->set_stance(Stance::STAND1);
+            }
             nametags[selected_absolute].set_selected(false);
 
             if (selected_relative < PAGESIZE)
@@ -492,6 +631,8 @@ namespace jrc
 
         update_counts();
         update_selection();
+        charlist_transition::set_preview_progress(preview_ready, charlooks.size());
+        charlist_transition::set_phase(charlist_transition::Phase::PREVIEW_LOADING);
     }
 
     void UICharSelect::remove_char(int32_t cid)
@@ -512,14 +653,19 @@ namespace jrc
             return;
         }
 
+        if (charlooks[index] && preview_ready > 0)
+        {
+            --preview_ready;
+        }
+
         characters.erase(characters.begin() + index);
         charlooks.erase(charlooks.begin() + index);
         nametags.erase(nametags.begin() + index);
 
         charcount_absolute--;
-        charcount_relative--;
         update_counts();
         update_selection();
+        charlist_transition::set_preview_progress(preview_ready, charlooks.size());
     }
 
     const CharEntry& UICharSelect::get_character(int32_t cid)

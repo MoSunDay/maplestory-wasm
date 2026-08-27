@@ -28,7 +28,8 @@
 
 namespace jrc
 {
-    Clothing::Clothing(int32_t id, const BodyDrawinfo& drawinfo) : itemid(id)
+    Clothing::Clothing(int32_t id, const BodyDrawinfo& drawinfo,
+                       Texture::LoadMode load_mode) : itemid(id)
     {
         const EquipData& equipdata = EquipData::get(itemid);
 
@@ -216,7 +217,7 @@ namespace jrc
                     }
 
                     stances[stance][z]
-                        .emplace(frame, partnode)->second.shift(shift);
+                        .emplace(frame, Texture(partnode, load_mode))->second.shift(shift);
                 }
             }
         }
@@ -245,6 +246,20 @@ namespace jrc
             for (const auto& entry : stances[stance][static_cast<Layer>(layer)])
             {
                 entry.second.prepare_map_required();
+            }
+        }
+    }
+
+    void Clothing::prepare_background() const
+    {
+        for (size_t stance = 0; stance < Stance::LENGTH; ++stance)
+        {
+            for (size_t layer = 0; layer < Layer::NUM_LAYERS; ++layer)
+            {
+                for (const auto& entry : stances[static_cast<Stance::Id>(stance)][static_cast<Layer>(layer)])
+                {
+                    entry.second.prepare_background();
+                }
             }
         }
     }
