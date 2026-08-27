@@ -139,6 +139,15 @@ try {
   }, 90);
 	await requireState('NX asset loading phase reported', async () =>
 		driver.logs.some(line => line.includes('[loading] assets')), 45);
+	await requireState('Map.nx registered', async () => {
+		try {
+			return await driver.evaluate(
+				"Boolean(Module.LazyFS?.files?.get('Map.nx')?.size)"
+			);
+		} catch (error) {
+			return false;
+		}
+	}, 90);
   await driver.evaluate(`(() => {
     const startup = document.getElementById('loading-screen');
     window.assetTestStartupDisplay = startup.style.display;
