@@ -19,11 +19,11 @@
 
 #include "../../Data/EquipData.h"
 #include "../../Data/WeaponData.h"
+#include "../../Console.h"
 
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
-#include <stdexcept>
 #include <unordered_set>
 
 namespace jrc
@@ -151,10 +151,12 @@ namespace jrc
                         std::optional<Layer> glove_layer = glove_layer_by_name(zs);
                         if (!glove_layer)
                         {
-                            throw std::runtime_error(
-                                "Unhandled glove layer: " + zs + " in " +
-                                std::to_string(itemid)
+                            Console::get().print(
+                                "Warning: Unhandled glove layer (" + zs +
+                                ") for equip " + std::to_string(itemid) +
+                                ", part " + part + "; skipping bitmap."
                             );
+                            continue;
                         }
                         z = *glove_layer;
                     }

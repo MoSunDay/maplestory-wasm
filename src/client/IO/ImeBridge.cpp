@@ -157,6 +157,11 @@ extern "C"
         return 0;
     }
 
+    EMSCRIPTEN_KEEPALIVE int msui_enabled()
+    {
+        return jrc::UI::get().is_enabled() ? 1 : 0;
+    }
+
     EMSCRIPTEN_KEEPALIVE int mscharlist_phase()
     {
         return static_cast<int>(jrc::charlist_transition::snapshot().phase);

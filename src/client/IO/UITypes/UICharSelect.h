@@ -20,6 +20,7 @@
 
 #include "../Components/Charset.h"
 #include "../Components/Nametag.h"
+#include "../CharacterSelect/PreviewLoadPolicy.h"
 
 #include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Sprite.h"
@@ -69,6 +70,9 @@ namespace jrc
         void send_deletion();
         void initialize_ui();
         void load_next_preview();
+        void resolve_preview(size_t index, character_preview::LoadState state);
+        void complete_previews_if_ready();
+        void fail_preview(size_t index, const std::string& message);
         void fail_ui(const std::exception& error);
         void fail_ui(const std::string& message);
         void update_selection();
@@ -103,12 +107,14 @@ namespace jrc
 
         std::vector<CharEntry> characters;
         std::vector<std::optional<CharLook>> charlooks;
+        std::vector<character_preview::LoadState> preview_states;
         std::vector<Nametag> nametags;
         int8_t require_pic;
         uint8_t channel_id;
         PicAction pending_pic_action;
         int32_t pending_pic_cid;
         size_t preview_ready;
+        bool preview_completion_announced;
         bool ui_initialized;
         bool ui_failed;
 
