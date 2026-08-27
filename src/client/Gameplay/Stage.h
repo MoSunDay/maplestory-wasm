@@ -117,6 +117,7 @@ namespace jrc
         bool set_pet_auto_thresholds(uint8_t hp, uint8_t mp);
         const pet_automation::Controller& get_pet_automation() const;
         pet_capability::Capabilities get_pet_capabilities() const;
+        int32_t get_pet_loot_target_oid() const;
 
         // Return a pointer to a character, possibly the player.
         Optional<Char> get_character(int32_t cid);

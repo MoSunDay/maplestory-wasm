@@ -336,7 +336,7 @@ namespace jrc
             return;
         }
 
-        if (pet_loot_target_oid && !drops.has_drop(pet_loot_target_oid))
+        if (pet_loot_target_oid && !drops.has_lootable_drop(pet_loot_target_oid))
         {
             clear_pet_loot_target(pet);
         }
@@ -527,6 +527,11 @@ namespace jrc
             inventory.has_equipped_item(pet_automation::WING_BOOTS),
             inventory.has_equipped_item(pet_automation::MAGIC_SCALES)
         });
+    }
+
+    int32_t Stage::get_pet_loot_target_oid() const
+    {
+        return pet_loot_target_oid;
     }
 
     Optional<Char> Stage::get_character(int32_t cid)

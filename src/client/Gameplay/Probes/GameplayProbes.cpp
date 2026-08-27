@@ -143,9 +143,19 @@ extern "C"
         return static_cast<int>(jrc::Stage::get().get_drops().pet_pickup_count());
     }
 
+    int mspet_loot_target_oid()
+    {
+        return jrc::Stage::get().get_pet_loot_target_oid();
+    }
+
     int msdrop_count()
     {
         return static_cast<int>(jrc::Stage::get().get_drops().size());
+    }
+
+    int msdrop_has(int32_t oid)
+    {
+        return jrc::Stage::get().get_drops().has_drop(oid) ? 1 : 0;
     }
 
     int msplayer_hp()
