@@ -25,6 +25,9 @@
 #include "../../Graphics/Sprite.h"
 #include "../../Net/Login.h"
 
+#include <exception>
+#include <optional>
+
 namespace jrc
 {
     // The character selection screen.
@@ -36,7 +39,6 @@ namespace jrc
         static constexpr bool TOGGLED = false;
 
         UICharSelect(std::vector<CharEntry> characters,
-                     uint8_t count,
                      uint8_t slots,
                      uint8_t channel_id,
                      int8_t pic);
@@ -65,6 +67,10 @@ namespace jrc
         void prompt_pic_entry(PicAction action, int32_t cid);
         void send_selection();
         void send_deletion();
+        void initialize_ui();
+        void load_next_preview();
+        void fail_ui(const std::exception& error);
+        void fail_ui(const std::string& message);
         void update_selection();
         void update_counts();
         std::string get_label_string(size_t label) const;
@@ -96,11 +102,15 @@ namespace jrc
         Point<int16_t> slotcountpos;
 
         std::vector<CharEntry> characters;
-        std::vector<CharLook> charlooks;
+        std::vector<std::optional<CharLook>> charlooks;
         std::vector<Nametag> nametags;
         int8_t require_pic;
+        uint8_t channel_id;
         PicAction pending_pic_action;
         int32_t pending_pic_cid;
+        size_t preview_ready;
+        bool ui_initialized;
+        bool ui_failed;
 
         uint8_t charcount_absolute;
         uint8_t charcount_relative;

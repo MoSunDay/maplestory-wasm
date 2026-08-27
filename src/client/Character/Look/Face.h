@@ -44,12 +44,14 @@ namespace jrc
     class Face
     {
     public:
-        Face(int32_t faceid);
+        Face(int32_t faceid,
+             Texture::LoadMode load_mode = Texture::LoadMode::BACKGROUND);
 
         void draw(Expression::Id expression, uint8_t frame, const DrawArgument& args) const;
 
         uint8_t nextframe(Expression::Id expression, uint8_t frame) const;
         int16_t get_delay(Expression::Id expression, uint8_t frame) const;
+        void prepare_background() const;
         const std::string& get_name() const;
 
     private:
@@ -58,9 +60,9 @@ namespace jrc
             Texture texture;
             uint16_t delay;
 
-            Frame(nl::node src)
+            Frame(nl::node src, Texture::LoadMode load_mode)
             {
-                texture = src["face"];
+                texture = Texture(src["face"], load_mode);
 
                 Point<int16_t> shift = src["face"]["map"]["brow"];
                 texture.shift(-shift);
@@ -75,4 +77,3 @@ namespace jrc
         std::string name;
     };
 }
-

@@ -41,7 +41,8 @@ namespace jrc
         void draw(Equipslot::Id slot, Stance::Id stance, Clothing::Layer layer, uint8_t frame, const DrawArgument& args) const;
         void prepare(Stance::Id stance) const;
         // Add an equip, if not in cache, the equip is created from the files.
-        void add_equip(int32_t itemid, const BodyDrawinfo& drawinfo);
+        void add_equip(int32_t itemid, const BodyDrawinfo& drawinfo,
+                       Texture::LoadMode load_mode = Texture::LoadMode::BACKGROUND);
         // Remove an equip.
         void remove_equip(Equipslot::Id slot);
 

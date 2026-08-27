@@ -20,6 +20,7 @@
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
+- 角色选择预览按帧顺序（选中角色、当前页、其余角色，含越界保护）：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client tools/verify/character-preview-policy.cpp src/client/IO/CharacterSelect/PreviewLoadPolicy.cpp -o /tmp/character-preview-policy && /tmp/character-preview-policy`
 - Cosmic 远端玩家出生头（custom-client short 等级与角色名对齐）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-player-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnPlayerHeader.cpp -o /tmp/spawn-player-parser && /tmp/spawn-player-parser`
 - linked server 怪物出生负载（固定状态块、坐标/foothold、出生特效、假怪显形与截断拒绝）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-mob-payload.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnMobPayload.cpp -o /tmp/spawn-mob-payload && /tmp/spawn-mob-payload`
 - 地图玩家点击命中（摄像机偏移、重叠人物最近目标、输入顺序无关）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/player-targeting.cpp src/client/Gameplay/Targeting/PlayerTargeting.cpp -o /tmp/player-targeting && /tmp/player-targeting`

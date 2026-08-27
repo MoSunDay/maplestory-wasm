@@ -27,20 +27,26 @@
 
 namespace jrc
 {
-    CharLook::CharLook(const LookEntry& entry)
+    CharLook::CharLook(const LookEntry& entry,
+                       Texture::LoadMode load_mode,
+                       EquipLoadObserver equip_observer)
     {
         reset();
 
-        set_body(entry.skin);
-        set_hair(entry.hairid);
-        set_face(entry.faceid);
+        set_body(entry.skin, load_mode);
+        set_hair(entry.hairid, load_mode);
+        set_face(entry.faceid, load_mode);
 
-        add_equip(Clothing::TOP_DEFAULT_ID);
-        add_equip(Clothing::BOTTOM_DEFAULT_ID);
+        add_equip(Clothing::TOP_DEFAULT_ID, load_mode);
+        add_equip(Clothing::BOTTOM_DEFAULT_ID, load_mode);
 
         for (auto& equip : entry.equips)
         {
-            add_equip(equip.second);
+            if (equip_observer)
+            {
+                equip_observer(equip.second);
+            }
+            add_equip(equip.second, load_mode);
         }
     }
 
@@ -392,19 +398,33 @@ namespace jrc
 
     void CharLook::set_body(int32_t skin_id)
     {
+        set_body(skin_id, Texture::LoadMode::BACKGROUND);
+    }
+
+    void CharLook::set_body(int32_t skin_id, Texture::LoadMode load_mode)
+    {
         auto iter = bodytypes.find(skin_id);
         if (iter == bodytypes.end())
         {
             iter = bodytypes.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(skin_id),
-                std::forward_as_tuple(skin_id, drawinfo)
+                std::forward_as_tuple(skin_id, drawinfo, load_mode)
             ).first;
+        }
+        else if (load_mode == Texture::LoadMode::BACKGROUND)
+        {
+            iter->second.prepare_background();
         }
         body = &iter->second;
     }
 
     void CharLook::set_hair(int32_t hair_id)
+    {
+        set_hair(hair_id, Texture::LoadMode::BACKGROUND);
+    }
+
+    void CharLook::set_hair(int32_t hair_id, Texture::LoadMode load_mode)
     {
         auto iter = hairstyles.find(hair_id);
         if (iter == hairstyles.end())
@@ -412,18 +432,35 @@ namespace jrc
             iter = hairstyles.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(hair_id),
-                std::forward_as_tuple(hair_id, drawinfo)
+                std::forward_as_tuple(hair_id, drawinfo, load_mode)
             ).first;
+        }
+        else if (load_mode == Texture::LoadMode::BACKGROUND)
+        {
+            iter->second.prepare_background();
         }
         hair = &iter->second;
     }
 
     void CharLook::set_face(int32_t face_id)
     {
+        set_face(face_id, Texture::LoadMode::BACKGROUND);
+    }
+
+    void CharLook::set_face(int32_t face_id, Texture::LoadMode load_mode)
+    {
         auto iter = facetypes.find(face_id);
         if (iter == facetypes.end())
         {
-            iter = facetypes.emplace(face_id, face_id).first;
+            iter = facetypes.emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(face_id),
+                std::forward_as_tuple(face_id, load_mode)
+            ).first;
+        }
+        else if (load_mode == Texture::LoadMode::BACKGROUND)
+        {
+            iter->second.prepare_background();
         }
         face = &iter->second;
     }
@@ -436,7 +473,12 @@ namespace jrc
 
     void CharLook::add_equip(int32_t itemid)
     {
-        equips.add_equip(itemid, drawinfo);
+        add_equip(itemid, Texture::LoadMode::BACKGROUND);
+    }
+
+    void CharLook::add_equip(int32_t itemid, Texture::LoadMode load_mode)
+    {
+        equips.add_equip(itemid, drawinfo, load_mode);
         updatetwohanded();
     }
 
