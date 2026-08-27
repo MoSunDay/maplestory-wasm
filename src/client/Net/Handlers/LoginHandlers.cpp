@@ -164,12 +164,14 @@ namespace jrc
         int8_t pic = recv.read_byte();
         uint8_t slots = (uint8_t)recv.read_int();
 
-        // Remove previous UIs.
+        // Build and install the next screen before removing the previous one.
+        // WASM bitmap loading is nonblocking, but keeping this transition
+        // transactional also prevents a future resource suspension from
+        // leaving the login UI with no active screen.
+        UI::get().emplace<UICharSelect>(characters, charcount, slots, channel_id, pic);
+
         UI::get().remove(UIElement::WORLDSELECT);
         UI::get().remove(UIElement::CHARCREATION);
-
-        // Add the character selection screen.
-        UI::get().emplace<UICharSelect>(characters, charcount, slots, channel_id, pic);
         UI::get().enable();
     }
 
