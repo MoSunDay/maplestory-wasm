@@ -55,3 +55,13 @@
   → 帧预算）全部 PASS。
 - 本地探针：character-preview-policy、login-parser、
   character-creation-flow 均通过。
+
+## 后续修正
+
+- 前 Chaos 登录背景 `back/0`（20x600，origin (10,300)）锚点 (370,300) →
+  (400,300)：位图左上角 = 锚点 - origin = (390,0) = ((800-20)/2, (600-600)/2)，
+  即 800x600 虚拟屏幕的精确居中；原 (370,300) 对应左上角 (360,0)，偏左 30px。
+- 同步应用于登录链三个界面：UILogin、UIWorldSelect、UICharSelect；
+  `back/11` 锚点 (360,313) 保持不变。
+- 随 2023 版 Map.nx（已含 back/11）该回退分支不可达，e2e 无法渲染，
+  以上述算术推导作为验证依据。
