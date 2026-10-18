@@ -1,5 +1,6 @@
 #include "../UIShop.h"
 #include "../UINotice.h"
+#include "../UIShopNodes.h"
 #include "SalePolicy.h"
 
 #include "../../UI.h"
@@ -114,10 +115,10 @@ namespace jrc
                 break;
             }
 
-            Point<int16_t> itempos(243, 116 + 42 * visible_slot);
+            Point<int16_t> itempos = shop_nodes::sell_item_button_pos(visible_slot);
             if (slot == selection)
             {
-                selected.draw(parentpos + itempos + Point<int16_t>(35, -1));
+                selected.draw(parentpos + itempos + shop_nodes::selection_shift());
             }
             items[slot].draw(parentpos + itempos);
         }
