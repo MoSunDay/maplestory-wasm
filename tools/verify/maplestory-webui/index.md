@@ -16,7 +16,7 @@ E2E_URL=http://127.0.0.1:8001/web/index.html node tools/verify/maplestory-webui/
 
 世界选择默认通过物理鼠标事件单击确认按钮；`E2E_WORLD_SELECT_ACTION` 可设为 `channel`、`dom-go` 或 `dom-channel`，分别验证物理双击频道、纯 DOM 确认和纯 DOM 双击兼容路径。设置 `E2E_STOP_AT_CHAR_SELECT=1` 可在确认进入角色选择后结束专项验收。
 角色选择转换会逐帧记录 UI 状态、输入锁、CHARLIST 解析/挂载/预览阶段、角色和装备进度，并拦截 `Character.nx` 元数据读取、预取、优先请求和前台请求写入 `char-select-transition.json`。验收断言状态从世界选择直接进入角色选择且不经过 0、角色选择壳已经挂载、挂载前没有角色素材访问，预览完成前输入保持禁用，最终阶段为 `READY`、完成数等于角色总数且只在完成边沿恢复输入；进入游戏流程还会断言选角请求等待期间输入不会被预览更新重新启用。`E2E_CHAR_SELECT_LATENCY_MS` 可在该转换期间注入网络延迟以放大冷素材时序。
-世界选择与角色选择阶段还执行页面内 WebGL readPixels 像素级布局断言（`layout-pixels.mjs`，纯函数，不依赖截图或外部工具）：世界选择锁定 49e4dc6 的 Nova 顶部槽位（`novaTop` 均值须高于旧中部偏下槽位与栏背景各 ≥ 20，实测差距约 36/46）；角色选择锁定单行现代布局——左右翻页箭头显著亮于背景参照（≥ 20，实测约 40/86）、占用槽位下方的白色名牌文本显著亮于左侧背景（≥ 25，实测约 45）。断言内置于 `run.mjs` 的世界选择与角色选择阶段，默认流程与 `E2E_STOP_AT_CHAR_SELECT=1` 专项模式均覆盖。
+世界选择与角色选择阶段还执行页面内 WebGL readPixels 像素级布局断言（`layout-pixels.mjs`，纯函数，不依赖截图或外部工具）：世界选择锁定 49e4dc6 的 Nova 顶部槽位（`novaTop` 均值须高于旧中部偏下槽位与栏背景各 ≥ 20，实测差距约 36/46）；角色选择锁定单行现代布局——左右翻页箭头显著亮于背景参照（≥ 20，实测约 40/86）、占用槽位下方的白色名牌文本显著亮于左侧背景（≥ 25，实测约 45）。断言内置于 `run.mjs` 的世界选择与角色选择阶段，默认流程与 `E2E_STOP_AT_CHAR_SELECT=1` 专项模式均覆盖。箭头参照已改为与角色卡无关（左箭头上方天空条 / 卡顶与右箭头之间），空角色账号亦成立；名牌检查前置条件为页 0 槽 1 有角色，无角色时自动跳过并输出 NOTE（由 `run.mjs` 以 `previewTotal>0` 传入）。
 
 设置 `E2E_STOP_AT_GAME=1` 会选择已有角色，完成登录服到频道服重连、完整角色数据解析和首次地图前台素材加载后结束；该模式不会创建角色或发送聊天消息，适合上线首尾稳定样本。
 
@@ -51,7 +51,7 @@ node tools/verify/maplestory-webui/social-flow.mjs
 
 ## GM 商店几何目检流程
 
-`gm-shop-flow.mjs` 不走位、不找 NPC，登录后直接用 GM 聊天命令 `!gmshop`（服务端 HeavenMS GmShopCommand，gm2 级，打开 shop 1337）稳定打开商店窗口，再用页面内 WebGL readPixels 做几何断言：窗口左边缘竖线（game x≈174 列的相邻列亮度差分 > 40 且显著高于两侧参照列）、USE 页签切换（双页签区均值差均 > 3 直接通过；实测 EQUIP 页签选中/未选中位图均值差仅 ~1.5，此时退回可逆切换验证：USE 页签名均值先显著变化、点回 EQUIP 后复原），以及售物行区域（game x410..610 y196..232）的暗像素目检（实测空槽框最暗 ~119、物品描边近 0，阈值取 100）。开店检测刻意不用暗色标题条启发式（会误报）。
+`gm-shop-flow.mjs` 不走位、不找 NPC，登录后直接用 GM 聊天命令 `!gmshop`（服务端 HeavenMS GmShopCommand，gm2 级，打开 shop 1337）稳定打开商店窗口，再用页面内 WebGL readPixels 做几何断言：窗口左边缘竖线（game x≈174 列的相邻列亮度差分 > 40 且显著高于两侧参照列）、USE 页签切换（双页签区均值差均 > 3 直接通过；实测 EQUIP 页签选中/未选中位图均值差仅 ~1.5，此时退回可逆切换验证：USE 页签名均值先显著变化、点回 EQUIP 后复原），以及售物行区域（game x410..610 y196..232）的暗像素目检（实测空槽框最暗 ~119、物品描边近 0，阈值取 100）。开店检测刻意不用暗色标题条启发式（会误报）。注意其采样器 bbox 尺寸为排他宽度（width=x1-x0）而子区域循环为闭区间，当前所有子区域严格内嵌于 sampleRect 故未触发越界；若未来把采样区域扩到 bbox 边缘，需先改为闭区间尺寸（参照 layout-pixels.mjs 的 +1 修正）。
 
 ```bash
 GM_SHOP_ACCOUNT=test1 GM_SHOP_PASSWORD=test1 GM_SHOP_CARD=1 \
