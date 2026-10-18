@@ -30,3 +30,13 @@ UI 整体使用高版本素材，仅职业技能与自由市场及其传送地�
 - e2e 全绿（E2E_CREATE_CHARACTER=0）：login→world→char-select
   （3/3 预览含中文名）→双击进图→地图门→p95 16.7ms→拼音中文聊天，
   0 浏览器异常。
+
+## Follow-up（同日第二笔）
+
+- 四件套游戏内窗口双世代恢复（bea8a45）：人物属性（UIWindow4/Stat）、
+  背包（UIWindow2/Item）、快捷键设置（UIWindow2/KeyConfig + 复活
+  KeyConfigLayout）、装备（UIWindow2/Equip）；v83 路径原样保留。
+  游戏内探针验证：四窗口+技能书区域差分 32~76%，0 报错。
+- 服务器默认经验 3 倍：ServerConstants.EXP_RATE 5→3（dist 常量池
+  Integer 3 实证），world.ini 无覆盖即默认生效；@rates 中央对话框
+  渲染验证。
