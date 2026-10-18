@@ -34,6 +34,11 @@ std::string value_of(const nl::node &n)
         return std::to_string(n.get_integer());
     case nl::node::type::string:
         return "\"" + n.get_string() + "\"";
+    case nl::node::type::vector:
+    {
+        const auto v = n.get_vector();
+        return "(" + std::to_string(v.first) + "," + std::to_string(v.second) + ")";
+    }
     default:
         return "";
     }
@@ -50,6 +55,7 @@ void dump(const nl::node &n, int depth, int maxdepth)
     std::cout << indent_of(depth) << n.name();
     if (!val.empty())
         std::cout << " = " << val;
+    std::cout << " <t=" << static_cast<int>(n.data_type()) << ">";
     if (n.data_type() == nl::node::type::bitmap)
     {
         const auto b = n.get_bitmap();

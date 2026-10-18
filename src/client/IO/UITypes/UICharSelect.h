@@ -47,6 +47,7 @@ namespace jrc
         void draw(float alpha) const override;
         void update() override;
         Button::State button_pressed(uint16_t id) override;
+        void doubleclick(Point<int16_t> pos) override;
 
         void add_character(CharEntry&& character);
         void remove_char(int32_t cid);

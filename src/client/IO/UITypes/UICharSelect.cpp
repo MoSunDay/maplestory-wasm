@@ -347,6 +347,8 @@ namespace jrc
             return Button::DISABLED;
         }
 
+        if (bid == 9999)
+            return Button::DISABLED;
         if (bid >= BT_CHAR0 && bid < BT_CHAR0 + PAGESIZE)
         {
             const uint8_t next_relative = static_cast<uint8_t>(bid - BT_CHAR0);
@@ -396,6 +398,34 @@ namespace jrc
                 return Button::IDENTITY;
             default:
                 return Button::PRESSED;
+            }
+        }
+    }
+
+    void UICharSelect::doubleclick(Point<int16_t> pos)
+    {
+        if (!ui_initialized || ui_failed)
+        {
+            return;
+        }
+
+        for (uint8_t i = 0; i < PAGESIZE; ++i)
+        {
+            const uint8_t next_relative = i;
+            if (next_relative >= charcount_relative)
+            {
+                break;
+            }
+
+            if (buttons[BT_CHAR0 + i]->bounds(position).contains(pos))
+            {
+                nametags[selected_absolute].set_selected(false);
+                buttons[BT_CHAR0 + selected_relative]->set_state(Button::NORMAL);
+                selected_relative = next_relative;
+                selected_absolute = next_relative + page * PAGESIZE;
+                update_selection();
+                send_selection();
+                return;
             }
         }
     }
