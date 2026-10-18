@@ -137,16 +137,16 @@ namespace jrc
             switch (mode)
             {
             case 0x0A:
-                message = "Your inventory is full.";
+                message = "背包已满，无法继续。";
                 break;
             case 0x0B:
-                message = "You do not have enough mesos.";
+                message = "金币不足。";
                 break;
             case 0x0C:
-                message = "This item cannot be moved from storage.";
+                message = "该物品无法从仓库中取出。";
                 break;
             case 0x11:
-                message = "Storage is full.";
+                message = "仓库已满。";
                 break;
             default:
                 break;
@@ -166,29 +166,29 @@ namespace jrc
             switch (result)
             {
             case 0x01:
-                message = "The requested shop item is no longer available.";
+                message = "所请求的商品已无法购买。";
                 break;
             case 0x05:
-                message = "No eligible items could be sold.";
+                message = "没有可以出售的物品。";
                 break;
             case 0x02:
-                message = "You do not have enough mesos.";
+                message = "金币不足。";
                 break;
             case 0x03:
-                message = "Your inventory is full.";
+                message = "背包已满，无法继续。";
                 break;
             case 0x0D:
-                message = "You do not have the required items.";
+                message = "你没有所需的物品。";
                 break;
             case 0x10:
                 message = "现金物品不能出售。";
                 break;
             case 0x06:
             case 0x07:
-                message = "The shop transaction could not be completed.";
+                message = "商店交易未能完成。";
                 break;
             default:
-                message = "The shop returned an unknown transaction error.";
+                message = "商店返回了未知的交易错误。";
                 break;
             }
 
