@@ -25,7 +25,8 @@
 
 namespace jrc
 {
-    Body::Body(int32_t skin, const BodyDrawinfo& drawinfo)
+    Body::Body(int32_t skin, const BodyDrawinfo& drawinfo,
+               Texture::LoadMode load_mode)
     {
         std::string strid = string_format::extend_id(skin, 2);
         nl::node bodynode = nl::nx::character["000020" + strid + ".img"];
@@ -66,7 +67,7 @@ namespace jrc
                         }
 
                         stances[stance][layer]
-                            .emplace(frame, partnode)
+                            .emplace(frame, Texture(partnode, load_mode))
                             .first->second.shift(shift);
                     }
                 }
@@ -76,7 +77,7 @@ namespace jrc
                     Point<int16_t> shift = drawinfo.get_head_position(stance, frame);
 
                     stances[stance][Layer::HEAD]
-                        .emplace(frame, headsfnode)
+                        .emplace(frame, Texture(headsfnode, load_mode))
                         .first->second.shift(shift);
                 }
             }
@@ -109,6 +110,20 @@ namespace jrc
             for (const auto& entry : stances[stance][layer])
             {
                 entry.second.prepare_map_required();
+            }
+        }
+    }
+
+    void Body::prepare_background() const
+    {
+        for (size_t stance = 0; stance < Stance::LENGTH; ++stance)
+        {
+            for (size_t layer = 0; layer < Layer::NUM_LAYERS; ++layer)
+            {
+                for (const auto& entry : stances[stance][layer])
+                {
+                    entry.second.prepare_background();
+                }
             }
         }
     }

@@ -204,6 +204,26 @@ async function fullSocialFlow() {
       throw new Error('party participants must both be starters or both be level 10 or higher');
     }
 
+    await waitFor('remote character visible for profile card', () =>
+      probe(primaryDriver, 'mschar_visible', [secondaryId], ['number']).then(value => value === 1));
+    const remotePoint = {
+      x: await probe(primaryDriver, 'mschar_screen_x', [secondaryId], ['number']),
+      y: await probe(primaryDriver, 'mschar_screen_y', [secondaryId], ['number']) - 32
+    };
+    await primaryDriver.doubleClick(remotePoint.x, remotePoint.y);
+    await waitFor('remote character info card loaded', async () =>
+      await probe(primaryDriver, 'msuserinfo_active') === 1 &&
+      await probe(primaryDriver, 'msuserinfo_target_id') === secondaryId &&
+      await probe(primaryDriver, 'msuserinfo_loaded') === 1);
+    await primaryDriver.screenshot('social-remote-user-info');
+    await primaryDriver.key('Escape', 'Escape', 27);
+    await waitFor('remote character info card closed', () =>
+      probe(primaryDriver, 'msuserinfo_active').then(value => value === 0));
+    await primaryDriver.rightClick(remotePoint.x, remotePoint.y);
+    await waitFor('remote right-click trade context retained', () =>
+      probe(primaryDriver, 'msplayer_context_active').then(value => value === 1));
+    await primaryDriver.key('Escape', 'Escape', 27);
+
     await clearExistingBuddies(primaryDriver);
     await clearExistingBuddies(secondaryDriver);
 

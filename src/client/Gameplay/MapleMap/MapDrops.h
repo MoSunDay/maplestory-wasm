@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "MapObjects.h"
+#include "DropLifecycle/RemovalPolicy.h"
 
 #include "../Spawn.h"
 #include "../../Graphics/Animation.h"
@@ -24,6 +25,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <queue>
 
 namespace jrc
@@ -47,7 +49,9 @@ namespace jrc
         // Spawn a new drop.
         void spawn(DropSpawn&& spawn);
         // Remove a drop.
-        void remove(int32_t oid, int8_t mode, const PhysicsObject* looter,
+        void remove(int32_t oid, drop_removal::Effect effect,
+            const PhysicsObject* looter,
+            std::optional<Point<int16_t>> pickup_target = std::nullopt,
             bool local_pet_pickup = false);
         // Remove all drops.
         void clear();
@@ -75,12 +79,13 @@ namespace jrc
 
         PetLootTarget find_pet_loot(const PetLootQuery& query) const;
         bool has_drop(int32_t oid) const;
+        bool has_lootable_drop(int32_t oid) const;
         size_t size() const;
         uint32_t pet_pickup_count() const;
 
     private:
         void try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos,
-            int32_t& closest_distance_sq, Loot& closest_loot) const;
+            int64_t& closest_distance_sq, Loot& closest_loot) const;
         static bool pet_can_target(const Drop& drop, const PetLootQuery& query);
 
         MapObjects drops;

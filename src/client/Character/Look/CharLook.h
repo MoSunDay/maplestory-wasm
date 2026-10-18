@@ -27,6 +27,7 @@
 #include "../../Util/Randomizer.h"
 #include "../../Util/TimedBool.h"
 
+#include <functional>
 #include <vector>
 
 namespace jrc
@@ -34,7 +35,11 @@ namespace jrc
     class CharLook
     {
     public:
-        CharLook(const LookEntry& entry);
+        using EquipLoadObserver = std::function<void(int32_t)>;
+
+        CharLook(const LookEntry& entry,
+                 Texture::LoadMode load_mode = Texture::LoadMode::BACKGROUND,
+                 EquipLoadObserver equip_observer = {});
         CharLook();
 
         void reset();
@@ -72,6 +77,10 @@ namespace jrc
         static void init();
 
     private:
+        void set_hair(int32_t hairid, Texture::LoadMode load_mode);
+        void set_body(int32_t skinid, Texture::LoadMode load_mode);
+        void set_face(int32_t faceid, Texture::LoadMode load_mode);
+        void add_equip(int32_t equipid, Texture::LoadMode load_mode);
         void updatetwohanded();
         void draw(const DrawArgument& args, Stance::Id interstance,
             Expression::Id interexp, uint8_t interframe, uint8_t interfcframe) const;

@@ -2,7 +2,9 @@
 
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../IO/Field/UIFieldClock.h"
+#include "../../IO/CharacterInfo/UIUserInfo.h"
 #include "../../IO/UI.h"
+#include "../../IO/Trade/UIPlayerContext.h"
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/Pet/UIPetOptions.h"
 #include "../../IO/UITypes/UIShop.h"
@@ -55,6 +57,18 @@ extern "C"
         return jrc::Stage::get().get_player().get_position().y();
     }
 
+    int msplayer_screen_x()
+    {
+        auto& stage = jrc::Stage::get();
+        return stage.get_player().get_position().x() + stage.get_view_position().x();
+    }
+
+    int msplayer_screen_y()
+    {
+        auto& stage = jrc::Stage::get();
+        return stage.get_player().get_position().y() + stage.get_view_position().y();
+    }
+
     int msother_character_count()
     {
         return static_cast<int>(jrc::Stage::get().get_chars().get_chars()->size());
@@ -75,6 +89,22 @@ extern "C"
     {
         auto character = jrc::Stage::get().get_chars().get_char(character_id);
         return character ? character->get_position().y() : MISSING_COORDINATE;
+    }
+
+    int mschar_screen_x(int32_t character_id)
+    {
+        auto& stage = jrc::Stage::get();
+        auto character = stage.get_chars().get_char(character_id);
+        return character ? character->get_position().x() + stage.get_view_position().x() :
+            MISSING_COORDINATE;
+    }
+
+    int mschar_screen_y(int32_t character_id)
+    {
+        auto& stage = jrc::Stage::get();
+        auto character = stage.get_chars().get_char(character_id);
+        return character ? character->get_position().y() + stage.get_view_position().y() :
+            MISSING_COORDINATE;
     }
 
     int msmob_count()
@@ -103,6 +133,17 @@ extern "C"
         return jrc::Stage::get().get_player().get_pet(0) ? 1 : 0;
     }
 
+    int mspet_item_id()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? pet->get_itemid() : 0;
+    }
+
+    int mspet_capability_mask()
+    {
+        return jrc::Stage::get().get_pet_capabilities().mask();
+    }
+
     int mspet_x()
     {
         const auto* pet = jrc::Stage::get().get_player().get_pet(0);
@@ -121,6 +162,36 @@ extern "C"
         return pet ? static_cast<int>(pet->get_stance()) : -1;
     }
 
+    int mspet_foothold_id()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? pet->get_foothold_id() : 0;
+    }
+
+    int mspet_onground()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet && pet->is_onground() ? 1 : 0;
+    }
+
+    int mspet_move_intent()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? static_cast<int>(pet->get_last_move_intent()) : -1;
+    }
+
+    int mspet_horizontal_collision()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? static_cast<int>(pet->get_last_horizontal_collision()) : -1;
+    }
+
+    int mspet_jump_trigger_count()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? static_cast<int>(pet->get_jump_trigger_count()) : 0;
+    }
+
     int mspet_has_loot_target()
     {
         const auto* pet = jrc::Stage::get().get_player().get_pet(0);
@@ -132,9 +203,25 @@ extern "C"
         return static_cast<int>(jrc::Stage::get().get_drops().pet_pickup_count());
     }
 
+    int mspet_loot_target_oid()
+    {
+        return jrc::Stage::get().get_pet_loot_target_oid();
+    }
+
+    int mspet_last_warp_distance()
+    {
+        const auto* pet = jrc::Stage::get().get_player().get_pet(0);
+        return pet ? pet->get_last_warp_owner_distance() : 0;
+    }
+
     int msdrop_count()
     {
         return static_cast<int>(jrc::Stage::get().get_drops().size());
+    }
+
+    int msdrop_has(int32_t oid)
+    {
+        return jrc::Stage::get().get_drops().has_drop(oid) ? 1 : 0;
     }
 
     int msplayer_hp()
@@ -185,6 +272,64 @@ extern "C"
     int mspet_options_active()
     {
         return jrc::UI::get().is_element_active(jrc::UIElement::PETOPTIONS) ? 1 : 0;
+    }
+
+    int msuserinfo_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::USERINFO) ? 1 : 0;
+    }
+
+    int msuserinfo_target_id()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window ? window->target_id() : 0;
+    }
+
+    int msuserinfo_loaded()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window && window->info_loaded() ? 1 : 0;
+    }
+
+    int msuserinfo_pet_count()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window ? static_cast<int>(window->pet_count()) : 0;
+    }
+
+    int msuserinfo_pet_expanded()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window && window->pet_expanded() ? 1 : 0;
+    }
+
+    int msuserinfo_x()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window ? window->origin().x() : MISSING_COORDINATE;
+    }
+
+    int msuserinfo_y()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window ? window->origin().y() : MISSING_COORDINATE;
+    }
+
+    int msuserinfo_width()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window ? window->size().x() : 0;
+    }
+
+    int msuserinfo_height()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIUserInfo>();
+        return window ? window->size().y() : 0;
+    }
+
+    int msplayer_context_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::PLAYER_CONTEXT) ? 1 : 0;
     }
 
     int mspet_options_hp_item()

@@ -42,6 +42,11 @@ namespace jrc
             Point<int16_t> cursor,
             Point<int16_t> view_position
         ) const;
+        std::optional<PlayerTarget> find_target_with(
+            Point<int16_t> cursor,
+            Point<int16_t> view_position,
+            const PlayerTarget& additional_target
+        ) const;
         void set_visual_buff(int32_t cid, Buffstat::Id stat, int16_t value);
         void set_visual_buff_source(int32_t cid, Buffstat::Id stat, int32_t source);
         void cancel_visual_buff(int32_t cid, Buffstat::Id stat);
@@ -59,6 +64,11 @@ namespace jrc
         }
 
     private:
+        std::optional<PlayerTarget> find_target_from(
+            Point<int16_t> cursor,
+            Point<int16_t> view_position,
+            const PlayerTarget* additional_target
+        ) const;
         MapObjects chars;
 
         std::queue<CharSpawn> spawns;

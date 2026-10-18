@@ -37,6 +37,11 @@ namespace jrc
         return top - pos;
     }
 
+    size_t InPacket::position() const
+    {
+        return pos;
+    }
+
     void InPacket::skip(size_t count)
     {
         if (count > length())

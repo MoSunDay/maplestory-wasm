@@ -34,10 +34,12 @@ namespace jrc
             NUM_LAYERS
         };
 
-        Body(int32_t skin, const BodyDrawinfo& drawinfo);
+        Body(int32_t skin, const BodyDrawinfo& drawinfo,
+             Texture::LoadMode load_mode = Texture::LoadMode::BACKGROUND);
 
         void draw(Stance::Id stance, Layer layer, uint8_t frame, const DrawArgument& args) const;
         void prepare(Stance::Id stance) const;
+        void prepare_background() const;
 
         const std::string& get_name() const;
 

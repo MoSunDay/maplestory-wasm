@@ -20,6 +20,9 @@
 
 #include "../../Template/Interpolated.h"
 #include "../../Template/Rectangle.h"
+#include "DropLifecycle/RemovalPolicy.h"
+
+#include <optional>
 
 namespace jrc
 {
@@ -29,12 +32,14 @@ namespace jrc
         virtual int8_t update(const Physics& physics) override;
 
         void init(int8_t);
-        void expire(int8_t, const PhysicsObject*);
+        void expire(drop_removal::Effect, const PhysicsObject*,
+            std::optional<Point<int16_t>> pickup_target = std::nullopt);
 
         Rectangle<int16_t> bounds() const;
         int32_t get_owner() const;
         int8_t get_pickup_type() const;
         bool is_player_drop() const;
+        bool is_lootable() const;
         void update_ownership(int32_t owner, int8_t pickup_type, bool player_drop);
         virtual bool is_meso() const = 0;
         virtual int32_t get_item_id() const = 0;
@@ -59,6 +64,7 @@ namespace jrc
         bool playerdrop;
 
         const PhysicsObject* looter;
+        std::optional<Point<int16_t>> pickup_target;
         State state;
 
         Point<int16_t> dest;

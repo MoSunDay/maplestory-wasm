@@ -1,4 +1,4 @@
-Commit: b42ba604e68b4f517c782a65c9b3994a0342ec60
+Commit: 31fe7db09f74d8c7baa70a68f598de8084e90dac
 
 # 图形渲染
 
@@ -30,6 +30,7 @@ Commit: b42ba604e68b4f517c782a65c9b3994a0342ec60
 ### 纹理图集 (`GraphicsGL::addbitmap`)
 
 - WASM 中 `Texture` 实例化后通过 `queuebitmap()` 静默预取，主循环每帧调用 `preparebitmaps()`；普通运行使用 2ms、阻塞加载使用 8ms 软预算批量解压和上传
+- `Texture::LoadMode::DEFERRED` 允许对象只解析位图引用而不在构造期入队；首次实际绘制仍提升为 `BLOCKING_VISIBLE`，`prepare_background()` 可恢复默认后台预取语义。角色选择预览用延迟模式阻止完整外观构造制造大规模 bitmap 队列
 - `beginbitmapbatch()`/`bitmapbatchprogress()` 在地图切换期间收集所有新实例化贴图；全图贴图要求 NX 范围驻留，首屏可见贴图还要求已经进入 WebGL 图集
 - 首屏静态地图对象、图块和背景会把可见动画的全部帧提升为高优先级，避免安全门释放后紧接着因下一动画帧再次停顿
 - 位图准备分为 `BACKGROUND`、`MAP_REQUIRED`、`BLOCKING_VISIBLE`、`TRANSIENT_EFFECT`：地图必需素材参与安全门，可交互 UI 缺图才暂停玩法，剑光和掉落物等瞬态内容只提升网络/GPU 优先级

@@ -7,6 +7,7 @@
 #include "UITypes/UICharCreation.h"
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
+#include "../Net/Login/CharlistTransition.h"
 
 #ifdef MS_PLATFORM_WASM
 
@@ -160,6 +161,41 @@ extern "C"
         if (ui.is_element_active(jrc::UIElement::WORLDSELECT)) return 2;
         if (ui.is_element_active(jrc::UIElement::LOGIN)) return 1;
         return 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_enabled()
+    {
+        return jrc::UI::get().is_enabled() ? 1 : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscharlist_phase()
+    {
+        return static_cast<int>(jrc::charlist_transition::snapshot().phase);
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscharlist_character_index()
+    {
+        return jrc::charlist_transition::snapshot().character_index;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscharlist_equip_id()
+    {
+        return jrc::charlist_transition::snapshot().equip_id;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscharlist_remaining_bytes()
+    {
+        return jrc::charlist_transition::snapshot().remaining_bytes;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscharlist_preview_ready()
+    {
+        return jrc::charlist_transition::snapshot().preview_ready;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscharlist_preview_total()
+    {
+        return jrc::charlist_transition::snapshot().preview_total;
     }
 
     // A modal notice does not replace its parent UI state, so expose it

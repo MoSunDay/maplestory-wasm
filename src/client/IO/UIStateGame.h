@@ -26,14 +26,14 @@
 
 #include "../Template/EnumMap.h"
 #include "../Template/Optional.h"
+#include "../Gameplay/Targeting/PlayerTargeting.h"
 
 #include <list>
 #include <memory>
+#include <optional>
 
 namespace jrc
 {
-    struct PlayerTarget;
-
     class UIStateGame : public UIState
     {
     public:
@@ -70,6 +70,7 @@ namespace jrc
         void clear_cursors(bool clicked, Point<int16_t> pos, UIElement::Type except);
         void drop_icon(const Icon& icon, Point<int16_t> pos);
         void select_player_target(const PlayerTarget& target);
+        void clear_pending_player_target();
         template <class T, typename...Args>
         void emplace(Args&&...args);
 
@@ -89,5 +90,7 @@ namespace jrc
         Optional<Icon> draggedicon;
         int16_t view_width;
         int16_t view_height;
+        std::optional<PlayerTarget> pending_player_target;
+        uint16_t pending_player_frames = 0;
     };
 }

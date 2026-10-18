@@ -35,6 +35,7 @@
 #include "UITypes/UIWorldMap.h"
 #include "Field/UIFieldClock.h"
 #include "Trade/UIPlayerContext.h"
+#include "CharacterInfo/UIUserInfo.h"
 
 #include "../Constants.h"
 #include "../Character/Inventory/InventoryType.h"
@@ -45,6 +46,8 @@ namespace jrc
 {
     namespace
     {
+        constexpr uint16_t DOUBLECLICK_DELAY_FRAMES = 44;
+
         Tooltip::Parent tooltip_parent_for_type(UIElement::Type type)
         {
             switch (type)
@@ -137,6 +140,14 @@ namespace jrc
                 element->update();
             }
         }
+
+        if (pending_player_target && pending_player_frames > 0 &&
+            --pending_player_frames == 0)
+        {
+            const PlayerTarget target = *pending_player_target;
+            clear_pending_player_target();
+            select_player_target(target);
+        }
     }
 
     void UIStateGame::drop_icon(const Icon& icon, Point<int16_t> pos)
@@ -155,7 +166,17 @@ namespace jrc
     {
         if (UIElement* front = get_front(pos))
         {
+            clear_pending_player_target();
             front->doubleclick(pos);
+        }
+        else if (const auto target = Stage::get().find_character_info_target(pos))
+        {
+            clear_pending_player_target();
+            if (Optional<Char> character = Stage::get().get_character(target->id))
+            {
+                emplace<UIUserInfo>(target->id, target->name,
+                    character->get_look(), Stage::get().is_player(target->id));
+            }
         }
     }
 
@@ -397,6 +418,7 @@ namespace jrc
                 {
                     if (clicked)
                     {
+                        clear_pending_player_target();
                         elementorder.remove(fronttype);
                         elementorder.push_back(fronttype);
                     }
@@ -416,11 +438,14 @@ namespace jrc
                     {
                         if (clicked)
                         {
-                            select_player_target(*target);
+                            pending_player_target = *target;
+                            pending_player_frames = DOUBLECLICK_DELAY_FRAMES;
                             return Cursor::CLICKING;
                         }
                         return Cursor::CANCLICK;
                     }
+                    if (clicked)
+                        clear_pending_player_target();
                     return Stage::get().send_cursor(clicked, pos);
                 }
             }
@@ -448,6 +473,12 @@ namespace jrc
         elementorder.remove(UIElement::PARTY);
         elementorder.push_back(UIElement::PARTY);
         party->select_player_target(target.id, target.name, target.level);
+    }
+
+    void UIStateGame::clear_pending_player_target()
+    {
+        pending_player_target.reset();
+        pending_player_frames = 0;
     }
 
     void UIStateGame::send_scroll(Point<int16_t> pos, double yoffset)

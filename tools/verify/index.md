@@ -7,7 +7,8 @@
 - 位图加载分类（后台、阻塞可见、短时特效）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/bitmap-load-class.cpp -o /tmp/bitmap-load-class && /tmp/bitmap-load-class`
 - 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`
 - 自然恢复规则：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/natural-recovery.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/natural-recovery && /tmp/natural-recovery`
-- 宠物药品选择、自动补给、拾取重试与稳定跟随策略：`c++ -std=c++17 -Isrc tools/verify/pet-automation.cpp src/client/Gameplay/Pet/PetAutomation.cpp src/client/Gameplay/Pet/PetFollowPolicy.cpp src/client/Gameplay/Pet/PetLootPolicy.cpp -o /tmp/pet-automation && /tmp/pet-automation`
+- 宠物内建能力、药品选择、自动补给、真实受阻跳跃与 300px 唯一瞬移门槛：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc tools/verify/pet-automation.cpp src/client/Gameplay/Pet/PetAutomation.cpp src/client/Gameplay/Pet/PetCapabilityPolicy.cpp src/client/Gameplay/Pet/PetFollowPolicy.cpp src/client/Gameplay/Pet/PetLootPolicy.cpp -o /tmp/pet-automation && /tmp/pet-automation`
+- 宠物对齐人物的斜坡、墙体和平台末端实际碰撞：`c++ -std=c++17 -Wall -Wextra -Werror -Wno-narrowing -Wno-unused-function -Isrc/client -Isrc -Isrc/nlnx tools/verify/pet-physics-nx.cpp src/client/Gameplay/Pet/PetFollowPolicy.cpp src/client/Gameplay/Physics/Physics.cpp src/client/Gameplay/Physics/FootholdTree.cpp src/client/Gameplay/Physics/Foothold.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/pet-physics-nx && /tmp/pet-physics-nx Map.nx`
 - 浏览器恢复帧时间限制：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/runtime/frame-timing.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/frame-timing && /tmp/frame-timing`
 - 死亡幽灵轨迹：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-orbit.cpp -o /tmp/death-tomb-orbit && /tmp/death-tomb-orbit`
 - 死亡墓碑落地点：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-ground.cpp -o /tmp/death-tomb-ground && /tmp/death-tomb-ground`
@@ -16,17 +17,22 @@
 - 动画单端透明度语义：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/animation-frame-properties.cpp -o /tmp/animation-frame-properties && /tmp/animation-frame-properties`
 - 普通攻击姿态预热集合：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/regular-attack-stances.cpp -o /tmp/regular-attack-stances && /tmp/regular-attack-stances`
 - Buff 掩码位序、重复位选择与未知位拒绝：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
-- 世界选择单频道策略与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
+- 世界选择单频道策略、CHARLIST 失败后的请求门闩恢复与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`
+- 角色选择预览按帧顺序、真实异常捕获、来源 UI 恢复决策与失败收敛（选中角色、当前页、其余角色，含越界保护及失败计入完成）：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client tools/verify/character-preview-policy.cpp src/client/IO/CharacterSelect/PreviewLoadPolicy.cpp -o /tmp/character-preview-policy && /tmp/character-preview-policy`
 - Cosmic 远端玩家出生头（custom-client short 等级与角色名对齐）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-player-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnPlayerHeader.cpp -o /tmp/spawn-player-parser && /tmp/spawn-player-parser`
 - linked server 怪物出生负载（固定状态块、坐标/foothold、出生特效、假怪显形与截断拒绝）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/spawn-mob-payload.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/SpawnMobPayload.cpp -o /tmp/spawn-mob-payload && /tmp/spawn-mob-payload`
+- 掉落移除协议（过期、玩家拾取、爆炸、宠物拾取、截断/尾随拒绝与未知模式安全收敛）：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client -Isrc tools/verify/drop-removal-payload.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/DropRemovalPayload.cpp -o /tmp/drop-removal-payload && /tmp/drop-removal-payload`；UBSan：`c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Isrc/client -Isrc tools/verify/drop-removal-payload.cpp src/client/Net/InPacket.cpp src/client/Net/Protocol/DropRemovalPayload.cpp -o /tmp/drop-removal-payload-ubsan && /tmp/drop-removal-payload-ubsan`
 - 地图玩家点击命中（摄像机偏移、重叠人物最近目标、输入顺序无关）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/player-targeting.cpp src/client/Gameplay/Targeting/PlayerTargeting.cpp -o /tmp/player-targeting && /tmp/player-targeting`
 - 多职业阶段、新手技能族与主副属性映射：`c++ -std=c++17 -Isrc/client tools/verify/job-progression.cpp src/client/Character/JobProgression.cpp src/client/Character/Job.cpp -o /tmp/job-progression && /tmp/job-progression`
 - 面对面交易纯状态（9 格物品、金币、聊天、双方确认）：`c++ -std=c++17 -Isrc/client tools/verify/trade-state.cpp src/client/IO/Trade/TradeState.cpp -o /tmp/trade-state && /tmp/trade-state`
 - 交易物品封包（普通物品、装备、宠物完整消费）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/trade-item-parser.cpp src/client/Net/Protocol/TradeProtocol.cpp src/client/Net/InPacket.cpp -o /tmp/trade-item-parser && /tmp/trade-item-parser`
 - 交易窗口 NX 素材契约：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/trade-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/trade-ui-nx && /tmp/trade-ui-nx UI.nx`
+- 人物信息、最多三只宠物及人气增减协议：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client -Isrc tools/verify/character-info-protocol.cpp src/client/Net/InPacket.cpp src/client/Net/CharacterInfo/CharacterInfoProtocol.cpp -o /tmp/character-info-protocol && /tmp/character-info-protocol`
+- 老版人物/宠物信息卡片 NX 素材契约：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/user-info-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/user-info-ui-nx && /tmp/user-info-ui-nx UI.nx`
+- linked server 人物信息、人气模式与 opcode 契约：`node tools/verify/character-info-server-contract.mjs`
 - linked server 交易原子提交、合法性与 v83 opcode：`node tools/verify/trade-server-contract.mjs`
 - 好友封包编码、事件解析与好友/队伍纯状态转换：`c++ -std=c++17 -Wall -Wextra -Werror tools/verify/social-protocol.cpp src/client/IO/Social/SocialState.cpp src/client/Net/Protocol/SocialProtocol.cpp src/client/Net/InPacket.cpp -Isrc/client -Isrc -o /tmp/social-protocol && /tmp/social-protocol`
 - Cosmic 完整角色数据（Java 定长 UTF-8、戒指、新年贺卡、小游戏门禁）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-data-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/CharacterDataParser.cpp -o /tmp/character-data-parser && /tmp/character-data-parser`
@@ -35,7 +41,7 @@
 - NPC 商店售卖数量钳制、批量售卖 Tab 与现金物品过滤：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/npc-shop-sale.cpp -o /tmp/npc-shop-sale && /tmp/npc-shop-sale`
 - 攻击 NX 结构审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/attack-effect-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/attack-effect-nx && /tmp/attack-effect-nx Skill.nx`
 - 近战武器残影 NX 审计：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/weapon-afterimage-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/weapon-afterimage-nx && /tmp/weapon-afterimage-nx Character.nx`
-- 手套图层与 Base zmap 一致性：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/glove-layering-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/glove-layering-nx && /tmp/glove-layering-nx Character.nx Base.nx`
+- 前后手套图层、`1082003` 重贴图样本与 Base zmap 一致性：`c++ -std=c++17 -Wall -Wextra -Werror -Wno-narrowing -Wno-unused-function -Isrc/client -Isrc -Isrc/nlnx tools/verify/glove-layering-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/glove-layering-nx && /tmp/glove-layering-nx Character.nx Base.nx`
 - 场地计时器倒计时、跨日时钟与格式化：`c++ -std=c++17 -Isrc tools/verify/field-clock.cpp src/client/IO/Field/FieldClockModel.cpp -o /tmp/field-clock && /tmp/field-clock`
 - 废弃都市组队任务门对象与成功/失败音效素材：`c++ -std=c++17 -Isrc -Isrc/client -Isrc/nlnx tools/verify/kerning-pq-field-assets.cpp src/client/Audio/FieldSoundPath.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/kerning-pq-field-assets && /tmp/kerning-pq-field-assets`
 - 废弃都市组队任务服务端脚本、地图、怪物、掉落、计时与奖励契约：`node tools/verify/kerning-pq-contract.mjs`

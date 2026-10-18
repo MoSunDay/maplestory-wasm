@@ -130,7 +130,9 @@ namespace jrc
 
     bool Foothold::is_blocking(const Range<int16_t>& vertical) const
     {
-        return is_wall() && m_vertical.overlaps(vertical);
+        return is_wall() &&
+            m_vertical.smaller() <= vertical.greater() &&
+            m_vertical.greater() >= vertical.smaller();
     }
 
     int16_t Foothold::hdelta() const

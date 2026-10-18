@@ -39,7 +39,7 @@ namespace jrc
             CAPE, SHOES, PANTS, TOP, MAIL, MAILARM,
             EARRINGS, FACEACC, EYEACC, PENDANT, BELT, MEDAL, RING,
             CAP, CAP_BELOW_BODY, CAP_OVER_HAIR,
-            GLOVE, WRIST,
+            GLOVE, WRIST, BACK_GLOVE, BACK_WRIST,
             GLOVE_BELOW_BODY, WRIST_BELOW_BODY,
             GLOVE_OVER_BODY, WRIST_OVER_BODY,
             GLOVE_BELOW_HEAD, WRIST_BELOW_HEAD,
@@ -54,11 +54,13 @@ namespace jrc
         };
 
         // Construct a new equip.
-        Clothing(int32_t itemid, const BodyDrawinfo& drawinfo);
+        Clothing(int32_t itemid, const BodyDrawinfo& drawinfo,
+                 Texture::LoadMode load_mode = Texture::LoadMode::BACKGROUND);
 
         // Draw the equip.
         void draw(Stance::Id stance, Layer layer, uint8_t frame, const DrawArgument& args) const;
         void prepare(Stance::Id stance) const;
+        void prepare_background() const;
         // Check if a part of the equip lies on the specified layer while in the specified stance.
         bool contains_layer(Stance::Id stance, Layer layer) const;
 
@@ -84,6 +86,8 @@ namespace jrc
         ) {
             if (name == "glove") return GLOVE;
             if (name == "gloveWrist") return WRIST;
+            if (name == "backGlove") return BACK_GLOVE;
+            if (name == "backGloveWrist") return BACK_WRIST;
             if (name == "gloveBelowBody") return GLOVE_BELOW_BODY;
             if (name == "gloveWristBelowBody") return WRIST_BELOW_BODY;
             if (name == "gloveOverBody") return GLOVE_OVER_BODY;
@@ -105,6 +109,8 @@ namespace jrc
             {
             case GLOVE_BELOW_BODY: return 78;
             case WRIST_BELOW_BODY: return 77;
+            case BACK_GLOVE: return 109;
+            case BACK_WRIST: return 108;
             case GLOVE_OVER_BODY: return 75;
             case WRIST_OVER_BODY: return 63;
             case GLOVE_BELOW_HEAD: return 57;
