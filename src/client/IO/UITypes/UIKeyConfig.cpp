@@ -3,10 +3,12 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UIKeyConfig.h"
 
+#include "UIKeyConfigNodes.h"
 #include "UINotice.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "../Layout/KeyConfigLayout.h"
 #include "../Layout/KeyConfigV83Layout.h"
 
 #include "../../Data/ItemData.h"
@@ -101,27 +103,56 @@ namespace jrc
           keyboard(&UI::get().get_keyboard()),
           dirty(false)
     {
-        // v83 ships the whole key configuration window as a single bitmap
-        // (UIWindow.img/KeyConfig/backgrnd, 629x373): keyboard at the top,
-        // an empty button strip at y = 237..259 and three rows of 18 icon
-        // sockets below (x = 9 + 34 * col, y = 268 + 34 * row).
-        nl::node src = nl::nx::ui["UIWindow.img"]["KeyConfig"];
+        // The window art is generation specific: post-Chaos splits it into
+        // three layered bitmaps (UIWindow2.img/KeyConfig) whose buttons
+        // carry baked-in captions, while pre-Chaos (v83) ships one single
+        // bitmap (UIWindow.img/KeyConfig/backgrnd, 629x373): keyboard at
+        // the top, a label-less button strip at y = 237..259 and three
+        // rows of 18 icon sockets below (x = 9 + 34 * col,
+        // y = 268 + 34 * row).
+        nl::node src = keyconfig_nodes::src();
         icon = src["icon"];
 
-        sprites.emplace_back(src["backgrnd"], DrawArgument({}));
+        Point<int16_t> bgdim;
+        if (keyconfig_nodes::post_chaos())
+        {
+            Texture bg1 = Texture(src["backgrnd"]);
+            Texture bg2 = Texture(src["backgrnd2"]);
+            Texture bg3 = Texture(src["backgrnd3"]);
+            sprites.emplace_back(src["backgrnd"], DrawArgument(bg1.get_origin()));
+            sprites.emplace_back(src["backgrnd2"], DrawArgument(bg2.get_origin()));
+            sprites.emplace_back(src["backgrnd3"], DrawArgument(bg3.get_origin()));
 
-        Point<int16_t> bgdim = Texture(src["backgrnd"]).get_dimensions();
-        buttons[CLOSE] = std::make_unique<MapleButton>(src["BtClose"], Point<int16_t>(bgdim.x() - 16, 7));
-        buttons[CANCEL] = std::make_unique<MapleButton>(src["BtCancel"], Point<int16_t>(519, 240));
-        buttons[DEFAULT] = std::make_unique<MapleButton>(src["BtDefault"], Point<int16_t>(9, 240));
-        buttons[DELETE] = std::make_unique<MapleButton>(src["BtDelete"], Point<int16_t>(84, 240));
-        buttons[KEYSETTING] = std::make_unique<MapleButton>(src["BtQuickSlot"], Point<int16_t>(159, 241));
-        buttons[OK] = std::make_unique<MapleButton>(src["BtOK"], Point<int16_t>(573, 240));
-        english_button_labels[CANCEL] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Cancel");
-        english_button_labels[DEFAULT] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Default");
-        english_button_labels[DELETE] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Delete");
-        english_button_labels[KEYSETTING] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Quick Slot");
-        english_button_labels[OK] = Text(Text::A11M, Text::CENTER, Text::WHITE, "OK");
+            nl::node close = nl::nx::ui["Basic.img"]["BtClose"];
+
+            bgdim = bg1.get_dimensions();
+            buttons[CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bgdim.x() - 12, 9));
+            buttons[CANCEL] = std::make_unique<MapleButton>(src["BtCancel"]);
+            buttons[DEFAULT] = std::make_unique<MapleButton>(src["BtDefault"]);
+            buttons[DELETE] = std::make_unique<MapleButton>(src["BtDelete"]);
+            buttons[KEYSETTING] = std::make_unique<MapleButton>(src["BtQuickSlot"]);
+            buttons[OK] = std::make_unique<MapleButton>(src["BtOK"]);
+        }
+        else
+        {
+            sprites.emplace_back(src["backgrnd"], DrawArgument({}));
+
+            bgdim = Texture(src["backgrnd"]).get_dimensions();
+            buttons[CLOSE] = std::make_unique<MapleButton>(src["BtClose"], Point<int16_t>(bgdim.x() - 16, 7));
+            buttons[CANCEL] = std::make_unique<MapleButton>(src["BtCancel"], Point<int16_t>(519, 240));
+            buttons[DEFAULT] = std::make_unique<MapleButton>(src["BtDefault"], Point<int16_t>(9, 240));
+            buttons[DELETE] = std::make_unique<MapleButton>(src["BtDelete"], Point<int16_t>(84, 240));
+            buttons[KEYSETTING] = std::make_unique<MapleButton>(src["BtQuickSlot"], Point<int16_t>(159, 241));
+            buttons[OK] = std::make_unique<MapleButton>(src["BtOK"], Point<int16_t>(573, 240));
+            // The v83 buttons are label-less sockets, so their captions are
+            // drawn as text. Post-Chaos buttons ship caption textures and
+            // keep this map empty, which turns the label draw into a no-op.
+            english_button_labels[CANCEL] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Cancel");
+            english_button_labels[DEFAULT] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Default");
+            english_button_labels[DELETE] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Delete");
+            english_button_labels[KEYSETTING] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Quick Slot");
+            english_button_labels[OK] = Text(Text::A11M, Text::CENTER, Text::WHITE, "OK");
+        }
 
         dimension = bgdim;
         dragarea = { bgdim.x(), 20 };
@@ -135,6 +166,10 @@ namespace jrc
     void UIKeyConfig::draw(float alpha) const
     {
         UIElement::draw(alpha);
+
+        // v83-only: the pre-Chaos buttons are label-less sockets, so their
+        // captions are drawn as text. The label map stays empty with
+        // post-Chaos assets (buttons carry baked-in captions).
         draw_english_button_labels();
 
         for (const auto& kv : staged_mappings)
@@ -364,7 +399,11 @@ namespace jrc
 
     void UIKeyConfig::load_key_bounds()
     {
-        key_bounds = KeyConfigV83Layout::key_bounds();
+        // Hit rectangles follow the keyboard bitmap of the loaded
+        // generation: backgrnd3 (post-Chaos) vs backgrnd (v83).
+        key_bounds = keyconfig_nodes::post_chaos()
+            ? KeyConfigLayout::key_bounds()
+            : KeyConfigV83Layout::key_bounds();
     }
 
     void UIKeyConfig::load_action_icons()

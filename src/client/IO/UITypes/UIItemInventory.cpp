@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UIItemInventory.h"
 
+#include "UIItemInventoryNodes.h"
+
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
@@ -35,15 +37,23 @@
 namespace jrc
 {
     UIItemInventory::UIItemInventory(const Inventory& invent)
-        : UIDragElement<PosINV>(Point<int16_t>(175, 20)), inventory(invent) {
+        : UIDragElement<PosINV>(iteminv_nodes::drag_position()), inventory(invent) {
 
-        // v83 ships the item inventory in UIWindow.img.  It has a single
-        // 175x288 backgrnd with the slot sockets, tab strip and meso row
-        // baked in; the backgrnd2/backgrnd3 layers of later files do not
-        // exist yet.
-        nl::node src = nl::nx::ui["UIWindow.img"]["Item"];
+        // The window ships as two different node sets: post-Chaos reads
+        // UIWindow2.img/Item (172x335, layered backgrounds, origin
+        // bearing buttons, extra panels), pre-Chaos v83 reads
+        // UIWindow.img/Item (175x288, single baked background).
+        // iteminv_nodes picks the generation matching the loaded UI.nx.
+        nl::node src = iteminv_nodes::src();
 
         sprites.emplace_back(src["backgrnd"]);
+        if (iteminv_nodes::has_layered_background())
+        {
+            // Post-Chaos paints the sockets and the tab strip/meso row on
+            // their own backgrnd2/backgrnd3 layers.
+            sprites.emplace_back(src["backgrnd2"]);
+            sprites.emplace_back(src["backgrnd3"]);
+        }
 
         newitemslot = src["New"]["inventory"];
         newitemtab = src["New"]["Tab0"];
@@ -52,25 +62,38 @@ namespace jrc
         nl::node taben = src["Tab"]["enabled"];
         nl::node tabdis = src["Tab"]["disabled"];
 
-        // v83 tab sprites carry no origin, so the strip is laid out
-        // explicitly: five 27px tabs, 32px apart, sitting on the dark
-        // band between the title bar and the slot grid.
-        buttons[BT_TAB_EQUIP]= std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"], Point<int16_t>(9, 24));
-        buttons[BT_TAB_USE] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"], Point<int16_t>(41, 24));
-        buttons[BT_TAB_ETC] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"], Point<int16_t>(73, 24));
-        buttons[BT_TAB_SETUP] = std::make_unique<TwoSpriteButton>(tabdis["3"], taben["3"], Point<int16_t>(105, 24));
-        buttons[BT_TAB_CASH]= std::make_unique<TwoSpriteButton>(tabdis["4"], taben["4"], Point<int16_t>(137, 24));
+        // Post-Chaos tab sprites carry origins and only need the upstream
+        // nudge; v83 sprites carry none, so the strip is laid out
+        // explicitly (five 27px tabs, 32px apart, on the dark band
+        // between the title bar and the slot grid).
+        buttons[BT_TAB_EQUIP]= std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"], iteminv_nodes::tab_button_pos(0));
+        buttons[BT_TAB_USE] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"], iteminv_nodes::tab_button_pos(1));
+        buttons[BT_TAB_ETC] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"], iteminv_nodes::tab_button_pos(2));
+        buttons[BT_TAB_SETUP] = std::make_unique<TwoSpriteButton>(tabdis["3"], taben["3"], iteminv_nodes::tab_button_pos(3));
+        buttons[BT_TAB_CASH]= std::make_unique<TwoSpriteButton>(tabdis["4"], taben["4"], iteminv_nodes::tab_button_pos(4));
 
-        // v83 button frames are centre-anchored (origin 6,6) or plain
+        // Post-Chaos button art carries origins, so the buttons position
+        // themselves; v83 frames are centre-anchored (origin 6,6) or plain
         // (BtCoin), so each one is placed on its socket in the backgrnd:
         // the meso coin at (8, 267), the gather/sort pair in the dark
         // panel at the bottom right and the expand toggle in the title
-        // bar.  BtPoint0/BtPot3/BtUpgrade3/BtAppraise3/BtBits3 are
-        // post-Chaos only and simply stay absent.
-        buttons[BT_DROPMESO]= std::make_unique<MapleButton>(src["BtCoin"], Point<int16_t>(8, 267));
-        buttons[BT_GATHER]= std::make_unique<MapleButton>(src["BtGather"], Point<int16_t>(147, 273));
-        buttons[BT_SORT]= std::make_unique<MapleButton>(src["BtSort"], Point<int16_t>(162, 273));
-        buttons[BT_EXPAND]= std::make_unique<MapleButton>(src["BtFull"], Point<int16_t>(163, 11));
+        // bar.
+        buttons[BT_DROPMESO]= std::make_unique<MapleButton>(src["BtCoin"], iteminv_nodes::drop_meso_pos());
+        buttons[BT_GATHER]= std::make_unique<MapleButton>(src["BtGather"], iteminv_nodes::gather_pos());
+        buttons[BT_SORT]= std::make_unique<MapleButton>(src["BtSort"], iteminv_nodes::sort_pos());
+        buttons[BT_EXPAND]= std::make_unique<MapleButton>(src["BtFull"], iteminv_nodes::expand_pos());
+
+        if (iteminv_nodes::has_extra_buttons())
+        {
+            // Post-Chaos-only chrome: the meso point wallet and the item
+            // pot / upgrade / magnify / bit case panels. v83 does not ship
+            // them and they simply stay absent.
+            buttons[BT_POINTS]= std::make_unique<MapleButton>(src["BtPoint0"]);
+            buttons[BT_ITEMPOT]= std::make_unique<MapleButton>(src["BtPot3"]);
+            buttons[BT_UPGRADE]= std::make_unique<MapleButton>(src["BtUpgrade3"]);
+            buttons[BT_MAGNIFY]= std::make_unique<MapleButton>(src["BtAppraise3"]);
+            buttons[BT_BITCASE]= std::make_unique<MapleButton>(src["BtBits3"]);
+        }
 
         tab = InventoryType::EQUIP;
         slotrange.first = 1;
@@ -84,10 +107,10 @@ namespace jrc
         mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
 
         // The scrollbar runs along the strip between the last socket
-        // column (x 148) and the border (x 171); its arrows span the
-        // six socket rows (y 50 to 252).
+        // column and the border; its arrows span the six socket rows.
         slider = {
-            11, { 50, 240 }, 154, 6, 1 + inventory.get_slotmax(tab) / 4,
+            11, iteminv_nodes::slider_vertical(), iteminv_nodes::slider_x(),
+            6, 1 + inventory.get_slotmax(tab) / 4,
             [&](bool upwards) {
             int16_t shift = upwards ? -4 : 4;
             bool above = slotrange.first + shift > 0;
@@ -99,7 +122,7 @@ namespace jrc
             }
         } };
 
-        dimension = { 175, 289 };
+        dimension = iteminv_nodes::dimension();
         active = true;
 
         load_icons();
@@ -140,7 +163,7 @@ namespace jrc
             newitemtab.draw({ newtabpos }, alpha);
         }
 
-        Point<int16_t> mesopos = position + Point<int16_t>(137, 268);
+        Point<int16_t> mesopos = position + iteminv_nodes::meso_label_pos();
         mesolabel.draw(mesopos);
     }
 
@@ -468,45 +491,26 @@ namespace jrc
 
     int16_t UIItemInventory::slot_by_position(Point<int16_t> cursorpos) const
     {
-        // v83 socket grid: four 32px cells, 36px apart, starting at (8, 50)
-        // with a 34px row pitch.
-        int16_t xoff = cursorpos.x() - 8;
-        int16_t yoff = cursorpos.y() - 50;
-        if (xoff < 1 || xoff > 143 || yoff < 1 || yoff > 203)
+        // Socket hit test against the generation's grid geometry (see
+        // iteminv_nodes).
+        const int16_t offset = iteminv_nodes::page_offset_at(cursorpos);
+        if (offset < 0)
             return 0;
 
-        int16_t slot = slotrange.first + (xoff / 36) + 4 * (yoff / 34);
+        const int16_t slot = slotrange.first + offset;
         return is_visible(slot) ? slot : 0;
     }
 
     Point<int16_t> UIItemInventory::get_slotpos(int16_t slot) const
     {
-        int16_t absslot = slot - slotrange.first;
-        return Point<int16_t>(
-            8 + (absslot % 4) * 36,
-            50 + (absslot / 4) * 34
-            );
+        return iteminv_nodes::slotpos(slot - slotrange.first);
     }
 
     Point<int16_t> UIItemInventory::get_tabpos(InventoryType::Id tb) const
     {
-        // The "new item" flash (New/Tab0, 34x18) is centred over the
-        // 27x16 tab sprite it highlights.
-        switch (tb)
-        {
-        case InventoryType::EQUIP:
-            return Point<int16_t>(6, 23);
-        case InventoryType::USE:
-            return Point<int16_t>(38, 23);
-        case InventoryType::SETUP:
-            return Point<int16_t>(102, 23);
-        case InventoryType::ETC:
-            return Point<int16_t>(70, 23);
-        case InventoryType::CASH:
-            return Point<int16_t>(134, 23);
-        default:
-            return Point<int16_t>();
-        }
+        // The "new item" flash position differs per generation; the
+        // window itself shares the tab button strip.
+        return iteminv_nodes::tab_flash_pos(tb);
     }
 
     uint16_t UIItemInventory::button_by_tab(InventoryType::Id tb) const
