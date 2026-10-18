@@ -4,6 +4,13 @@
 // Nova top slot beats the old mid-low slot / sidebar background by ~36/~46
 // mean luminance, char-select arrows beat their background references by
 // ~40/~86 and the slot-0 nametag beats the left background by ~45.
+// The arrow references are card-independent (bgAboveL is the sky strip
+// above the left arrow, bgAbove the gap between card tops and the right
+// arrow), so the arrow checks also hold on empty accounts; the nametag
+// check requires page-0 slot 1 to be occupied (callers pass
+// firstSlotOccupied to skip it when page 0 is empty). The sampler reads
+// exact top-based rows y0..y1 inclusive (readPixels origin
+// canvas.height - 1 - y1), so each rect's rows land where intended.
 // Sampling runs fully in page on the live WebGL drawing buffer
 // (canvas #canvas) via requestAnimationFrame + gl.readPixels, with the
 // backing-buffer scale canvas.width/800, a Y-flip, and FRAMEBUFFER binding
@@ -23,7 +30,9 @@ async function evaluateAwait(driver, expression) {
 // game render pass and before compositing clears the drawing buffer. One
 // readPixels covers the bounding box of all requested rects; the game GL
 // state is left untouched. Rects are game-coord {name, x0, y0, x1, y1} in
-// the 800x600 space and resolve to mean luminance (0-255).
+// the 800x600 space and resolve to mean luminance (0-255). Coverage is
+// exact for top-based rows y0..y1 inclusive, so the readPixels y origin is
+// canvas.height - 1 - y1 (not canvas.height - y1, which reads one row high).
 function samplerExpression(rects) {
   const config = JSON.stringify({ rects });
   return `(() => new Promise(resolve => {
@@ -44,7 +53,7 @@ function samplerExpression(rects) {
       const pixels = new Uint8Array(width * height * 4);
       const boundFrameBuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.readPixels(x0, canvas.height - y1, width, height,
+      gl.readPixels(x0, canvas.height - 1 - y1, width, height,
         gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       gl.bindFramebuffer(gl.FRAMEBUFFER, boundFrameBuffer);
       const luminance = (x, y) => {
@@ -110,32 +119,42 @@ export async function assertWorldSelectNovaTopSlot(driver) {
 // Char-select: page arrows sit at (46,240)/(533,240), occupied slots ride
 // disc platforms at char_slot_pos(i) = (130+120i, 270) with their white
 // nametags just below at y 282-290. bgAbove samples the strip between the
-// card tops and the right arrow; the old bgR rect (590,241)-(620,287)
-// overlapped the charInfo board and read high (146.9 vs 44.9).
+// card tops and the right arrow and bgAboveL the sky strip above the left
+// arrow - both card-independent references (measured 54.1/44.9 vs arrowL
+// 115.7), so the arrow checks hold on empty accounts too; the old bgR
+// rect (590,241)-(620,287) overlapped the charInfo board and read high
+// (146.9 vs 44.9).
 const charSelectRects = Object.freeze([
   { name: 'arrowL', x0: 47, y0: 241, x1: 83, y1: 287 },
   { name: 'arrowR', x0: 534, y0: 241, x1: 571, y1: 287 },
   { name: 'bgAbove', x0: 536, y0: 196, x1: 568, y1: 226 },
+  { name: 'bgAboveL', x0: 48, y0: 200, x1: 80, y1: 228 },
   { name: 'bgL', x0: 90, y0: 241, x1: 120, y1: 287 },
   { name: 'nametag0', x0: 110, y0: 282, x1: 150, y1: 290 }
 ]);
 
-export async function assertCharSelectModernLayout(driver) {
+export async function assertCharSelectModernLayout(driver, firstSlotOccupied = true) {
   const means = await sampleLuminance(driver, charSelectRects);
   const failures = [];
-  requireMargin(failures, 'arrowL-bgL', means.arrowL, means.bgL, 20);
+  requireMargin(failures, 'arrowL-bgAboveL', means.arrowL, means.bgAboveL, 20);
   requireMargin(failures, 'arrowR-bgAbove', means.arrowR, means.bgAbove, 20);
-  requireMargin(failures, 'nametag0-bgL', means.nametag0, means.bgL, 25);
+  if (firstSlotOccupied) {
+    requireMargin(failures, 'nametag0-bgL', means.nametag0, means.bgL, 25);
+  } else {
+    console.log('NOTE  char-select nametag check skipped (no characters on page 0)');
+  }
   // The lower screen is the textured pier deck of backdrop back/11 (band
   // means 242.7 vs 167.4 across x), so old-grid second-row sprites are not
   // luminance-separable; nametag y + page-arrow band + PAGESIZE lock single-row.
   const summary = JSON.stringify({
-    arrowL: means.arrowL, arrowR: means.arrowR, bgL: means.bgL,
-    bgAbove: means.bgAbove, nametag0: means.nametag0
+    arrowL: means.arrowL, arrowR: means.arrowR, bgAboveL: means.bgAboveL,
+    bgAbove: means.bgAbove, bgL: means.bgL,
+    nametag0: firstSlotOccupied ? means.nametag0 : 'skipped'
   });
   if (failures.length > 0) {
     throw new Error(
       `char-select not in single-row modern layout ${summary}: ${failures.join('; ')}`);
   }
-  console.log(`PASS  char-select single-row modern layout ${summary}`);
+  console.log(`PASS  char-select single-row modern layout (nametag check ${
+    firstSlotOccupied ? 'ran' : 'skipped'}) ${summary}`);
 }
