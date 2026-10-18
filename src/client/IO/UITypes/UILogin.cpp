@@ -49,7 +49,7 @@ namespace jrc
         }
         else if (back["0"])
         {
-            sprites.emplace_back(back["0"], Point<int16_t>(370, 300));
+            sprites.emplace_back(back["0"], Point<int16_t>(400, 300));
         }
 
         const bool has_legacy_form = static_cast<bool>(title["signboard"]) &&

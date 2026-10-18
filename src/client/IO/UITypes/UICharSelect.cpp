@@ -89,7 +89,7 @@ namespace jrc
         }
         else if (back["0"])
         {
-            sprites.emplace_back(back["0"], Point<int16_t>(370, 300));
+            sprites.emplace_back(back["0"], Point<int16_t>(400, 300));
         }
 
         // Keep legacy world-select art as an optional overlay when available.
