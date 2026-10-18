@@ -93,14 +93,9 @@ namespace jrc
             BT_TAB_SETUP,
             BT_TAB_CASH,
             BT_DROPMESO,
-            BT_POINTS,
             BT_GATHER,
             BT_SORT,
-            BT_EXPAND,
-            BT_ITEMPOT,
-            BT_UPGRADE,
-            BT_MAGNIFY,
-            BT_BITCASE
+            BT_EXPAND
         };
 
         const Inventory& inventory;

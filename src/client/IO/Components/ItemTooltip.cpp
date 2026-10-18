@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "ItemTooltip.h"
 
+#include "TooltipFrame.h"
+
 #include "../../Data/ItemData.h"
 
 #include "nlnx/nx.hpp"
@@ -68,9 +70,26 @@ namespace jrc
         if (itemid == 0)
             return;
 
-        top.draw(pos);
-        mid.draw({ pos + Point<int16_t>(0, 13), Point<int16_t>(0, filllength) });
-        bot.draw(pos + Point<int16_t>(0, filllength + 13));
+        if (tooltip_frame::has_assets())
+        {
+            top.draw(pos);
+            mid.draw({ pos + Point<int16_t>(0, 13), Point<int16_t>(0, filllength) });
+            bot.draw(pos + Point<int16_t>(0, filllength + 13));
+        }
+        else
+        {
+            // v83 ships no UIToolTip.img; replace the top/mid/bot chrome
+            // with a plain box of the same footprint (13 + filllength + 13),
+            // extended to also cover the 2x scaled icon below the name.
+            int16_t boxheight = filllength + 26;
+            const int16_t iconbottom = 4 + name.height() + 152;
+            if (iconbottom > boxheight)
+            {
+                boxheight = iconbottom;
+            }
+
+            tooltip_frame::draw_at(pos, 261, boxheight);
+        }
 
         name.draw(pos + Point<int16_t>(130, 3));
 

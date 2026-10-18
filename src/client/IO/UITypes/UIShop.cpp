@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UIShop.h"
 #include "UINotice.h"
+#include "UIShopNodes.h"
 
 #include "../UI.h"
 #include "../Components/AreaButton.h"
@@ -35,48 +36,57 @@ namespace jrc
     UIShop::UIShop(const CharLook& in_charlook, const Inventory& in_inventory)
         : charlook(in_charlook), inventory(in_inventory), last_cursor_pos()
     {
-        nl::node src  = nl::nx::ui["UIWindow2.img"]["Shop"];
-        nl::node src2 = nl::nx::ui["UIWindow2.img"]["Shop2"];
+        nl::node src = shop_nodes::src();
 
         sprites.emplace_back(src["backgrnd"]);
-        sprites.emplace_back(src["backgrnd2"]);
-        sprites.emplace_back(src["backgrnd3"]);
+        // v83 ships a single merged background layer.
+        if (nl::node backgrnd2 = src["backgrnd2"])
+        {
+            sprites.emplace_back(backgrnd2);
+            sprites.emplace_back(src["backgrnd3"]);
+        }
 
-        buttons[BUY_ITEM]  = std::make_unique<MapleButton>(src["BtBuy"]);
-        buttons[SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"]);
-        buttons[SELL_ALL]  = std::make_unique<MapleButton>(src["BtSell"], 0, -20);
-        buttons[EXIT]      = std::make_unique<MapleButton>(src["BtExit"]);
+        buttons[BUY_ITEM]  = std::make_unique<MapleButton>(src["BtBuy"], shop_nodes::buy_button_pos());
+        buttons[SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"], shop_nodes::sell_button_pos());
+        buttons[SELL_ALL]  = std::make_unique<MapleButton>(src["BtSell"], shop_nodes::sell_all_button_pos());
+        buttons[EXIT]      = std::make_unique<MapleButton>(src["BtExit"], shop_nodes::exit_button_pos());
         if (nl::node rechargenode = src["BtRecharge"])
         {
             for (uint16_t i = RECHARGE0; i <= RECHARGE4; ++i)
             {
-                auto recharge = std::make_unique<MapleButton>(rechargenode);
-                recharge->set_position({ 398, static_cast<int16_t>(133 + 42 * (i - RECHARGE0)) });
+                auto recharge = std::make_unique<MapleButton>(
+                    rechargenode,
+                    shop_nodes::recharge_pos(static_cast<int16_t>(i - RECHARGE0))
+                );
                 recharge->set_active(false);
                 buttons[i] = std::move(recharge);
             }
         }
 
-        nl::node sellen  = src2["TabSell"]["enabled"];
-        nl::node selldis = src2["TabSell"]["disabled"];
+        nl::node selltabs = shop_nodes::sell_tabs();
+        nl::node sellen   = selltabs["enabled"];
+        nl::node selldis  = selltabs["disabled"];
 
-        constexpr Point<int16_t> stshift(-43, -9);
         for (uint16_t i = EQUIP; i <= CASH; ++i)
         {
             std::string tabnum = std::to_string(i - EQUIP);
-            buttons[i] = std::make_unique<TwoSpriteButton>(selldis[tabnum], sellen[tabnum], stshift);
+            buttons[i] = std::make_unique<TwoSpriteButton>(
+                selldis[tabnum],
+                sellen[tabnum],
+                shop_nodes::sell_tab_pos(static_cast<int16_t>(i - EQUIP))
+            );
         }
 
         for (uint16_t i = BUY0; i <= BUY4; ++i)
         {
-            Point<int16_t> pos(8, 116 + 42 * (i - BUY0));
-            Point<int16_t> dim(200, 36);
+            Point<int16_t> pos = shop_nodes::buy_item_button_pos(static_cast<int16_t>(i - BUY0));
+            Point<int16_t> dim(shop_nodes::row_width(), shop_nodes::row_height());
             buttons[i] = std::make_unique<AreaButton>(pos, dim);
         }
         for (uint16_t i = SELL0; i <= SELL4; ++i)
         {
-            Point<int16_t> pos(242, 116 + 42 * (i - SELL0));
-            Point<int16_t> dim(200, 36);
+            Point<int16_t> pos = shop_nodes::sell_item_button_pos(static_cast<int16_t>(i - SELL0));
+            Point<int16_t> dim(shop_nodes::row_width(), shop_nodes::row_height());
             buttons[i] = std::make_unique<AreaButton>(pos, dim);
         }
 
@@ -86,8 +96,11 @@ namespace jrc
 
         mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
 
+        const Point<int16_t> buysliderpos = shop_nodes::buy_slider_pos();
+        const Point<int16_t> sellsliderpos = shop_nodes::sell_slider_pos();
+
         buyslider  = {
-            11, { 115, 308 }, 214, 5, 1,
+            11, { buysliderpos.y(), static_cast<int16_t>(buysliderpos.y() + shop_nodes::buy_slider_height()) }, buysliderpos.x(), 5, 1,
             [&](bool upwards) {
                 int16_t shift = upwards ? -1 : 1;
                 bool above = buystate.offset + shift >= 0;
@@ -99,7 +112,7 @@ namespace jrc
             }
         };
         sellslider = {
-            11, { 115, 308 }, 445, 5, 1,
+            11, { sellsliderpos.y(), static_cast<int16_t>(sellsliderpos.y() + shop_nodes::sell_slider_height()) }, sellsliderpos.x(), 5, 1,
             [&](bool upwards) {
                 int16_t shift = upwards ? -1 : 1;
                 bool above = sellstate.offset + shift >= 0;
@@ -120,17 +133,20 @@ namespace jrc
     {
         UIElement::draw(alpha);
 
-        npc.draw({ position + Point<int16_t>(64, 76), true });
-        charlook.draw(
-            position + Point<int16_t>(294, 76),
-            false,
-            Stance::STAND1,
-            Expression::DEFAULT
-        );
+        if (shop_nodes::has_portraits())
+        {
+            npc.draw({ position + Point<int16_t>(64, 76), true });
+            charlook.draw(
+                position + Point<int16_t>(294, 76),
+                false,
+                Stance::STAND1,
+                Expression::DEFAULT
+            );
+        }
 
-        mesolabel.draw(position + Point<int16_t>(450, 62));
+        mesolabel.draw(position + shop_nodes::meso_label_pos());
         buystate.draw(position, selection);
-        sellstate.draw(position, selection);
+        sellstate.draw(position + shop_nodes::sell_parent_shift(), selection);
 
         buyslider.draw(position);
         sellslider.draw(position);
@@ -264,11 +280,11 @@ namespace jrc
         int16_t slot = slot_by_position(yoff);
         if (slot >= 0 && slot <= 4)
         {
-            if (xoff > 7 && xoff < 209)
+            if (shop_nodes::cursor_over_buy_list(xoff))
             {
                 show_item(slot, true);
             }
-            else if (xoff > 241 && xoff < 443)
+            else if (shop_nodes::cursor_over_sell_list(xoff))
             {
                 show_item(slot, false);
             }
@@ -293,11 +309,11 @@ namespace jrc
             return;
         }
 
-        if (buyslider.isenabled() && xoff >= 7 && xoff <= 223)
+        if (buyslider.isenabled() && shop_nodes::scroll_over_buy_list(xoff))
         {
             buyslider.send_scroll(yoffset);
         }
-        else if (sellslider.isenabled() && xoff >= 241 && xoff <= 454)
+        else if (sellslider.isenabled() && shop_nodes::scroll_over_sell_list(xoff))
         {
             sellslider.send_scroll(yoffset);
             update_recharge_buttons();
@@ -467,31 +483,25 @@ namespace jrc
 
     int16_t UIShop::slot_by_position(int16_t y)
     {
-        int16_t yoff = y - 115;
-        if (yoff > 0 && yoff < 38)
-        {
-            return 0;
-        }
-        else if (yoff > 42 && yoff < 80)
-        {
-            return 1;
-        }
-        else if (yoff > 84 && yoff < 122)
-        {
-            return 2;
-        }
-        else if (yoff > 126 && yoff < 164)
-        {
-            return 3;
-        }
-        else if (yoff > 168 && yoff < 206)
-        {
-            return 4;
-        }
-        else
+        const int16_t yoff = static_cast<int16_t>(y - shop_nodes::row_top());
+        if (yoff < 0)
         {
             return -1;
         }
+
+        const int16_t slot = static_cast<int16_t>(yoff / shop_nodes::row_step());
+        if (slot < 0 || slot > 4)
+        {
+            return -1;
+        }
+
+        const int16_t row_start = static_cast<int16_t>(slot * shop_nodes::row_step());
+        if (yoff - row_start >= shop_nodes::row_height())
+        {
+            return -1;
+        }
+
+        return slot;
     }
 
     uint16_t UIShop::tabbyinventory(InventoryType::Id type)
@@ -541,10 +551,22 @@ namespace jrc
 
     void UIShop::BuyItem::draw(Point<int16_t> pos) const
     {
-        icon.draw(pos + Point<int16_t>(0, 32));
-        namelabel.draw(pos + Point<int16_t>(40, -1));
-        currency.draw(pos + Point<int16_t>(38, 20));
-        pricelabel.draw(pos + Point<int16_t>(53, 17));
+        if (shop_nodes::post_chaos())
+        {
+            icon.draw(pos + Point<int16_t>(0, 32));
+            namelabel.draw(pos + Point<int16_t>(40, -1));
+            currency.draw(pos + Point<int16_t>(38, 20));
+            pricelabel.draw(pos + Point<int16_t>(53, 17));
+        }
+        else
+        {
+            // v83 rows are 35px tall with the icon slot flush at the row
+            // origin and origin-less item icons.
+            icon.draw(pos + Point<int16_t>(2, 2));
+            namelabel.draw(pos + Point<int16_t>(38, 1));
+            currency.draw(pos + Point<int16_t>(36, 20));
+            pricelabel.draw(pos + Point<int16_t>(51, 18));
+        }
     }
 
     int32_t UIShop::BuyItem::get_id() const
@@ -576,10 +598,10 @@ namespace jrc
                 break;
             }
 
-            auto itempos = Point<int16_t>(12, 116 + 42 * i);
+            Point<int16_t> itempos = shop_nodes::buy_itempos(i);
             if (slot == selection)
             {
-                selected.draw(parentpos + itempos + Point<int16_t>(35, -1));
+                selected.draw(parentpos + itempos + shop_nodes::selection_shift());
             }
             items[slot].draw(parentpos + itempos);
         }

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UIStorage.h"
 #include "UINotice.h"
+#include "UIStorageNodes.h"
 
 #include "../UI.h"
 #include "../Components/AreaButton.h"
@@ -40,15 +41,6 @@ namespace jrc
     namespace
     {
         constexpr int16_t ROWS_VISIBLE = 5;
-        constexpr int16_t ROW_TOP = 94;
-        constexpr int16_t ROW_STEP = 42;
-        constexpr int16_t LEFT_ROW_X = 8;
-        constexpr int16_t RIGHT_ROW_X = 177;
-        constexpr int16_t ROW_WIDTH = 160;
-        constexpr int16_t ROW_HEIGHT = 36;
-        constexpr int16_t LEFT_ICON_X = 17;
-        constexpr int16_t RIGHT_ICON_X = 186;
-        constexpr int16_t ICON_Y = 99;
 
         constexpr InventoryType::Id INVENTORY_TABS[] = {
             InventoryType::EQUIP,
@@ -81,55 +73,73 @@ namespace jrc
           slots(0),
           npcid(0)
     {
-        nl::node src = nl::nx::ui["UIWindow2.img"]["Trunk"];
+        nl::node src = storage_nodes::src();
 
         sprites.emplace_back(src["backgrnd"]);
-        sprites.emplace_back(src["backgrnd2"]);
-        sprites.emplace_back(src["backgrnd3"]);
+        // v83 ships a single merged background layer.
+        if (nl::node backgrnd2 = src["backgrnd2"])
+        {
+            sprites.emplace_back(backgrnd2);
+            sprites.emplace_back(src["backgrnd3"]);
+        }
 
-        buttons[GET] = std::make_unique<MapleButton>(src["BtGet"]);
-        buttons[PUT] = std::make_unique<MapleButton>(src["BtPut"]);
-        buttons[SORT] = std::make_unique<MapleButton>(src["BtSort"]);
-        buttons[IN_COIN] = std::make_unique<MapleButton>(src["BtInCoin"]);
-        buttons[OUT_COIN] = std::make_unique<MapleButton>(src["BtOutCoin"]);
-        buttons[EXIT] = std::make_unique<MapleButton>(src["BtExit"]);
-        buttons[FULL] = std::make_unique<MapleButton>(src["BtFull"]);
-        buttons[SMALL] = std::make_unique<MapleButton>(src["BtSmall"]);
-        buttons[SLOT_EX] = std::make_unique<MapleButton>(src["BtSlotEx"]);
+        buttons[GET] = std::make_unique<MapleButton>(src["BtGet"], storage_nodes::get_pos());
+        buttons[PUT] = std::make_unique<MapleButton>(src["BtPut"], storage_nodes::put_pos());
+        buttons[SORT] = std::make_unique<MapleButton>(src["BtSort"], storage_nodes::sort_pos());
+        buttons[IN_COIN] = std::make_unique<MapleButton>(src["BtInCoin"], storage_nodes::in_coin_pos());
+        buttons[OUT_COIN] = std::make_unique<MapleButton>(src["BtOutCoin"], storage_nodes::out_coin_pos());
+        buttons[EXIT] = std::make_unique<MapleButton>(src["BtExit"], storage_nodes::exit_pos());
 
-        // Full/Small mode and slot expansion require extra UI flows that are not
-        // implemented yet; keep controls hidden to avoid dead-end interactions.
-        buttons[FULL]->set_active(false);
-        buttons[SMALL]->set_active(false);
-        buttons[SLOT_EX]->set_active(false);
+        // Full/Small mode and slot expansion only exist post-Chaos and their
+        // UI flows are not implemented; keep the controls hidden.
+        if (storage_nodes::has_mode_buttons())
+        {
+            buttons[FULL] = std::make_unique<MapleButton>(src["BtFull"]);
+            buttons[SMALL] = std::make_unique<MapleButton>(src["BtSmall"]);
+            buttons[SLOT_EX] = std::make_unique<MapleButton>(src["BtSlotEx"]);
+            buttons[FULL]->set_active(false);
+            buttons[SMALL]->set_active(false);
+            buttons[SLOT_EX]->set_active(false);
+        }
 
         nl::node tab_enabled = src["Tab"]["enabled"];
         nl::node tab_disabled = src["Tab"]["disabled"];
 
-        buttons[TAB_EQUIP] = std::make_unique<TwoSpriteButton>(tab_disabled["0"], tab_enabled["0"]);
-        buttons[TAB_USE] = std::make_unique<TwoSpriteButton>(tab_disabled["1"], tab_enabled["1"]);
-        buttons[TAB_ETC] = std::make_unique<TwoSpriteButton>(tab_disabled["2"], tab_enabled["2"]);
-        buttons[TAB_SETUP] = std::make_unique<TwoSpriteButton>(tab_disabled["3"], tab_enabled["3"]);
-        buttons[TAB_CASH] = std::make_unique<TwoSpriteButton>(tab_disabled["4"], tab_enabled["4"]);
+        buttons[TAB_EQUIP] = std::make_unique<TwoSpriteButton>(tab_disabled["0"], tab_enabled["0"], storage_nodes::tab_pos(false, 0));
+        buttons[TAB_USE] = std::make_unique<TwoSpriteButton>(tab_disabled["1"], tab_enabled["1"], storage_nodes::tab_pos(false, 1));
+        buttons[TAB_ETC] = std::make_unique<TwoSpriteButton>(tab_disabled["2"], tab_enabled["2"], storage_nodes::tab_pos(false, 2));
+        buttons[TAB_SETUP] = std::make_unique<TwoSpriteButton>(tab_disabled["3"], tab_enabled["3"], storage_nodes::tab_pos(false, 3));
+        buttons[TAB_CASH] = std::make_unique<TwoSpriteButton>(tab_disabled["4"], tab_enabled["4"], storage_nodes::tab_pos(false, 4));
+
+        // The v83 header carries a second tab strip over the inventory
+        // column; both strips drive the same tab selection.
+        if (!storage_nodes::post_chaos())
+        {
+            buttons[TAB2_EQUIP] = std::make_unique<TwoSpriteButton>(tab_disabled["0"], tab_enabled["0"], storage_nodes::tab_pos(true, 0));
+            buttons[TAB2_USE] = std::make_unique<TwoSpriteButton>(tab_disabled["1"], tab_enabled["1"], storage_nodes::tab_pos(true, 1));
+            buttons[TAB2_ETC] = std::make_unique<TwoSpriteButton>(tab_disabled["2"], tab_enabled["2"], storage_nodes::tab_pos(true, 2));
+            buttons[TAB2_SETUP] = std::make_unique<TwoSpriteButton>(tab_disabled["3"], tab_enabled["3"], storage_nodes::tab_pos(true, 3));
+            buttons[TAB2_CASH] = std::make_unique<TwoSpriteButton>(tab_disabled["4"], tab_enabled["4"], storage_nodes::tab_pos(true, 4));
+        }
 
         for (int16_t i = 0; i < ROWS_VISIBLE; ++i)
         {
             buttons[STORAGE_ROW0 + i] = std::make_unique<AreaButton>(
-                Point<int16_t>(LEFT_ROW_X, ROW_TOP + i * ROW_STEP),
-                Point<int16_t>(ROW_WIDTH, ROW_HEIGHT)
+                Point<int16_t>(storage_nodes::left_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step()),
+                Point<int16_t>(storage_nodes::row_width(), storage_nodes::row_height())
             );
 
             buttons[INVENTORY_ROW0 + i] = std::make_unique<AreaButton>(
-                Point<int16_t>(RIGHT_ROW_X, ROW_TOP + i * ROW_STEP),
-                Point<int16_t>(ROW_WIDTH, ROW_HEIGHT)
+                Point<int16_t>(storage_nodes::right_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step()),
+                Point<int16_t>(storage_nodes::row_width(), storage_nodes::row_height())
             );
         }
 
         buttons[button_by_tab(tab)]->set_state(Button::PRESSED);
 
-        selection = nl::nx::ui["UIWindow2.img"]["Shop"]["select"];
-        disabled_slot = src["disabled"];
-        meso_icon = nl::nx::ui["UIWindow2.img"]["Shop"]["meso"];
+        selection = storage_nodes::selection();
+        disabled_slot = storage_nodes::empty_slot();
+        meso_icon = storage_nodes::meso_icon();
 
         storage_mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
         player_mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
@@ -156,12 +166,12 @@ namespace jrc
         for (int16_t i = 0; i < ROWS_VISIBLE; ++i)
         {
             int16_t storage_index = i + storage_offset;
-            Point<int16_t> storage_rowpos = position + Point<int16_t>(LEFT_ROW_X, ROW_TOP + i * ROW_STEP);
-            Point<int16_t> storage_iconpos = position + Point<int16_t>(LEFT_ICON_X, ICON_Y + i * ROW_STEP);
+            Point<int16_t> storage_rowpos = position + Point<int16_t>(storage_nodes::left_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step());
+            Point<int16_t> storage_iconpos = position + Point<int16_t>(storage_nodes::left_icon_x(), storage_nodes::icon_y() + i * storage_nodes::row_step());
 
             if (storage_index == storage_selection)
             {
-                selection.draw(storage_rowpos);
+                selection.draw(storage_rowpos + Point<int16_t>(storage_nodes::selection_shift(), 0));
             }
 
             if (storage_index >= 0 && storage_index < static_cast<int16_t>(current_storage.size()))
@@ -181,12 +191,12 @@ namespace jrc
             }
 
             int16_t inventory_index = i + inventory_offset;
-            Point<int16_t> inventory_rowpos = position + Point<int16_t>(RIGHT_ROW_X, ROW_TOP + i * ROW_STEP);
-            Point<int16_t> inventory_iconpos = position + Point<int16_t>(RIGHT_ICON_X, ICON_Y + i * ROW_STEP);
+            Point<int16_t> inventory_rowpos = position + Point<int16_t>(storage_nodes::right_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step());
+            Point<int16_t> inventory_iconpos = position + Point<int16_t>(storage_nodes::right_icon_x(), storage_nodes::icon_y() + i * storage_nodes::row_step());
 
             if (inventory_index == inventory_selection)
             {
-                selection.draw(inventory_rowpos);
+                selection.draw(inventory_rowpos + Point<int16_t>(storage_nodes::selection_shift(), 0));
             }
 
             if (inventory_index >= 0 && inventory_index < static_cast<int16_t>(inventory_items.size()))
@@ -206,10 +216,10 @@ namespace jrc
             }
         }
 
-        meso_icon.draw(position + Point<int16_t>(142, 317));
-        meso_icon.draw(position + Point<int16_t>(314, 317));
-        storage_mesolabel.draw(position + Point<int16_t>(173, 319));
-        player_mesolabel.draw(position + Point<int16_t>(345, 319));
+        meso_icon.draw(position + storage_nodes::storage_meso_icon_pos());
+        meso_icon.draw(position + storage_nodes::player_meso_icon_pos());
+        storage_mesolabel.draw(position + storage_nodes::storage_meso_label_pos());
+        player_mesolabel.draw(position + storage_nodes::player_meso_label_pos());
     }
 
     void UIStorage::update()
@@ -238,11 +248,11 @@ namespace jrc
         int16_t row = slot_by_position(cursoroffset.y());
         if (row >= 0)
         {
-            if (cursoroffset.x() >= LEFT_ROW_X && cursoroffset.x() <= LEFT_ROW_X + ROW_WIDTH)
+            if (cursoroffset.x() >= storage_nodes::left_row_x() && cursoroffset.x() <= storage_nodes::left_row_x() + storage_nodes::row_width())
             {
                 show_item(row, true);
             }
-            else if (cursoroffset.x() >= RIGHT_ROW_X && cursoroffset.x() <= RIGHT_ROW_X + ROW_WIDTH)
+            else if (cursoroffset.x() >= storage_nodes::right_row_x() && cursoroffset.x() <= storage_nodes::right_row_x() + storage_nodes::row_width())
             {
                 show_item(row, false);
             }
@@ -271,11 +281,11 @@ namespace jrc
         int16_t shift = yoffset > 0 ? -1 : 1;
         int16_t xoff = last_cursor_pos.x();
 
-        if (xoff >= LEFT_ROW_X && xoff <= LEFT_ROW_X + ROW_WIDTH)
+        if (xoff >= storage_nodes::left_row_x() && xoff <= storage_nodes::left_row_x() + storage_nodes::row_width())
         {
             storage_offset = static_cast<int16_t>(storage_offset + shift);
         }
-        else if (xoff >= RIGHT_ROW_X && xoff <= RIGHT_ROW_X + ROW_WIDTH)
+        else if (xoff >= storage_nodes::right_row_x() && xoff <= storage_nodes::right_row_x() + storage_nodes::row_width())
         {
             inventory_offset = static_cast<int16_t>(inventory_offset + shift);
         }
@@ -292,7 +302,7 @@ namespace jrc
             return;
         }
 
-        if (cursoroffset.x() >= LEFT_ROW_X && cursoroffset.x() <= LEFT_ROW_X + ROW_WIDTH)
+        if (cursoroffset.x() >= storage_nodes::left_row_x() && cursoroffset.x() <= storage_nodes::left_row_x() + storage_nodes::row_width())
         {
             int16_t index = row + storage_offset;
             if (index >= 0 && index < static_cast<int16_t>(storage_items[tab].size()))
@@ -302,7 +312,7 @@ namespace jrc
                 request_take_selected();
             }
         }
-        else if (cursoroffset.x() >= RIGHT_ROW_X && cursoroffset.x() <= RIGHT_ROW_X + ROW_WIDTH)
+        else if (cursoroffset.x() >= storage_nodes::right_row_x() && cursoroffset.x() <= storage_nodes::right_row_x() + storage_nodes::row_width())
         {
             int16_t index = row + inventory_offset;
             if (index >= 0 && index < static_cast<int16_t>(inventory_items.size()))
@@ -447,18 +457,23 @@ namespace jrc
             close_with_packet();
             return Button::PRESSED;
         case TAB_EQUIP:
+        case TAB2_EQUIP:
             change_tab(InventoryType::EQUIP);
             return Button::IDENTITY;
         case TAB_USE:
+        case TAB2_USE:
             change_tab(InventoryType::USE);
             return Button::IDENTITY;
         case TAB_ETC:
+        case TAB2_ETC:
             change_tab(InventoryType::ETC);
             return Button::IDENTITY;
         case TAB_SETUP:
+        case TAB2_SETUP:
             change_tab(InventoryType::SETUP);
             return Button::IDENTITY;
         case TAB_CASH:
+        case TAB2_CASH:
             change_tab(InventoryType::CASH);
             return Button::IDENTITY;
         default:
@@ -545,6 +560,14 @@ namespace jrc
 
         buttons[oldtab]->set_state(Button::NORMAL);
         buttons[newtab]->set_state(Button::PRESSED);
+
+        uint16_t oldmirror = static_cast<uint16_t>(oldtab + TAB2_EQUIP - TAB_EQUIP);
+        uint16_t newmirror = static_cast<uint16_t>(newtab + TAB2_EQUIP - TAB_EQUIP);
+        if (buttons.find(oldmirror) != buttons.end())
+        {
+            buttons[oldmirror]->set_state(Button::NORMAL);
+            buttons[newmirror]->set_state(Button::PRESSED);
+        }
 
         tab = type;
         storage_offset = 0;
@@ -644,20 +667,20 @@ namespace jrc
 
     int16_t UIStorage::slot_by_position(int16_t y) const
     {
-        int16_t yoff = static_cast<int16_t>(y - ROW_TOP);
+        int16_t yoff = static_cast<int16_t>(y - storage_nodes::row_top());
         if (yoff < 0)
         {
             return -1;
         }
 
-        int16_t slot = static_cast<int16_t>(yoff / ROW_STEP);
+        int16_t slot = static_cast<int16_t>(yoff / storage_nodes::row_step());
         if (slot < 0 || slot >= ROWS_VISIBLE)
         {
             return -1;
         }
 
-        int16_t row_start = static_cast<int16_t>(slot * ROW_STEP);
-        if (yoff - row_start >= ROW_HEIGHT)
+        int16_t row_start = static_cast<int16_t>(slot * storage_nodes::row_step());
+        if (yoff - row_start >= storage_nodes::row_height())
         {
             return -1;
         }

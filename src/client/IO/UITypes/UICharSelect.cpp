@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UICharSelect.h"
 #include "../UiAssetVersion.h"
+#include "UICharSelectNodes.h"
 
 #include "UISoftKey.h"
 #include "UICharCreation.h"
@@ -25,6 +26,7 @@
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "../Components/AreaButton.h"
+#include "../Components/TwoSpriteButton.h"
 
 #include "../../Constants.h"
 #include "../../Configuration.h"
@@ -115,30 +117,71 @@ namespace jrc
         */
 
         // Pre BB
-        charinfopos = Point<int16_t>(662, 305);
+        // Post-Chaos keeps the upstream anchor. The pre-Chaos board
+        // (charInfo1, 183x151, origin (45,57)) would run flush against
+        // the right screen edge there, so it is shifted left.
+        const bool post_chaos_assets = charselect_nodes::post_chaos();
+        charinfopos = post_chaos_assets ? Point<int16_t>(662, 305)
+                                        : Point<int16_t>(625, 305);
         selworldpos = Point<int16_t>(578, 112);
 
-        sprites.emplace_back(charselect["charInfo"],                        charinfopos);
-        sprites.emplace_back(common["selectWorld"],                         selworldpos);
-        sprites.emplace_back(charselect["selectedWorld"]["icon"]["15"],     selworldpos);
-        sprites.emplace_back(charselect["selectedWorld"]["name"]["15"],     selworldpos);
-        sprites.emplace_back(charselect["selectedWorld"]["ch"][channel_id], selworldpos);
+        sprites.emplace_back(charselect_nodes::info_board(),      charinfopos);
+        sprites.emplace_back(common["selectWorld"],               selworldpos);
 
-        nl::node charslot = charselect["charSlot"];
-        Point<int16_t> charslotpos = charslot["pos"];
-        sprites.emplace_back(charslot["0"], charslotpos);
-        slotcountpos = charslotpos + Point<int16_t>(charslot["numberpos"]);
+        if (charselect["selectedWorld"])
+        {
+            // Post-Chaos world banner art. Pre-Chaos only ships the
+            // Common/selectWorld board added above.
+            sprites.emplace_back(charselect["selectedWorld"]["icon"]["15"],     selworldpos);
+            sprites.emplace_back(charselect["selectedWorld"]["name"]["15"],     selworldpos);
+            sprites.emplace_back(charselect["selectedWorld"]["ch"][channel_id], selworldpos);
+        }
+
+        if (charselect["charSlot"])
+        {
+            nl::node charslot = charselect["charSlot"];
+            Point<int16_t> charslotpos = charslot["pos"];
+            sprites.emplace_back(charslot["0"], charslotpos);
+            slotcountpos = charslotpos + Point<int16_t>(charslot["numberpos"]);
+        }
+        else
+        {
+            // Pre-Chaos has no slot window: anchor the count label at the
+            // bottom right corner of the selectWorld board instead.
+            slotcountpos = selworldpos + Point<int16_t>(144, 71);
+        }
         slotcountlabel = { Text::A11M, Text::RIGHT, Text::WHITE };
 
-        emptyslot = charselect["buyCharacter"];
-        charplatform = charselect["character"]["0"];
-        nametag   = charselect["nameTag"];
+        emptyslot    = charselect_nodes::empty_slot();
+        charplatform = charselect_nodes::platform();
+        nametag      = charselect["nameTag"];
 
-        buttons[BT_SELECTCHAR] = std::make_unique<MapleButton>(charselect["BtSelect"], charinfopos + Point<int16_t>(-76, 72));
+        buttons[BT_SELECTCHAR] = std::make_unique<MapleButton>(
+            charselect["BtSelect"],
+            post_chaos_assets ? charinfopos + Point<int16_t>(-76, 72)
+                              : Point<int16_t>(440, 495));
         buttons[BT_CREATECHAR] = std::make_unique<MapleButton>(charselect["BtNew"],    Point<int16_t>(200, 495));
         buttons[BT_DELETECHAR] = std::make_unique<MapleButton>(charselect["BtDelete"], Point<int16_t>(320, 495));
-        buttons[BT_PAGELEFT]   = std::make_unique<MapleButton>(charselect["pageL"],    Point<int16_t>(100, 490));
-        buttons[BT_PAGERIGHT]  = std::make_unique<MapleButton>(charselect["pageR"],    Point<int16_t>(490, 490));
+
+        if (charselect_nodes::pages_are_state_buttons())
+        {
+            buttons[BT_PAGELEFT]   = std::make_unique<MapleButton>(charselect["pageL"],    Point<int16_t>(100, 490));
+            buttons[BT_PAGERIGHT]  = std::make_unique<MapleButton>(charselect["pageR"],    Point<int16_t>(490, 490));
+        }
+        else
+        {
+            // Pre-Chaos pageL/pageR are big edge arrows stored as plain
+            // frame pairs instead of state subtrees. Their origins are
+            // (43,37)/(44,36), so the anchors keep the upstream top left
+            // corners and the right arrow mirrors the left one at the
+            // opposite screen edge.
+            buttons[BT_PAGELEFT]   = std::make_unique<TwoSpriteButton>(
+                charselect["pageL"]["1"], charselect["pageL"]["0"],
+                Point<int16_t>(100, 490));
+            buttons[BT_PAGERIGHT]  = std::make_unique<TwoSpriteButton>(
+                charselect["pageR"]["1"], charselect["pageR"]["0"],
+                Point<int16_t>(698, 490));
+        }
 
         for (uint8_t i = 0; i < PAGESIZE; ++i)
         {
@@ -174,6 +217,7 @@ namespace jrc
             return;
         }
 
+        const bool post_chaos_assets = charselect_nodes::post_chaos();
         slotcountlabel.draw(slotcountpos);
 
         for (uint8_t i = 0; i < charcount_relative; ++i)
@@ -191,10 +235,25 @@ namespace jrc
             const Point<int16_t> data_origin = charinfopos + CHARACTER_DATA_OFFSET;
 
             std::string levelstr = std::to_string(stats.stats[Maplestat::LEVEL]);
-            int16_t lvx = levelset.draw(levelstr, charinfopos + Point<int16_t>(23, -93));
-            levelset.draw('l', charinfopos + Point<int16_t>(-7 - lvx / 2, -93));
+            if (charselect_nodes::has_level_charset())
+            {
+                int16_t lvx = levelset.draw(levelstr, charinfopos + Point<int16_t>(23, -93));
+                levelset.draw('l', charinfopos + Point<int16_t>(-7 - lvx / 2, -93));
 
-            namelabel.draw(charinfopos + Point<int16_t>(0, -85));
+                namelabel.draw(charinfopos + Point<int16_t>(0, -85));
+            }
+            else
+            {
+                // Pre-Chaos ships no lv charset, so the marker is a plain
+                // label. The info board top edge sits 57px above the
+                // anchor; the level goes on the first board row and the
+                // name right below it.
+                Text& lvlabel = charselect_nodes::level_label();
+                lvlabel.change_text("Lv. " + levelstr);
+                lvlabel.draw(charinfopos + Point<int16_t>(46, -37));
+
+                namelabel.draw(charinfopos + Point<int16_t>(46, -13));
+            }
 
             for (size_t i = 0; i < NUM_LABELS; ++i)
             {
@@ -206,7 +265,17 @@ namespace jrc
         for (uint8_t i = charcount_relative; i < slots_relative; ++i)
         {
             Point<int16_t> position_slot(130 + (120 * (i % 4)), 250 + (200 * (i > 3)));
-            emptyslot.draw(position_slot, alpha);
+            if (post_chaos_assets)
+            {
+                emptyslot.draw(position_slot, alpha);
+            }
+            else
+            {
+                // Pre-Chaos keeps the empty platform under unused slots
+                // and puts the small icon/new badge just above it.
+                charplatform.draw(position_slot, alpha);
+                emptyslot.draw(position_slot + Point<int16_t>(-4, -84), alpha);
+            }
         }
     }
 
@@ -671,6 +740,28 @@ namespace jrc
 
     Point<int16_t> UICharSelect::get_label_pos(size_t label) const
     {
+        if (!charselect_nodes::post_chaos())
+        {
+            // Pre-Chaos charInfo1 board layout: the job goes on its own
+            // right aligned line below the name and the stats fill a 2x2
+            // table in the lower half of the board.
+            switch (label)
+            {
+            case JOB:
+                return { 113, 31 };
+            case STR:
+                return { 38, 56 };
+            case INT:
+                return { 113, 56 };
+            case DEX:
+                return { 38, 81 };
+            case LUK:
+                return { 113, 81 };
+            default:
+                return {};
+            }
+        }
+
         switch (label)
         {
         case JOB:

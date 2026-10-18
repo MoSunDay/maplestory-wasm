@@ -28,34 +28,31 @@
 namespace jrc
 {
     UIStatsinfo::UIStatsinfo(const CharStats& st) :
-        UIDragElement<PosSTATS>(Point<int16_t>(212, 20)), stats(st)
+        UIDragElement<PosSTATS>(Point<int16_t>(175, 20)), stats(st)
     {
-        nl::node src    = nl::nx::ui["UIWindow4.img"]["Stat"]["main"];
-        nl::node detail = nl::nx::ui["UIWindow4.img"]["Stat"]["detail"];
+        // v83 keeps the whole stat window in UIWindow.img/Stat: the main
+        // panel (backgrnd, 175x347) and the detachable detail panel
+        // (backgrnd2, 177x203).  The bitmap paints eight info rows at
+        // y = 32 + 18 * n (the job row is taller), the secondary stat rows
+        // STR/DEX/INT/LUK below the divider at y = 244 + 18 * n and ten
+        // detail rows at y = 6 + 18 * n.  Values start at x = 56 on the
+        // main panel and at x = 74 on the detail panel.
+        nl::node src    = nl::nx::ui["UIWindow.img"]["Stat"];
+        nl::node detail = src;
 
         sprites.emplace_back(src["backgrnd"]);
-        sprites.emplace_back(src["backgrnd2"]);
-        sprites.emplace_back(src["backgrnd3"]);
-        textures_detail.emplace_back(detail["backgrnd"]);
         textures_detail.emplace_back(detail["backgrnd2"]);
-        textures_detail.emplace_back(detail["backgrnd3"]);
 
-        abilities[RARE]      = detail["abilityTitle"]["rare"]["0"];
-        abilities[EPIC]      = detail["abilityTitle"]["epic"]["0"];
-        abilities[UNIQUE]    = detail["abilityTitle"]["unique"]["0"];
-        abilities[LEGENDARY] = detail["abilityTitle"]["legendary"]["0"];
-        abilities[NONE]      = detail["abilityTitle"]["normal"]["0"];
+        // v83 only ships a single "AP up" sprite (BtApUp, 12x12); it is
+        // reused for every raisable stat row.
+        buttons[BT_HP]  = std::make_unique<MapleButton>(src["BtApUp"], Point<int16_t>(157, 134));
+        buttons[BT_MP]  = std::make_unique<MapleButton>(src["BtApUp"], Point<int16_t>(157, 152));
+        buttons[BT_STR] = std::make_unique<MapleButton>(src["BtApUp"], Point<int16_t>(157, 246));
+        buttons[BT_DEX] = std::make_unique<MapleButton>(src["BtApUp"], Point<int16_t>(157, 264));
+        buttons[BT_INT] = std::make_unique<MapleButton>(src["BtApUp"], Point<int16_t>(157, 282));
+        buttons[BT_LUK] = std::make_unique<MapleButton>(src["BtApUp"], Point<int16_t>(157, 300));
 
-        buttons[BT_HP]  = std::make_unique<MapleButton>(src["BtHpUp"]);
-        buttons[BT_MP]  = std::make_unique<MapleButton>(src["BtMpUp"]);
-        buttons[BT_STR] = std::make_unique<MapleButton>(src["BtStrUp"]);
-        buttons[BT_DEX] = std::make_unique<MapleButton>(src["BtDexUp"]);
-        buttons[BT_LUK] = std::make_unique<MapleButton>(src["BtLukUp"]);
-        buttons[BT_INT] = std::make_unique<MapleButton>(src["BtIntUp"]);
-
-        buttons[BT_DETAILOPEN]  = std::make_unique<MapleButton>(src["BtDetailOpen"]);
-        buttons[BT_DETAILCLOSE] = std::make_unique<MapleButton>(src["BtDetailClose"]);
-        buttons[BT_DETAILCLOSE]->set_active(false);
+        buttons[BT_DETAIL] = std::make_unique<MapleButton>(src["BtDetail"], Point<int16_t>(64, 322));
 
         update_ap();
 
@@ -63,39 +60,31 @@ namespace jrc
         {
             statlabels[i] = Text(Text::A11M, Text::LEFT, Text::LIGHTGREY);
         }
-        statoffsets[NAME]      = Point<int16_t>( 73, 27 );
-        statoffsets[JOB]       = Point<int16_t>( 73, 45 );
-        statoffsets[GUILD]     = Point<int16_t>( 73, 63 );
-        statoffsets[FAME]      = Point<int16_t>( 73, 81 );
-        statoffsets[DAMAGE]    = Point<int16_t>( 73, 99 );
-        statoffsets[HP]        = Point<int16_t>( 73, 117);
-        statoffsets[MP]        = Point<int16_t>( 73, 135);
-        statoffsets[AP]        = Point<int16_t>( 70, 177);
-        statoffsets[STR]       = Point<int16_t>( 73, 204);
-        statoffsets[DEX]       = Point<int16_t>( 73, 222);
-        statoffsets[INT]       = Point<int16_t>( 73, 240);
-        statoffsets[LUK]       = Point<int16_t>( 73, 258);
-        statoffsets[ATTACK]    = Point<int16_t>( 73, 37 );
-        statoffsets[CRIT]      = Point<int16_t>( 73, 55 );
-        statoffsets[MINCRIT]   = Point<int16_t>( 73, 73 );
-        statoffsets[MAXCRIT]   = Point<int16_t>(168, 73 );
-        statoffsets[BDM]       = Point<int16_t>( 73, 91 );
-        statoffsets[IGNOREDEF] = Point<int16_t>(168, 91 );
-        statoffsets[RESIST]    = Point<int16_t>( 73, 109);
-        statoffsets[STANCE]    = Point<int16_t>(168, 109);
-        statoffsets[WDEF]      = Point<int16_t>( 73, 127);
-        statoffsets[MDEF]      = Point<int16_t>( 73, 145);
-        statoffsets[ACCURACY]  = Point<int16_t>( 73, 163);
-        statoffsets[AVOID]     = Point<int16_t>( 73, 199);
-        statoffsets[SPEED]     = Point<int16_t>( 73, 235);
-        statoffsets[JUMP]      = Point<int16_t>(168, 235);
-        statoffsets[HONOR]     = Point<int16_t>( 73, 353);
+        statoffsets[NAME]      = Point<int16_t>( 56,  34);
+        statoffsets[JOB]       = Point<int16_t>( 56,  56);
+        statoffsets[GUILD]     = Point<int16_t>( 56,  80);
+        statoffsets[FAME]      = Point<int16_t>( 56,  98);
+        statoffsets[DAMAGE]    = Point<int16_t>( 56, 116);
+        statoffsets[HP]        = Point<int16_t>( 56, 134);
+        statoffsets[MP]        = Point<int16_t>( 56, 152);
+        statoffsets[AP]        = Point<int16_t>( 56, 170);
+        statoffsets[STR]       = Point<int16_t>( 56, 246);
+        statoffsets[DEX]       = Point<int16_t>( 56, 264);
+        statoffsets[INT]       = Point<int16_t>( 56, 282);
+        statoffsets[LUK]       = Point<int16_t>( 56, 300);
+        statoffsets[ATTACK]    = Point<int16_t>(249,   8);
+        statoffsets[WDEF]      = Point<int16_t>(249,  44);
+        statoffsets[MDEF]      = Point<int16_t>(249,  62);
+        statoffsets[ACCURACY]  = Point<int16_t>(249,  80);
+        statoffsets[AVOID]     = Point<int16_t>(249,  98);
+        statoffsets[SPEED]     = Point<int16_t>(249, 134);
+        statoffsets[JUMP]      = Point<int16_t>(249, 152);
 
         update_all_stats();
         update_stat(Maplestat::JOB);
         update_stat(Maplestat::FAME);
 
-        dimension  = Point<int16_t>(212, 318);
+        dimension  = Point<int16_t>(175, 347);
         showdetail = false;
     }
 
@@ -105,24 +94,18 @@ namespace jrc
 
         if (showdetail)
         {
-            Point<int16_t> detail_pos(position + Point<int16_t>(213, 0));
+            Point<int16_t> detail_pos(position + Point<int16_t>(175, 0));
             for (auto& texture : textures_detail)
             {
                 texture.draw(detail_pos);
             }
-            abilities[NONE].draw({ detail_pos });
         }
 
         size_t last = showdetail ? NUMLABELS : NUMNORMAL;
         for (size_t i = 0; i < last; ++i)
         {
-            Point<int16_t> labelpos = position + statoffsets[i];
-            if (i >= NUMNORMAL)
-            {
-                labelpos.shift_x(213);
-            }
-
-            statlabels[i].draw(labelpos);
+            // Detail offsets already include the panel shift.
+            statlabels[i].draw(position + statoffsets[i]);
         }
     }
 
@@ -169,16 +152,11 @@ namespace jrc
         update_buffed(ACCURACY, Equipstat::ACC);
         update_buffed(AVOID, Equipstat::AVOID);
 
-        statlabels[CRIT     ].change_text(std::to_string(static_cast<int32_t>(stats.get_critical()   * 100)) + "%");
-        statlabels[MINCRIT  ].change_text(std::to_string(static_cast<int32_t>(stats.get_mincrit()    * 100)) + "%");
-        statlabels[MAXCRIT  ].change_text(std::to_string(static_cast<int32_t>(stats.get_maxcrit()    * 100)) + "%");
-        statlabels[BDM      ].change_text(std::to_string(static_cast<int32_t>(stats.get_bossdmg()    * 100)) + "%");
-        statlabels[IGNOREDEF].change_text(std::to_string(static_cast<int32_t>(stats.get_ignoredef()  * 100)) + "%");
-        statlabels[RESIST   ].change_text(std::to_string(static_cast<int32_t>(stats.get_resistance() * 100)) + "%");
-        statlabels[STANCE   ].change_text(std::to_string(static_cast<int32_t>(stats.get_stance()     * 100)) + "%");
+        // Critical rate, boss damage, resistance, stance and honor are
+        // post-Chaos stats; the v83 window has no rows for them.
+
         statlabels[SPEED    ].change_text(std::to_string(stats.get_total(Equipstat::SPEED))                  + "%");
         statlabels[JUMP     ].change_text(std::to_string(stats.get_total(Equipstat::JUMP))                   + "%");
-        statlabels[HONOR    ].change_text(std::to_string(stats.get_honor())                                       );
     }
 
     void UIStatsinfo::update_stat(Maplestat::Id stat)
@@ -200,15 +178,9 @@ namespace jrc
     {
         switch (id)
         {
-        case BT_DETAILOPEN:
-            showdetail = true;
-            buttons[BT_DETAILOPEN]->set_active(false);
-            buttons[BT_DETAILCLOSE]->set_active(true);
-            break;
-        case BT_DETAILCLOSE:
-            showdetail = false;
-            buttons[BT_DETAILCLOSE]->set_active(false);
-            buttons[BT_DETAILOPEN]->set_active(true);
+        case BT_DETAIL:
+            // v83 has a single toggle button for the detail panel.
+            showdetail = !showdetail;
             break;
         case BT_HP:
             send_apup(Maplestat::HP);

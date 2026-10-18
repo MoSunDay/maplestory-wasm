@@ -18,11 +18,14 @@
 #pragma once
 #include "../UIElement.h"
 
+#include "StatusBar/StatusBarPreChaos.h"
+
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
 
 #include "../../Graphics/Geometry.h"
 #include "../../Graphics/Texture.h"
+#include "../../Graphics/Text.h"
 #include "../Social/SocialState.h"
 
 #include <cstdint>
@@ -99,6 +102,8 @@ namespace jrc
 
     private:
         void set_chat_open(bool open);
+        void apply_chat_target_label();
+        void draw_chatrows() const;
         int32_t resolve_party_member_id(const std::string& token) const;
         bool handle_social_command(const std::string& message);
         void send_chat_message(const std::string& message);
@@ -128,6 +133,12 @@ namespace jrc
         Texture chatcover;
         Texture tapbar;
         Texture tapbartop;
+
+        // Pre-Chaos (v83 StatusBar.img) chat row pieces.
+        Texture chat_strip;
+        Texture chat_target_box;
+        ColorBox chat_input_row;
+        Text chat_target_label;
 
         bool chatopen;
         ChatTarget chattarget;

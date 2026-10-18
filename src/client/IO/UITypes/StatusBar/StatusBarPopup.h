@@ -1,7 +1,10 @@
 #pragma once
 
 #include "../../Components/MapleButton.h"
+#include "StatusBarPreChaos.h"
+#include "../../../Graphics/Geometry.h"
 #include "../../../Graphics/Texture.h"
+#include "../../../Graphics/Text.h"
 
 #include <memory>
 #include <optional>
@@ -68,12 +71,29 @@ namespace jrc
             Action action;
         };
 
+        // v83 has no button textures for the popup: the frame is assembled
+        // from UIWindow.img/ContextMenu and the rows are drawn as text.
+        struct ItemSpec
+        {
+            const char* label;
+            Action action;
+        };
+
+        struct TextItem
+        {
+            Text label;
+            Action action;
+        };
+
         struct PanelData
         {
             Texture top;
             Texture middle;
             Texture bottom;
             std::vector<Entry> entries;
+            std::vector<TextItem> items;
+            ColorBox hover_row;
+            int16_t hover = -1;
             Point<int16_t> position;
             int16_t width = 0;
             int16_t height = 0;
@@ -82,8 +102,14 @@ namespace jrc
 
         static void initialize_panel(PanelData& panel, nl::node source,
                                      const std::vector<ButtonSpec>& specs);
+        static void initialize_panel_prechaos(PanelData& panel,
+                                              const std::vector<ItemSpec>& specs);
         static void position_panel(PanelData& panel, Rectangle<int16_t> anchor);
         static Rectangle<int16_t> panel_bounds(const PanelData& panel);
+        static Rectangle<int16_t> item_bounds(const PanelData& panel, size_t index);
+
+        void draw_prechaos(const PanelData& panel) const;
+        void select_action(PanelData& panel, Action action);
 
         PanelData& active_data();
         const PanelData& active_data() const;

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "TextTooltip.h"
 
+#include "TooltipFrame.h"
+
 #include "../../Constants.h"
 
 #include "nlnx/nx.hpp"
@@ -56,8 +58,18 @@ namespace jrc
             position.shift_y(-adj_y);
         }
 
-        frame.draw(position + Point<int16_t>(fillwidth / 2 + 10, fillheight + 14), fillwidth, fillheight);
-        cover.draw(position + Point<int16_t>(-5, -2));
+        if (tooltip_frame::has_assets())
+        {
+            frame.draw(position + Point<int16_t>(fillwidth / 2 + 10, fillheight + 14), fillwidth, fillheight);
+            cover.draw(position + Point<int16_t>(-5, -2));
+        }
+        else
+        {
+            // v83 ships no UIToolTip.img; draw the chrome ourselves. The
+            // box hugs the text (drawn at +10/+8) with an even margin.
+            tooltip_frame::draw_at(position, fillwidth + 20, fillheight + 22);
+        }
+
         text_label.draw(position + Point<int16_t>(10, 8));
     }
 

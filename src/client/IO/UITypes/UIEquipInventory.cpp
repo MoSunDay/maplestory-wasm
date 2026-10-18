@@ -32,48 +32,54 @@
 namespace jrc
 {
     UIEquipInventory::UIEquipInventory(const Inventory& invent) :
-        UIDragElement<PosEQINV>(Point<int16_t>(184, 20)), inventory(invent) {
+        UIDragElement<PosEQINV>(Point<int16_t>(175, 20)), inventory(invent) {
 
-        iconpositions[Equipslot::CAP]      = Point<int16_t>( 43,  25);
-        iconpositions[Equipslot::FACEACC]  = Point<int16_t>( 43,  91);
-        iconpositions[Equipslot::EYEACC]   = Point<int16_t>( 43,  68);
-        iconpositions[Equipslot::EARRINGS] = Point<int16_t>(109,  91);
-        iconpositions[Equipslot::TOP]      = Point<int16_t>( 43, 124);
-        iconpositions[Equipslot::PANTS]    = Point<int16_t>( 43, 157);
-        iconpositions[Equipslot::SHOES]    = Point<int16_t>( 76, 190);
-        iconpositions[Equipslot::GLOVES]   = Point<int16_t>( 10, 157);
-        iconpositions[Equipslot::CAPE]     = Point<int16_t>( 10, 124);
-        iconpositions[Equipslot::SHIELD]   = Point<int16_t>(142, 124);
-        iconpositions[Equipslot::WEAPON]   = Point<int16_t>(109, 124);
-        iconpositions[Equipslot::RING]     = Point<int16_t>(109, 157);
-        iconpositions[Equipslot::RING2]    = Point<int16_t>(142, 157);
-        iconpositions[Equipslot::RING3]    = Point<int16_t>(109,  91);
-        iconpositions[Equipslot::RING4]    = Point<int16_t>(142,  91);
-        iconpositions[Equipslot::PENDANT]  = Point<int16_t>( 76, 124);
-        iconpositions[Equipslot::TAMEDMOB] = Point<int16_t>(142,  91);
-        iconpositions[Equipslot::SADDLE]   = Point<int16_t>( 76, 124);
-        iconpositions[Equipslot::MEDAL]    = Point<int16_t>( 10,  58);
-        iconpositions[Equipslot::BELT]     = Point<int16_t>( 76, 157);
+        // v83 keeps the whole character panel in one bitmap
+        // (UIWindow.img/Equip/backgrnd).  The labelled sockets form the
+        // same five-column grid the later files use (32px cells, 33px
+        // pitch) shifted by (-5, +10): columns x = 5, 38, 71, 104, 137
+        // and rows y = 35, 68, 101, 134, 167, 200, 233.  Only cells that
+        // actually carry a socket in the bitmap are mapped; the four
+        // same-labelled sockets at (137,200) and y = 233 (x = 71, 104,
+        // 137) have no counterpart slot in this client and stay unused.
+        iconpositions[Equipslot::CAP]      = Point<int16_t>( 38,  35);
+        iconpositions[Equipslot::MEDAL]    = Point<int16_t>(  5,  68);
+        iconpositions[Equipslot::EYEACC]   = Point<int16_t>( 38,  68);
+        iconpositions[Equipslot::RING3]    = Point<int16_t>(104,  68);
+        iconpositions[Equipslot::RING4]    = Point<int16_t>(137,  68);
+        iconpositions[Equipslot::FACEACC]  = Point<int16_t>( 71, 101);
+        iconpositions[Equipslot::EARRINGS] = Point<int16_t>(104, 101);
+        iconpositions[Equipslot::CAPE]     = Point<int16_t>(  5, 134);
+        iconpositions[Equipslot::TOP]      = Point<int16_t>( 38, 134);
+        iconpositions[Equipslot::PENDANT]  = Point<int16_t>( 71, 134);
+        iconpositions[Equipslot::WEAPON]   = Point<int16_t>(104, 134);
+        iconpositions[Equipslot::SHIELD]   = Point<int16_t>(137, 134);
+        iconpositions[Equipslot::GLOVES]   = Point<int16_t>(  5, 167);
+        iconpositions[Equipslot::PANTS]    = Point<int16_t>( 38, 167);
+        iconpositions[Equipslot::BELT]     = Point<int16_t>( 71, 167);
+        iconpositions[Equipslot::RING]     = Point<int16_t>(104, 167);
+        iconpositions[Equipslot::RING2]    = Point<int16_t>(137, 167);
+        iconpositions[Equipslot::SHOES]    = Point<int16_t>( 71, 200);
+        iconpositions[Equipslot::TAMEDMOB] = Point<int16_t>(  5, 233);
+        iconpositions[Equipslot::SADDLE]   = Point<int16_t>( 38, 233);
 
-        nl::node source = nl::nx::ui["UIWindow2.img"]["Equip"]["character"];
-        nl::node petsource = nl::nx::ui["UIWindow2.img"]["Equip"]["pet"];
+        nl::node source = nl::nx::ui["UIWindow.img"]["Equip"];
+        nl::node petsource = source["pet"];
 
+        // The character/pet sub-windows and the backgrnd2/backgrnd3
+        // layers of the post-Chaos file do not exist here; the pet
+        // panel is the separate 177x181 "pet" bitmap attached to the
+        // right edge of the 175px-wide window.
         sprites.emplace_back(source["backgrnd"]);
-        sprites.emplace_back(source["backgrnd2"]);
-        sprites.emplace_back(source["backgrnd3_Kanna"]);
-        sprites.emplace_back(source["cashPendant"]);
-        sprites.emplace_back(source["charmPocket"]);
-        sprites.emplace_back(source["emblem"]);
 
-        buttons[BT_TOGGLEPETS] = std::make_unique<MapleButton>(source["BtPet"]);
+        buttons[BT_TOGGLEPETS] = std::make_unique<MapleButton>(
+            source["BtPetEquipShow"], Point<int16_t>(87, 287));
 
-        textures_pet.emplace_back(petsource["backgrnd"]);
-        textures_pet.emplace_back(petsource["backgrnd2"]);
-        textures_pet.emplace_back(petsource["backgrnd3"]);
+        textures_pet.emplace_back(petsource);
 
         load_icons();
 
-        dimension = { 184, 290 };
+        dimension = { 175, 304 };
         active = true;
         showpetequips = false;
     }
@@ -90,15 +96,18 @@ namespace jrc
 
         if (showpetequips)
         {
-            Point<int16_t> position_pet(position + Point<int16_t>(184, 0));
+            // The pet panel attaches flush to the right edge of the
+            // 175px-wide v83 window; its sockets sit on a 4-column grid
+            // (x = 13, 46, 79, 112) with rows at y = 44, 77 and 110.
+            Point<int16_t> position_pet(position + Point<int16_t>(175, 0));
             for (auto& texture : textures_pet)
             {
                 texture.draw(position_pet);
             }
 
             const auto& automation = Stage::get().get_pet_automation();
-            draw_pet_item(automation.get_hp_item(), { 194, 43 });
-            draw_pet_item(automation.get_mp_item(), { 234, 43 });
+            draw_pet_item(automation.get_hp_item(), { 188, 44 });
+            draw_pet_item(automation.get_mp_item(), { 221, 44 });
 
             constexpr std::array<int32_t, 5> ABILITIES = {
                 pet_automation::MESO_MAGNET,
@@ -108,9 +117,9 @@ namespace jrc
                 pet_automation::WING_BOOTS
             };
             constexpr std::array<Point<int16_t>, 5> POSITIONS = {
-                Point<int16_t>(194, 88), Point<int16_t>(230, 88),
-                Point<int16_t>(266, 88), Point<int16_t>(212, 124),
-                Point<int16_t>(248, 124)
+                Point<int16_t>(188, 77), Point<int16_t>(221, 77),
+                Point<int16_t>(254, 77), Point<int16_t>(204, 110),
+                Point<int16_t>(237, 110)
             };
             const pet_capability::Capabilities capabilities =
                 Stage::get().get_pet_capabilities();
@@ -142,8 +151,8 @@ namespace jrc
         if (UIElement::is_in_range(cursorpos))
             return true;
         return showpetequips && Rectangle<int16_t>(
-            position + Point<int16_t>(184, 0),
-            position + Point<int16_t>(304, 185)
+            position + Point<int16_t>(175, 0),
+            position + Point<int16_t>(352, 181)
         ).contains(cursorpos);
     }
 
@@ -235,10 +244,10 @@ namespace jrc
     {
         if (!showpetequips)
             return 0;
-        Rectangle<int16_t> hp(position + Point<int16_t>(194, 43),
-            position + Point<int16_t>(226, 75));
-        Rectangle<int16_t> mp(position + Point<int16_t>(234, 43),
-            position + Point<int16_t>(266, 75));
+        Rectangle<int16_t> hp(position + Point<int16_t>(188, 44),
+            position + Point<int16_t>(220, 76));
+        Rectangle<int16_t> mp(position + Point<int16_t>(221, 44),
+            position + Point<int16_t>(253, 76));
         return hp.contains(cursorpos) ? 1 : mp.contains(cursorpos) ? 2 : 0;
     }
 

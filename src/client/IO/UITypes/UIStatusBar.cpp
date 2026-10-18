@@ -32,6 +32,7 @@
 #include "nlnx/nx.hpp"
 
 #include <algorithm>
+#include <string>
 
 
 namespace jrc
@@ -41,6 +42,20 @@ namespace jrc
 
     UIStatusbar::UIStatusbar(const CharStats& st)
         : UIElement(POSITION, DIMENSION), stats(st), chatbar(POSITION)
+    {
+        if (statusbar::prechaos())
+        {
+            initialize_prechaos(nl::nx::ui["StatusBar.img"]);
+        }
+        else
+        {
+            initialize_postchaos();
+        }
+
+        update_layout_position();
+    }
+
+    void UIStatusbar::initialize_postchaos()
     {
         nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 
@@ -89,13 +104,76 @@ namespace jrc
         buttons[BT_INVENTORY] = std::make_unique<MapleButton>(mainbar["BtInven"]);
         buttons[BT_EQUIPS]    = std::make_unique<MapleButton>(mainbar["BtEquip"]);
         buttons[BT_SKILL]     = std::make_unique<MapleButton>(mainbar["BtSkill"]);
+    }
 
-        update_layout_position();
+    void UIStatusbar::initialize_prechaos(nl::node statusbar)
+    {
+        nl::node base = statusbar["base"];
+
+        // v83 ships one 1280x71 strip anchored bottom-left.
+        sprites.emplace_back(base["backgrnd"]);
+
+        nl::node gauge = statusbar["gauge"];
+        gauge_graduation = gauge["graduation"];
+        gauge_fill = gauge["bar"];
+
+        statset  = { gauge["number"], Charset::RIGHT };
+        levelset = { gauge["number"], Charset::LEFT  };
+
+        joblabel  = { Text::A11M, Text::LEFT, Text::BLACK };
+        namelabel = { Text::A11M, Text::LEFT, Text::BLACK };
+
+        gauge_covers[0] = { 1, 1, Geometry::BLACK, statusbar::gauge_empty_opacity() };
+        gauge_covers[1] = { 1, 1, Geometry::BLACK, statusbar::gauge_empty_opacity() };
+        gauge_covers[2] = { 1, 1, Geometry::BLACK, statusbar::gauge_empty_opacity() };
+
+        quickslot_panel = base["quickSlot"];
+        nl::node keyset = statusbar["key"];
+        for (int16_t i = 0; i < 8; ++i)
+        {
+            quickslot_keys[i] = keyset[std::to_string(i)];
+        }
+
+        // Menu bar buttons, right-anchored to the view.
+        buttons[BT_TRADE]     = std::make_unique<MapleButton>(
+            statusbar["BtShort"], statusbar::big_button_x(0), statusbar::big_button_y());
+        buttons[BT_CASHSHOP]  = std::make_unique<MapleButton>(
+            statusbar["BtShop"], statusbar::big_button_x(1), statusbar::big_button_y());
+        buttons[BT_MENU]      = std::make_unique<MapleButton>(
+            statusbar["BtMenu"], statusbar::big_button_x(2), statusbar::big_button_y());
+
+        // Menu shortcut icons left of the quickslot display.
+        buttons[BT_CHARACTER] = std::make_unique<MapleButton>(
+            statusbar["KeySet"], statusbar::icon_button_pos(0));
+        buttons[BT_STATS]     = std::make_unique<MapleButton>(
+            statusbar["StatKey"], statusbar::icon_button_pos(1));
+        buttons[BT_INVENTORY] = std::make_unique<MapleButton>(
+            statusbar["InvenKey"], statusbar::icon_button_pos(2));
+        buttons[BT_EQUIPS]    = std::make_unique<MapleButton>(
+            statusbar["EquipKey"], statusbar::icon_button_pos(3));
+        buttons[BT_SKILL]     = std::make_unique<MapleButton>(
+            statusbar["SkillKey"], statusbar::icon_button_pos(4));
+        buttons[BT_QUEST]     = std::make_unique<MapleButton>(
+            statusbar["QuickSlot"], statusbar::icon_button_pos(5));
+
+        // Small chat row buttons.
+        buttons[BT_WHISPER] = std::make_unique<MapleButton>(
+            statusbar["BtWhisper"], statusbar::whisper_pos());
+        buttons[BT_CALLGM]  = std::make_unique<MapleButton>(
+            statusbar["BtClaim"], statusbar::claim_pos());
     }
 
     void UIStatusbar::draw(float alpha) const
     {
         UIElement::draw(alpha);
+
+        if (statusbar::prechaos())
+        {
+            draw_prechaos();
+            chatbar.draw(alpha);
+            popup.draw(alpha);
+            return;
+        }
 
         expbar.draw(position + Point<int16_t>(-261, -15));
         hpbar.draw(position + Point<int16_t>(-261, -31));
@@ -133,6 +211,89 @@ namespace jrc
         popup.draw(alpha);
     }
 
+    void UIStatusbar::draw_prechaos() const
+    {
+        const Point<int16_t> gauge_pos = position + statusbar::gauge_anchor();
+
+        // gauge/bar carries the labels plus the 100% gradient fills. The
+        // unfilled rest of each slot is dimmed to the empty-slot look of
+        // gauge/graduation, which is drawn on top (frame, ticks, base).
+        gauge_fill.draw(gauge_pos);
+
+        auto draw_cover = [this, gauge_pos](statusbar::Gauge kind, float percent) {
+            const Rectangle<int16_t> fill = statusbar::gauge_fill(kind);
+            const int16_t width = fill.width();
+            const int16_t filled = static_cast<int16_t>(percent * width + 0.5f);
+            const int16_t empty = static_cast<int16_t>(width - filled);
+            if (empty <= 0)
+            {
+                return;
+            }
+
+            const int16_t index = static_cast<int16_t>(kind);
+            gauge_covers[index].setwidth(empty);
+            gauge_covers[index].draw(gauge_pos + Point<int16_t>(
+                static_cast<int16_t>(fill.l() + filled), fill.t()
+            ));
+        };
+
+        draw_cover(statusbar::Gauge::HP, gethppercent());
+        draw_cover(statusbar::Gauge::MP, getmppercent());
+        draw_cover(statusbar::Gauge::EXP, getexppercent());
+
+        gauge_graduation.draw(gauge_pos);
+
+        int16_t level = stats.get_stat(Maplestat::LEVEL);
+        int16_t hp    = stats.get_stat(Maplestat::HP);
+        int16_t mp    = stats.get_stat(Maplestat::MP);
+        int32_t maxhp = stats.get_total(Equipstat::HP);
+        int32_t maxmp = stats.get_total(Equipstat::MP);
+        int64_t exp   = stats.get_exp();
+
+        // The v83 number font maps brackets/slash/percent to their node
+        // names, so the composed strings reuse those glyphs.
+        statset.draw(
+            "L" + std::to_string(hp) + "s" + std::to_string(maxhp) + "R",
+            gauge_pos + Point<int16_t>(
+                statusbar::gauge_number_right(statusbar::Gauge::HP),
+                statusbar::gauge_number_y()
+            )
+        );
+        statset.draw(
+            "L" + std::to_string(mp) + "s" + std::to_string(maxmp) + "R",
+            gauge_pos + Point<int16_t>(
+                statusbar::gauge_number_right(statusbar::Gauge::MP),
+                statusbar::gauge_number_y()
+            )
+        );
+        const int16_t exppercent = static_cast<int16_t>(
+            100.0f * getexppercent() + 0.5f
+        );
+        statset.draw(
+            std::to_string(exp) + "L" + std::to_string(exppercent) + "pR",
+            gauge_pos + Point<int16_t>(
+                statusbar::gauge_number_right(statusbar::Gauge::EXP),
+                statusbar::gauge_number_y()
+            )
+        );
+
+        levelset.draw(std::to_string(level), position + statusbar::level_pos());
+        namelabel.draw(position + statusbar::name_pos());
+        joblabel.draw(position + statusbar::job_pos());
+
+        // Quickslot display (base/quickSlot + key caps).
+        const Point<int16_t> quickslot_pos = position + statusbar::quickslot_pos();
+        quickslot_panel.draw(quickslot_pos);
+        for (int16_t i = 0; i < 8; ++i)
+        {
+            const Point<int16_t> center = statusbar::quickslot_key_center(i);
+            const Point<int16_t> size = quickslot_keys[i].get_dimensions();
+            quickslot_keys[i].draw(quickslot_pos + center - Point<int16_t>(
+                size.x() / 2, size.y() / 2
+            ));
+        }
+    }
+
     void UIStatusbar::update()
     {
         update_layout_position();
@@ -140,9 +301,12 @@ namespace jrc
 
         chatbar.update();
 
-        expbar.update(getexppercent());
-        hpbar.update(gethppercent());
-        mpbar.update(getmppercent());
+        if (!statusbar::prechaos())
+        {
+            expbar.update(getexppercent());
+            hpbar.update(gethppercent());
+            mpbar.update(getmppercent());
+        }
 
         namelabel.change_text(stats.get_name());
         joblabel.change_text(stats.get_jobname());
@@ -157,6 +321,25 @@ namespace jrc
 
     void UIStatusbar::update_layout_position()
     {
+        if (statusbar::prechaos())
+        {
+            position = statusbar::bar_position();
+            dimension = statusbar::bar_dimension();
+            chatbar.set_position(position);
+
+            // v83 has a single menu button; the system popup opens to its
+            // left so both stay on screen.
+            Rectangle<int16_t> menu_anchor = buttons[BT_MENU]->bounds(position);
+            Rectangle<int16_t> system_anchor(
+                static_cast<int16_t>(menu_anchor.l() - 108),
+                static_cast<int16_t>(menu_anchor.l() - 4),
+                menu_anchor.t(),
+                menu_anchor.b()
+            );
+            popup.update_anchors(menu_anchor, system_anchor);
+            return;
+        }
+
         position = {
             POSITION.x(),
             static_cast<int16_t>(Constants::viewheight() - Constants::VIEWYOFFSET)
@@ -204,6 +387,13 @@ namespace jrc
 
     bool UIStatusbar::is_in_range(Point<int16_t> cursorpos) const
     {
+        if (statusbar::prechaos())
+        {
+            return statusbar::statusbar_range(position).contains(cursorpos)
+                || chatbar.is_in_range(cursorpos)
+                || popup.contains(cursorpos);
+        }
+
         Rectangle<int16_t> bounds(
             position - Point<int16_t>(512, 84),
             position - Point<int16_t>(512, 84) + dimension
@@ -242,8 +432,12 @@ namespace jrc
         }
 
         bool toggles_popup =
-            buttons[BT_MENU]->bounds(position).contains(cursorpos) ||
-            buttons[BT_OPTIONS]->bounds(position).contains(cursorpos);
+            buttons[BT_MENU]->bounds(position).contains(cursorpos);
+        if (const auto options = buttons.find(BT_OPTIONS); options != buttons.end())
+        {
+            toggles_popup = toggles_popup
+                || options->second->bounds(position).contains(cursorpos);
+        }
         if (pressed && popup.is_open() && !toggles_popup)
         {
             popup.close();
