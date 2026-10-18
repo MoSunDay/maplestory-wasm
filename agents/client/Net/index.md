@@ -1,4 +1,4 @@
-Commit: b2922f3eef7e2afa16fe954cee477d1ca3831e00
+Commit: e683a36c8ac98d8f13d5a15928b91366c126879d
 
 # 网络层
 
@@ -58,6 +58,8 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 其他玩家出生包 `SPAWN_PLAYER` 的头部由独立解析器读取 `charId:int`、`level:short` 和 `name:string`。linked server 的 custom-client 模式使用 16 位等级；若按旧版单字节读取，后续姓名长度会错位并使整个远端玩家出生包被丢弃，表现为能看到怪物和掉落变化但看不到具体玩家。
 
+掉落移除包由无 UI 状态依赖的 `DropRemovalPayload` 解析器完整消费：mode 0/1 只含 oid，mode 2/4 追加角色 cid，mode 5 再追加宠物槽位。已知模式的截断或尾随字节会抛出 `PacketError`；未知模式记录警告并按服务端权威结论立即擦除对应 oid，不能让单个表现分支中断地图封包处理。mode 5 会解析拾取宠物的固定位置供动画使用；角色或宠物已离开可见范围时仍执行原地淡出和删除。
+
 场地包 `CLOCK` / `STOP_CLOCK` 驱动游戏内场地计时器；`FIELD_EFFECT` 的 2、3、4 模式分别处理具名地图对象关闭、一次性视觉效果和场地音效。服务端 `Party1/Clear`、`Party1/Failed` 会按 `Sound.nx/Field.img` 兼容路径解析，组队任务开门则按地图对象的 `name` 精确停用。
 
 怪物出生包 `SPAWN_MONSTER` / `SPAWN_MONSTER_CONTROL` 共用无应用状态依赖的 `SpawnMobPayload` 解析器。linked server 在坐标前固定写入 22 字节出生状态块；假怪显形包额外写入 6 字节。解析器按已存在的怪物 oid 区分显形布局，并完整消费坐标、姿态、foothold、出生特效、父怪物、队伍和物品特效尾段；未知布局或截断封包直接抛出 `PacketError`，不会以默认坐标生成怪物。
@@ -81,14 +83,22 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 `PLAYER_INTERACTION(0x7B)` 复用 v83 交易模式：创建房间、邀请地图内角色、接受/拒绝、聊天、放入物品/金币、确认和退出。`TradeHandler` 消费 `PLAYER_INTERACTION(0x13A)` 的房间、参与者、物品、金币、确认与结束事件；交易物品负载由 `TradeProtocol` 完整消费普通物品、装备和宠物分支。所有成功或失败结论以服务端结果为准，客户端只维护展示状态和发送意图。
 
+### 人物信息与人气协议
+
+`CharacterInfo/` 按 linked server 的 `CHAR_INFO_REQUEST(0x61)` / `CHAR_INFO(0x3D)` 合约请求并解析人物资料：等级为 16 位，宠物段最多三只并以零标记结束，随后完整消费坐骑、愿望单、怪物书、勋章和勋章任务尾段。解析截断、越界或尾随数据时只让当前资料卡进入错误态，不禁用全局 UI。`GIVE_FAME(0x5F)` / `FAME_RESPONSE(0x26)` 支持增加或减少其他玩家人气，发送意图在回包或资料卡超时后恢复；服务端仍是权限和最终结果的唯一裁决者。
+
 ### 注册复用登录协议
 
 游戏内注册不引入新 opcode：`UIRegister` 校验账号为 4–12 位 ASCII 字母数字、密码为 4–12 位非空白可打印 ASCII 后发送现有 `LOGIN_PASSWORD`。服务端对不存在的合法账号自动建号并返回 `LOGIN_STATUS=23`，客户端自动发送 `ACCEPT_TOS`，随后沿用登录成功和世界列表流程。注册失败由 `LoginHandlers` 回填到注册表单，不落入通用登录位图提示。
 
+### CHARLIST 事务边界
+
+`CharlistHandler` 完整消费并校验角色列表尾部：槽位必须覆盖角色数且不超过字节范围，PIC/槽位后不允许残留字节。解析进度记录当前角色、剩余字节和失败阶段；成功后先安装不访问 NX 的 `UICharSelect` 壳，来源 `WORLDSELECT` / `CHARCREATION` 保留到全部人物预览进入 `READY` 或 `FAILED` 后才释放。解析、安装、静态资源或顶层更新失败时移除或停用失败壳，重新激活来源 UI、复位世界选择 CHARLIST 请求门闩并恢复输入，因此同一入口可重试。单个角色的外观构造、更新或绘制失败只影响该角色预览，不阻断其他预览收敛和选角进入游戏。
+
 ### InPacket / OutPacket
 
 封包读写辅助:
-- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)；读取数值前先整体检查剩余长度，linked server 的 Java 定长 UTF-8 字段先编码再补零到固定字节数，客户端必须按线上字节宽度消费
+- `InPacket`: 从字节流中按顺序读取不同类型字段 (`read_byte()`, `read_int()`, `read_string()` 等)，并通过 `position()` 暴露只读消费位置供协议诊断；读取数值前先整体检查剩余长度，linked server 的 Java 定长 UTF-8 字段先编码再补零到固定字节数，客户端必须按线上字节宽度消费
 - `OutPacket`: 构建封包字节流 (`write_byte()`, `write_int()`, `write_string()` 等)
 
 登录 `CHARLIST` / 新建角色 / 进入地图复用 `LoginParser::parse_stats`。其字段宽度必须与 linked server 的 `addCharStats` 一致：角色名固定 13 字节，custom-client 模式的等级为 short；Evan 职业（2001、2200–2218）的剩余 SP 为多池表，其余职业为单个 short。宠物、队伍、戒指和现金礼物的 Java 定长字段遵循同一字节宽度规则。
@@ -127,7 +137,8 @@ linked MapleStory Server → Socket::read() → Session::read()
 | `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, Social, Trade, NpcInteraction, CashShop 等) |
 | `Handlers/Helpers/` | 封包解析辅助 (CharacterDataParser, ItemParser, LoginParser, MovementParser) |
 | `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets, SocialPackets, TradePackets, CashShopPackets 等)；`CharacterCreation/` 保存可独立验证的建角 payload 编码 |
-| `Protocol/` | 可独立验证的协议解析与编码，包括好友事件、远端玩家和怪物出生负载 |
+| `Protocol/` | 可独立验证的协议解析与编码，包括好友事件、远端玩家/怪物出生负载和掉落移除负载 |
+| `CharacterInfo/` | 人物信息、人气请求与响应的纯协议模型、封包和处理器 |
 
 ## 依赖关系
 

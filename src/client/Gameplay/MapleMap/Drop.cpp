@@ -91,6 +91,11 @@ namespace jrc
                 double hdelta = looter->x - phobj.x;
                 phobj.hspeed = looter->hspeed / 2.0 + (hdelta - 16.0) / PICKUPTIME;
             }
+            else if (pickup_target)
+            {
+                double hdelta = pickup_target->x() - phobj.crnt_x();
+                phobj.hspeed = (hdelta - 16.0) / PICKUPTIME;
+            }
 
             opacity -= OPCSTEP;
             if (opacity.last() <= OPCSTEP)
@@ -105,22 +110,24 @@ namespace jrc
         return phobj.fhlayer;
     }
 
-    void Drop::expire(int8_t type, const PhysicsObject* lt)
+    void Drop::expire(drop_removal::Effect effect, const PhysicsObject* lt,
+        std::optional<Point<int16_t>> target)
     {
-        switch (type)
+        switch (effect)
         {
-        case 0:
+        case drop_removal::Effect::EXPIRY_FADE:
             state = PICKEDUP;
             break;
-        case 1:
-            deactivate();
-            break;
-        case 2:
+        case drop_removal::Effect::PLAYER_PICKUP:
+        case drop_removal::Effect::PET_PICKUP:
             angle.set(0.0f);
             state = PICKEDUP;
             looter = lt;
+            pickup_target = target;
             phobj.vspeed = -4.5f;
             phobj.type = PhysicsObject::NORMAL;
+            break;
+        case drop_removal::Effect::IMMEDIATE_ERASE:
             break;
         }
     }
@@ -145,6 +152,11 @@ namespace jrc
     bool Drop::is_player_drop() const
     {
         return playerdrop;
+    }
+
+    bool Drop::is_lootable() const
+    {
+        return is_active() && state != PICKEDUP;
     }
 
     void Drop::update_ownership(int32_t new_owner, int8_t pickup_type, bool player_drop)

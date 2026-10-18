@@ -18,6 +18,8 @@
 #include "LoginHandlers.h"
 
 #include "Helpers/LoginParser.h"
+#include "../Login/CharlistTransition.h"
+#include "../../IO/CharacterSelect/CharlistRecovery.h"
 
 #include "../Session.h"
 #include "../../Console.h"
@@ -35,6 +37,15 @@
 
 namespace jrc
 {
+    namespace
+    {
+        void recover_charlist_handler_failure()
+        {
+            UI::get().remove(UIElement::CHARSELECT);
+            charlist_recovery::restore_source_ui();
+        }
+    }
+
     void LoginResultHandler::handle(InPacket& recv) const
     {
         // Remove previous UIs.
@@ -150,27 +161,81 @@ namespace jrc
 
     void CharlistHandler::handle(InPacket& recv) const
     {
-        uint8_t channel_id = recv.read_byte();
+        using charlist_transition::Phase;
+        charlist_transition::reset(recv.length(), 0);
+        charlist_transition::set_phase(Phase::PARSING);
 
-        // Parse all characters.
-        std::vector<CharEntry> characters;
-        uint8_t charcount = recv.read_byte();
-        for (uint8_t i = 0; i < charcount; ++i)
+        try
         {
-            characters.emplace_back(
-                LoginParser::parse_charentry(recv)
+            uint8_t channel_id = recv.read_byte();
+
+            std::vector<CharEntry> characters;
+            uint8_t charcount = recv.read_byte();
+            characters.reserve(charcount);
+            charlist_transition::set_preview_progress(0, charcount);
+            for (uint8_t i = 0; i < charcount; ++i)
+            {
+                charlist_transition::set_character(i, recv.length());
+                characters.emplace_back(LoginParser::parse_charentry(recv));
+                charlist_transition::set_remaining(recv.length());
+            }
+
+            int8_t pic = recv.read_byte();
+            int32_t slots_value = recv.read_int();
+            if (slots_value < charcount || slots_value > 0xFF)
+            {
+                throw PacketError(
+                    "Invalid CHARLIST slot count " + std::to_string(slots_value)
+                );
+            }
+            if (recv.available())
+            {
+                throw PacketError(
+                    "Unexpected CHARLIST trailing bytes at " +
+                    std::to_string(recv.position())
+                );
+            }
+
+            charlist_transition::set_remaining(0);
+            charlist_transition::set_phase(Phase::PARSED);
+            charlist_transition::set_phase(Phase::UI_MOUNTING);
+            UI::get().emplace<UICharSelect>(
+                std::move(characters),
+                static_cast<uint8_t>(slots_value),
+                channel_id,
+                pic
+            );
+            if (!UI::get().get_element<UICharSelect>())
+            {
+                throw PacketError("CHARLIST UI installation failed");
+            }
+
+            charlist_transition::set_phase(Phase::UI_MOUNTED);
+            UI::get().disable();
+        }
+        catch (const PacketError&)
+        {
+            const auto phase = charlist_transition::snapshot().phase;
+            charlist_transition::set_phase(
+                phase == Phase::PARSING ? Phase::FAILED_PARSE : Phase::FAILED_UI
+            );
+            recover_charlist_handler_failure();
+            throw;
+        }
+        catch (const std::exception& error)
+        {
+            charlist_transition::set_phase(Phase::FAILED_UI);
+            recover_charlist_handler_failure();
+            throw PacketError(
+                std::string("CHARLIST transition failed: ") + error.what()
             );
         }
-        int8_t pic = recv.read_byte();
-        uint8_t slots = (uint8_t)recv.read_int();
-
-        // Remove previous UIs.
-        UI::get().remove(UIElement::WORLDSELECT);
-        UI::get().remove(UIElement::CHARCREATION);
-
-        // Add the character selection screen.
-        UI::get().emplace<UICharSelect>(characters, charcount, slots, channel_id, pic);
-        UI::get().enable();
+        catch (...)
+        {
+            charlist_transition::set_phase(Phase::FAILED_UI);
+            recover_charlist_handler_failure();
+            throw PacketError("CHARLIST transition failed: unknown exception");
+        }
     }
 
 
@@ -201,6 +266,7 @@ namespace jrc
         {
             charselect->add_character(std::move(character));
             charselect->makeactive();
+            return;
         }
 
         UI::get().enable();

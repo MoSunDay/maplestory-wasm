@@ -3,9 +3,11 @@ import { BrowserDriver, sleep } from './cdp.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
+import { verifyUserInfoFlow } from './user-info-flow.mjs';
 import {
   createAssetIdleWaiter,
   createRuntimeProbes,
+  enterTutorialLootMap,
   enterTutorialMobMap,
   resolvePageUrl
 } from './runtime-flow.mjs';
@@ -26,6 +28,7 @@ const chatMessage = process.env.E2E_CHAT || '中文聊天测试';
 const maxP95FrameMs = Number(process.env.E2E_MAX_P95_FRAME_MS || 34);
 const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
+const charSelectLatencyMs = Number(process.env.E2E_CHAR_SELECT_LATENCY_MS || 0);
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
 const verifyCashShop = process.env.E2E_CASH_SHOP === '1';
@@ -36,7 +39,8 @@ const requireMobs = process.env.E2E_REQUIRE_MOBS === '1';
 const routeTutorialMobMap = process.env.E2E_ROUTE_TUTORIAL_MOB_MAP === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const petOptionsMode = process.env.E2E_PET_OPTIONS || '';
-const verifyPetOptions = ['1', 'configure', 'runtime'].includes(petOptionsMode);
+const verifyPetOptions = ['1', 'configure', 'runtime', 'pickup', 'follow'].includes(petOptionsMode);
+const verifyCharacterInfo = process.env.E2E_CHARACTER_INFO === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 
@@ -138,6 +142,15 @@ try {
   }, 90);
 	await requireState('NX asset loading phase reported', async () =>
 		driver.logs.some(line => line.includes('[loading] assets')), 45);
+	await requireState('Map.nx registered', async () => {
+		try {
+			return await driver.evaluate(
+				"Boolean(Module.LazyFS?.files?.get('Map.nx')?.size)"
+			);
+		} catch (error) {
+			return false;
+		}
+	}, 90);
   await driver.evaluate(`(() => {
     const startup = document.getElementById('loading-screen');
     window.assetTestStartupDisplay = startup.style.display;
@@ -308,6 +321,64 @@ try {
   await driver.screenshot('02-world-select');
 
   await driver.screenshot('03-channel-one-only');
+  await driver.evaluate(`(() => {
+    const lazy = Module.LazyFS;
+    const state = () => Module.ccall('msui_state', 'number', [], []);
+    const probe = name => Module.ccall(name, 'number', [], []);
+    const snapshot = () => ({
+      state: state(),
+      uiEnabled: probe('msui_enabled'),
+      phase: probe('mscharlist_phase'),
+      characterIndex: probe('mscharlist_character_index'),
+      equipId: probe('mscharlist_equip_id'),
+      remainingBytes: probe('mscharlist_remaining_bytes'),
+      previewReady: probe('mscharlist_preview_ready'),
+      previewTotal: probe('mscharlist_preview_total'),
+      at: performance.now()
+    });
+    const intercepted = [
+      'readFileData',
+      'prefetchFileRange',
+      'requestPriorityFileRange',
+      'requestForegroundFileRange'
+    ];
+    const originals = {};
+    const evidence = {
+      active: true,
+      states: [snapshot()],
+      characterRequests: []
+    };
+    for (const kind of intercepted) {
+      const original = lazy[kind];
+      if (typeof original !== 'function') continue;
+      originals[kind] = original;
+      lazy[kind] = function(filepath, offset, length) {
+        if (evidence.active && filepath === 'Character.nx') {
+          evidence.characterRequests.push({
+            kind, filepath, offset, length, ...snapshot()
+          });
+        }
+        return original.apply(this, arguments);
+      };
+    }
+    const sample = () => {
+      if (!evidence.active) return;
+      evidence.states.push(snapshot());
+      requestAnimationFrame(sample);
+    };
+    evidence.restore = () => {
+      evidence.active = false;
+      for (const [kind, original] of Object.entries(originals)) {
+        lazy[kind] = original;
+      }
+    };
+    window.charSelectTransitionEvidence = evidence;
+    requestAnimationFrame(sample);
+  })()`);
+  if (!Number.isFinite(charSelectLatencyMs) || charSelectLatencyMs < 0) {
+    throw new Error(`Invalid E2E_CHAR_SELECT_LATENCY_MS: ${charSelectLatencyMs}`);
+  }
+  if (charSelectLatencyMs > 0) await driver.setNetworkLatency(charSelectLatencyMs);
   if (worldSelectAction === 'channel') {
     await driver.doubleClick(255, 260);
   } else if (worldSelectAction === 'dom-go') {
@@ -323,6 +394,66 @@ try {
   }
   await requireUiState('character-select UI active', uiState.charSelect, 45);
   await requireAssetIdle('character-select assets ready');
+  if (charSelectLatencyMs > 0) await driver.setNetworkLatency(0);
+  const charSelectTransition = await driver.evaluate(`(() => {
+    const evidence = window.charSelectTransitionEvidence;
+    evidence.states.push({
+      state: Module.ccall('msui_state', 'number', [], []),
+      uiEnabled: Module.ccall('msui_enabled', 'number', [], []),
+      phase: Module.ccall('mscharlist_phase', 'number', [], []),
+      characterIndex: Module.ccall('mscharlist_character_index', 'number', [], []),
+      equipId: Module.ccall('mscharlist_equip_id', 'number', [], []),
+      remainingBytes: Module.ccall('mscharlist_remaining_bytes', 'number', [], []),
+      previewReady: Module.ccall('mscharlist_preview_ready', 'number', [], []),
+      previewTotal: Module.ccall('mscharlist_preview_total', 'number', [], []),
+      at: performance.now()
+    });
+    evidence.restore();
+    return {
+      states: evidence.states,
+      characterRequests: evidence.characterRequests
+    };
+  })()`);
+  fs.writeFileSync(
+    `${driver.artifactDir}/char-select-transition.json`,
+    `${JSON.stringify(charSelectTransition, null, 2)}\n`
+  );
+  const transitionStates = charSelectTransition.states.map(sample => sample.state);
+  if (transitionStates[0] !== uiState.worldSelect
+      || transitionStates[transitionStates.length - 1] !== uiState.charSelect
+      || transitionStates.includes(0)) {
+    throw new Error(`Character-select transition crossed an invalid UI state: ${JSON.stringify(transitionStates)}`);
+  }
+  const mountedOrLater = charSelectTransition.states.some(
+    sample => sample.phase >= 5 && sample.phase <= 8
+  );
+  if (!mountedOrLater) {
+    throw new Error(`Character-select UI never reached the mounted phase: ${JSON.stringify(charSelectTransition.states)}`);
+  }
+  const finalPreview = charSelectTransition.states.at(-1);
+  if (finalPreview.phase !== 8
+      || finalPreview.previewReady !== finalPreview.previewTotal
+      || finalPreview.uiEnabled !== 1) {
+    throw new Error(`Character previews did not settle: ${JSON.stringify(finalPreview)}`);
+  }
+  const enabledWhileLoading = charSelectTransition.states.filter(
+    sample => sample.phase >= 5 && sample.phase < 8 && sample.uiEnabled !== 0
+  );
+  if (enabledWhileLoading.length > 0) {
+    throw new Error(`Character-select input unlocked before previews settled: ${JSON.stringify(enabledWhileLoading)}`);
+  }
+  const earlyCharacterRequests = charSelectTransition.characterRequests.filter(
+    request => request.state !== uiState.charSelect
+  );
+  if (earlyCharacterRequests.length > 0) {
+    throw new Error(`Character assets were read before CHARSELECT installation: ${JSON.stringify(earlyCharacterRequests)}`);
+  }
+  console.log(`PASS  character-select transition remained mounted ${JSON.stringify({
+    samples: transitionStates.length,
+    characterRequests: charSelectTransition.characterRequests.length,
+    finalPhase: charSelectTransition.states.at(-1).phase,
+    previews: `${charSelectTransition.states.at(-1).previewReady}/${charSelectTransition.states.at(-1).previewTotal}`
+  })}`);
   await driver.screenshot('04-character-select-before');
   if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');
 
@@ -439,6 +570,14 @@ try {
       window.naturalAssetEvidence = evidence;
     })()`);
     await driver.click(650, 400);
+    const selectionLock = await driver.evaluate(`({
+      state: Module.ccall('msui_state', 'number', [], []),
+      uiEnabled: Module.ccall('msui_enabled', 'number', [], [])
+    })`);
+    if (selectionLock.state === uiState.charSelect && selectionLock.uiEnabled !== 0) {
+      throw new Error(`Character-select input unlocked while selection was pending: ${JSON.stringify(selectionLock)}`);
+    }
+    console.log(`PASS  character selection keeps input locked ${JSON.stringify(selectionLock)}`);
     await requireUiState('in-game UI active', uiState.game, 60);
     await requireState('map field initialized', async () => await mapId() > 0, 60);
     await requireState('map asset safety gate released', async () =>
@@ -452,6 +591,10 @@ try {
       console.log(`INFO  mob runtime entry map=${initialMapId} count=${initialMobCount}`);
       if (initialMobCount === 0 && routeTutorialMobMap && initialMapId === 10000)
         await enterTutorialMobMap(driver, {
+          mapId, playerX, playerY, mapAssetLoading
+        }, requireState);
+      if (petOptionsMode === 'pickup' && await mapId() === 40000)
+        await enterTutorialLootMap(driver, {
           mapId, playerX, playerY, mapAssetLoading
         }, requireState);
       await requireState('map monsters instantiated', async () =>
@@ -682,6 +825,11 @@ try {
       console.log(`PASS  ${observedAttacks.length} attacks presented afterimages (stab and swing)`);
     }
 
+    if (verifyCharacterInfo) {
+      await verifyUserInfoFlow(driver, probes, requireState);
+      if (!verifyPetOptions) throw new Error('__CHARACTER_INFO_COMPLETE__');
+    }
+
     if (verifyPetOptions) {
       await verifyPetAutomationFlow(
         driver, probes, requireState, petOptionsMode === '1' ? 'options' : petOptionsMode);
@@ -777,6 +925,9 @@ try {
     assertRuntimeHealthy();
     passed = true;
   } else if (verifyPetOptions && error.message === '__PET_OPTIONS_COMPLETE__') {
+    assertRuntimeHealthy();
+    passed = true;
+  } else if (verifyCharacterInfo && error.message === '__CHARACTER_INFO_COMPLETE__') {
     assertRuntimeHealthy();
     passed = true;
   } else if (logoutToLogin && error.message === '__LOGOUT_COMPLETE__') {

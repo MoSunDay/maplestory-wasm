@@ -34,7 +34,14 @@ namespace jrc
     namespace
     {
         constexpr int16_t PICKUP_RADIUS = 30;
-        constexpr int32_t PICKUP_RADIUS_SQ = PICKUP_RADIUS * PICKUP_RADIUS;
+        constexpr int64_t PICKUP_RADIUS_SQ = PICKUP_RADIUS * PICKUP_RADIUS;
+
+        int64_t squared_distance(Point<int16_t> first, Point<int16_t> second)
+        {
+            const int64_t dx = static_cast<int32_t>(first.x()) - second.x();
+            const int64_t dy = static_cast<int32_t>(first.y()) - second.y();
+            return dx * dx + dy * dy;
+        }
     }
 
     MapDrops::MapDrops()
@@ -109,14 +116,20 @@ namespace jrc
         spawns.emplace(std::move(spawn));
     }
 
-    void MapDrops::remove(int32_t oid, int8_t mode, const PhysicsObject* looter,
-        bool local_pet_pickup)
+    void MapDrops::remove(int32_t oid, drop_removal::Effect effect,
+        const PhysicsObject* looter,
+        std::optional<Point<int16_t>> pickup_target, bool local_pet_pickup)
     {
         if (Optional<Drop> drop = drops.get(oid))
         {
             if (local_pet_pickup)
                 ++confirmed_pet_pickups;
-            drop->expire(mode, looter);
+            if (effect == drop_removal::Effect::IMMEDIATE_ERASE)
+            {
+                drops.remove(oid);
+                return;
+            }
+            drop->expire(effect, looter, pickup_target);
         }
     }
 
@@ -126,14 +139,17 @@ namespace jrc
         confirmed_pet_pickups = 0;
     }
 
-    void MapDrops::try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos, int32_t& closest_distance_sq, Loot& closest_loot) const
+    void MapDrops::try_pickup(int32_t oid, const Drop& drop,
+        Point<int16_t> playerpos, int64_t& closest_distance_sq,
+        Loot& closest_loot) const
     {
+        if (!drop.is_lootable())
+            return;
+
         Point<int16_t> position = drop.get_position();
         Point<int16_t> center = position + Point<int16_t>(16, 16);
 
-        int32_t dx = static_cast<int32_t>(center.x()) - playerpos.x();
-        int32_t dy = static_cast<int32_t>(center.y()) - playerpos.y();
-        int32_t distance_sq = dx * dx + dy * dy;
+        const int64_t distance_sq = squared_distance(center, playerpos);
 
         // Keep strict overlap, but also accept a small proximity window so
         // slightly offset drops can still be attempted during pickup spam.
@@ -158,7 +174,7 @@ namespace jrc
         if (!lootenabled)
             return { 0, {} };
 
-        int32_t closest_distance_sq = std::numeric_limits<int32_t>::max();
+        int64_t closest_distance_sq = std::numeric_limits<int64_t>::max();
         Loot closest_loot = { 0, {} };
 
         for (auto& mmo : drops)
@@ -194,18 +210,17 @@ namespace jrc
 
     MapDrops::PetLootTarget MapDrops::find_pet_loot(const PetLootQuery& query) const
     {
-        int32_t closest_distance_sq = static_cast<int32_t>(query.range) * query.range + 1;
+        int64_t closest_distance_sq =
+            static_cast<int64_t>(query.range) * query.range + 1;
         PetLootTarget target;
         for (const auto& entry : drops)
         {
             Optional<const Drop> drop = entry.second.get();
-            if (!drop || !pet_can_target(*drop, query))
+            if (!drop || !drop->is_lootable() || !pet_can_target(*drop, query))
                 continue;
 
             Point<int16_t> position = drop->get_position() + Point<int16_t>(16, 16);
-            int32_t dx = static_cast<int32_t>(position.x()) - query.origin.x();
-            int32_t dy = static_cast<int32_t>(position.y()) - query.origin.y();
-            int32_t distance_sq = dx * dx + dy * dy;
+            const int64_t distance_sq = squared_distance(position, query.origin);
             if (distance_sq < closest_distance_sq)
             {
                 closest_distance_sq = distance_sq;
@@ -218,6 +233,12 @@ namespace jrc
     bool MapDrops::has_drop(int32_t oid) const
     {
         return static_cast<bool>(drops.get(oid));
+    }
+
+    bool MapDrops::has_lootable_drop(int32_t oid) const
+    {
+        Optional<const Drop> drop = drops.get(oid);
+        return drop && drop->is_lootable();
     }
 
     size_t MapDrops::size() const

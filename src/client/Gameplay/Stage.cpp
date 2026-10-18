@@ -302,6 +302,7 @@ namespace jrc
         }
 
         const Inventory& inventory = player.get_inventory();
+        const pet_capability::Capabilities capabilities = get_pet_capabilities();
         const CharStats& stats = player.get_stats();
         int16_t hp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_hp_item());
         int16_t mp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_mp_item());
@@ -314,8 +315,8 @@ namespace jrc
             stats.get_stat(Maplestat::MAXMP),
             stats.get_stat(Maplestat::HP) > 0,
             true,
-            inventory.has_equipped_item(jrc::pet_automation::AUTO_HP_POUCH),
-            inventory.has_equipped_item(jrc::pet_automation::AUTO_MP_POUCH),
+            capabilities.auto_hp_pouch,
+            capabilities.auto_mp_pouch,
             hp_slot > 0 && hp_item && hp_item.restores_hp(),
             mp_slot > 0 && mp_item && mp_item.restores_mp()
         };
@@ -329,14 +330,18 @@ namespace jrc
                 PetAutoPotPacket(0, pet->get_uniqueid(), slot, item_id).dispatch();
         }
 
-        bool has_boots = inventory.has_equipped_item(jrc::pet_automation::WING_BOOTS);
-        if (!has_boots)
+        if (!capabilities.wing_boots)
         {
             clear_pet_loot_target(pet);
             return;
         }
 
-        if (pet_loot_target_oid && !drops.has_drop(pet_loot_target_oid))
+        if (pet_loot_target_oid && !drops.has_lootable_drop(pet_loot_target_oid))
+        {
+            clear_pet_loot_target(pet);
+        }
+
+        if (pet_loot_target_oid && !pet->has_loot_target())
         {
             clear_pet_loot_target(pet);
         }
@@ -347,10 +352,10 @@ namespace jrc
                 player.get_position(),
                 player.get_oid(),
                 current_party_id(),
-                300,
-                inventory.has_equipped_item(jrc::pet_automation::MESO_MAGNET),
-                inventory.has_equipped_item(jrc::pet_automation::ITEM_POUCH),
-                inventory.has_equipped_item(jrc::pet_automation::MAGIC_SCALES)
+                120,
+                capabilities.meso_magnet,
+                capabilities.item_pouch,
+                capabilities.magic_scales
             };
             MapDrops::PetLootTarget target = drops.find_pet_loot(query);
             if (target.oid)
@@ -367,7 +372,8 @@ namespace jrc
             return;
 
         ++pet_loot_target_frames;
-        bool pet_in_range = pet->get_position().distance(pet_loot_target_position) <= 50;
+        bool pet_in_range = pet_follow::distance_between(
+            pet->get_position(), pet_loot_target_position) <= 50;
         if (pet_loot::should_attempt(pet_loot_target_frames,
             pet_loot_attempts, pet_in_range))
         {
@@ -431,9 +437,29 @@ namespace jrc
         return chars.find_target(position, view_position);
     }
 
+    std::optional<PlayerTarget> Stage::find_character_info_target(
+        Point<int16_t> position) const
+    {
+        if (state != ACTIVE)
+            return std::nullopt;
+        const Point<int16_t> view_position = camera.position();
+        if (npcs.contains_cursor(position, view_position))
+            return std::nullopt;
+        const PlayerTarget self_target = {
+            player.get_oid(), player.get_name(), player.get_level(),
+            player.get_position()
+        };
+        return chars.find_target_with(position, view_position, self_target);
+    }
+
     bool Stage::is_player(int32_t cid) const
     {
         return cid == player.get_oid();
+    }
+
+    Point<int16_t> Stage::get_view_position() const
+    {
+        return camera.position();
     }
 
     MapNpcs& Stage::get_npcs()
@@ -508,6 +534,25 @@ namespace jrc
     const pet_automation::Controller& Stage::get_pet_automation() const
     {
         return pet_automation;
+    }
+
+    pet_capability::Capabilities Stage::get_pet_capabilities() const
+    {
+        const PetLook* pet = player.get_pet(0);
+        const Inventory& inventory = player.get_inventory();
+        return pet_capability::resolve(pet ? pet->get_itemid() : 0, {
+            inventory.has_equipped_item(pet_automation::MESO_MAGNET),
+            inventory.has_equipped_item(pet_automation::ITEM_POUCH),
+            inventory.has_equipped_item(pet_automation::AUTO_HP_POUCH),
+            inventory.has_equipped_item(pet_automation::AUTO_MP_POUCH),
+            inventory.has_equipped_item(pet_automation::WING_BOOTS),
+            inventory.has_equipped_item(pet_automation::MAGIC_SCALES)
+        });
+    }
+
+    int32_t Stage::get_pet_loot_target_oid() const
+    {
+        return pet_loot_target_oid;
     }
 
     Optional<Char> Stage::get_character(int32_t cid)

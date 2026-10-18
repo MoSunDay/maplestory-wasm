@@ -5,6 +5,13 @@ const DEFAULT_HP_ITEM = 2000000;
 const DEFAULT_MP_ITEM = 2000003;
 const CONFIGURED_THRESHOLD = 98;
 const MINIMUM_POTION_QUANTITY = 20;
+const STARTER_PUPPY = 5000001;
+const STARTER_CAPABILITIES = (1 << 0) | (1 << 1) | (1 << 4);
+const PET_WARP_STANCE = 7;
+const PET_JUMP_STANCE = 2;
+const PET_MOVE_LEFT = 1;
+const PET_MOVE_RIGHT = 2;
+const HORIZONTAL_WALL = 1;
 
 async function moveToX(driver, probes, targetX, tolerance = 70) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -23,8 +30,13 @@ async function moveToX(driver, probes, targetX, tolerance = 70) {
 }
 
 async function ensurePetSummoned(driver, probes, requireState) {
-  if (await probes.petActive() === 1) return;
-  const puppySlot = await probes.inventorySlot(5000001);
+  if (await probes.petActive() === 1) {
+    const activeItemId = await probes.petItemId();
+    if (activeItemId !== STARTER_PUPPY)
+      throw new Error(`Expected active starter puppy ${STARTER_PUPPY}, got ${activeItemId}`);
+    return;
+  }
+  const puppySlot = await probes.inventorySlot(STARTER_PUPPY);
   if (puppySlot < 1 || puppySlot > 24)
     throw new Error(`Starter puppy is unavailable in visible cash inventory: slot=${puppySlot}`);
 
@@ -51,7 +63,8 @@ async function ensurePetSummoned(driver, probes, requireState) {
   const column = (puppySlot - 1) % 4;
   const row = Math.floor((puppySlot - 1) / 4);
   await driver.doubleClick(329 + column * 36, 218 + row * 35);
-  await requireState('starter puppy summoned', async () => await probes.petActive() === 1);
+  await requireState('starter puppy summoned', async () =>
+    await probes.petActive() === 1 && await probes.petItemId() === STARTER_PUPPY);
   await driver.key('i', 'KeyI', 73, 'i');
 }
 
@@ -154,7 +167,7 @@ async function configureOptions(driver, probes, requireState, hpItem, mpItem, co
   return selected;
 }
 
-async function captureFollowAttempt(driver, probes, right) {
+async function captureFollowAttempt(driver, probes, firstRight) {
   const before = { playerX: await probes.playerX(), petX: await probes.petX() };
   await driver.evaluate(`(() => {
     const sample = { active: true, points: [] };
@@ -162,20 +175,31 @@ async function captureFollowAttempt(driver, probes, right) {
       if (!sample.active) return;
       sample.points.push({
         playerX: Module.ccall('msplayer_x', 'number', [], []),
+        playerY: Module.ccall('msplayer_y', 'number', [], []),
         petX: Module.ccall('mspet_x', 'number', [], []),
         petY: Module.ccall('mspet_y', 'number', [], []),
-        stance: Module.ccall('mspet_stance', 'number', [], [])
+        stance: Module.ccall('mspet_stance', 'number', [], []),
+        footholdId: Module.ccall('mspet_foothold_id', 'number', [], []),
+        onground: Module.ccall('mspet_onground', 'number', [], []),
+        moveIntent: Module.ccall('mspet_move_intent', 'number', [], []),
+        horizontalCollision: Module.ccall(
+          'mspet_horizontal_collision', 'number', [], []),
+        jumpTriggers: Module.ccall('mspet_jump_trigger_count', 'number', [], []),
+        lootTarget: Module.ccall('mspet_has_loot_target', 'number', [], [])
       });
       requestAnimationFrame(tick);
     };
     window.petFollowEvidence = sample;
     requestAnimationFrame(tick);
   })()`);
-  await driver.keyHold(
-    right ? 'ArrowRight' : 'ArrowLeft',
-    right ? 'ArrowRight' : 'ArrowLeft',
-    right ? 39 : 37, 2200
-  );
+  for (const right of [firstRight, !firstRight, firstRight]) {
+    await driver.keyHold(
+      right ? 'ArrowRight' : 'ArrowLeft',
+      right ? 'ArrowRight' : 'ArrowLeft',
+      right ? 39 : 37, 1800
+    );
+    await sleep(150);
+  }
   await sleep(1500);
   const points = await driver.evaluate(`(() => {
     window.petFollowEvidence.active = false;
@@ -188,25 +212,125 @@ async function captureFollowAttempt(driver, probes, right) {
   return { before, after, points };
 }
 
-async function verifyFollow(driver, probes) {
-  let attempt = await captureFollowAttempt(driver, probes, true);
-  if (Math.abs(attempt.after.playerX - attempt.before.playerX) <= 50)
-    attempt = await captureFollowAttempt(driver, probes, false);
-  const { before, after, points } = attempt;
-  const distance = Math.hypot(after.playerX - after.petX, after.playerY - after.petY);
+function percentile(values, ratio) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))];
+}
+
+function analyzeFollowAttempt(attempt) {
+  const playerSpeeds = [];
+  const petSpeeds = [];
+  const warpPoints = [];
+  const warpTransitions = [];
+  let jumpSamples = 0;
+  let slopeSamples = 0;
+  let wallBlockedSamples = 0;
+  const unauthorizedJumps = [];
+  let maxDistance = 0;
   let reversals = 0;
   let direction = 0;
-  for (let index = 6; index < points.length; index += 6) {
-    if (points[index].stance !== 0 || points[index - 6].stance !== 0) continue;
-    const delta = points[index].petX - points[index - 6].petX;
-    if (Math.abs(delta) < 3) continue;
-    const next = Math.sign(delta);
+  for (let index = 1; index < attempt.points.length; index += 1) {
+    const previous = attempt.points[index - 1];
+    const point = attempt.points[index];
+    const distance = Math.hypot(point.playerX - point.petX, point.playerY - point.petY);
+    maxDistance = Math.max(maxDistance, distance);
+    if (point.stance === PET_WARP_STANCE) warpPoints.push({ ...point, distance });
+    if (point.stance === PET_JUMP_STANCE) jumpSamples += 1;
+    if (point.horizontalCollision === HORIZONTAL_WALL)
+      wallBlockedSamples += 1;
+    if (point.onground === 1 && previous.onground === 1 &&
+        point.horizontalCollision === 0 &&
+        point.stance !== PET_JUMP_STANCE &&
+        Math.abs(point.petX - previous.petX) > 0 &&
+        Math.abs(point.petY - previous.petY) > 0) {
+      slopeSamples += 1;
+    }
+    if (point.jumpTriggers > previous.jumpTriggers &&
+        (point.horizontalCollision !== HORIZONTAL_WALL ||
+         ![PET_MOVE_LEFT, PET_MOVE_RIGHT].includes(point.moveIntent))) {
+      unauthorizedJumps.push({ previous, point, reason: 'trigger-without-block' });
+    }
+    if (point.stance === PET_JUMP_STANCE && previous.stance !== PET_JUMP_STANCE &&
+        point.jumpTriggers === previous.jumpTriggers &&
+        previous.horizontalCollision !== HORIZONTAL_WALL) {
+      unauthorizedJumps.push({ previous, point, reason: 'jump-without-trigger' });
+    }
+    if (point.stance === PET_WARP_STANCE && previous.stance !== PET_WARP_STANCE) {
+      warpTransitions.push({
+        beforeDistance: Math.hypot(
+          previous.playerX - previous.petX, previous.playerY - previous.petY),
+        afterDistance: distance
+      });
+    }
+    if (previous.stance === PET_WARP_STANCE || point.stance === PET_WARP_STANCE) continue;
+    const playerSpeed = Math.abs(point.playerX - previous.playerX);
+    const petSpeed = Math.abs(point.petX - previous.petX);
+    if (playerSpeed > 0) playerSpeeds.push(playerSpeed);
+    if (petSpeed > 0) petSpeeds.push(petSpeed);
+    if (petSpeed < 2) continue;
+    const next = Math.sign(point.petX - previous.petX);
     if (next && direction && next !== direction) reversals += 1;
     if (next) direction = next;
   }
-  if (Math.abs(after.playerX - before.playerX) <= 50 || distance > 260 || reversals > 2)
-    throw new Error(`Pet follow stability failed: ${JSON.stringify({ before, after, distance, reversals })}`);
-  return { before, after, distance, reversals, sampleCount: points.length };
+  return {
+    playerP95: percentile(playerSpeeds, 0.95),
+    petP95: percentile(petSpeeds, 0.95),
+    maxDistance,
+    reversals,
+    warpPoints,
+    warpTransitions,
+    jumpSamples,
+    slopeSamples,
+    wallBlockedSamples,
+    unauthorizedJumps
+  };
+}
+
+async function verifyFollow(driver, probes) {
+  const attempts = [];
+  for (const right of [true, false]) {
+    const attempt = await captureFollowAttempt(driver, probes, right);
+    attempt.analysis = analyzeFollowAttempt(attempt);
+    attempts.push(attempt);
+    if (attempt.analysis.warpPoints.length > 0) break;
+  }
+  const attempt = attempts.find(candidate => candidate.analysis.warpPoints.length > 0) ||
+    attempts[attempts.length - 1];
+  const { before, after, points, analysis } = attempt;
+  const distance = Math.hypot(after.playerX - after.petX, after.playerY - after.petY);
+  const recovered = analysis.warpPoints.some(point =>
+    point.distance <= 50 && point.lootTarget === 0);
+  const speedLimit = analysis.playerP95 * 1.2 + 0.5;
+  const recordedWarpDistance = await probes.petLastWarpDistance();
+  const warpObserved = analysis.warpPoints.length > 0;
+  const warpValid = warpObserved ? recordedWarpDistance > 300 && recovered :
+    analysis.maxDistance <= 300;
+  if (points.length < 30 || analysis.playerP95 <= 0 ||
+      analysis.petP95 > speedLimit || distance > 300 ||
+      analysis.reversals > 4 || !warpValid) {
+    throw new Error(`Pet normal-speed leash recovery failed: ${JSON.stringify({
+      before, after, distance, analysis, speedLimit, attempts: attempts.length
+    })}`);
+  }
+  if (analysis.unauthorizedJumps.length > 0) {
+    throw new Error(`Pet jumped without an actual blocked movement: ${JSON.stringify(
+      analysis.unauthorizedJumps.slice(0, 3))}`);
+  }
+  return {
+    before, after, distance, sampleCount: points.length,
+    playerP95: analysis.playerP95, petP95: analysis.petP95,
+    maxDistance: analysis.maxDistance, reversals: analysis.reversals,
+    warpSamples: analysis.warpPoints.length,
+    warpTransitions: analysis.warpTransitions,
+    recordedWarpDistance,
+    warpObserved,
+    jumpSamples: analysis.jumpSamples,
+    slopeSamples: analysis.slopeSamples,
+    wallBlockedSamples: analysis.wallBlockedSamples,
+    unauthorizedJumps: analysis.unauthorizedJumps,
+    recovered: warpObserved ? recovered : true
+  };
 }
 
 async function verifyRuntimePickup(driver, probes) {
@@ -217,10 +341,28 @@ async function verifyRuntimePickup(driver, probes) {
     meso: await probes.playerMeso()
   };
   await driver.evaluate(`(() => {
-    const evidence = { active: true, targetSeen: false, maxDrops: 0 };
+    const evidence = {
+      active: true,
+      targetSeen: false,
+      maxDrops: 0,
+      targetOids: [],
+      lastNonzeroTargetOid: Module.ccall('mspet_loot_target_oid', 'number', [], []),
+      lastPickupCount: ${before.pickups},
+      confirmedTargetOid: 0
+    };
     const tick = () => {
       if (!evidence.active) return;
-      evidence.targetSeen ||= Module.ccall('mspet_has_loot_target', 'number', [], []) === 1;
+      const targetOid = Module.ccall('mspet_loot_target_oid', 'number', [], []);
+      const pickups = Module.ccall('mspet_confirmed_pickups', 'number', [], []);
+      evidence.targetSeen ||= targetOid !== 0;
+      if (pickups > evidence.lastPickupCount && evidence.confirmedTargetOid === 0)
+        evidence.confirmedTargetOid = evidence.lastNonzeroTargetOid || targetOid;
+      evidence.lastPickupCount = pickups;
+      if (targetOid !== 0) {
+        evidence.lastNonzeroTargetOid = targetOid;
+        if (evidence.targetOids.at(-1) !== targetOid)
+          evidence.targetOids.push(targetOid);
+      }
       evidence.maxDrops = Math.max(evidence.maxDrops,
         Module.ccall('msdrop_count', 'number', [], []));
       requestAnimationFrame(tick);
@@ -271,6 +413,23 @@ async function verifyRuntimePickup(driver, probes) {
   for (let second = 0; second < 15 &&
       await probes.petConfirmedPickups() === before.pickups; second += 1)
     await sleep(1000);
+  await sleep(100);
+  const pickupSample = await driver.evaluate('window.petLootEvidence');
+  const targetOid = pickupSample.confirmedTargetOid;
+  const removal = {
+    targetOid,
+    removed: false,
+    elapsedMs: 0,
+    finalTargetOid: await probes.petLootTargetOid()
+  };
+  if (targetOid > 0) {
+    const started = Date.now();
+    while (Date.now() - started < 2000 && await probes.dropExists(targetOid) === 1)
+      await sleep(50);
+    removal.elapsedMs = Date.now() - started;
+    removal.removed = await probes.dropExists(targetOid) === 0;
+    removal.finalTargetOid = await probes.petLootTargetOid();
+  }
   const sampled = await driver.evaluate(`(() => {
     window.petLootEvidence.active = false;
     return window.petLootEvidence;
@@ -280,13 +439,18 @@ async function verifyRuntimePickup(driver, probes) {
     meso: await probes.playerMeso()
   };
   fs.writeFileSync(`${driver.artifactDir}/pet-pickup-trace.json`,
-    `${JSON.stringify({ before, after, sampled, trace }, null, 2)}\n`);
+    `${JSON.stringify({ before, after, sampled, removal, trace }, null, 2)}\n`);
   if (after.pickups <= before.pickups)
     throw new Error(`Server-confirmed pet pickup was not observed: ${JSON.stringify({ after, sampled, trace })}`);
   console.log('PASS  server-confirmed pet pickup');
   if (!sampled.targetSeen || sampled.maxDrops < 1)
     throw new Error(`Pet loot target transition was not observed: ${JSON.stringify(sampled)}`);
-  return { before, after, ...sampled };
+  if (targetOid <= 0 || !removal.removed)
+    throw new Error(`Server-confirmed pet pickup did not erase its exact drop OID: ${JSON.stringify({ sampled, removal })}`);
+  if (removal.finalTargetOid === targetOid)
+    throw new Error(`Pet retained the removed drop OID as its loot target: ${JSON.stringify(removal)}`);
+  console.log(`PASS  pet pickup erased exact drop oid=${targetOid}`);
+  return { before, after, ...sampled, removal };
 }
 
 export async function verifyPetAutomationFlow(driver, probes, requireState, mode) {
@@ -294,9 +458,17 @@ export async function verifyPetAutomationFlow(driver, probes, requireState, mode
   const mpItem = Number(process.env.E2E_PET_MP_ITEM || DEFAULT_MP_ITEM);
   if (mode === 'configure') await ensurePotions(driver, probes, requireState, hpItem, mpItem);
   await ensurePetSummoned(driver, probes, requireState);
+  const petIdentity = {
+    itemId: await probes.petItemId(),
+    capabilityMask: await probes.petCapabilityMask()
+  };
+  if (petIdentity.itemId !== STARTER_PUPPY ||
+      (petIdentity.capabilityMask & STARTER_CAPABILITIES) !== STARTER_CAPABILITIES) {
+    throw new Error(`Starter puppy intrinsic capabilities unavailable: ${JSON.stringify(petIdentity)}`);
+  }
 
   let selected = null;
-  if (mode !== 'runtime')
+  if (!['runtime', 'pickup', 'follow'].includes(mode))
     selected = await configureOptions(driver, probes, requireState, hpItem, mpItem, mode === 'configure');
 
   const configured = {
@@ -320,11 +492,11 @@ export async function verifyPetAutomationFlow(driver, probes, requireState, mode
   if (mode === 'runtime' && (configured.hp <= 1 || configured.mp <= 1))
     throw new Error(`Pet auto recovery did not restore resources: ${JSON.stringify(configured)}`);
 
-  const loot = mode === 'runtime'
+  const loot = mode === 'runtime' || mode === 'pickup'
     ? await verifyRuntimePickup(driver, probes)
     : null;
   const follow = await verifyFollow(driver, probes);
-  const evidence = { mode, selected, configured, loot, follow };
+  const evidence = { mode, petIdentity, selected, configured, loot, follow };
   fs.writeFileSync(`${driver.artifactDir}/pet-automation-evidence.json`,
     `${JSON.stringify(evidence, null, 2)}\n`);
   await driver.screenshot('08h-pet-follow-recovered');

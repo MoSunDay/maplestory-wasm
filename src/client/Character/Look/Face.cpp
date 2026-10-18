@@ -43,7 +43,7 @@ namespace jrc
     };
 
 
-    Face::Face(int32_t faceid)
+    Face::Face(int32_t faceid, Texture::LoadMode load_mode)
     {
         std::string strid = "000" + std::to_string(faceid);
         nl::node facenode = nl::nx::character["Face"][strid + ".img"];
@@ -54,7 +54,7 @@ namespace jrc
             if (exp == Expression::DEFAULT)
             {
                 expressions[Expression::DEFAULT]
-                    .emplace(0, facenode["default"]);
+                    .emplace(0, Frame(facenode["default"], load_mode));
             }
             else
             {
@@ -64,7 +64,7 @@ namespace jrc
                 for (uint8_t frame = 0; nl::node framenode = expnode[frame]; ++frame)
                 {
                     expressions[exp]
-                        .emplace(frame, framenode);
+                        .emplace(frame, Frame(framenode, load_mode));
                 }
             }
         }
@@ -88,6 +88,17 @@ namespace jrc
     {
         auto delayit = expressions[exp].find(frame);
         return delayit != expressions[exp].end() ? delayit->second.delay : 100;
+    }
+
+    void Face::prepare_background() const
+    {
+        for (size_t expression = 0; expression < Expression::LENGTH; ++expression)
+        {
+            for (const auto& entry : expressions[expression])
+            {
+                entry.second.texture.prepare_background();
+            }
+        }
     }
 
     const std::string& Face::get_name() const

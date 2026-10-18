@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../UIElement.h"
+#include "WorldSelectPolicy.h"
 
 #include "../../Net/Login.h"
 
@@ -37,6 +38,7 @@ namespace jrc
         uint8_t get_world_id() const;
         uint8_t get_channel_id() const;
         bool enter_selected_channel();
+        void recover_charlist_request();
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;

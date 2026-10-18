@@ -27,13 +27,20 @@ namespace jrc
     class Texture
     {
     public:
-        Texture(nl::node source);
+        enum class LoadMode
+        {
+            BACKGROUND,
+            DEFERRED
+        };
+
+        Texture(nl::node source, LoadMode load_mode = LoadMode::BACKGROUND);
         Texture();
         ~Texture();
 
         void draw(const DrawArgument& args) const;
         bool draw_effect(const DrawArgument& args) const;
         void prepare_visible() const;
+        void prepare_background() const;
         void prepare_map_required() const;
         void prepare_effect() const;
         void shift(Point<int16_t> amount);

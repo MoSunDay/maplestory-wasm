@@ -24,7 +24,7 @@
 
 namespace jrc
 {
-    Texture::Texture(nl::node src)
+    Texture::Texture(nl::node src, LoadMode load_mode)
     {
         if (src.data_type() == nl::node::type::bitmap)
         {
@@ -44,9 +44,15 @@ namespace jrc
             dimensions = Point<int16_t>(bitmap.width(),  bitmap.height());
 
 #ifdef MS_PLATFORM_WASM
-            GraphicsGL::get().queuebitmap(bitmap);
+            if (load_mode == LoadMode::BACKGROUND)
+            {
+                GraphicsGL::get().queuebitmap(bitmap);
+            }
 #else
-            GraphicsGL::get().addbitmap(bitmap);
+            if (load_mode == LoadMode::BACKGROUND)
+            {
+                GraphicsGL::get().addbitmap(bitmap);
+            }
 #endif
         }
     }
@@ -112,6 +118,19 @@ namespace jrc
         GraphicsGL::get().queuebitmap(
             bitmap,
             GraphicsGL::BitmapLoadClass::BLOCKING_VISIBLE
+        );
+    }
+
+    void Texture::prepare_background() const
+    {
+        if (!is_valid())
+        {
+            return;
+        }
+
+        GraphicsGL::get().queuebitmap(
+            bitmap,
+            GraphicsGL::BitmapLoadClass::BACKGROUND
         );
     }
 

@@ -52,6 +52,7 @@ namespace jrc
 
         void enable();
         void disable();
+        bool is_enabled() const;
         void change_state(State state);
         void enter_cash_shop(std::shared_ptr<CashShopModel> model, bool female);
         State get_state() const;

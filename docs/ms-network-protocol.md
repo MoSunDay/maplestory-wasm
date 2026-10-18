@@ -1515,11 +1515,12 @@ amount    int     Amount of mesos to drop
 
 ### 0x005F — GIVE_FAME
 
-**Purpose:** Client gives fame to another character.
+**Purpose:** Client increases or decreases another character's fame.
 
 ```
 Field    Type    Notes
 charId   int     Target character ID
+mode     byte    0 = decrease fame, 1 = increase fame
 ```
 
 Server responds with `FAME_RESPONSE` (0x26).
@@ -1528,7 +1529,7 @@ Server responds with `FAME_RESPONSE` (0x26).
 
 ### 0x0061 — CHAR_INFO_REQUEST
 
-**Purpose:** Client requests detailed character information panel (clicking another player).
+**Purpose:** Client requests the detailed information panel for self or another player.
 
 ```
 Field    Type   Notes
@@ -2581,13 +2582,19 @@ count       short   Number of skill entries
 
 ```
 Field        Type    Notes
-result       byte    0 = success, others = error
+result       byte    0 = success, 1–4/6 = error, 5 = received fame
 [If success:]
   name       string  Target character name
-  mode       byte    0 = gave fame, 1 = defamed
-  fame       int     Target's new fame
-  change     int     +1 or -1
+  mode       byte    0 = decreased, 1 = increased
+  fame       short   Target's new fame
+  [short]    short   0
+[If received (5):]
+  name       string  Source character name
+  mode       byte    0 = decreased, 1 = increased
 ```
+
+Error results are `1` invalid character, `2` level too low, `3` daily
+limit, `4` same-target monthly limit, and `6` unexpected failure.
 
 ---
 
@@ -2628,24 +2635,13 @@ questId   short  Completed quest ID
 
 ### 0x003D — CHAR_INFO
 
-**Purpose:** Detailed character information popup (from clicking another player).
+**Purpose:** Detailed character information popup for self or another player.
 
 ```
 Field              Type    Notes
 charId             int
-level              byte
+level              short   Custom-client level width
 job                short   Job ID
-str                short   STR stat
-dex                short
-int_               short
-luk                short
-hp                 short
-maxHp              short
-mp                 short
-maxMp              short
-ap                 short   AP remaining
-[SP info]          —       See §11.5
-exp                int
 fame               short
 isMarried          byte    1 if has marriage ring
 guildName          string
@@ -2659,7 +2655,7 @@ allianceName       string
   tameness         short
   fullness         byte
   [short]          short   0
-  mountEquipId     int     (currently equipped mount food item)
+  petEquipId       int     Currently equipped pet equipment, or 0
 [byte]             byte    0 (end of pets)
 [Mount if equipped:]
   mountId          byte    Mount type ID

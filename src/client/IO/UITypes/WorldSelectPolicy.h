@@ -15,4 +15,24 @@ namespace jrc::world_select
     {
         return 0;
     }
+
+    // Charlist request gate, functional form of a recoverable in-flight flag.
+    // One physical click can be observed by both the GLFW mouse handler and
+    // the browser compatibility bridge, so the flag is raised before the
+    // packet leaves; only an explicit recovery (failed charlist) clears it.
+    inline bool begin_request(bool& pending)
+    {
+        if (pending)
+        {
+            return false;
+        }
+
+        pending = true;
+        return true;
+    }
+
+    inline void recover_request(bool& pending)
+    {
+        pending = false;
+    }
 }

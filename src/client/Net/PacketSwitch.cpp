@@ -29,6 +29,7 @@
 #include "Handlers/NpcInteractionHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/TradeHandlers.h"
+#include "CharacterInfo/CharacterInfoHandlers.h"
 
 #include "../Console.h"
 
@@ -51,6 +52,7 @@ namespace jrc
 
         // Player 1
         APPLY_BUFF = 20,
+        FAME_RESPONSE = 0x26,
 
         // Login 2
         SELECT_WORLD       = 26,
@@ -77,6 +79,7 @@ namespace jrc
 
         // Player 3
         UPDATE_GENDER   = 58,
+        CHAR_INFO       = 0x3D,
         PARTY_OPERATION = 62,
         BUDDY_LIST      = 63,
         GUILD_OPERATION = 65,
@@ -236,6 +239,8 @@ namespace jrc
         emplace<UPDATE_SKILL, UpdateSkillHandler>();
         emplace<ADD_COOLDOWN, AddCooldownHandler>();
         emplace<ADMIN_RESULT, AdminResultHandler>();
+        emplace<FAME_RESPONSE, FameResponseHandler>();
+        emplace<CHAR_INFO, CharacterInfoHandler>();
         emplace<AUTO_HP_POT, AutoHpPotHandler>();
         emplace<AUTO_MP_POT, AutoMpPotHandler>();
 

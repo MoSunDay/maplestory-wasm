@@ -23,7 +23,8 @@
 
 namespace jrc
 {
-    Hair::Hair(int32_t hairid, const BodyDrawinfo& drawinfo)
+    Hair::Hair(int32_t hairid, const BodyDrawinfo& drawinfo,
+               Texture::LoadMode load_mode)
     {
         nl::node hairnode = nl::nx::character["Hair"]["000" + std::to_string(hairid) + ".img"];
 
@@ -54,7 +55,7 @@ namespace jrc
                     Point<int16_t> shift = drawinfo.gethairpos(stance, frame) - brow;
 
                     stances[stance][layer]
-                        .emplace(frame, layernode)
+                        .emplace(frame, Texture(layernode, load_mode))
                         .first->second.shift(shift);
                 }
             }
@@ -88,6 +89,20 @@ namespace jrc
             for (const auto& entry : stances[stance][layer])
             {
                 entry.second.prepare_map_required();
+            }
+        }
+    }
+
+    void Hair::prepare_background() const
+    {
+        for (size_t stance = 0; stance < Stance::LENGTH; ++stance)
+        {
+            for (size_t layer = 0; layer < Layer::NUM_LAYERS; ++layer)
+            {
+                for (const auto& entry : stances[stance][layer])
+                {
+                    entry.second.prepare_background();
+                }
             }
         }
     }

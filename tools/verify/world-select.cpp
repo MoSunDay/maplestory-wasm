@@ -32,6 +32,20 @@ int main(int argc, char** argv)
     static_assert(jrc::world_select::selectable_channel_count(3) == 1);
     static_assert(jrc::world_select::selected_channel_id() == 0);
 
+    jrc::world_select::RequestGate request_gate;
+    if (request_gate.is_pending() || !request_gate.try_begin() ||
+        request_gate.try_begin())
+    {
+        std::cerr << "FAIL world-select request gate is not idempotent\n";
+        return 1;
+    }
+    request_gate.recover();
+    if (request_gate.is_pending() || !request_gate.try_begin())
+    {
+        std::cerr << "FAIL world-select request gate cannot recover\n";
+        return 1;
+    }
+
     const std::string path = argc > 1 ? argv[1] : "UI.nx";
     nl::file file(path);
     nl::node channels = file.root()["Login.img"]["WorldSelect"]["BtChannel"];

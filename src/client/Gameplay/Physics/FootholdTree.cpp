@@ -113,8 +113,10 @@ namespace jrc
 
     Footholdtree::Footholdtree() = default;
 
-    void Footholdtree::limit_movement(PhysicsObject& phobj) const
+    Footholdtree::HorizontalCollision Footholdtree::limit_movement(
+        PhysicsObject& phobj) const
     {
+        HorizontalCollision horizontal_collision = HorizontalCollision::NONE;
         if (phobj.hmobile())
         {
             double crnt_x = phobj.crnt_x();
@@ -125,6 +127,8 @@ namespace jrc
             bool collision = left ?
                 crnt_x >= wall && next_x <= wall :
                 crnt_x <= wall && next_x >= wall;
+            if (collision)
+                horizontal_collision = HorizontalCollision::WALL;
 
             if (!collision && phobj.is_flag_set(PhysicsObject::TURNATEDGES))
             {
@@ -132,6 +136,8 @@ namespace jrc
                 collision = left ?
                     crnt_x >= wall && next_x <= wall :
                     crnt_x <= wall && next_x >= wall;
+                if (collision)
+                    horizontal_collision = HorizontalCollision::EDGE;
             }
 
             if (collision)
@@ -155,7 +161,9 @@ namespace jrc
             {
                 phobj.limity(ground.second());
 
-                limit_movement(phobj);
+                const HorizontalCollision landed_collision = limit_movement(phobj);
+                if (horizontal_collision == HorizontalCollision::NONE)
+                    horizontal_collision = landed_collision;
             }
             else
             {
@@ -169,6 +177,8 @@ namespace jrc
                 }
             }
         }
+
+        return horizontal_collision;
     }
 
     void Footholdtree::update_fh(PhysicsObject& phobj) const
@@ -424,4 +434,5 @@ namespace jrc
     {
         return borders;
     }
+
 }

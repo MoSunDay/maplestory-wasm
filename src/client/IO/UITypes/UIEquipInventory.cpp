@@ -112,8 +112,15 @@ namespace jrc
                 Point<int16_t>(266, 88), Point<int16_t>(212, 124),
                 Point<int16_t>(248, 124)
             };
+            const pet_capability::Capabilities capabilities =
+                Stage::get().get_pet_capabilities();
+            const std::array<bool, 5> ENABLED = {
+                capabilities.meso_magnet, capabilities.item_pouch,
+                capabilities.auto_hp_pouch, capabilities.auto_mp_pouch,
+                capabilities.wing_boots
+            };
             for (size_t index = 0; index < ABILITIES.size(); ++index)
-                if (inventory.has_equipped_item(ABILITIES[index]))
+                if (ENABLED[index])
                     draw_pet_item(ABILITIES[index], POSITIONS[index]);
         }
     }

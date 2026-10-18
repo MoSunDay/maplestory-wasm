@@ -34,6 +34,7 @@
 #include "MapleMap/MapDrops.h"
 #include "Physics/Physics.h"
 #include "Pet/PetAutomation.h"
+#include "Pet/PetCapabilityPolicy.h"
 #include "Mist/MapMists.h"
 
 #include "../Character/Player.h"
@@ -87,6 +88,9 @@ namespace jrc
         Cursor::State send_cursor(bool pressed, Point<int16_t> position);
         // Return the visible remote player under a screen-space cursor.
         std::optional<PlayerTarget> find_player_target(Point<int16_t> position) const;
+        // Return either the local or a remote character under the cursor.
+        std::optional<PlayerTarget> find_character_info_target(
+            Point<int16_t> position) const;
 
         // Check if the specified id is the player's id.
         bool is_player(int32_t cid) const;
@@ -106,6 +110,7 @@ namespace jrc
         Player& get_player();
         // Returns the id of the current map.
         int32_t get_mapid() const;
+        Point<int16_t> get_view_position() const;
         bool is_loading() const;
         void retry_loading();
         // Return a reference to the attack and buff component.
@@ -115,6 +120,8 @@ namespace jrc
         void set_pet_auto_mp_item(int32_t item_id);
         bool set_pet_auto_thresholds(uint8_t hp, uint8_t mp);
         const pet_automation::Controller& get_pet_automation() const;
+        pet_capability::Capabilities get_pet_capabilities() const;
+        int32_t get_pet_loot_target_oid() const;
 
         // Return a pointer to a character, possibly the player.
         Optional<Char> get_character(int32_t cid);

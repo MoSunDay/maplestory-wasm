@@ -201,10 +201,20 @@ namespace jrc
 
         // Both GLFW mouse-down and the browser compatibility bridge can see
         // one physical click. Mark the request first so only one packet leaves.
-        request_pending = true;
+        world_select::begin_request(request_pending);
         UI::get().disable();
         CharlistRequestPacket(worldid, channelid).dispatch();
         return true;
+    }
+
+    void UIWorldSelect::recover_charlist_request()
+    {
+        world_select::recover_request(request_pending);
+        makeactive();
+        if (channelcount > 0)
+        {
+            buttons[BT_ENTERWORLD]->set_state(Button::NORMAL);
+        }
     }
 
     Button::State UIWorldSelect::button_pressed(uint16_t id)

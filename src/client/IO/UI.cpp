@@ -89,6 +89,11 @@ namespace jrc
         enabled = false;
     }
 
+    bool UI::is_enabled() const
+    {
+        return enabled;
+    }
+
     bool UI::has_element(UIElement::Type type)
     {
         return state->get(type) != nullptr;
@@ -286,6 +291,7 @@ namespace jrc
                 UIElement::PARTY,
                 UIElement::TRADE,
                 UIElement::PLAYER_CONTEXT,
+                UIElement::USERINFO,
                 UIElement::STATSINFO,
                 UIElement::NOTICE
             };
