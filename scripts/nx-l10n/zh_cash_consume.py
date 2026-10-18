@@ -86,6 +86,7 @@ ZH_CASH_CONSUME = {
     "GMEvent_Horntail's Left Head": 'GM活动_暗黑龙王左首',
     "GMEvent_Horntail's Right Head": 'GM活动_暗黑龙王右首',
     'GMEvent_Pink Bean': 'GM活动_粉红豆豆',
+    'GMEvent_Pink Bean2': 'GM活动_粉红豆豆2',
     'Suspicious Black Sack': '可疑的黑色袋子',
     'Clean Slate Scroll 20%': '洁净卷轴20%',
     'Normal Witch Scroll': '普通女巫卷轴',
@@ -120,8 +121,10 @@ def _scroll_entries():
     for cape_stat, cape_zh in _SCROLL_CAPE.items():
         entries[f'Scroll for Cape for {cape_stat} 50%'] = f'披风{cape_zh}卷轴50%'
     for weapon, weapon_zh in _SCROLL_WEAPONS.items():
-        stat_zh = '魔力' if weapon in ('Wand', 'Staff') else '攻击'
-        entries[f'Scroll for {weapon} for ATT 50%'] = f'{weapon_zh}{stat_zh}卷轴50%'
+        magic = weapon in ('Wand', 'Staff')
+        stat_en = 'Magic Att.' if magic else 'ATT'
+        stat_zh = '魔力' if magic else '攻击'
+        entries[f'Scroll for {weapon} for {stat_en} 50%'] = f'{weapon_zh}{stat_zh}卷轴50%'
         if weapon in ('Knuckler', 'Gun'):
             entries[f'Scroll for {weapon} for Attack 50%'] = f'{weapon_zh}攻击卷轴50%'
     return entries

@@ -128,6 +128,7 @@ ZH_INS_MAP_MISC = {
     'FAQ 퀘스트 npc 4': 'FAQ任务NPC 4',
     'FAQ 퀘스트 npc 5': 'FAQ任务NPC 5',
     'FAQ npc': 'FAQ NPC',
+    'FAQ NPC': 'FAQ任务NPC',
     # ---- Pet.img ----
     'Husky': '哈士奇',
     'Porcupine': '豪猪',

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Apply Chinese translations to String.nx name entries.
 
-Rewrites the NX string table in place: new string data and a new offset
-table are appended to the file, then the header's string_offset field is
-patched. Node table and node name indices stay untouched, so every node
-keeps resolving to (possibly translated) strings.
+Rewrites the file compactly: header + node table (copied verbatim, node
+name/value indices untouched) + fresh string blob + fresh offset table,
+with the header's node_offset/string_offset patched accordingly. Safe
+because String.nx contains no bitmap/audio nodes, so no other absolute
+file offsets exist. Re-running after translation is a no-op content-wise.
 
 Usage: python3 apply.py <String.nx> [--dry-run]
 """
@@ -49,17 +50,6 @@ def iter_nodes(data, node_count, node_offset):
         yield node_at(data, node_offset, i)
 
 
-def find_target_indices(data, node_count, node_offset, strings):
-    """Map string-table index -> node path for every name-like string node."""
-    targets = {}
-    for name_idx, _, _, ntype, value in iter_nodes(data, node_count, node_offset):
-        if ntype != NODE_TYPE_STRING:
-            continue
-        if strings[name_idx] in ('name', 'mapName', 'streetName'):
-            targets[value] = strings[name_idx]
-    return targets
-
-
 def translate(english):
     text = english.strip()
     if text in ('MISSING NAME', 'test'):
@@ -69,7 +59,7 @@ def translate(english):
     return ZH_ALL.get(text)
 
 
-def build_replacements(data, node_count, node_offset, strings, name_indices):
+def build_replacements(data, node_count, node_offset, strings):
     """Return {string_index: translated_bytes} plus unmatched latin entries."""
     stack = [(0, '')]
     replacements = {}
@@ -91,12 +81,14 @@ def build_replacements(data, node_count, node_offset, strings, name_indices):
     return replacements, untranslated
 
 
-def rebuild(data, string_count, old_table_offset, replacements):
-    """Append new string data + offset table; return patched file bytes."""
+HEADER_SIZE = 28
+
+
+def rebuild(data, node_count, node_offset, string_count, old_table_offset, replacements):
+    """Rewrite compactly: header + node table + string blob + offset table."""
     strings = read_all_strings(data, string_count, old_table_offset)
-    # The offset table stores absolute file offsets; string data lands
-    # right after the current file, then the new offset table after it.
-    blob_start = len(data)
+    node_bytes = data[node_offset:node_offset + node_count * 20]
+    blob_start = HEADER_SIZE + len(node_bytes)
     blob = bytearray()
     offsets = []
     for i, text in enumerate(strings):
@@ -104,13 +96,13 @@ def rebuild(data, string_count, old_table_offset, replacements):
         offsets.append(blob_start + len(blob))
         blob += struct.pack('<H', len(raw)) + raw
     table_offset = blob_start + len(blob)
-    new_table = bytearray()
-    for off in offsets:
-        new_table += struct.pack('<Q', off)
-    out = bytearray(data)
-    out += blob
-    out += new_table
+    out = bytearray(data[:HEADER_SIZE])
+    struct.pack_into('<Q', out, 8, HEADER_SIZE)
     struct.pack_into('<Q', out, 20, table_offset)
+    out += node_bytes
+    out += blob
+    for off in offsets:
+        out += struct.pack('<Q', off)
     return bytes(out)
 
 
@@ -122,14 +114,13 @@ def main():
     data = open(path, 'rb').read()
     node_count, node_offset, string_count, string_offset = read_header(data)
     strings = read_all_strings(data, string_count, string_offset)
-    name_indices = find_target_indices(data, node_count, node_offset, strings)
-    replacements, untranslated = build_replacements(data, node_count, node_offset, strings, name_indices)
+    replacements, untranslated = build_replacements(data, node_count, node_offset, strings)
     print(f'{path}: {len(replacements)} translated, {len(untranslated)} latin names left as-is')
     for path_name, english in untranslated[:40]:
         print(f'  ?? {path_name} | {english!r}')
     if dry:
         return
-    out = rebuild(data, string_count, string_offset, replacements)
+    out = rebuild(data, node_count, node_offset, string_count, string_offset, replacements)
     with open(path + '.bak', 'wb') as f:
         f.write(data)
     with open(path, 'wb') as f:
