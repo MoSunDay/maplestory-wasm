@@ -476,7 +476,8 @@ try {
     previews: `${charSelectTransition.states.at(-1).previewReady}/${charSelectTransition.states.at(-1).previewTotal}`
   })}`);
   // Pixel-level lock: char-select keeps the single-row modern layout.
-  await assertCharSelectModernLayout(driver);
+  await assertCharSelectModernLayout(
+    driver, charSelectTransition.states.at(-1).previewTotal > 0);
   await driver.screenshot('04-character-select-before');
   if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');
 
@@ -527,8 +528,20 @@ try {
 
     // The name submit schedules a second cold-asset wave (customization
     // previews); CDP clicks keep getting dropped while those chunks stream.
-    if (!await driver.retryClick(520, 310, async () =>
-      await characterCreationCustomizing() === 1, 8, 4000)) {
+    // The name-availability round-trip also occasionally drops (~1 in 3
+    // observed runs, e.g. 2026-10-19); re-opening the name field resets the
+    // stuck submit state, so retry the whole submit once before failing.
+    let submitted = false;
+    for (let attempt = 0; attempt < 2 && !submitted; attempt += 1) {
+      if (attempt > 0) {
+        await driver.click(530, 230);
+        await driver.compose(firstName);
+        await driver.click(520, 310);
+      }
+      submitted = await driver.retryClick(520, 310,
+        async () => await characterCreationCustomizing() === 1, 8, 4000);
+    }
+    if (!submitted) {
       throw new Error('accepted name never entered customization');
     }
     await requireState('accepted name enters customization', async () =>
@@ -993,5 +1006,23 @@ try {
   await driver.stop();
 }
 
-if (!passed) process.exit(1);
+// Piped stdout is asynchronous in Node: exiting right after console.log
+// truncates the tail (observed: chat/artifacts PASS lines lost while the
+// run itself succeeded). Drain the pipe before any exit path.
+async function drainStdout() {
+  await new Promise((resolve) => {
+    const settle = () => resolve(undefined);
+    if (process.stdout.writableLength === 0)
+      settle();
+    else
+      process.stdout.once('drain', settle);
+    setTimeout(settle, 2000).unref();
+  });
+}
+
+if (!passed) {
+  await drainStdout();
+  process.exit(1);
+}
 console.log('PASS  MapleStory WebUI flow completed');
+await drainStdout();

@@ -63,10 +63,12 @@ namespace jrc
         // First baked world slot inside the sidebar, matching button:10's
         // origin (-14,-14).
         constexpr Point<int16_t> POSTCH_SIDEBAR_TOP_SLOT{ 14, 14 };
-        // Panel colour sampled between the baked cells of layer:bg.
-        constexpr float POSTCH_PANEL_R = 0.31f;
-        constexpr float POSTCH_PANEL_G = 0.40f;
-        constexpr float POSTCH_PANEL_B = 0.48f;
+        // Panel colour calibrated against the rendered row-gap strip of
+        // layer:bg (raw PPM average renders brighter through the texture
+        // path than an untextured quad, so the fill is scaled down).
+        constexpr float POSTCH_PANEL_R = 0.26f;
+        constexpr float POSTCH_PANEL_G = 0.35f;
+        constexpr float POSTCH_PANEL_B = 0.44f;
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
@@ -210,25 +212,44 @@ namespace jrc
         const int16_t band_l = CHANNEL_WINDOW_CENTER.x() + POSTCH_GRID_POS.x();
         const int16_t band_t = CHANNEL_WINDOW_CENTER.y() + POSTCH_GRID_POS.y();
         const int16_t band_r = band_l + POSTCH_STEP_X * (POSTCH_COLS - 1) + POSTCH_CELL_W;
+        const int16_t band_b = band_t + POSTCH_STEP_Y * (POSTCH_ROWS - 1) + POSTCH_CELL_H;
         const uint8_t rows_used = (channelcount + POSTCH_COLS - 1) / POSTCH_COLS;
 
-        for (uint8_t r = 0; r < POSTCH_ROWS; ++r)
+        if (rows_used >= POSTCH_ROWS)
+            return;
+
+        // Cover in two pieces so no baked cell (nor the light row
+        // separator strip under the last used row) stays visible:
+        // 1. the unused tail of the partially used row, if any;
+        // 2. one continuous rectangle over every row below it.
+        const uint8_t partial_row = rows_used == 0 ? 0 : rows_used - 1;
+        const uint8_t used = channelcount - POSTCH_COLS * partial_row;
+
+        if (used > 0 && used < POSTCH_COLS)
         {
-            uint8_t used = 0;
-            if (r + 1 < rows_used)
-                used = POSTCH_COLS;
-            else if (r + 1 == rows_used)
-                used = channelcount - POSTCH_COLS * r;
-
-            if (used >= POSTCH_COLS)
-                continue;
-
             const int16_t x = band_l + POSTCH_STEP_X * used;
             GraphicsGL::get().drawrectangle(
                 x,
-                band_t + POSTCH_STEP_Y * r,
+                band_t + POSTCH_STEP_Y * partial_row,
                 band_r - x,
                 POSTCH_CELL_H,
+                POSTCH_PANEL_R,
+                POSTCH_PANEL_G,
+                POSTCH_PANEL_B,
+                1.0f
+            );
+        }
+
+        const int16_t below_y = channelcount > 0
+            ? band_t + POSTCH_STEP_Y * partial_row + POSTCH_CELL_H
+            : band_t;
+        if (below_y < band_b)
+        {
+            GraphicsGL::get().drawrectangle(
+                band_l,
+                below_y,
+                band_r - band_l,
+                band_b - below_y,
                 POSTCH_PANEL_R,
                 POSTCH_PANEL_G,
                 POSTCH_PANEL_B,
