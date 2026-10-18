@@ -84,7 +84,7 @@ int main(int argc, char** argv)
     check(nimble["mpCon"].get_integer() == 4, "0001002 lv1 mpCon == 4");
     check(nimble["time"].get_integer() == 4, "0001002 lv1 time == 4");
     check(nimble["speed"].get_integer() == 10, "0001002 lv1 speed == 10");
-    check(nimble["cooltime"].get_integer() == 60, "0001002 lv1 cooltime == 60");
+    check(nimble["cooltime"].get_integer() == 3600, "0001002 lv1 cooltime == 3600 (1h, ops override)");
     nl::node hp_up = skill["100.img"]["skill"]["1000001"]["level"]["1"];
     check(hp_up["x"].get_integer() == 4, "1000001 lv1 x == 4");
     check(hp_up["y"].get_integer() == 3, "1000001 lv1 y == 3");
