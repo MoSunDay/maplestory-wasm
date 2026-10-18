@@ -55,5 +55,11 @@ namespace jrc
         uint8_t channelid;
         uint8_t channelcount;
         bool request_pending;
+        bool postch_window;
+
+        // The post-Chaos window art bakes a full grid of disabled
+        // channel cells into its background; paint over the cells
+        // that have no rendered plate (see UIWorldSelect.cpp).
+        void draw_channel_cover() const;
     };
 }
