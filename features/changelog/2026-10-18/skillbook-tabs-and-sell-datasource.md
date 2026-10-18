@@ -43,5 +43,15 @@
 ## Notes
 
 - 测试数据已清理：wt1210（char 9）gm 还原 0、USE 药品删除。
+- GM 商店目检通道已沉淀为可复用脚本
+  `tools/verify/maplestory-webui/gm-shop-flow.mjs`（含几何断言与用法
+  文档），替代一次性 /tmp 探针；npc-shop e2e 的环境性失败在
+  `tools/verify/maplestory-webui/index.md` 已标注，几何验证走该脚本。
+- 提权字段澄清：`characters` 表的 `gm` 列（非 `accounts` 表）；
+  账号 test1/test1 实测进入账号 test1test1(id 26)，角色卡
+  card0=e2efix1/card1=wt1210/card2=验证员一，选卡前先核对归属。
+- 像素采样陷阱：游戏内光标精灵绘制在点击点右下方（约 +50/+34px），
+  点击后须先把光标移出采样区再 readPixels，否则行区/页签采样被
+  光标污染（本脚本 clickAway 即为此设）。
 - SellItem::draw 内部 +32/+20/+17 图标文本纵向偏移为上游 v83
   布局惯例，内容底部略侵入槽间 8px 间隙，属既有行为，未改动。
