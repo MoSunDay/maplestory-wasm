@@ -459,6 +459,47 @@ namespace jrc
         return position + Point<int16_t>(108, static_cast<int16_t>(134 + 42 * row));
     }
 
+    int32_t UIShop::visible_sell_item(int16_t row) const
+    {
+        const int16_t slot = row + sellstate.offset;
+        if (row < 0 || row >= 5 || slot < 0 || slot >= sellstate.lastslot)
+        {
+            return 0;
+        }
+        return sellstate.items[slot].get_id();
+    }
+
+    Point<int16_t> UIShop::visible_sell_center(int16_t row) const
+    {
+        if (row < 0 || row >= 5)
+        {
+            return { -32768, -32768 };
+        }
+        return position + shop_nodes::sell_item_button_pos(row)
+            + Point<int16_t>(
+                static_cast<int16_t>(shop_nodes::row_width() / 2),
+                static_cast<int16_t>(shop_nodes::row_height() / 2));
+    }
+
+    Point<int16_t> UIShop::button_center(uint16_t id) const
+    {
+        const auto iter = buttons.find(id);
+        if (iter == buttons.end())
+        {
+            return { -32768, -32768 };
+        }
+        const Rectangle<int16_t> rect = iter->second->bounds(position);
+        return {
+            static_cast<int16_t>((rect.l() + rect.r()) / 2),
+            static_cast<int16_t>((rect.t() + rect.b()) / 2)
+        };
+    }
+
+    int16_t UIShop::sell_selection() const
+    {
+        return sellstate.selection;
+    }
+
     void UIShop::add_item(int32_t id,
                           int32_t price,
                           int32_t pitch,

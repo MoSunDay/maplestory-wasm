@@ -303,20 +303,29 @@ try {
         }
       }, 90);
       await requireUiState('login UI active after registration check', uiState.login, 30);
-      await driver.click(340, 260);
+      await driver.clickField(340, 260);
       await driver.typeAscii(account);
-      await driver.click(340, 285);
+      await driver.clickField(340, 285);
       await driver.typeAscii(password);
       await driver.key('Enter', 'Enter', 13);
     }
   } else {
     await driver.click(340, 260);
+    if (!await driver.waitFieldFocused()) throw new Error('username field focus race');
     await driver.typeAscii(account);
     await driver.click(340, 285);
+    if (!await driver.waitFieldFocused()) throw new Error('password field focus race');
     await driver.typeAscii(password);
     await driver.key('Enter', 'Enter', 13);
   }
-  await requireUiState('world-select UI active', uiState.worldSelect, 45);
+  // The web build also routes canvas clicks through world_select_input.js
+  // (DOM-level GO-button bridge), so the client can advance past world
+  // select before this 1 Hz poll observes state 2. Accept either state;
+  // the later 'go' retryClick self-skips when char select is already up.
+  await requireState('world-select UI active', async () => {
+    const state = await currentUiState();
+    return state === uiState.worldSelect || state === uiState.charSelect;
+  }, 45);
   await requireAssetIdle('world-select assets ready');
   await driver.screenshot('02-world-select');
 
@@ -388,11 +397,20 @@ try {
     await driver.domClick(255, 260);
   } else if (worldSelectAction === 'go') {
     // The normal-state bitmap occupies x=445..576 and y=201..232.
-    await driver.click(510, 216);
+    await driver.retryClick(510, 216, async () => await currentUiState() === uiState.charSelect);
   } else {
     throw new Error(`Unsupported E2E_WORLD_SELECT_ACTION: ${worldSelectAction}`);
   }
   await requireUiState('character-select UI active', uiState.charSelect, 45);
+  // Preview streaming is not part of the blocking overlay; wait for the
+  // lazy charlook wave explicitly so the transition readback below cannot
+  // cut the window while previews are still loading (larger rosters stream
+  // more cold Character.nx chunks than the overlay tracks).
+  await requireState('character previews settled', async () => {
+    const ready = await driver.evaluate("Module.ccall('mscharlist_preview_ready', 'number', [], [])");
+    const total = await driver.evaluate("Module.ccall('mscharlist_preview_total', 'number', [], [])");
+    return total > 0 && ready === total;
+  }, 90);
   await requireAssetIdle('character-select assets ready');
   if (charSelectLatencyMs > 0) await driver.setNetworkLatency(0);
   const charSelectTransition = await driver.evaluate(`(() => {
@@ -458,7 +476,9 @@ try {
   if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');
 
   if (createCharacter) {
-    await driver.click(250, 515);
+    if (!await driver.retryClick(250, 515, async () => await currentUiState() === uiState.charCreation)) {
+      throw new Error('character-creation UI did not activate');
+    }
     await requireUiState('character-creation UI active', uiState.charCreation);
     // Character creation references a wider cold set of UI and avatar
     // bitmaps than selection; allow the frame-budgeted queue to request them.
@@ -500,6 +520,12 @@ try {
       await driver.click(520, 310);
     }
 
+    // The name submit schedules a second cold-asset wave (customization
+    // previews); CDP clicks keep getting dropped while those chunks stream.
+    if (!await driver.retryClick(520, 310, async () =>
+      await characterCreationCustomizing() === 1, 8, 4000)) {
+      throw new Error('accepted name never entered customization');
+    }
     await requireState('accepted name enters customization', async () =>
       await characterCreationCustomizing() === 1, 15);
     await requireAssetIdle('character-customization assets ready');
@@ -507,7 +533,7 @@ try {
 
     if (retryCharacterName) {
       if (stopAfterCharacterCreate) {
-        await driver.click(525, 465);
+        await driver.retryClick(525, 465, async () => await currentUiState() === uiState.charSelect);
         await requireUiState('created character returned to selection', uiState.charSelect, 45);
       } else {
         // Verify availability without creating persistent test data.
@@ -522,7 +548,7 @@ try {
       }
       await driver.screenshot('07-character-select-after');
     } else {
-      await driver.click(525, 465);
+      await driver.retryClick(525, 465, async () => await currentUiState() === uiState.charSelect);
       await requireUiState('character creation returned to selection', uiState.charSelect, 45);
     }
   }
@@ -571,8 +597,16 @@ try {
     // Double-click the first character card (card 0 center) to enter the game.
     // Works for both pre- and post-Chaos layouts since card positions are
     // derived from the AreaButton grid, and double-click is layout-agnostic.
-    await driver.click(130, 210);
-    await driver.click(130, 210);
+    // Retry the synthetic double-click: the browser can drop the second
+    // press, and re-issuing it on an already-selected card is harmless.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      if ((await driver.evaluate("Module.ccall('msui_state','number',[],[])")) !== uiState.charSelect) break;
+      await driver.doubleClick(130, 210);
+      for (let i = 0; i < 4; i += 1) {
+        if ((await driver.evaluate("Module.ccall('msui_state','number',[],[])")) !== uiState.charSelect) break;
+        await sleep(1000);
+      }
+    }
     const selectionLock = await driver.evaluate(`({
       state: Module.ccall('msui_state', 'number', [], []),
       uiEnabled: Module.ccall('msui_enabled', 'number', [], [])
@@ -583,10 +617,13 @@ try {
     console.log(`PASS  character selection keeps input locked ${JSON.stringify(selectionLock)}`);
     await requireUiState('in-game UI active', uiState.game, 60);
     await requireState('map field initialized', async () => await mapId() > 0, 60);
+    // Ariant (npc-shop flow) streams a much larger cold-asset set; give the
+    // map gates more headroom there.
+    const mapGateSeconds = verifyNpcShop ? 300 : 60;
     await requireState('map asset safety gate released', async () =>
-      await mapAssetLoading() === 0, 60);
+      await mapAssetLoading() === 0, mapGateSeconds);
     await requireState('all blocking assets released', async () =>
-      await assetBlocking() === 0, 60);
+      await assetBlocking() === 0, mapGateSeconds);
     await requireAssetIdle('in-game foreground assets ready');
     if (requireMobs) {
       const initialMapId = await mapId();

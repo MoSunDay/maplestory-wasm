@@ -173,6 +173,9 @@ export class BrowserDriver {
 
   async doubleClick(gameX, gameY) {
     await this.click(gameX, gameY);
+    // A short beat between presses: zero-gap dispatches can be coalesced on
+    // the browser side so the game never sees the second GLFW_PRESS.
+    await sleep(80);
     await this.click(gameX, gameY);
   }
 
@@ -256,6 +259,48 @@ export class BrowserDriver {
       type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKeyCode,
       nativeVirtualKeyCode: virtualKeyCode
     });
+  }
+
+  // After clicking a game text field, typed keys race the game-side focus
+  // transition (keys that arrive early are dropped and, on the login screen,
+  // can even trigger the server's AUTOMATIC_REGISTER with a partial name).
+  // Poll the exported focus probe first. Works for both plain fields (IME
+  // path) and crypted fields (plain GLFW keyboard path).
+  async waitFieldFocused(timeoutMs = 4000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (await this.evaluate(
+        "Module.ccall('msime_field_focused','number',[],[])") === 1) return true;
+      await sleep(40);
+    }
+    return false;
+  }
+
+  // Click a game text field and wait for the game-side focus probe. Retries
+  // the click because an overloaded tab can drop the first mouse dispatch
+  // before the game processes it.
+  async clickField(gameX, gameY) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await this.click(gameX, gameY);
+      if (await this.waitFieldFocused(2500)) return;
+    }
+    throw new Error(`text field at (${gameX},${gameY}) never gained focus`);
+  }
+
+  // CDP input dispatches are occasionally dropped while the tab is busy
+  // streaming assets; state-changing clicks therefore retry until the
+  // caller-supplied predicate observes the effect.
+  async retryClick(gameX, gameY, predicate, tries = 5, settleMs = 3000) {
+    for (let attempt = 0; attempt < tries; attempt += 1) {
+      if (await predicate()) return true;
+      await this.click(gameX, gameY);
+      const deadline = Date.now() + settleMs;
+      while (Date.now() < deadline) {
+        if (await predicate()) return true;
+        await sleep(250);
+      }
+    }
+    return await predicate();
   }
 
   async typeAscii(value) {

@@ -403,6 +403,47 @@ extern "C"
         return shop ? shop->visible_buy_center(row).y() : MISSING_COORDINATE;
     }
 
+    int msshop_sell_item(int16_t row)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop ? shop->visible_sell_item(row) : 0;
+    }
+
+    int msshop_sell_x(int16_t row)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop ? shop->visible_sell_center(row).x() : MISSING_COORDINATE;
+    }
+
+    int msshop_sell_y(int16_t row)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop ? shop->visible_sell_center(row).y() : MISSING_COORDINATE;
+    }
+
+    int msshop_selected()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop ? shop->sell_selection() : MISSING_COORDINATE;
+    }
+
+    // id follows UIShop::Buttons: 0=BUY_ITEM, 1=SELL_ITEM, 2=EXIT, 23=SELL_ALL.
+    int msshop_button_x(int16_t id)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop
+            ? shop->button_center(static_cast<uint16_t>(id)).x()
+            : MISSING_COORDINATE;
+    }
+
+    int msshop_button_y(int16_t id)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UIShop>();
+        return shop
+            ? shop->button_center(static_cast<uint16_t>(id)).y()
+            : MISSING_COORDINATE;
+    }
+
     int msinventory_quantity(int32_t item_id)
     {
         return item_quantity(item_id);

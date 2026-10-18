@@ -99,10 +99,14 @@ namespace jrc
             return;
         }
 
-        const World& world = worlds.front();
         // This screen currently renders one world entry. Bind it to the
         // server-provided id instead of a stale saved setting, which may refer
-        // to a world that is no longer available.
+        // to a world that is no longer available. Use the LAST announced
+        // world: a serverlist burst may arrive as one coalesced delivery
+        // (all worlds here) or as one packet per world (each packet
+        // re-emplacing this screen, the final one surviving). Both
+        // delivery orders then resolve to the same world id.
+        const World& world = worlds.back();
         worldid = static_cast<uint8_t>(world.wid);
         channelcount = world_select::selectable_channel_count(world.channelcount);
 

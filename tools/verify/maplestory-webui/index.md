@@ -23,7 +23,9 @@ E2E_URL=http://127.0.0.1:8001/web/index.html node tools/verify/maplestory-webui/
 
 设置 `E2E_CASH_SHOP=1` 会在进入地图后打开老版商城，搜索 linked server 固定商品 SN `80000002`，完成真实购买、商城仓库取出、角色现金栏存回和退出商城，并通过 WASM 只读探针逐步核对 NX Credit、仓库和角色现金栏数量。该流程会产生真实测试账号数据；运行前应确保账号离线且至少有 1 NX Credit。
 
-设置 `E2E_NPC_SHOP=1` 会进入勇士部落装备店，验证售卖数量超过堆叠上限时立即回填上限、当前 Tab 一键售卖的二次确认，以及现金 Tab 保留但不展示可售物品。流程只取消确认，不会实际售出角色物品；角色已在店内时同时设置 `E2E_NPC_SHOP_INSIDE=1`。已知问题：`E2E_NPC_SHOP=1` 环境敏感：走位后商店可能不弹出（NPC 对话框正常）；商店几何/页签/售物行验证请用 gm-shop-flow.mjs（需 characters.gm≥2）。
+设置 `E2E_NPC_SHOP=1` 会走 Ariant(260000000) 武器店 NPC 2100002 的真实开店链路：右行至 NPC、双击开店、切换 USE 页签、选中卖出行、卖出 1 件（UIEnterNumber 默认数量回车确认）、一键售卖当前分类全部非现金物品（UIYesNo 回车确认，服务端 NPC_SHOP_ACTION mode=4）并验证库存清零与行消失，最后 Escape 关店。所有状态变迁点击使用带真实状态谓词的 `retryClick`，坐标来自 `msshop_*` 只读探针直读窗口几何；Ariant 冷素材较大，该模式下地图素材门放宽到 300 秒。前置 SQL（把 card0 角色迁到 Ariant 并放入 37 个 2000000 药水，注意 `inventoryitems.type` 为 NOT NULL 列）见 `npc-shop-flow.mjs` 头部注释。纯几何目检（不动角色）可用 gm-shop-flow.mjs（需 characters.gm≥2）。
+
+CDP 输入在资产流高负载下会整击丢失，因此关键交互使用 `cdp.mjs` 的加固原语：文本框用 `clickField`（点击后轮询 `msime_field_focused` 聚焦探针并重试），状态变迁点击用 `retryClick`（以游戏内真实状态为谓词循环重发），双击固定 80ms 间隔（低于客户端 0.35s 双击窗口）。世界选择门接受 worldSelect/charSelect 双态，兼容 web 构建下 DOM GO 按钮桥接导致的快速跃迁。
 
 设置 `E2E_CAPTURE_ATTACK_EFFECTS=1` 会在进入地图后使用普通攻击，通过 CDP screencast 连续保存真实合成帧，并断言攻击期间没有素材遮罩或全局资源阻塞；默认采集 20 次，可用 `E2E_ATTACK_SAMPLES` 调整。只读 WASM 探针会逐帧记录刺击/挥砍姿态、身体帧以及非零透明残影是否实际提交渲染，并要求两类攻击均覆盖。它可以与 `E2E_STOP_AT_GAME=1` 组合，用于冷缓存和热缓存的武器残影验收；合成帧仍需抽样确认剑光形状与人物图层观感。
 
