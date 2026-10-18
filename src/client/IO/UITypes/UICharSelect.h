@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../UIElement.h"
+#include "UICharSelectLayout.h"
 
 #include "../Components/Charset.h"
 #include "../Components/Nametag.h"
@@ -80,8 +81,6 @@ namespace jrc
         void update_selection();
         void update_counts();
         std::string get_label_string(size_t label) const;
-        Point<int16_t> get_label_pos(size_t label) const;
-        Point<int16_t> get_char_pos(size_t id) const;
 
         enum Buttons
         {
@@ -95,7 +94,7 @@ namespace jrc
             BT_CHAR0
         };
 
-        static constexpr uint8_t PAGESIZE = 8;
+        static constexpr uint8_t PAGESIZE = charselect_layout::PAGESIZE;
 
         Sprite emptyslot;
         Sprite charplatform;

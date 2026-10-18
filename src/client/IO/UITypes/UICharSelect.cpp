@@ -43,7 +43,6 @@ namespace jrc
     namespace
     {
         constexpr const char* AUTO_PIC = "1010";
-        constexpr Point<int16_t> CHARACTER_DATA_OFFSET{ -3, -6 };
     }
 
     UICharSelect::UICharSelect(std::vector<CharEntry> cs,
@@ -86,7 +85,7 @@ namespace jrc
         // than Title/worldsel.
         if (back["11"])
         {
-            sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
+            sprites.emplace_back(back["11"], Point<int16_t>(360, 313));
         }
         else if (back["0"])
         {
@@ -165,8 +164,8 @@ namespace jrc
 
         if (charselect_nodes::pages_are_state_buttons())
         {
-            buttons[BT_PAGELEFT]   = std::make_unique<MapleButton>(charselect["pageL"],    Point<int16_t>(100, 490));
-            buttons[BT_PAGERIGHT]  = std::make_unique<MapleButton>(charselect["pageR"],    Point<int16_t>(490, 490));
+            buttons[BT_PAGELEFT]   = std::make_unique<MapleButton>(charselect["pageL"],    charselect_layout::PAGE_ARROW_LEFT_POS);
+            buttons[BT_PAGERIGHT]  = std::make_unique<MapleButton>(charselect["pageR"],    charselect_layout::PAGE_ARROW_RIGHT_POS);
         }
         else
         {
@@ -186,8 +185,8 @@ namespace jrc
         for (uint8_t i = 0; i < PAGESIZE; ++i)
         {
             buttons[BT_CHAR0 + i] = std::make_unique<AreaButton>(
-                Point<int16_t>(105 + (120 * (i % 4)), 170 + (200 * (i > 3))),
-                Point<int16_t>(50, 80)
+                charselect_layout::slot_hotzone_pos(i),
+                charselect_layout::slot_hotzone_dim()
             );
         }
 
@@ -222,17 +221,26 @@ namespace jrc
 
         for (uint8_t i = 0; i < charcount_relative; ++i)
         {
-            Point<int16_t> charpos = get_char_pos(i);
-            uint8_t index = i + page * PAGESIZE;
-            charplatform.draw(charpos, alpha);
+            const Point<int16_t> charpos = charselect_layout::char_slot_pos(i);
+            const uint8_t index = i + page * PAGESIZE;
+            // The post-Chaos disc origin sinks the feet; the pre-Chaos
+            // platform already sits correctly at the feet anchor.
+            const Point<int16_t> platformpos = post_chaos_assets
+                ? charpos + charselect_layout::PLATFORM_OFFSET
+                : charpos;
+            charplatform.draw(platformpos, alpha);
             draw_preview(index, charpos, alpha);
-            nametags[index].draw(charpos);
+            nametags[index].draw(
+                post_chaos_assets
+                    ? charpos + charselect_layout::NAMETAG_OFFSET
+                    : charpos
+            );
         }
 
         if (selected_absolute < charcount_absolute)
         {
             const StatsEntry& stats = characters[selected_absolute].stats;
-            const Point<int16_t> data_origin = charinfopos + CHARACTER_DATA_OFFSET;
+            const Point<int16_t> data_origin = charinfopos + charselect_layout::CHARACTER_DATA_OFFSET;
 
             std::string levelstr = std::to_string(stats.stats[Maplestat::LEVEL]);
             if (charselect_nodes::has_level_charset())
@@ -257,16 +265,17 @@ namespace jrc
 
             for (size_t i = 0; i < NUM_LABELS; ++i)
             {
-                Point<int16_t> labelpos = data_origin + get_label_pos(i);
+                Point<int16_t> labelpos = data_origin + charselect_layout::label_pos(i, post_chaos_assets);
                 infolabels[i].draw(labelpos);
             }
         }
 
         for (uint8_t i = charcount_relative; i < slots_relative; ++i)
         {
-            Point<int16_t> position_slot(130 + (120 * (i % 4)), 250 + (200 * (i > 3)));
+            const Point<int16_t> position_slot = charselect_layout::char_slot_pos(i);
             if (post_chaos_assets)
             {
+                charplatform.draw(position_slot + charselect_layout::PLATFORM_OFFSET, alpha);
                 emptyslot.draw(position_slot, alpha);
             }
             else
@@ -446,7 +455,7 @@ namespace jrc
 
         if (charlooks[selected_absolute])
         {
-            charlooks[selected_absolute]->set_stance(Stance::WALK1);
+            charlooks[selected_absolute]->set_stance(Stance::STAND1);
         }
         nametags[selected_absolute].set_selected(true);
 
@@ -510,7 +519,9 @@ namespace jrc
             slots_relative = PAGESIZE;
         }
 
-        if (charcount_relative < slots_relative)
+        // Enablement is account-wide, not per page: a full single
+        // page must still allow creating characters in free slots.
+        if (charcount_absolute < slots_absolute)
         {
             buttons[BT_CREATECHAR]->set_state(Button::NORMAL);
         }
@@ -766,53 +777,5 @@ namespace jrc
         default:
             return "";
         }
-    }
-
-    Point<int16_t> UICharSelect::get_label_pos(size_t label) const
-    {
-        if (!charselect_nodes::post_chaos())
-        {
-            // Pre-Chaos charInfo1 board layout: the job goes on its own
-            // right aligned line below the name and the stats fill a 2x2
-            // table in the lower half of the board.
-            switch (label)
-            {
-            case JOB:
-                return { 113, 31 };
-            case STR:
-                return { 38, 56 };
-            case INT:
-                return { 113, 56 };
-            case DEX:
-                return { 38, 81 };
-            case LUK:
-                return { 113, 81 };
-            default:
-                return {};
-            }
-        }
-
-        switch (label)
-        {
-        case JOB:
-            return { 63, -39 };
-        case STR:
-            return { -8, -12 };
-        case INT:
-            return { 63, -12 };
-        case DEX:
-            return { -8, 13 };
-        case LUK:
-            return { 63, 13 };
-        default:
-            return {};
-        }
-    }
-
-    Point<int16_t> UICharSelect::get_char_pos(size_t i) const
-    {
-        int16_t x = 130 + (120 * (i % 4));
-        int16_t y = 250 + (200 * (i > 3));
-        return { x, y };
     }
 }

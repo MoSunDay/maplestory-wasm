@@ -34,7 +34,7 @@ namespace jrc
                 );
                 if (index == selected_absolute)
                 {
-                    charlooks[index]->set_stance(Stance::WALK1);
+                    charlooks[index]->set_stance(Stance::STAND1);
                 }
             });
 
