@@ -40,5 +40,5 @@
 
 ## 运维注记
 
-- e2e 进图 `std::length_error "vector"` 崩溃根因:`assets-server` 启动时 `fs::metadata` 缓存 NX 文件长度,而 `scripts/nx-l10n` 就地 append 改写了 `String.nx`(header string offset 已指向新偏移),客户端经 WebSocket 拉到「新 header + 旧长度」截断流导致字符串表越界。重启 `ms-assets-server` 重新扫描即修复,代码无需改动。
+- e2e 进图 `std::length_error "vector"` 崩溃根因:`assets-server` 启动时 `fs::metadata` 缓存 NX 文件长度,而 `scripts/nx-l10n` 就地 append 改写了 `String.nx`(header string offset 已指向新偏移),客户端经 WebSocket 拉到「新 header + 旧长度」截断流导致字符串表越界。临时处置是重启 `ms-assets-server` 重新扫描;永久修复见同日 `assets-server-stale-nx-reload.md`(按需重载过期条目)。
 - e2e 首次余额为 0 属测试账号数据问题,已为 `test1` 充值 NX(数据库 `accounts.nxCredit`)。
