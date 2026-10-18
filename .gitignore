@@ -6,3 +6,8 @@ __pycache__
 link_repos
 /target/
 *.nx
+
+# v83 WZ conversion sources (2GB, regenerable from upstream client)
+wz/
+# NoLifeWzToNx conversion log
+NoLifeWzToNx.log
