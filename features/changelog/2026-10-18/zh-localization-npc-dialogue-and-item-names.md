@@ -6,9 +6,9 @@
 
 ## Change Summary
 
-- 新增 `scripts/nx-l10n/`：NX 字符串表原地重写工具（`apply.py`）与三份翻译数据模块。工具在文件尾部追加新字符串数据与偏移数组，并 patch header 的 `string_offset`，节点表与字符串索引不动。
-- 对 `nxFiles/String.nx` 与 `assets/String.nx` 应用 519 条翻译：Cash/Consume/Eqp/Etc/Ins/Map/Mob/Npc/Pet 各表的 `name`/`mapName`/`streetName` 条目（含 `MISSING NAME` 之外的卷轴、结婚道具、Masteria 装备、活动地图与韩服残留 NPC 名）。
-- linked server `scripts/npc/`（633 个含对话文件，3888 处 `cm.send*`）与 `scripts/quest/`（249 个含对话文件）的对话文本全部译为简体中文；格式宏（`#b/#k/#L#l/#m/#p/#t` 等）、`\r\n`、拼接结构、逻辑与注释逐字节保留。
+- 新增 `scripts/nx-l10n/`：NX 字符串表重写工具（`apply.py`）与三份翻译数据模块。工具按 header + 节点表（原样搬移）+ 新字符串 blob + 新偏移数组紧凑重写文件并 patch header 偏移；节点名/值索引不动，重跑字节级幂等。String.nx 仅含 none/int/string/vector 节点（无 bitmap/audio 绝对偏移），搬移安全。
+- 对 `nxFiles/String.nx` 与 `assets/String.nx` 应用 523 条翻译：Cash/Consume/Eqp/Etc/Ins/Map/Mob/Npc/Pet 各表的 `name`/`mapName`/`streetName` 条目（含 `MISSING NAME` 之外的卷轴、结婚道具、Masteria 装备、活动地图与韩服残留 NPC 名）。
+- linked server `scripts/npc/`（642 个含对话文件，3888 处 `cm.send*`）与 `scripts/quest/`（249 个含对话文件）的对话文本全部译为简体中文；格式宏（`#b/#k/#L#l/#m/#p/#t` 等）、`\r\n`、拼接结构、逻辑与注释逐字节保留。
 - 跨文件口令校验同步：`npc/211101{7,8,9}.js` 的 `"my love Phyllia"` 与 `npc/2091009.js` 的 `"Actions speak louder than words"` 改为与 quest 题面一致的中文口令，避免任务卡死。
 - 客户端 `src/client/Net/Handlers/NpcInteractionHandlers.cpp`：仓库/商店错误提示 11 条译为中文。
 
@@ -20,10 +20,11 @@
 
 ## Validation
 
-- `python3 scripts/nx-l10n/apply.py <nx> --dry-run`：纯英文残留仅 `BOSS`（内部测试怪，有意保留）。
+- `python3 scripts/nx-l10n/apply.py <nx> --dry-run`：纯英文 `name` 残留仅白名单 8 项（`BOSS` 内部测试怪、`d`/`e`/`f`/`E1-A`/`E3-A`/`J.J.`/`test` 单字母或内部代号，有意保留）。Review 阶段补译 4 条：`Scroll for Wand/Staff for Magic Att. 50%`（生成键此前误用 `ATT` 未命中）、`FAQ NPC`、`GMEvent_Pink Bean2`。
+- 结构复验：137557/137557 节点全部可达、81197 条字符串 UTF-8 可解码、两份文件 md5 一致、工具重跑输出字节级一致；重写后文件 5.88MB（原 append 方式为 9.06MB）。
 - 重写后的 `String.nx`：81197 条字符串全部 UTF-8 可解码，抽查 `2040045=头盔防御卷轴50%`、`4031367=爱的证明`、`9201142=女巫马拉迪`、`680000110=白色婚礼圣坛/阿莫利亚`。
 - 972 个 JS 全量 `node --check`：仅 `npc/9900000.js` 失败，为原有 Rhino E4X `for each(` 语法（服务器 Nashorn 支持，Node 不支持），与翻译无关。
-- 英文残留扫描：`send*` 调用中仅注释内英文与宠物指令关键字（`sit`/`bad` 等，需与指令数据一致）。
+- 英文残留扫描：`send*` 调用中仅注释内英文与宠物指令关键字（`sit`/`bad` 等，需与指令数据一致）；术语统一复验无 `莱恩/里恩/艾雷弗/枫币` 等异译（婚礼 NPC 3 处 `枫币` 已改 `金币`）。
 
 ## Notes / Compatibility
 
