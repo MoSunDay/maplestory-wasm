@@ -94,14 +94,6 @@ namespace jrc
             };
         }
 
-        // The sell rows are drawn by SellState with a hardcoded
-        // (243, 116 + 42 * slot) origin; shifting the parent position by
-        // this delta realigns them with the v83 grid.
-        inline Point<int16_t> sell_parent_shift()
-        {
-            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 0, 8 };
-        }
-
         inline Point<int16_t> buy_item_button_pos(int16_t visible_slot)
         {
             return {

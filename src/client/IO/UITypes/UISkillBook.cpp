@@ -203,10 +203,20 @@ namespace jrc
         nl::node tabe = main["Tab"]["enabled"];
         nl::node tabd = main["Tab"]["disabled"];
 
+        constexpr int16_t TAB_Y = 27;
+        constexpr int16_t TAB_GAP = 4;
+        int16_t tab_x = 10;
         for (uint16_t i = BT_TAB0; i <= BT_TAB4; ++i)
         {
             uint16_t tabid = i - BT_TAB0;
-            buttons[i] = std::make_unique<TwoSpriteButton>(tabd[tabid], tabe[tabid]);
+            // Book tabs form a horizontal row in the blank band between
+            // the title separator (y22) and the content divider (y42).
+            buttons[i] = std::make_unique<TwoSpriteButton>(
+                tabd[tabid], tabe[tabid], Point<int16_t>(tab_x, TAB_Y)
+            );
+            tab_x = static_cast<int16_t>(
+                tab_x + Texture(tabe[tabid]).get_dimensions().x() + TAB_GAP
+            );
         }
         for (uint16_t i = BT_SPUP0; i <= BT_SPUP3; ++i)
         {

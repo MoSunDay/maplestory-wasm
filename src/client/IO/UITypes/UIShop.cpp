@@ -146,7 +146,7 @@ namespace jrc
 
         mesolabel.draw(position + shop_nodes::meso_label_pos());
         buystate.draw(position, selection);
-        sellstate.draw(position + shop_nodes::sell_parent_shift(), selection);
+        sellstate.draw(position, selection);
 
         buyslider.draw(position);
         sellslider.draw(position);
