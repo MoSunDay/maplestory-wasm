@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
+import { assertCharSelectModernLayout, assertWorldSelectNovaTopSlot } from './layout-pixels.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
 import { verifyUserInfoFlow } from './user-info-flow.mjs';
@@ -388,6 +389,8 @@ try {
     throw new Error(`Invalid E2E_CHAR_SELECT_LATENCY_MS: ${charSelectLatencyMs}`);
   }
   if (charSelectLatencyMs > 0) await driver.setNetworkLatency(charSelectLatencyMs);
+  // Pixel-level lock: Nova stays in the world-select sidebar top slot.
+  await assertWorldSelectNovaTopSlot(driver);
   if (worldSelectAction === 'channel') {
     await driver.doubleClick(255, 260);
   } else if (worldSelectAction === 'dom-go') {
@@ -472,6 +475,8 @@ try {
     finalPhase: charSelectTransition.states.at(-1).phase,
     previews: `${charSelectTransition.states.at(-1).previewReady}/${charSelectTransition.states.at(-1).previewTotal}`
   })}`);
+  // Pixel-level lock: char-select keeps the single-row modern layout.
+  await assertCharSelectModernLayout(driver);
   await driver.screenshot('04-character-select-before');
   if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');
 
