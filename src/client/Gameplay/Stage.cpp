@@ -372,7 +372,8 @@ namespace jrc
             return;
 
         ++pet_loot_target_frames;
-        bool pet_in_range = pet->get_position().distance(pet_loot_target_position) <= 50;
+        bool pet_in_range = pet_follow::distance_between(
+            pet->get_position(), pet_loot_target_position) <= 50;
         if (pet_loot::should_attempt(pet_loot_target_frames,
             pet_loot_attempts, pet_in_range))
         {
@@ -436,9 +437,29 @@ namespace jrc
         return chars.find_target(position, view_position);
     }
 
+    std::optional<PlayerTarget> Stage::find_character_info_target(
+        Point<int16_t> position) const
+    {
+        if (state != ACTIVE)
+            return std::nullopt;
+        const Point<int16_t> view_position = camera.position();
+        if (npcs.contains_cursor(position, view_position))
+            return std::nullopt;
+        const PlayerTarget self_target = {
+            player.get_oid(), player.get_name(), player.get_level(),
+            player.get_position()
+        };
+        return chars.find_target_with(position, view_position, self_target);
+    }
+
     bool Stage::is_player(int32_t cid) const
     {
         return cid == player.get_oid();
+    }
+
+    Point<int16_t> Stage::get_view_position() const
+    {
+        return camera.position();
     }
 
     MapNpcs& Stage::get_npcs()

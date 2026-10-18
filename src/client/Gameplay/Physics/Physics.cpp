@@ -35,25 +35,29 @@ namespace jrc
 
     Physics::Physics() = default;
 
-    void Physics::move_object(PhysicsObject& phobj) const
+    Physics::MoveResult Physics::move_object(PhysicsObject& phobj) const
     {
+        MoveResult result;
+        result.start_x = phobj.crnt_x();
+
         // Determine which platform the object is currently on.
         fht.update_fh(phobj);
+        result.grounded = phobj.onground;
 
         // Use the appropriate physics for the terrain the object is on.
         switch (phobj.type)
         {
         case PhysicsObject::NORMAL:
             move_normal(phobj);
-            fht.limit_movement(phobj);
+            result.horizontal_collision = fht.limit_movement(phobj);
             break;
         case PhysicsObject::FLYING:
             move_flying(phobj);
-            fht.limit_movement(phobj);
+            result.horizontal_collision = fht.limit_movement(phobj);
             break;
         case PhysicsObject::SWIMMING:
             move_swimming(phobj);
-            fht.limit_movement(phobj);
+            result.horizontal_collision = fht.limit_movement(phobj);
             break;
         case PhysicsObject::FIXATED:
             break;
@@ -64,6 +68,8 @@ namespace jrc
 
         // Move the object forward.
         phobj.move();
+        result.end_x = phobj.crnt_x();
+        return result;
     }
 
     void Physics::move_normal(PhysicsObject& phobj) const

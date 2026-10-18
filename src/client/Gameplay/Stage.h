@@ -88,6 +88,9 @@ namespace jrc
         Cursor::State send_cursor(bool pressed, Point<int16_t> position);
         // Return the visible remote player under a screen-space cursor.
         std::optional<PlayerTarget> find_player_target(Point<int16_t> position) const;
+        // Return either the local or a remote character under the cursor.
+        std::optional<PlayerTarget> find_character_info_target(
+            Point<int16_t> position) const;
 
         // Check if the specified id is the player's id.
         bool is_player(int32_t cid) const;
@@ -107,6 +110,7 @@ namespace jrc
         Player& get_player();
         // Returns the id of the current map.
         int32_t get_mapid() const;
+        Point<int16_t> get_view_position() const;
         bool is_loading() const;
         void retry_loading();
         // Return a reference to the attack and buff component.

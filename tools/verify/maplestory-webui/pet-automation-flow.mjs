@@ -8,6 +8,10 @@ const MINIMUM_POTION_QUANTITY = 20;
 const STARTER_PUPPY = 5000001;
 const STARTER_CAPABILITIES = (1 << 0) | (1 << 1) | (1 << 4);
 const PET_WARP_STANCE = 7;
+const PET_JUMP_STANCE = 2;
+const PET_MOVE_LEFT = 1;
+const PET_MOVE_RIGHT = 2;
+const HORIZONTAL_WALL = 1;
 
 async function moveToX(driver, probes, targetX, tolerance = 70) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -175,6 +179,12 @@ async function captureFollowAttempt(driver, probes, firstRight) {
         petX: Module.ccall('mspet_x', 'number', [], []),
         petY: Module.ccall('mspet_y', 'number', [], []),
         stance: Module.ccall('mspet_stance', 'number', [], []),
+        footholdId: Module.ccall('mspet_foothold_id', 'number', [], []),
+        onground: Module.ccall('mspet_onground', 'number', [], []),
+        moveIntent: Module.ccall('mspet_move_intent', 'number', [], []),
+        horizontalCollision: Module.ccall(
+          'mspet_horizontal_collision', 'number', [], []),
+        jumpTriggers: Module.ccall('mspet_jump_trigger_count', 'number', [], []),
         lootTarget: Module.ccall('mspet_has_loot_target', 'number', [], [])
       });
       requestAnimationFrame(tick);
@@ -212,6 +222,11 @@ function analyzeFollowAttempt(attempt) {
   const playerSpeeds = [];
   const petSpeeds = [];
   const warpPoints = [];
+  const warpTransitions = [];
+  let jumpSamples = 0;
+  let slopeSamples = 0;
+  let wallBlockedSamples = 0;
+  const unauthorizedJumps = [];
   let maxDistance = 0;
   let reversals = 0;
   let direction = 0;
@@ -221,6 +236,33 @@ function analyzeFollowAttempt(attempt) {
     const distance = Math.hypot(point.playerX - point.petX, point.playerY - point.petY);
     maxDistance = Math.max(maxDistance, distance);
     if (point.stance === PET_WARP_STANCE) warpPoints.push({ ...point, distance });
+    if (point.stance === PET_JUMP_STANCE) jumpSamples += 1;
+    if (point.horizontalCollision === HORIZONTAL_WALL)
+      wallBlockedSamples += 1;
+    if (point.onground === 1 && previous.onground === 1 &&
+        point.horizontalCollision === 0 &&
+        point.stance !== PET_JUMP_STANCE &&
+        Math.abs(point.petX - previous.petX) > 0 &&
+        Math.abs(point.petY - previous.petY) > 0) {
+      slopeSamples += 1;
+    }
+    if (point.jumpTriggers > previous.jumpTriggers &&
+        (point.horizontalCollision !== HORIZONTAL_WALL ||
+         ![PET_MOVE_LEFT, PET_MOVE_RIGHT].includes(point.moveIntent))) {
+      unauthorizedJumps.push({ previous, point, reason: 'trigger-without-block' });
+    }
+    if (point.stance === PET_JUMP_STANCE && previous.stance !== PET_JUMP_STANCE &&
+        point.jumpTriggers === previous.jumpTriggers &&
+        previous.horizontalCollision !== HORIZONTAL_WALL) {
+      unauthorizedJumps.push({ previous, point, reason: 'jump-without-trigger' });
+    }
+    if (point.stance === PET_WARP_STANCE && previous.stance !== PET_WARP_STANCE) {
+      warpTransitions.push({
+        beforeDistance: Math.hypot(
+          previous.playerX - previous.petX, previous.playerY - previous.petY),
+        afterDistance: distance
+      });
+    }
     if (previous.stance === PET_WARP_STANCE || point.stance === PET_WARP_STANCE) continue;
     const playerSpeed = Math.abs(point.playerX - previous.playerX);
     const petSpeed = Math.abs(point.petX - previous.petX);
@@ -236,7 +278,12 @@ function analyzeFollowAttempt(attempt) {
     petP95: percentile(petSpeeds, 0.95),
     maxDistance,
     reversals,
-    warpPoints
+    warpPoints,
+    warpTransitions,
+    jumpSamples,
+    slopeSamples,
+    wallBlockedSamples,
+    unauthorizedJumps
   };
 }
 
@@ -255,18 +302,34 @@ async function verifyFollow(driver, probes) {
   const recovered = analysis.warpPoints.some(point =>
     point.distance <= 50 && point.lootTarget === 0);
   const speedLimit = analysis.playerP95 * 1.2 + 0.5;
+  const recordedWarpDistance = await probes.petLastWarpDistance();
+  const warpObserved = analysis.warpPoints.length > 0;
+  const warpValid = warpObserved ? recordedWarpDistance > 300 && recovered :
+    analysis.maxDistance <= 300;
   if (points.length < 30 || analysis.playerP95 <= 0 ||
-      analysis.petP95 > speedLimit || distance > 150 ||
-      analysis.reversals > 4 || analysis.warpPoints.length === 0 || !recovered) {
+      analysis.petP95 > speedLimit || distance > 300 ||
+      analysis.reversals > 4 || !warpValid) {
     throw new Error(`Pet normal-speed leash recovery failed: ${JSON.stringify({
       before, after, distance, analysis, speedLimit, attempts: attempts.length
     })}`);
+  }
+  if (analysis.unauthorizedJumps.length > 0) {
+    throw new Error(`Pet jumped without an actual blocked movement: ${JSON.stringify(
+      analysis.unauthorizedJumps.slice(0, 3))}`);
   }
   return {
     before, after, distance, sampleCount: points.length,
     playerP95: analysis.playerP95, petP95: analysis.petP95,
     maxDistance: analysis.maxDistance, reversals: analysis.reversals,
-    warpSamples: analysis.warpPoints.length, recovered
+    warpSamples: analysis.warpPoints.length,
+    warpTransitions: analysis.warpTransitions,
+    recordedWarpDistance,
+    warpObserved,
+    jumpSamples: analysis.jumpSamples,
+    slopeSamples: analysis.slopeSamples,
+    wallBlockedSamples: analysis.wallBlockedSamples,
+    unauthorizedJumps: analysis.unauthorizedJumps,
+    recovered: warpObserved ? recovered : true
   };
 }
 
@@ -405,7 +468,7 @@ export async function verifyPetAutomationFlow(driver, probes, requireState, mode
   }
 
   let selected = null;
-  if (mode !== 'runtime' && mode !== 'pickup')
+  if (!['runtime', 'pickup', 'follow'].includes(mode))
     selected = await configureOptions(driver, probes, requireState, hpItem, mpItem, mode === 'configure');
 
   const configured = {

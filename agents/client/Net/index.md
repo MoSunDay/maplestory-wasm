@@ -1,4 +1,4 @@
-Commit: f79ac092343f9cbdd17a486211f0f7768039c291
+Commit: e683a36c8ac98d8f13d5a15928b91366c126879d
 
 # 网络层
 
@@ -83,6 +83,10 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 `PLAYER_INTERACTION(0x7B)` 复用 v83 交易模式：创建房间、邀请地图内角色、接受/拒绝、聊天、放入物品/金币、确认和退出。`TradeHandler` 消费 `PLAYER_INTERACTION(0x13A)` 的房间、参与者、物品、金币、确认与结束事件；交易物品负载由 `TradeProtocol` 完整消费普通物品、装备和宠物分支。所有成功或失败结论以服务端结果为准，客户端只维护展示状态和发送意图。
 
+### 人物信息与人气协议
+
+`CharacterInfo/` 按 linked server 的 `CHAR_INFO_REQUEST(0x61)` / `CHAR_INFO(0x3D)` 合约请求并解析人物资料：等级为 16 位，宠物段最多三只并以零标记结束，随后完整消费坐骑、愿望单、怪物书、勋章和勋章任务尾段。解析截断、越界或尾随数据时只让当前资料卡进入错误态，不禁用全局 UI。`GIVE_FAME(0x5F)` / `FAME_RESPONSE(0x26)` 支持增加或减少其他玩家人气，发送意图在回包或资料卡超时后恢复；服务端仍是权限和最终结果的唯一裁决者。
+
 ### 注册复用登录协议
 
 游戏内注册不引入新 opcode：`UIRegister` 校验账号为 4–12 位 ASCII 字母数字、密码为 4–12 位非空白可打印 ASCII 后发送现有 `LOGIN_PASSWORD`。服务端对不存在的合法账号自动建号并返回 `LOGIN_STATUS=23`，客户端自动发送 `ACCEPT_TOS`，随后沿用登录成功和世界列表流程。注册失败由 `LoginHandlers` 回填到注册表单，不落入通用登录位图提示。
@@ -134,6 +138,7 @@ linked MapleStory Server → Socket::read() → Session::read()
 | `Handlers/Helpers/` | 封包解析辅助 (CharacterDataParser, ItemParser, LoginParser, MovementParser) |
 | `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets, SocialPackets, TradePackets, CashShopPackets 等)；`CharacterCreation/` 保存可独立验证的建角 payload 编码 |
 | `Protocol/` | 可独立验证的协议解析与编码，包括好友事件、远端玩家/怪物出生负载和掉落移除负载 |
+| `CharacterInfo/` | 人物信息、人气请求与响应的纯协议模型、封包和处理器 |
 
 ## 依赖关系
 

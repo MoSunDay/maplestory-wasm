@@ -34,7 +34,14 @@ namespace jrc
     namespace
     {
         constexpr int16_t PICKUP_RADIUS = 30;
-        constexpr int32_t PICKUP_RADIUS_SQ = PICKUP_RADIUS * PICKUP_RADIUS;
+        constexpr int64_t PICKUP_RADIUS_SQ = PICKUP_RADIUS * PICKUP_RADIUS;
+
+        int64_t squared_distance(Point<int16_t> first, Point<int16_t> second)
+        {
+            const int64_t dx = static_cast<int32_t>(first.x()) - second.x();
+            const int64_t dy = static_cast<int32_t>(first.y()) - second.y();
+            return dx * dx + dy * dy;
+        }
     }
 
     MapDrops::MapDrops()
@@ -132,7 +139,9 @@ namespace jrc
         confirmed_pet_pickups = 0;
     }
 
-    void MapDrops::try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos, int32_t& closest_distance_sq, Loot& closest_loot) const
+    void MapDrops::try_pickup(int32_t oid, const Drop& drop,
+        Point<int16_t> playerpos, int64_t& closest_distance_sq,
+        Loot& closest_loot) const
     {
         if (!drop.is_lootable())
             return;
@@ -140,9 +149,7 @@ namespace jrc
         Point<int16_t> position = drop.get_position();
         Point<int16_t> center = position + Point<int16_t>(16, 16);
 
-        int32_t dx = static_cast<int32_t>(center.x()) - playerpos.x();
-        int32_t dy = static_cast<int32_t>(center.y()) - playerpos.y();
-        int32_t distance_sq = dx * dx + dy * dy;
+        const int64_t distance_sq = squared_distance(center, playerpos);
 
         // Keep strict overlap, but also accept a small proximity window so
         // slightly offset drops can still be attempted during pickup spam.
@@ -167,7 +174,7 @@ namespace jrc
         if (!lootenabled)
             return { 0, {} };
 
-        int32_t closest_distance_sq = std::numeric_limits<int32_t>::max();
+        int64_t closest_distance_sq = std::numeric_limits<int64_t>::max();
         Loot closest_loot = { 0, {} };
 
         for (auto& mmo : drops)
@@ -203,7 +210,8 @@ namespace jrc
 
     MapDrops::PetLootTarget MapDrops::find_pet_loot(const PetLootQuery& query) const
     {
-        int32_t closest_distance_sq = static_cast<int32_t>(query.range) * query.range + 1;
+        int64_t closest_distance_sq =
+            static_cast<int64_t>(query.range) * query.range + 1;
         PetLootTarget target;
         for (const auto& entry : drops)
         {
@@ -212,9 +220,7 @@ namespace jrc
                 continue;
 
             Point<int16_t> position = drop->get_position() + Point<int16_t>(16, 16);
-            int32_t dx = static_cast<int32_t>(position.x()) - query.origin.x();
-            int32_t dy = static_cast<int32_t>(position.y()) - query.origin.y();
-            int32_t distance_sq = dx * dx + dy * dy;
+            const int64_t distance_sq = squared_distance(position, query.origin);
             if (distance_sq < closest_distance_sq)
             {
                 closest_distance_sq = distance_sq;

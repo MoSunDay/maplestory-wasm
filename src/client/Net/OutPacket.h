@@ -119,6 +119,8 @@ namespace jrc
         SPEND_AP = 87,
         HEAL_OVER_TIME = 89,
         SPEND_SP = 90,
+        GIVE_FAME = 0x5F,
+        CHAR_INFO_REQUEST = 0x61,
         SPAWN_PET = 0x62,
         CHANGE_KEYMAP = 135,
 

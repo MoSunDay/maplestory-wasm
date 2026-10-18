@@ -176,6 +176,28 @@ export class BrowserDriver {
     await this.click(gameX, gameY);
   }
 
+  async rightClick(gameX, gameY) {
+    const point = await this.evaluate(`(() => {
+      const canvas = document.getElementById('canvas');
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        x: bounds.left + ${gameX} * bounds.width / 800,
+        y: bounds.top + ${gameY} * bounds.height / 600
+      };
+    })()`);
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', x: point.x, y: point.y, button: 'none'
+    });
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed', x: point.x, y: point.y, button: 'right',
+      buttons: 2, clickCount: 1
+    });
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x: point.x, y: point.y, button: 'right',
+      buttons: 0, clickCount: 1
+    });
+  }
+
   async drag(fromX, fromY, toX, toY) {
     const points = await this.evaluate(`(() => {
       const bounds = document.getElementById('canvas').getBoundingClientRect();

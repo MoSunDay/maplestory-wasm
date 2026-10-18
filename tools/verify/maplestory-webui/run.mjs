@@ -3,6 +3,7 @@ import { BrowserDriver, sleep } from './cdp.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
+import { verifyUserInfoFlow } from './user-info-flow.mjs';
 import {
   createAssetIdleWaiter,
   createRuntimeProbes,
@@ -38,7 +39,8 @@ const requireMobs = process.env.E2E_REQUIRE_MOBS === '1';
 const routeTutorialMobMap = process.env.E2E_ROUTE_TUTORIAL_MOB_MAP === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const petOptionsMode = process.env.E2E_PET_OPTIONS || '';
-const verifyPetOptions = ['1', 'configure', 'runtime', 'pickup'].includes(petOptionsMode);
+const verifyPetOptions = ['1', 'configure', 'runtime', 'pickup', 'follow'].includes(petOptionsMode);
+const verifyCharacterInfo = process.env.E2E_CHARACTER_INFO === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 
@@ -823,6 +825,11 @@ try {
       console.log(`PASS  ${observedAttacks.length} attacks presented afterimages (stab and swing)`);
     }
 
+    if (verifyCharacterInfo) {
+      await verifyUserInfoFlow(driver, probes, requireState);
+      if (!verifyPetOptions) throw new Error('__CHARACTER_INFO_COMPLETE__');
+    }
+
     if (verifyPetOptions) {
       await verifyPetAutomationFlow(
         driver, probes, requireState, petOptionsMode === '1' ? 'options' : petOptionsMode);
@@ -918,6 +925,9 @@ try {
     assertRuntimeHealthy();
     passed = true;
   } else if (verifyPetOptions && error.message === '__PET_OPTIONS_COMPLETE__') {
+    assertRuntimeHealthy();
+    passed = true;
+  } else if (verifyCharacterInfo && error.message === '__CHARACTER_INFO_COMPLETE__') {
     assertRuntimeHealthy();
     passed = true;
   } else if (logoutToLogin && error.message === '__LOGOUT_COMPLETE__') {
