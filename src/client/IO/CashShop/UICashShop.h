@@ -16,9 +16,10 @@
 namespace jrc
 {
     // Full-screen cash shop window painted from the modern CashShop.img set.
-    // All child geometry lives in the 800x600 design space and is mapped to
-    // the real viewport through cash_shop_layout; the element itself stays
-    // anchored at (0, 0) covering the whole screen.
+    // The background bitmap is stretched from its native 1024x768 to the
+    // 800x600 canvas and every other element follows the same 25/32 scale, so
+    // artwork, labels and hit areas stay on one pixel grid. The element itself
+    // stays anchored at (0, 0) covering the whole screen.
     class UICashShop : public UIElement
     {
     public:
@@ -94,8 +95,11 @@ namespace jrc
         int32_t right_item_id(size_t index) const;
         int64_t right_cash_id(size_t index) const;
         int16_t right_item_count(size_t index) const;
-        Point<int16_t> map_to_screen(Point<int16_t> design) const;
-        void position_static_buttons();
+        void draw_action(uint16_t id,
+            const cash_shop_skin::CashShopButtonSkin& source,
+            Point<int16_t> pos, Point<int16_t> size) const;
+        void draw_icon(const Texture& icon, Point<int16_t> center,
+            int16_t max_side) const;
         void position_buy_button();
 
         std::shared_ptr<CashShopModel> model;
@@ -114,13 +118,21 @@ namespace jrc
         Point<int16_t> last_cursor_position;
 
         cash_shop_skin::CashShopSkin skin;
-        float screen_scale;
-        Point<int16_t> screen_offset;
 
         Textfield search;
         Text title;
+        Text category_title;
+        Text pane_title;
+        Text pane_info;
         Text search_label;
         Text transfer_hint;
+        Text details_hint;
+        Text details_name;
+        Text details_count;
+        Text buy_label;
+        Text transfer_label;
+        Text charge_label;
+        Text exit_label;
         Text tab_labels[2];
         Text balance_labels[CURRENCY_CHOICES];
         Text currency_labels[CURRENCY_CHOICES];

@@ -10,10 +10,10 @@
 
 namespace jrc::cash_shop_view
 {
-    constexpr size_t CATALOG_COLS = 3;
-    constexpr size_t CATALOG_ROWS = 2;
+    constexpr size_t CATALOG_COLS = 4;
+    constexpr size_t CATALOG_ROWS = 3;
     constexpr size_t CATALOG_PAGE_SIZE = CATALOG_COLS * CATALOG_ROWS;
-    constexpr size_t RIGHT_COLS = 8;
+    constexpr size_t RIGHT_COLS = 7;
     constexpr size_t RIGHT_ROWS = 3;
     constexpr size_t RIGHT_PAGE_SIZE = RIGHT_COLS * RIGHT_ROWS;
     constexpr int8_t CATEGORY_COUNT = 7;
