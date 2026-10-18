@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "UIWorldSelect.h"
+#include "../UiAssetVersion.h"
 #include "WorldSelectPolicy.h"
 
 #include "../../Console.h"
@@ -37,6 +38,13 @@ namespace jrc
     namespace
     {
         constexpr Point<int16_t> CHANNEL_WINDOW_CENTER{ 200, 170 };
+        // Pre-Chaos (v83) layout, derived from the WorldSelect node
+        // inventory: chBackgrn 449x233 origin (224,116), channel plates
+        // 92x30, BtGoworld 140x41, world signs 26x95.
+        constexpr Point<int16_t> PRECH_WORLD_SIGN_POS{ 200, 10 };
+        constexpr Point<int16_t> PRECH_ENTER_POS{ 270, 228 };
+        constexpr Point<int16_t> PRECH_CHANNEL_POS{ 100, 100 };
+        constexpr int16_t PRECH_CHANNEL_STEP_Y = 36;
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
@@ -47,18 +55,34 @@ namespace jrc
           request_pending(false) {
 
         nl::node back = nl::nx::map["Back"]["login.img"]["back"];
-        nl::node worldsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtWorld"]["release"];
-        nl::node channelsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"];
+        nl::node worldsel = nl::nx::ui["Login.img"]["WorldSelect"];
+        nl::node worldsrc = worldsel["BtWorld"]["release"];
+        nl::node channelsrc = worldsel["BtChannel"];
         nl::node frame = nl::nx::ui["Login.img"]["Common"]["frame"];
+        // Same probe as the NxFiles version warning: pre-Chaos UI.nx stores
+        // the channel window as WorldSelect/chBackgrn with per-channel
+        // bitmaps under WorldSelect/channel, not in the BtChannel subtree.
+        const bool post_chaos = static_cast<bool>(channelsrc["layer:bg"]);
 
         sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
-        sprites.emplace_back(worldsrc["layer:bg"], Point<int16_t>(650, 45));
-        sprites.emplace_back(frame, Point<int16_t>(400, 300));
+        if (post_chaos)
+            sprites.emplace_back(worldsrc["layer:bg"], Point<int16_t>(650, 45));
+        sprites.emplace_back(frame, Point<int16_t>(400, login_frame_y()));
 
-        buttons[BT_ENTERWORLD] = std::make_unique<MapleButton>(
-            channelsrc["button:GoWorld"],
-            CHANNEL_WINDOW_CENTER
-            );
+        if (post_chaos)
+        {
+            buttons[BT_ENTERWORLD] = std::make_unique<MapleButton>(
+                channelsrc["button:GoWorld"],
+                CHANNEL_WINDOW_CENTER
+                );
+        }
+        else
+        {
+            buttons[BT_ENTERWORLD] = std::make_unique<MapleButton>(
+                worldsel["BtGoworld"],
+                PRECH_ENTER_POS
+                );
+        }
 
         if (worldcount <= 0 || worlds.empty())
         {
@@ -73,19 +97,50 @@ namespace jrc
         worldid = static_cast<uint8_t>(world.wid);
         channelcount = world_select::selectable_channel_count(world.channelcount);
 
-        buttons[BT_WORLD0] = std::make_unique<MapleButton>(worldsrc["button:15"], Point<int16_t>(650, 20));
+        if (post_chaos)
+        {
+            buttons[BT_WORLD0] = std::make_unique<MapleButton>(worldsrc["button:15"], Point<int16_t>(650, 20));
+        }
+        else
+        {
+            nl::node sign = worldsel["BtWorld"][std::to_string(worldid)];
+            if (!sign)
+                sign = worldsel["BtWorld"]["0"];
+            buttons[BT_WORLD0] = std::make_unique<MapleButton>(sign, PRECH_WORLD_SIGN_POS);
+        }
         buttons[BT_WORLD0]->set_state(Button::PRESSED);
 
-        sprites.emplace_back(channelsrc["layer:bg"], CHANNEL_WINDOW_CENTER);
-        sprites.emplace_back(channelsrc["release"]["layer:15"], CHANNEL_WINDOW_CENTER);
+        if (post_chaos)
+        {
+            sprites.emplace_back(channelsrc["layer:bg"], CHANNEL_WINDOW_CENTER);
+            sprites.emplace_back(channelsrc["release"]["layer:15"], CHANNEL_WINDOW_CENTER);
+        }
+        else
+        {
+            sprites.emplace_back(worldsel["chBackgrn"], CHANNEL_WINDOW_CENTER);
+        }
 
         for (uint8_t i = 0; i < channelcount; ++i)
         {
-            nl::node chnode = channelsrc["button:" + std::to_string(i)];
-            buttons[BT_CHANNEL0 + i] = std::make_unique<TwoSpriteButton>(
-                chnode["normal"]["0"], chnode["keyFocused"]["0"],
-                CHANNEL_WINDOW_CENTER
-                );
+            if (post_chaos)
+            {
+                nl::node chnode = channelsrc["button:" + std::to_string(i)];
+                buttons[BT_CHANNEL0 + i] = std::make_unique<TwoSpriteButton>(
+                    chnode["normal"]["0"], chnode["keyFocused"]["0"],
+                    CHANNEL_WINDOW_CENTER
+                    );
+            }
+            else
+            {
+                // v83 channel plates only carry normal/disabled bitmaps, so
+                // the normal plate doubles as the focus state.
+                nl::node chnode = worldsel["channel"][std::to_string(i)];
+                buttons[BT_CHANNEL0 + i] = std::make_unique<TwoSpriteButton>(
+                    chnode["normal"], chnode["normal"],
+                    PRECH_CHANNEL_POS
+                        + Point<int16_t>(0, PRECH_CHANNEL_STEP_Y * i)
+                    );
+            }
             if (i == channelid)
                 buttons[BT_CHANNEL0 + i]->set_state(Button::PRESSED);
         }

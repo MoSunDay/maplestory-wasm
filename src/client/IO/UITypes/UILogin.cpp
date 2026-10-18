@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "UILogin.h"
+#include "../UiAssetVersion.h"
 #include "UILoginWait.h"
 #include "UIRegister.h"
 
@@ -83,7 +84,7 @@ namespace jrc
         }
         if (common["frame"])
         {
-            sprites.emplace_back(common["frame"], Point<int16_t>(400, 300));
+            sprites.emplace_back(common["frame"], Point<int16_t>(400, login_frame_y()));
         }
 
         const bool has_legacy_title_nodes = static_cast<bool>(title["11"]) ||
