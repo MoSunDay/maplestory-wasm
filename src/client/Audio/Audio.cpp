@@ -178,11 +178,8 @@ namespace jrc
             },
 
             playMusic(id) {
-                const clip = state.clips.get(id);
-                if (!clip) {
-                    return;
-                }
-
+                // Retire the running track before the clip lookup so a
+                // missing clip never leaves the previous BGM playing.
                 state.musicToken += 1;
                 const token = state.musicToken;
 
@@ -194,6 +191,11 @@ namespace jrc
                     }
                     state.currentMusic.disconnect();
                     state.currentMusic = null;
+                }
+
+                const clip = state.clips.get(id);
+                if (!clip) {
+                    return;
                 }
 
                 const startMusic = (buffer) => {
@@ -487,6 +489,10 @@ namespace jrc
         {
             return;
         }
+
+        // Play() may run without a preceding prepare() (e.g. the login BGM),
+        // so make sure the clip is registered before requesting playback.
+        prepare();
         wasm_audio_play_music(static_cast<int>(ad.id()));
         bgmpath = path;
 #else
