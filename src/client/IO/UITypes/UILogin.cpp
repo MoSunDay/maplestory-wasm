@@ -45,7 +45,7 @@ namespace jrc
         // Compatibility: some UI.nx variants do not have Title/11, Title/35, Title/Logo.
         if (back["11"])
         {
-            sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
+            sprites.emplace_back(back["11"], Point<int16_t>(360, 313));
         }
         else if (back["0"])
         {

@@ -45,6 +45,12 @@ namespace jrc
         constexpr Point<int16_t> PRECH_ENTER_POS{ 270, 228 };
         constexpr Point<int16_t> PRECH_CHANNEL_POS{ 100, 100 };
         constexpr int16_t PRECH_CHANNEL_STEP_Y = 36;
+        // Post-Chaos right sidebar (layer:bg, 144x513) top-left on screen
+        // when the window sprites are anchored at CHANNEL_WINDOW_CENTER.
+        constexpr Point<int16_t> POSTCH_SIDEBAR_POS{ 650, 45 };
+        // First baked world slot inside the sidebar, matching button:10's
+        // origin (-14,-14).
+        constexpr Point<int16_t> POSTCH_SIDEBAR_TOP_SLOT{ 14, 14 };
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
@@ -68,7 +74,7 @@ namespace jrc
         // variants do not ship the login backdrop under back/11.
         if (back["11"])
         {
-            sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
+            sprites.emplace_back(back["11"], Point<int16_t>(360, 313));
         }
         else if (back["0"])
         {
@@ -112,7 +118,14 @@ namespace jrc
 
         if (post_chaos)
         {
-            buttons[BT_WORLD0] = std::make_unique<MapleButton>(worldsrc["button:15"], Point<int16_t>(650, 20));
+            // Only one world is shown; pin it to the top sidebar slot instead of
+            // the low baked slot encoded in the button origin.
+            const nl::node nova = worldsrc["button:15"];
+            const Point<int16_t> nova_origin(nova["normal"]["0"]["origin"]);
+            buttons[BT_WORLD0] = std::make_unique<MapleButton>(
+                nova,
+                POSTCH_SIDEBAR_POS + POSTCH_SIDEBAR_TOP_SLOT + nova_origin
+                );
         }
         else
         {
