@@ -1,6 +1,7 @@
 # 验证工具索引
 
 - [MapleStory WebUI 全流程](maplestory-webui/index.md)
+- 2023 年度版技能双侧落地审计（76 wrapper、调校值、GM 携带、二分有序）：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/skill-2023-port-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/skill-2023-port-nx && /tmp/skill-2023-port-nx assets/Skill.nx`
 - 商城纯视图策略（6 卡网格/24 槽位分页）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/cash-shop-view.cpp src/client/IO/CashShop/CashShopView.cpp -o /tmp/cash-shop-view && /tmp/cash-shop-view`
 - 现代全屏 CashShop.img 素材契约（1024x768 背景、卡片/槽位面板、四态按钮、位图数字）与 linked-server 确定性商品：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/cash-shop-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/cash-shop-ui-nx && /tmp/cash-shop-ui-nx UI.nx src/client/data/cash-shop-v83.csv`
 - LazyFS 连接恢复：`node tools/verify/lazyfs-connection.mjs`
