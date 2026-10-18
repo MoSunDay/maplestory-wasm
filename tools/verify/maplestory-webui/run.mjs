@@ -529,7 +529,6 @@ try {
   if (!retryCharacterName) await driver.screenshot('07-character-select-after');
 
   if (!retryCharacterName && !stopAfterCharacterCreate) {
-    await driver.click(130, 220);
     await driver.setNetworkLatency(500);
     await driver.evaluate(`(() => {
       const lazy = Module.LazyFS;
@@ -569,7 +568,11 @@ try {
       };
       window.naturalAssetEvidence = evidence;
     })()`);
-    await driver.click(650, 400);
+    // Double-click the first character card (card 0 center) to enter the game.
+    // Works for both pre- and post-Chaos layouts since card positions are
+    // derived from the AreaButton grid, and double-click is layout-agnostic.
+    await driver.click(130, 210);
+    await driver.click(130, 210);
     const selectionLock = await driver.evaluate(`({
       state: Module.ccall('msui_state', 'number', [], []),
       uiEnabled: Module.ccall('msui_enabled', 'number', [], [])
