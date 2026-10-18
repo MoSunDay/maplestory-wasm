@@ -68,14 +68,16 @@ namespace jrc::cash_shop_skin
             return state_frame(src[static_cast<int>(state)]);
         }
 
-        // Requires all four button states as bitmaps of the exact size.
-        nl::node require_button(
+        // Requires all four button states as bitmaps of the exact size and
+        // converts them to drawable textures.
+        CashShopButtonSkin require_button(
             nl::node root, const std::string& path,
             uint16_t width, uint16_t height)
         {
             nl::node src = root.resolve(path);
             if (!src)
                 throw std::runtime_error("CashShop.img missing node: " + path);
+            CashShopButtonSkin button;
             for (size_t state = 0; state < 4; ++state)
             {
                 nl::node frame = button_state(src, state);
@@ -90,8 +92,9 @@ namespace jrc::cash_shop_skin
                         BUTTON_STATES[state] + " expected " +
                         std::to_string(width) + "x" + std::to_string(height) +
                         " got " + describe(image));
+                button.frames[state] = frame;
             }
-            return src;
+            return button;
         }
 
         size_t glyph_index(char character)
@@ -113,8 +116,6 @@ namespace jrc::cash_shop_skin
         skin.no_item = require_bitmap(root, "Base/noItem", 348, 148);
         skin.line = require_bitmap(root, "Base/line", 859, 2);
         skin.sort_bar = require_bitmap(root, "CSSortBar/backgrnd", 491, 32);
-        skin.sort_top_button = require_button(root, "CSSortBar/BtTop", 42, 16);
-        skin.sort_end_button = require_button(root, "CSSortBar/BtEnd", 42, 16);
         skin.card = require_bitmap(root, "CSList/Base", 119, 184);
         skin.buy_button = require_button(root, "CSList/BtBuy", 101, 24);
         skin.inventory_panel =
@@ -149,25 +150,27 @@ namespace jrc::cash_shop_skin
     }
 
     void draw_amount(
-        const CashShopSkin& skin, Point<int16_t> position, int32_t amount)
+        const CashShopSkin& skin, Point<int16_t> position, int32_t amount,
+        Color color)
     {
         const std::string text = cash_shop_view::format_amount(amount);
         int16_t x = position.x();
         for (char character : text)
         {
             const Texture& glyph = skin.number[glyph_index(character)];
-            glyph.draw({ Point<int16_t>{ x, position.y() } });
+            glyph.draw({ Point<int16_t>{ x, position.y() }, color });
             x += glyph.width();
         }
     }
 
     void draw_amount_right(
-        const CashShopSkin& skin, Point<int16_t> right, int32_t amount)
+        const CashShopSkin& skin, Point<int16_t> right, int32_t amount,
+        Color color)
     {
         draw_amount(
             skin,
             { static_cast<int16_t>(right.x() - amount_width(skin, amount)),
                 right.y() },
-            amount);
+            amount, color);
     }
 }

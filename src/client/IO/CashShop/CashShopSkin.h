@@ -10,16 +10,21 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "../../Graphics/Color.h"
 #include "../../Graphics/Texture.h"
 #include "../../Template/Point.h"
-
-#include "nlnx/node.hpp"
 
 namespace jrc::cash_shop_skin
 {
     // Digits 0-9 plus the comma glyph at index 10.
     constexpr size_t NUMBER_GLYPHS = 11;
     constexpr size_t COMMA_GLYPH = 10;
+
+    // Four frames in CashShop.img order: normal, pressed, mouseOver, disabled.
+    struct CashShopButtonSkin
+    {
+        Texture frames[4];
+    };
 
     struct CashShopSkin
     {
@@ -37,15 +42,13 @@ namespace jrc::cash_shop_skin
         Texture nx_icon;
         Texture selected_marker;
 
-        // Four-state button sources handed to MapleButton.
-        nl::node sort_top_button;
-        nl::node sort_end_button;
-        nl::node buy_button;
-        nl::node transfer_button;
-        nl::node charge_button;
-        nl::node exit_button;
-        nl::node prev_button;
-        nl::node next_button;
+        // Four-state action buttons, drawn stretched on the screen grid.
+        CashShopButtonSkin buy_button;
+        CashShopButtonSkin transfer_button;
+        CashShopButtonSkin charge_button;
+        CashShopButtonSkin exit_button;
+        CashShopButtonSkin prev_button;
+        CashShopButtonSkin next_button;
     };
 
     // Loads and validates every CashShop.img node the modern renderer uses.
@@ -53,12 +56,14 @@ namespace jrc::cash_shop_skin
 
     // Draws an amount with the bitmap number font, comma separated.
     void draw_amount(
-        const CashShopSkin& skin, Point<int16_t> position, int32_t amount);
+        const CashShopSkin& skin, Point<int16_t> position, int32_t amount,
+        Color color = Color::WHITE);
 
     // Width the amount would occupy in the bitmap number font.
     int16_t amount_width(const CashShopSkin& skin, int32_t amount);
 
     // Draws the amount right aligned so it ends at the given point.
     void draw_amount_right(
-        const CashShopSkin& skin, Point<int16_t> right, int32_t amount);
+        const CashShopSkin& skin, Point<int16_t> right, int32_t amount,
+        Color color = Color::WHITE);
 }

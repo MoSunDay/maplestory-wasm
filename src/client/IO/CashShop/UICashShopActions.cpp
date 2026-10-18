@@ -2,6 +2,7 @@
 
 #include "../UI.h"
 #include "../UITypes/UINotice.h"
+#include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/CashShopPackets.h"
 
@@ -90,14 +91,16 @@ namespace jrc
             right_page, right_count(), view::RIGHT_PAGE_SIZE);
         for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
             category_labels[entry].change_color(
-                entry == category ? Text::YELLOW : Text::LIGHTGREY);
+                entry == category ? Text::BLACK : Text::DARKGREY);
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
             currency_labels[choice].change_color(
-                currency == currency_choice(choice) ? Text::YELLOW :
+                currency == currency_choice(choice) ? Text::WHITE :
                     Text::LIGHTGREY);
         const bool locker_active = right_pane == view::RightPane::LOCKER;
-        tab_labels[0].change_color(locker_active ? Text::BLACK : Text::WHITE);
-        tab_labels[1].change_color(locker_active ? Text::WHITE : Text::BLACK);
+        tab_labels[0].change_color(
+            locker_active ? Text::WHITE : Text::LIGHTGREY);
+        tab_labels[1].change_color(
+            locker_active ? Text::LIGHTGREY : Text::WHITE);
         transfer_hint.change_text(locker_active ?
             "再次点击物品可快速取出" : "再次点击物品可快速存入");
         page_labels[0].change_text(std::to_string(left_page + 1) + "/" +
@@ -106,6 +109,8 @@ namespace jrc
         page_labels[1].change_text(std::to_string(right_page + 1) + "/" +
             std::to_string(view::page_count(
                 right_count(), view::RIGHT_PAGE_SIZE)));
+        pane_title.change_text(view::pane_name(right_pane));
+        pane_info.change_text("共 " + std::to_string(right_count()) + " 件");
         refresh_rows();
     }
 
@@ -144,15 +149,45 @@ namespace jrc
             buttons[BT_TAB_FIRST + entry]->set_active(!pending);
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
             buttons[BT_CURRENCY_FIRST + choice]->set_active(!pending);
-        buttons[BT_BUY]->set_active(!pending && selected_left.has_value());
+        const bool buy_visible = selected_left &&
+            *selected_left / view::CATALOG_PAGE_SIZE == left_page;
+        buttons[BT_BUY]->set_active(!pending && buy_visible);
         position_buy_button();
-        buttons[BT_TRANSFER]->set_active(!pending && selected_right.has_value());
+        const bool details_visible = selected_right &&
+            *selected_right / view::RIGHT_PAGE_SIZE == right_page &&
+            *selected_right < right_count();
+        transfer_label.change_text(
+            right_pane == view::RightPane::LOCKER ? "取出" : "存入");
+        buy_label.change_color(
+            buy_visible && !pending ? Text::BLACK : Text::LIGHTGREY);
+        transfer_label.change_color(
+            details_visible && !pending ? Text::WHITE : Text::LIGHTGREY);
+        charge_label.change_color(pending ? Text::LIGHTGREY : Text::BLACK);
+        exit_label.change_color(pending ? Text::LIGHTGREY : Text::WHITE);
+        buttons[BT_TRANSFER]->set_active(!pending && details_visible);
         buttons[BT_CHARGE]->set_active(!pending);
         buttons[BT_EXIT]->set_active(!pending);
-        buttons[BT_LEFT_PREV]->set_active(!pending);
-        buttons[BT_LEFT_NEXT]->set_active(!pending);
-        buttons[BT_RIGHT_PREV]->set_active(!pending);
-        buttons[BT_RIGHT_NEXT]->set_active(!pending);
+        buttons[BT_LEFT_PREV]->set_active(!pending && left_page > 0);
+        buttons[BT_LEFT_NEXT]->set_active(!pending &&
+            left_page + 1 < view::page_count(filtered.size(),
+                view::CATALOG_PAGE_SIZE));
+        buttons[BT_RIGHT_PREV]->set_active(!pending && right_page > 0);
+        buttons[BT_RIGHT_NEXT]->set_active(!pending &&
+            right_page + 1 < view::page_count(right_count(),
+                view::RIGHT_PAGE_SIZE));
+        details_hint.change_text(details_visible ? "" : "选择物品查看详情");
+        std::string detail_name;
+        std::string detail_count;
+        if (details_visible)
+        {
+            if (const ItemData& data = ItemData::get(
+                    right_item_id(*selected_right)))
+                detail_name = data.get_name();
+            detail_count = "数量: " +
+                std::to_string(right_item_count(*selected_right));
+        }
+        details_name.change_text(detail_name);
+        details_count.change_text(detail_count);
         const bool locker_tab = right_pane == view::RightPane::LOCKER;
         buttons[BT_RIGHT_LOCKER_TAB]->set_active(!pending && !locker_tab);
         buttons[BT_RIGHT_INVENTORY_TAB]->set_active(!pending && locker_tab);
