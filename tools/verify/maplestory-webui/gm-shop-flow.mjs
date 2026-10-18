@@ -16,9 +16,10 @@
 //   * 所选角色的 characters.gm 必须 ≥ 2（注意是 characters 表的 gm 列，而不是
 //     accounts 表）。提权：MySQL> update characters set gm=2 where id=<该角色id>;
 //     验证完成后还原：update characters set gm=0 where id=<该角色id>;
-//   * 账号 test1/test1 实测登录进的是账号 test1test1(id 26)，其角色列表为
-//     card0=e2efix1 card1=wt1210 card2=验证员一，与直觉的账号 25 不同；选卡前
-//     先核对 GM_SHOP_CARD 指向的角色（看 10-gm-shop-character-card.png 截图）。
+//   * 登录归属缺陷已修复（ImeBridge 失焦清理 + #ime-input pointer-events:none
+//     + Window.cpp activeElement 闸门），test1/test1 现稳定登入账号 25
+//     （test1）。其角色列表：card0=e2eaccept1(id5) card1=e2eaccept2(id6)
+//     card2=e2eaccept3(id7)；本流程默认 GM_SHOP_CARD=1（e2eaccept2，已提权）。
 //   * 页面服务需在 http://127.0.0.1:8000/web/index.html（GM_SHOP_URL 可覆盖）。
 //
 // 几何依据（800×600 游戏坐标系；页面 canvas 位于 page(79,0) 尺寸 662×497，页面
@@ -235,16 +236,16 @@ async function loginAndEnterGame(driver) {
     throw new Error('login UI did not activate');
   }
   console.log('PASS  login UI active');
-  await driver.click(340, 260);
+  await driver.clickField(340, 260);
   await driver.typeAscii(account);
-  await driver.click(340, 285);
+  await driver.clickField(340, 285);
   await driver.typeAscii(password);
   await driver.key('Enter', 'Enter', 13);
   if (!await waitFor(uiStateIs(driver, uiState.world), 45)) {
     throw new Error('world-select UI did not activate; check GM_SHOP_ACCOUNT/GM_SHOP_PASSWORD');
   }
   console.log('PASS  world-select UI active');
-  await driver.click(510, 216);
+  await driver.retryClick(510, 216, uiStateIs(driver, uiState.characters));
   if (!await waitFor(uiStateIs(driver, uiState.characters), 45)) {
     throw new Error('character-select UI did not activate');
   }
@@ -254,8 +255,17 @@ async function loginAndEnterGame(driver) {
   }
   const center = cardCenter(cardIndex);
   await driver.screenshot('10-gm-shop-character-card');
-  await driver.doubleClick(center.x, center.y);
-  if (!await waitFor(uiStateIs(driver, uiState.game), 60)) {
+  // The browser can drop the second press of a synthetic double-click;
+  // re-issuing it on an already-selected card is harmless.
+  let entered = false;
+  for (let attempt = 0; attempt < 4 && !entered; attempt += 1) {
+    await driver.doubleClick(center.x, center.y);
+    for (let i = 0; i < 5 && !entered; i += 1) {
+      entered = await uiStateIs(driver, uiState.game)();
+      if (!entered) await sleep(1000);
+    }
+  }
+  if (!entered) {
     throw new Error(`game UI did not activate after double-clicking card ${cardIndex}`);
   }
   console.log('PASS  in-game UI active');

@@ -45,7 +45,6 @@
         #loading-screen.is-hidden {
             opacity: 0;
             visibility: hidden;
-            pointer-events: none;
         }
 
         #asset-loading-screen {
@@ -66,7 +65,6 @@
         #asset-loading-screen.is-hidden {
             opacity: 0;
             visibility: hidden;
-            pointer-events: none;
         }
 
         .asset-loading-card {
@@ -209,6 +207,11 @@
             left: 0;
             top: 0;
             z-index: 10;
+            /* Click-through: the box is sized to the game textfield and can
+               overlap neighbouring fields (min page-pixel sizing). Mouse
+               events must reach the canvas so the game can move focus;
+               keyboard focus and IME candidate positioning are unaffected. */
+            pointer-events: none;
             opacity: 0;
             border: none;
             outline: none;

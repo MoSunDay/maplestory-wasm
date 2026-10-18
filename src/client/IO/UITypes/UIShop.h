@@ -54,6 +54,10 @@ namespace jrc
         void modify(InventoryType::Id type);
         int32_t visible_buy_item(int16_t row) const;
         Point<int16_t> visible_buy_center(int16_t row) const;
+        int32_t visible_sell_item(int16_t row) const;
+        Point<int16_t> visible_sell_center(int16_t row) const;
+        Point<int16_t> button_center(uint16_t id) const;
+        int16_t sell_selection() const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;

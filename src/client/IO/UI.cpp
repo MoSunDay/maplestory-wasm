@@ -57,6 +57,11 @@ namespace jrc
         state_id = LOGIN;
     }
 
+    bool UI::has_focused_textfield() const
+    {
+        return static_cast<bool>(focusedtextfield);
+    }
+
     void UI::init()
     {
         cursor.init();

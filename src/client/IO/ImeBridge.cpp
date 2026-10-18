@@ -47,7 +47,11 @@ namespace jrc
     {
         if (field->is_crypted())
         {
-            // Password fields stay on the plain keyboard path.
+            // Password fields stay on the plain keyboard path: release the
+            // DOM textarea so keystrokes cannot land in the stale IME buffer
+            // of the previously focused field (which would silently rewrite
+            // that field's text, e.g. doubling the login username).
+            blur_field();
             return;
         }
 
@@ -191,6 +195,11 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE int mscharlist_preview_ready()
     {
         return jrc::charlist_transition::snapshot().preview_ready;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msime_field_focused()
+    {
+        return jrc::UI::get().has_focused_textfield() ? 1 : 0;
     }
 
     EMSCRIPTEN_KEEPALIVE int mscharlist_preview_total()

@@ -91,11 +91,23 @@ namespace jrc
     void key_callback(GLFWwindow*, int key, int, int action, int)
     {
 #ifdef MS_PLATFORM_WASM
-        // While the hidden IME textarea has focus, GLFW still observes every
-        // key at the window level; ImeBridge owns that keyboard stream.
+        // While the hidden IME textarea has DOM focus, GLFW still observes
+        // every key at the window level; ImeBridge owns that keyboard stream
+        // (it forwards keys itself, so delivering here would double-type).
+        // When the textarea lost DOM focus -- e.g. a click's default action
+        // refocused the canvas after the game focused a text field -- the
+        // textarea sees no key events at all; deliver through GLFW instead
+        // or the keystrokes fall into a dead zone between the two paths.
         if (ImeBridge::is_active())
         {
-            return;
+            const bool dom_owns_keys = EM_ASM_INT({
+                const element = document.activeElement;
+                return element && element.id === 'ime-input' ? 1 : 0;
+            }) != 0;
+            if (dom_owns_keys)
+            {
+                return;
+            }
         }
 #endif
         UI::get().send_key(key, action != GLFW_RELEASE);

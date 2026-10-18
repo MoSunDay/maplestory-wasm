@@ -97,6 +97,11 @@ namespace jrc
         Optional<T> emplace(Args&&...args);
         template <class T>
         Optional<T> get_element();
+
+        // Whether any text field currently owns keyboard input. E2E drivers
+        // poll this after clicking a field so typed keys cannot race the
+        // game-side focus transition.
+        bool has_focused_textfield() const;
         bool has_element(UIElement::Type type);
         bool is_element_active(UIElement::Type type);
         void remove(UIElement::Type type);
