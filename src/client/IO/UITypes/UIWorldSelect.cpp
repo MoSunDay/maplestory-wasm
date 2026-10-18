@@ -64,7 +64,16 @@ namespace jrc
         // bitmaps under WorldSelect/channel, not in the BtChannel subtree.
         const bool post_chaos = static_cast<bool>(channelsrc["layer:bg"]);
 
-        sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
+        // Same 11 -> 0 fallback as the other login screens: some UI.nx
+        // variants do not ship the login backdrop under back/11.
+        if (back["11"])
+        {
+            sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
+        }
+        else if (back["0"])
+        {
+            sprites.emplace_back(back["0"], Point<int16_t>(370, 300));
+        }
         if (post_chaos)
             sprites.emplace_back(worldsrc["layer:bg"], Point<int16_t>(650, 45));
         sprites.emplace_back(frame, Point<int16_t>(400, login_frame_y()));

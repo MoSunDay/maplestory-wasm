@@ -19,12 +19,95 @@
 
 namespace jrc
 {
+    namespace
+    {
+        // Post-Chaos files name the button states, pre-Chaos files number
+        // them directly (0 = normal, 1 = pressed, 2 = mouseOver,
+        // 3 = disabled).
+        const char* named_state(Button::State state)
+        {
+            switch (state)
+            {
+            case Button::NORMAL:
+                return "normal";
+            case Button::PRESSED:
+                return "pressed";
+            case Button::MOUSEOVER:
+                return "mouseOver";
+            case Button::DISABLED:
+                return "disabled";
+            default:
+                return "";
+            }
+        }
+
+        // Numbered child used for the state in pre-Chaos button nodes.
+        int numbered_state(Button::State state)
+        {
+            switch (state)
+            {
+            case Button::PRESSED:
+                return 1;
+            case Button::MOUSEOVER:
+                return 2;
+            case Button::DISABLED:
+                return 3;
+            default:
+                return 0;
+            }
+        }
+
+        // A state node keeps its bitmap in a numbered frame child ("0") so
+        // animated states can hold several frames. Some pre-Chaos states
+        // store the bitmap on the node itself instead.
+        nl::node state_frame(nl::node state)
+        {
+            nl::node frame = state["0"];
+            return frame ? frame : state;
+        }
+
+        // Named states take precedence so post-Chaos files resolve exactly
+        // as before; numbered states are the pre-Chaos fallback.
+        nl::node find_state(nl::node src, Button::State state)
+        {
+            nl::node named = src[named_state(state)];
+            if (named)
+                return state_frame(named);
+
+            return state_frame(src[numbered_state(state)]);
+        }
+    }
+
     MapleButton::MapleButton(nl::node src, Point<int16_t> pos)
     {
-        textures[PRESSED] = src["pressed"]["0"];
-        textures[MOUSEOVER] = src["mouseOver"]["0"];
-        textures[NORMAL] = src["normal"]["0"];
-        textures[DISABLED] = src["disabled"]["0"];
+        textures[NORMAL] = find_state(src, NORMAL);
+        textures[PRESSED] = find_state(src, PRESSED);
+        textures[MOUSEOVER] = find_state(src, MOUSEOVER);
+        textures[DISABLED] = find_state(src, DISABLED);
+
+        // Not every generation ships all four states. Fall back to NORMAL
+        // so the button keeps working with the textures it does have.
+        if (textures[NORMAL].is_valid())
+        {
+            if (!textures[PRESSED].is_valid())
+                textures[PRESSED] = textures[NORMAL];
+            if (!textures[MOUSEOVER].is_valid())
+                textures[MOUSEOVER] = textures[NORMAL];
+            if (!textures[DISABLED].is_valid())
+                textures[DISABLED] = textures[NORMAL];
+        }
+        else
+        {
+            // Reverse fallback: keep the button visible when only NORMAL is
+            // missing.
+            if (textures[PRESSED].is_valid())
+                textures[NORMAL] = textures[PRESSED];
+            else if (textures[MOUSEOVER].is_valid())
+                textures[NORMAL] = textures[MOUSEOVER];
+            else if (textures[DISABLED].is_valid())
+                textures[NORMAL] = textures[DISABLED];
+        }
+
         position = pos;
         state = NORMAL;
         active = true;

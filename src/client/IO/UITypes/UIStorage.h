@@ -127,7 +127,13 @@ namespace jrc
             STORAGE_ROW0 = 14,
             STORAGE_ROW4 = 18,
             INVENTORY_ROW0 = 19,
-            INVENTORY_ROW4 = 23
+            INVENTORY_ROW4 = 23,
+            // Mirror tab strip over the inventory column (v83 only).
+            TAB2_EQUIP = 24,
+            TAB2_USE = 25,
+            TAB2_ETC = 26,
+            TAB2_SETUP = 27,
+            TAB2_CASH = 28
         };
     };
 }

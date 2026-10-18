@@ -35,13 +35,15 @@
 namespace jrc
 {
     UIItemInventory::UIItemInventory(const Inventory& invent)
-        : UIDragElement<PosINV>(Point<int16_t>(172, 20)), inventory(invent) {
+        : UIDragElement<PosINV>(Point<int16_t>(175, 20)), inventory(invent) {
 
-        nl::node src = nl::nx::ui["UIWindow2.img"]["Item"];
+        // v83 ships the item inventory in UIWindow.img.  It has a single
+        // 175x288 backgrnd with the slot sockets, tab strip and meso row
+        // baked in; the backgrnd2/backgrnd3 layers of later files do not
+        // exist yet.
+        nl::node src = nl::nx::ui["UIWindow.img"]["Item"];
 
         sprites.emplace_back(src["backgrnd"]);
-        sprites.emplace_back(src["backgrnd2"]);
-        sprites.emplace_back(src["backgrnd3"]);
 
         newitemslot = src["New"]["inventory"];
         newitemtab = src["New"]["Tab0"];
@@ -50,21 +52,25 @@ namespace jrc
         nl::node taben = src["Tab"]["enabled"];
         nl::node tabdis = src["Tab"]["disabled"];
 
-        buttons[BT_TAB_EQUIP]= std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"], Point<int16_t>(-1, -4));
-        buttons[BT_TAB_USE] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"], Point<int16_t>(-1, -4));
-        buttons[BT_TAB_ETC] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"], Point<int16_t>(0, -4));
-        buttons[BT_TAB_SETUP] = std::make_unique<TwoSpriteButton>(tabdis["3"], taben["3"], Point<int16_t>(-1, -4));
-        buttons[BT_TAB_CASH]= std::make_unique<TwoSpriteButton>(tabdis["4"], taben["4"], Point<int16_t>(-1, -4));
+        // v83 tab sprites carry no origin, so the strip is laid out
+        // explicitly: five 27px tabs, 32px apart, sitting on the dark
+        // band between the title bar and the slot grid.
+        buttons[BT_TAB_EQUIP]= std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"], Point<int16_t>(9, 24));
+        buttons[BT_TAB_USE] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"], Point<int16_t>(41, 24));
+        buttons[BT_TAB_ETC] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"], Point<int16_t>(73, 24));
+        buttons[BT_TAB_SETUP] = std::make_unique<TwoSpriteButton>(tabdis["3"], taben["3"], Point<int16_t>(105, 24));
+        buttons[BT_TAB_CASH]= std::make_unique<TwoSpriteButton>(tabdis["4"], taben["4"], Point<int16_t>(137, 24));
 
-        buttons[BT_DROPMESO]= std::make_unique<MapleButton>(src["BtCoin"]);
-        buttons[BT_POINTS]= std::make_unique<MapleButton>(src["BtPoint0"]);
-        buttons[BT_GATHER]= std::make_unique<MapleButton>(src["BtGather"]);
-        buttons[BT_SORT]= std::make_unique<MapleButton>(src["BtSort"]);
-        buttons[BT_EXPAND]= std::make_unique<MapleButton>(src["BtFull"]);
-        buttons[BT_ITEMPOT]= std::make_unique<MapleButton>(src["BtPot3"]);
-        buttons[BT_UPGRADE]= std::make_unique<MapleButton>(src["BtUpgrade3"]);
-        buttons[BT_MAGNIFY]= std::make_unique<MapleButton>(src["BtAppraise3"]);
-        buttons[BT_BITCASE]= std::make_unique<MapleButton>(src["BtBits3"]);
+        // v83 button frames are centre-anchored (origin 6,6) or plain
+        // (BtCoin), so each one is placed on its socket in the backgrnd:
+        // the meso coin at (8, 267), the gather/sort pair in the dark
+        // panel at the bottom right and the expand toggle in the title
+        // bar.  BtPoint0/BtPot3/BtUpgrade3/BtAppraise3/BtBits3 are
+        // post-Chaos only and simply stay absent.
+        buttons[BT_DROPMESO]= std::make_unique<MapleButton>(src["BtCoin"], Point<int16_t>(8, 267));
+        buttons[BT_GATHER]= std::make_unique<MapleButton>(src["BtGather"], Point<int16_t>(147, 273));
+        buttons[BT_SORT]= std::make_unique<MapleButton>(src["BtSort"], Point<int16_t>(162, 273));
+        buttons[BT_EXPAND]= std::make_unique<MapleButton>(src["BtFull"], Point<int16_t>(163, 11));
 
         tab = InventoryType::EQUIP;
         slotrange.first = 1;
@@ -77,8 +83,11 @@ namespace jrc
 
         mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
 
+        // The scrollbar runs along the strip between the last socket
+        // column (x 148) and the border (x 171); its arrows span the
+        // six socket rows (y 50 to 252).
         slider = {
-            11, { 50, 248 }, 152, 6, 1 + inventory.get_slotmax(tab) / 4,
+            11, { 50, 240 }, 154, 6, 1 + inventory.get_slotmax(tab) / 4,
             [&](bool upwards) {
             int16_t shift = upwards ? -4 : 4;
             bool above = slotrange.first + shift > 0;
@@ -90,7 +99,7 @@ namespace jrc
             }
         } };
 
-        dimension = { 172, 335 };
+        dimension = { 175, 289 };
         active = true;
 
         load_icons();
@@ -131,7 +140,7 @@ namespace jrc
             newitemtab.draw({ newtabpos }, alpha);
         }
 
-        Point<int16_t> mesopos = position + Point<int16_t>(124, 264);
+        Point<int16_t> mesopos = position + Point<int16_t>(137, 268);
         mesolabel.draw(mesopos);
     }
 
@@ -459,12 +468,14 @@ namespace jrc
 
     int16_t UIItemInventory::slot_by_position(Point<int16_t> cursorpos) const
     {
-        int16_t xoff = cursorpos.x() - 11;
-        int16_t yoff = cursorpos.y() - 51;
-        if (xoff < 1 || xoff > 143 || yoff < 1)
+        // v83 socket grid: four 32px cells, 36px apart, starting at (8, 50)
+        // with a 34px row pitch.
+        int16_t xoff = cursorpos.x() - 8;
+        int16_t yoff = cursorpos.y() - 50;
+        if (xoff < 1 || xoff > 143 || yoff < 1 || yoff > 203)
             return 0;
 
-        int16_t slot = slotrange.first + (xoff / 36) + 4 * (yoff / 35);
+        int16_t slot = slotrange.first + (xoff / 36) + 4 * (yoff / 34);
         return is_visible(slot) ? slot : 0;
     }
 
@@ -472,25 +483,27 @@ namespace jrc
     {
         int16_t absslot = slot - slotrange.first;
         return Point<int16_t>(
-            11 + (absslot % 4) * 36,
-            51 + (absslot / 4) * 35
+            8 + (absslot % 4) * 36,
+            50 + (absslot / 4) * 34
             );
     }
 
     Point<int16_t> UIItemInventory::get_tabpos(InventoryType::Id tb) const
     {
+        // The "new item" flash (New/Tab0, 34x18) is centred over the
+        // 27x16 tab sprite it highlights.
         switch (tb)
         {
         case InventoryType::EQUIP:
-            return Point<int16_t>(10, 28);
+            return Point<int16_t>(6, 23);
         case InventoryType::USE:
-            return Point<int16_t>(42, 28);
+            return Point<int16_t>(38, 23);
         case InventoryType::SETUP:
-            return Point<int16_t>(74, 28);
+            return Point<int16_t>(102, 23);
         case InventoryType::ETC:
-            return Point<int16_t>(105, 28);
+            return Point<int16_t>(70, 23);
         case InventoryType::CASH:
-            return Point<int16_t>(138, 28);
+            return Point<int16_t>(134, 23);
         default:
             return Point<int16_t>();
         }

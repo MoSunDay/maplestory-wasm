@@ -19,8 +19,39 @@
 
 #include "nlnx/nx.hpp"
 
+#include <string>
+
 namespace jrc
 {
+    namespace
+    {
+        // Post-Chaos files name each scrollbar variant VScr0, VScr1, ...
+        // while pre-Chaos Basic.img only ships the variants it actually
+        // draws: VScr plus VScr2..VScr8 (no VScr0/VScr1). Try the exact
+        // name first, then fall back to whatever exists.
+        nl::node resolve_scroll_src(const std::string& base, int32_t type)
+        {
+            nl::node basic = nl::nx::ui["Basic.img"];
+
+            nl::node src = basic[base + std::to_string(type)];
+            if (src)
+                return src;
+
+            src = basic[base];
+            if (src)
+                return src;
+
+            for (int32_t i = 2; i <= 8; i++)
+            {
+                nl::node candidate = basic[base + std::to_string(i)];
+                if (candidate)
+                    return candidate;
+            }
+
+            return src;
+        }
+    }
+
     Slider::Slider(int32_t type, Range<int16_t> ver, int16_t xp,
         int16_t ur, int16_t rm, std::function<void(bool)> om) {
 
@@ -31,7 +62,7 @@ namespace jrc
         start = { x, vertical.first() };
         end = { x, vertical.second() };
 
-        nl::node src = nl::nx::ui["Basic.img"]["VScr" + std::to_string(type)];
+        nl::node src = resolve_scroll_src("VScr", type);
 
         nl::node dsrc = src["disabled"];
 

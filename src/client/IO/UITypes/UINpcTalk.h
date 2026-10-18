@@ -67,9 +67,6 @@ namespace jrc
             UNKNOWN
         };
 
-        void parse_selections(const std::string& text, std::string& rendered_text);
-        static std::string strip_npc_tokens(const std::string& text);
-        static std::string replace_macros(const std::string& source);
         static DialogueMode resolve_dialogue_mode(int8_t msgtype, bool has_navigation_flags);
         void refresh_selection_styles();
         int16_t get_selection_text_height() const;

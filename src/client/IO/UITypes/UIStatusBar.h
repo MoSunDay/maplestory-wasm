@@ -22,6 +22,8 @@
 #include "../UIElement.h"
 #include "../Messages.h"
 
+#include "StatusBar/StatusBarPreChaos.h"
+
 #include "../Components/Charset.h"
 #include "../Components/Gauge.h"
 #include "../Components/Textfield.h"
@@ -30,6 +32,7 @@
 #include "../../Character/Inventory/Inventory.h"
 #include "../../Character/Job.h"
 #include "../../Graphics/Animation.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
 
 #include <vector>
@@ -92,6 +95,9 @@ namespace jrc
 
     private:
         void update_layout_position();
+        void initialize_postchaos();
+        void initialize_prechaos(nl::node statusbar);
+        void draw_prechaos() const;
         void dispatch_popup_action(StatusBarPopup::Action action);
         float getexppercent() const;
         float gethppercent() const;
@@ -133,5 +139,13 @@ namespace jrc
         Animation mpanimation;
         StatusBarPopup popup;
         int32_t cashshop_request_cooldown = 0;
+
+        // Pre-Chaos (v83 StatusBar.img) drawing state. The post-Chaos
+        // branch keeps the gauge sprites above and ignores these.
+        Texture gauge_graduation;
+        Texture gauge_fill;
+        Texture quickslot_panel;
+        Texture quickslot_keys[8];
+        mutable ColorBox gauge_covers[3];
     };
 }

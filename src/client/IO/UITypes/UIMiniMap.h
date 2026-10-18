@@ -77,8 +77,18 @@ namespace jrc
 
         void update_buttons();
         void toggle_buttons();
+        void toggle_buttons_v83();
         void update_text();
         void update_canvas();
+        void update_canvas_v83(Point<int16_t> map_dimensions);
+        void add_frame_sprites_v83(
+            std::vector<Sprite>& sprites,
+            nl::node src,
+            int16_t interior_width,
+            int16_t interior_height,
+            int16_t top_height,
+            int16_t bottom_height
+        );
         void draw_movable_markers(Point<int16_t> init_pos, float alpha) const;
         void update_static_markers();
         void set_npclist_active(bool active);

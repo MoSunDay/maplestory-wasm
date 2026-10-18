@@ -19,20 +19,18 @@
 
 #include "../Components/MapleButton.h"
 
-#include "../../Console.h"
 #include "../../Constants.h"
-#include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
-#include "../../Util/Misc.h"
+
+#include "UINpcTalkNodes.h"
+#include "UINpcTalkText.h"
 
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
 #include <algorithm>
-#include <cctype>
-#include <unordered_set>
 
 namespace jrc
 {
@@ -47,245 +45,6 @@ namespace jrc
         constexpr int16_t DIALOG_TEXT_Y_OFFSET = 16;
         constexpr int16_t OPTION_VERTICAL_GAP = 2;
         constexpr int16_t HOVER_UNDERLINE_THICKNESS = 1;
-        constexpr int8_t SELECTION_DIALOGUE_TYPE = 4;
-        constexpr int8_t LEGACY_SELECTION_DIALOGUE_TYPE = 5;
-
-        // Zero-parameter formatting tokens: bold, color switches, etc.
-        // These must be handled before number-parsing to avoid greedily
-        // consuming content like #e1000#k → stripping "1000".
-        bool is_formatting_token(char ch)
-        {
-            switch (std::tolower(static_cast<unsigned char>(ch)))
-            {
-            case 'b':  // blue
-            case 'd':  // dark/purple
-            case 'e':  // bold on
-            case 'f':  // dark-grey
-            case 'g':  // green
-            case 'k':  // black
-            case 'n':  // normal
-            case 'r':  // red
-                return true;
-            default:
-                return false;
-            }
-        }
-
-        bool is_selection_dialogue_type(int8_t msgtype)
-        {
-            // Cosmic-compatible servers have been observed using both values
-            // for menu prompts with #L...#l options.
-            return msgtype == SELECTION_DIALOGUE_TYPE || msgtype == LEGACY_SELECTION_DIALOGUE_TYPE;
-        }
-
-        size_t find_next_selection_tag(const std::string& source, size_t start)
-        {
-            size_t cursor = source.find("#L", start);
-            while (cursor != std::string::npos)
-            {
-                size_t id_start = cursor + 2;
-                size_t id_end = id_start;
-                while (id_end < source.size() && std::isdigit(static_cast<unsigned char>(source[id_end])))
-                {
-                    id_end++;
-                }
-
-                if (id_end > id_start && id_end < source.size() && source[id_end] == '#')
-                {
-                    return cursor;
-                }
-
-                cursor = source.find("#L", cursor + 2);
-            }
-
-            return std::string::npos;
-        }
-
-        std::string trim_selection_text(std::string text)
-        {
-            while (!text.empty())
-            {
-                char ch = text.back();
-                if (ch != '\r' && ch != '\n' && ch != ' ' && ch != '\t')
-                {
-                    break;
-                }
-
-                text.pop_back();
-            }
-
-            return text;
-        }
-
-        bool try_parse_int32(const std::string& token, int32_t& value)
-        {
-            if (token.empty())
-            {
-                return false;
-            }
-
-            try
-            {
-                value = std::stoi(token);
-            }
-            catch (...)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        bool try_parse_delimited_number(
-            const std::string& source,
-            size_t number_start,
-            size_t& delimiter_pos,
-            int32_t& value
-        )
-        {
-            size_t number_end = number_start;
-            while (number_end < source.size() && std::isdigit(static_cast<unsigned char>(source[number_end])))
-            {
-                number_end++;
-            }
-
-            if (number_end == number_start || number_end >= source.size() || source[number_end] != '#')
-            {
-                return false;
-            }
-
-            if (!try_parse_int32(source.substr(number_start, number_end - number_start), value))
-            {
-                return false;
-            }
-
-            delimiter_pos = number_end;
-            return true;
-        }
-
-        std::string try_get_item_name(int32_t itemid)
-        {
-            const ItemData& item_data = ItemData::get(itemid);
-            if (item_data.is_valid())
-            {
-                return item_data.get_name();
-            }
-
-            return {};
-        }
-
-        std::string try_get_npc_name(int32_t npcid)
-        {
-            nl::node npc_name = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
-            if (npc_name)
-            {
-                return npc_name.get_string();
-            }
-
-            return {};
-        }
-
-        std::string try_get_mob_name(int32_t mobid)
-        {
-            nl::node mob_name = nl::nx::string["Mob.img"][std::to_string(mobid)]["name"];
-            if (mob_name)
-            {
-                return mob_name.get_string();
-            }
-
-            return {};
-        }
-
-        std::string try_get_map_name(int32_t mapid)
-        {
-            const NxHelper::Map::MapInfo map_info = NxHelper::Map::get_map_info_by_id(mapid);
-            if (!map_info.full_name.empty())
-            {
-                return map_info.full_name;
-            }
-
-            return map_info.name;
-        }
-
-        std::string resolve_prefixed_reference(char prefix, int32_t id)
-        {
-            switch (prefix)
-            {
-            case 'm':
-            case 'M':
-                return try_get_map_name(id);
-            case 't':
-            case 'T':
-            case 'z':
-            case 'Z':
-                return try_get_item_name(id);
-            case 'p':
-            case 'P':
-                return try_get_npc_name(id);
-            case 'o':
-            case 'O':
-                return try_get_mob_name(id);
-            default:
-                return {};
-            }
-        }
-
-        std::string resolve_numeric_reference(int32_t id)
-        {
-            if (id >= 100000000)
-            {
-                return try_get_map_name(id);
-            }
-
-            // Some server scripts send bare "#123456#" placeholders without a
-            // token prefix. Resolve by trying the most common string tables.
-            std::string resolved = try_get_item_name(id);
-            if (!resolved.empty())
-            {
-                return resolved;
-            }
-
-            resolved = try_get_npc_name(id);
-            if (!resolved.empty())
-            {
-                return resolved;
-            }
-
-            resolved = try_get_mob_name(id);
-            if (!resolved.empty())
-            {
-                return resolved;
-            }
-
-            return try_get_map_name(id);
-        }
-
-        void log_unresolved_npc_token(const std::string& token)
-        {
-            static std::unordered_set<std::string> logged_tokens;
-            static bool emitted_log_limit_message = false;
-            constexpr size_t MAX_UNRESOLVED_TOKEN_LOGS = 20;
-
-            if (logged_tokens.find(token) != logged_tokens.end())
-            {
-                return;
-            }
-
-            if (logged_tokens.size() >= MAX_UNRESOLVED_TOKEN_LOGS)
-            {
-                if (!emitted_log_limit_message)
-                {
-                    Console::get().print(
-                        "[npc] unresolved token log limit reached; suppressing additional unique token logs."
-                    );
-                    emitted_log_limit_message = true;
-                }
-                return;
-            }
-
-            logged_tokens.insert(token);
-            Console::get().print("[npc] unresolved dialogue token: " + token);
-        }
     }
 
     UINpcTalk::UINpcTalk()
@@ -319,7 +78,7 @@ namespace jrc
 
     UINpcTalk::DialogueMode UINpcTalk::resolve_dialogue_mode(int8_t msgtype, bool has_navigation_flags)
     {
-        if (is_selection_dialogue_type(msgtype))
+        if (npctalk_text::is_selection_dialogue_type(msgtype))
         {
             return DialogueMode::SELECTION;
         }
@@ -511,7 +270,7 @@ namespace jrc
         const std::string& tx
     )
     {
-        std::string processed_tx = replace_macros(tx);
+        std::string processed_tx = npctalk_text::replace_macros(tx);
         dialogue_mode = resolve_dialogue_mode(msgtype, has_navigation_flags);
 
         selections.clear();
@@ -523,7 +282,10 @@ namespace jrc
 
         if (dialogue_mode == DialogueMode::SELECTION)
         {
-            parse_selections(processed_tx, prompttext);
+            const npctalk_text::SelectionList parsed = npctalk_text::parse_selections(processed_tx);
+            prompttext = parsed.rendered_text;
+            selections = parsed.option_ids;
+            selection_texts = parsed.option_texts;
             text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
             selection_labels.reserve(selection_texts.size());
             for (const std::string& option_text : selection_texts)
@@ -534,7 +296,7 @@ namespace jrc
         }
         else
         {
-            prompttext = strip_npc_tokens(processed_tx);
+            prompttext = npctalk_text::strip_npc_tokens(processed_tx);
             text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
         }
 
@@ -731,74 +493,6 @@ namespace jrc
         return UIElement::send_cursor(clicked, cursorpos);
     }
 
-    void UINpcTalk::parse_selections(const std::string& source, std::string& rendered_text)
-    {
-        rendered_text.clear();
-        selections.clear();
-        selection_texts.clear();
-
-        size_t cursor = 0;
-        while (cursor < source.size())
-        {
-            size_t begin = source.find("#L", cursor);
-            if (begin == std::string::npos)
-            {
-                rendered_text += source.substr(cursor);
-                break;
-            }
-
-            rendered_text += source.substr(cursor, begin - cursor);
-
-            size_t id_start = begin + 2;
-            size_t id_end = id_start;
-            while (id_end < source.size() && std::isdigit(static_cast<unsigned char>(source[id_end])))
-                id_end++;
-
-            if (id_end >= source.size() || source[id_end] != '#')
-            {
-                rendered_text += source.substr(begin);
-                break;
-            }
-
-            size_t option_start = id_end + 1;
-            size_t option_end = source.find("#l", option_start);
-            bool has_explicit_end = option_end != std::string::npos;
-            if (!has_explicit_end)
-            {
-                option_end = find_next_selection_tag(source, option_start);
-                if (option_end == std::string::npos)
-                {
-                    option_end = source.size();
-                }
-            }
-
-            if (id_end == id_start)
-            {
-                rendered_text += source.substr(begin, option_end - begin);
-                cursor = has_explicit_end ? option_end + 2 : option_end;
-                continue;
-            }
-
-            int32_t selection_id = 0;
-            if (!try_parse_int32(source.substr(id_start, id_end - id_start), selection_id))
-            {
-                rendered_text += source.substr(begin, option_end - begin);
-                cursor = has_explicit_end ? option_end + 2 : option_end;
-                continue;
-            }
-
-            selections.push_back(selection_id);
-            selection_texts.push_back(
-                trim_selection_text(
-                    strip_npc_tokens(source.substr(option_start, option_end - option_start))
-                )
-            );
-            cursor = has_explicit_end ? option_end + 2 : option_end;
-        }
-
-        rendered_text = strip_npc_tokens(rendered_text);
-    }
-
     void UINpcTalk::refresh_selection_styles()
     {
         for (size_t i = 0; i < selection_labels.size(); ++i)
@@ -884,167 +578,4 @@ namespace jrc
         return -1;
     }
 
-    std::string UINpcTalk::strip_npc_tokens(const std::string& source)
-    {
-        std::string stripped;
-        stripped.reserve(source.size());
-
-        size_t cursor = 0;
-        while (cursor < source.size())
-        {
-            if (source[cursor] != '#' || cursor + 1 >= source.size())
-            {
-                stripped.push_back(source[cursor]);
-                cursor++;
-                continue;
-            }
-
-            char token = source[cursor + 1];
-
-            if (token == '#')
-            {
-                stripped.push_back('#');
-                cursor += 2;
-                continue;
-            }
-
-            if (is_formatting_token(token))
-            {
-                cursor += 2;
-                continue;
-            }
-
-            if (std::isalpha(static_cast<unsigned char>(token)))
-            {
-                int32_t ignored_value = 0;
-                size_t token_end = 0;
-                if (try_parse_delimited_number(source, cursor + 2, token_end, ignored_value))
-                {
-                    cursor = token_end + 1;
-                    continue;
-                }
-
-                if (token == 'h' || token == 'H')
-                {
-                    size_t token_end_h = source.find('#', cursor + 2);
-                    if (token_end_h != std::string::npos)
-                    {
-                        cursor = token_end_h + 1;
-                        continue;
-                    }
-                }
-
-                cursor += 2;
-                continue;
-            }
-
-            if (std::isdigit(static_cast<unsigned char>(token)))
-            {
-                int32_t ignored_value = 0;
-                size_t token_end = 0;
-                if (try_parse_delimited_number(source, cursor + 1, token_end, ignored_value))
-                {
-                    cursor = token_end + 1;
-                    continue;
-                }
-            }
-
-            stripped.push_back(source[cursor]);
-            cursor++;
-        }
-
-        return stripped;
-    }
-
-    std::string UINpcTalk::replace_macros(const std::string& source)
-    {
-        std::string result;
-        result.reserve(source.size());
-
-        size_t cursor = 0;
-        while (cursor < source.size())
-        {
-            if (source[cursor] != '#' || cursor + 1 >= source.size())
-            {
-                result.push_back(source[cursor]);
-                cursor++;
-                continue;
-            }
-
-            char token = source[cursor + 1];
-
-            // Skip zero-parameter formatting tokens (#b, #e, #k, #n, #r, etc.)
-            if (is_formatting_token(token))
-            {
-                cursor += 2;
-                continue;
-            }
-
-            if (token == 'h' || token == 'H')
-            {
-                size_t token_end = source.find('#', cursor + 2);
-                if (token_end != std::string::npos)
-                {
-                    result += Stage::get().get_player().get_stats().get_name();
-                    cursor = token_end + 1;
-                    continue;
-                }
-            }
-
-            if (token == 'm' || token == 'M' ||
-                token == 't' || token == 'T' ||
-                token == 'z' || token == 'Z' ||
-                token == 'p' || token == 'P' ||
-                token == 'o' || token == 'O')
-            {
-                int32_t id = 0;
-                size_t token_end = 0;
-                if (try_parse_delimited_number(source, cursor + 2, token_end, id))
-                {
-                    std::string replacement = resolve_prefixed_reference(token, id);
-                    std::string token_text = source.substr(cursor, token_end + 1 - cursor);
-                    if (!replacement.empty())
-                    {
-                        result += replacement;
-                    }
-                    else
-                    {
-                        log_unresolved_npc_token(token_text);
-                        result += token_text;
-                    }
-
-                    cursor = token_end + 1;
-                    continue;
-                }
-            }
-
-            if (std::isdigit(static_cast<unsigned char>(token)))
-            {
-                int32_t id = 0;
-                size_t token_end = 0;
-                if (try_parse_delimited_number(source, cursor + 1, token_end, id))
-                {
-                    std::string replacement = resolve_numeric_reference(id);
-                    std::string token_text = source.substr(cursor, token_end + 1 - cursor);
-                    if (!replacement.empty())
-                    {
-                        result += replacement;
-                    }
-                    else
-                    {
-                        log_unresolved_npc_token(token_text);
-                        result += token_text;
-                    }
-
-                    cursor = token_end + 1;
-                    continue;
-                }
-            }
-
-            result.push_back(source[cursor]);
-            cursor++;
-        }
-
-        return result;
-    }
 }

@@ -35,6 +35,63 @@ namespace jrc
     namespace
     {
         constexpr uint32_t REQUEST_TIMEOUT = 8000;
+
+        // Login.img/NewChar form geometry the decision buttons must avoid:
+        // the look board (charSet, 225x377) is drawn at (450,115), the
+        // nine avatarSel rows (17px tall, 19px step) run from y = 217 to
+        // 386, and the name board (charName, 201x224) at (455,115) ends
+        // at y = 339.
+        constexpr int16_t LOOKBOARD_LEFT = 450;
+        constexpr int16_t LOOKBOARD_WIDTH = 225;
+        constexpr int16_t LOOKBOARD_BOTTOM = 115 + 377;
+        constexpr int16_t NAMEBOARD_LEFT = 455;
+        constexpr int16_t NAMEBOARD_WIDTH = 201;
+        constexpr int16_t NAMEBOARD_BOTTOM = 115 + 224;
+        constexpr int16_t BUTTON_BOTTOM_MARGIN = 6;
+        constexpr int16_t BUTTON_GAP = 11;
+        // Post-BB BtYes/BtNo size, used when the node cannot be read.
+        constexpr Point<int16_t> FALLBACK_BUTTON_DIMS{ 73, 41 };
+
+        Point<int16_t> newchar_button_dims(nl::node src)
+        {
+            const nl::bitmap bitmap = src["normal"]["0"].get_bitmap();
+            if (bitmap.width() == 0 || bitmap.height() == 0)
+                return FALLBACK_BUTTON_DIMS;
+
+            return {
+                static_cast<int16_t>(bitmap.width()),
+                static_cast<int16_t>(bitmap.height())
+            };
+        }
+
+        // OK/No anchors derived from the shipped button size: the pair is
+        // centered on the active board and sits in a row above its bottom
+        // edge. While customizing that is below the last avatarSel row
+        // (y = 386), so the buttons no longer rest on the form. The
+        // upstream literals (482/555 at y = 292) assumed ~73px wide
+        // post-BB buttons; the pre-Chaos art is 81px wide and the two
+        // buttons overlapped by 8px there.
+        Point<int16_t> decision_button_pos(
+            bool ok, bool customizing, Point<int16_t> button_dims)
+        {
+            const int16_t board_left = customizing
+                ? LOOKBOARD_LEFT : NAMEBOARD_LEFT;
+            const int16_t board_width = customizing
+                ? LOOKBOARD_WIDTH : NAMEBOARD_WIDTH;
+            const int16_t board_bottom = customizing
+                ? LOOKBOARD_BOTTOM : NAMEBOARD_BOTTOM;
+
+            const int16_t pair_width =
+                2 * button_dims.x() + BUTTON_GAP;
+            const int16_t left = board_left + (board_width - pair_width) / 2;
+            const int16_t top = board_bottom - button_dims.y()
+                - BUTTON_BOTTOM_MARGIN;
+
+            return {
+                left + (ok ? 0 : button_dims.x() + BUTTON_GAP),
+                top
+            };
+        }
     }
 
     UICharcreation::UICharcreation()
@@ -65,8 +122,14 @@ namespace jrc
         sprites_lookboard.emplace_back(crsrc["avatarSel"]["7"]["normal"], Point<int16_t>(461, 350));
         sprites_lookboard.emplace_back(crsrc["avatarSel"]["8"]["normal"], Point<int16_t>(461, 369));
 
-        buttons[BT_CHARC_OK] = std::make_unique<MapleButton>(crsrc["BtYes"], Point<int16_t>(482, 292));
-        buttons[BT_CHARC_CANCEL] = std::make_unique<MapleButton>(crsrc["BtNo"], Point<int16_t>(555, 292));
+        // Initial phase is name entry, so the decision buttons start on
+        // the name board row; they move below the form once the name is
+        // accepted (see set_customization_controls).
+        const Point<int16_t> ok_dims = newchar_button_dims(crsrc["BtYes"]);
+        buttons[BT_CHARC_OK] = std::make_unique<MapleButton>(
+            crsrc["BtYes"], decision_button_pos(true, false, ok_dims));
+        buttons[BT_CHARC_CANCEL] = std::make_unique<MapleButton>(
+            crsrc["BtNo"], decision_button_pos(false, false, ok_dims));
         buttons[BT_CHARC_FACEL] = std::make_unique<MapleButton>(crsrc["BtLeft"], Point<int16_t>(521, 216));
         buttons[BT_CHARC_FACER] = std::make_unique<MapleButton>(crsrc["BtRight"], Point<int16_t>(645, 216));
         buttons[BT_CHARC_HAIRL] = std::make_unique<MapleButton>(crsrc["BtLeft"], Point<int16_t>(521, 235));
@@ -385,8 +448,14 @@ namespace jrc
 
     void UICharcreation::set_customization_controls(bool enabled)
     {
-        buttons[BT_CHARC_OK]->set_position(enabled ? Point<int16_t>(486, 445) : Point<int16_t>(482, 292));
-        buttons[BT_CHARC_CANCEL]->set_position(enabled ? Point<int16_t>(560, 445) : Point<int16_t>(555, 292));
+        // Re-derive the anchors so the pair keeps tracking the button
+        // size shipped with the active UI.nx generation.
+        const nl::node crsrc = nl::nx::ui["Login.img"]["NewChar"];
+        const Point<int16_t> ok_dims = newchar_button_dims(crsrc["BtYes"]);
+        buttons[BT_CHARC_OK]->set_position(
+            decision_button_pos(true, enabled, ok_dims));
+        buttons[BT_CHARC_CANCEL]->set_position(
+            decision_button_pos(false, enabled, ok_dims));
 
         for (uint16_t id = BT_CHARC_FACEL; id <= BT_CHARC_GEMDERR; ++id)
         {

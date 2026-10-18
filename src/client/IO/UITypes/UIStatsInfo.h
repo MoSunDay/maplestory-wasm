@@ -42,19 +42,17 @@ namespace jrc
         Button::State button_pressed(uint16_t buttonid) override;
 
     private:
-        static const size_t NUMLABELS = 27;
+        static const size_t NUMLABELS = 19;
         static const size_t NUMNORMAL = 12;
-        static const size_t NUMDETAIL = 15;
+        static const size_t NUMDETAIL = 7;
         enum StatLabel
         {
             // Normal
             NAME, JOB, GUILD, FAME, DAMAGE,
             HP, MP, AP, STR, DEX, INT, LUK,
             // Detailed
-            ATTACK, CRIT, MINCRIT, MAXCRIT,
-            BDM, IGNOREDEF, RESIST, STANCE,
-            WDEF, MDEF, ACCURACY, AVOID,
-            SPEED, JUMP, HONOR
+            ATTACK, WDEF, MDEF, ACCURACY,
+            AVOID, SPEED, JUMP
         };
 
         void update_ap();
@@ -71,24 +69,11 @@ namespace jrc
             BT_DEX,
             BT_INT,
             BT_LUK,
-            BT_DETAILOPEN,
-            BT_DETAILCLOSE,
+            BT_DETAIL,
             NUM_BUTTONS
         };
 
         const CharStats& stats;
-
-        enum Ability
-        {
-            RARE,
-            EPIC,
-            UNIQUE,
-            LEGENDARY,
-            NONE,
-            NUM_ABILITIES
-        };
-
-        std::array<Texture, NUM_ABILITIES> abilities;
 
         std::vector<Texture> textures_detail;
         bool showdetail;

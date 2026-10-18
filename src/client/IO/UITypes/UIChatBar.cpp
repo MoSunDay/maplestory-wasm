@@ -1,9 +1,10 @@
 #include "UIChatBar.h"
 
 #include "../UI.h"
-
 #include "../Components/MapleButton.h"
+#include "StatusBar/StatusBarPreChaos.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Net/Packets/MessagingPackets.h"
 
 #include "UIParty.h"
@@ -41,34 +42,62 @@ namespace jrc
         lastpos = 0;
         dragchattop = false;
 
-        nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
+        if (statusbar::prechaos())
+        {
+            nl::node base = nl::nx::ui["StatusBar.img"]["base"];
 
-        buttons[BT_OPENCHAT] = std::make_unique<MapleButton>(mainbar["chatOpen"]);
-        buttons[BT_CLOSECHAT] = std::make_unique<MapleButton>(mainbar["chatClose"]);
-        buttons[BT_SCROLLUP] = std::make_unique<MapleButton>(mainbar["scrollUp"]);
-        buttons[BT_SCROLLDOWN] = std::make_unique<MapleButton>(mainbar["scrollDown"]);
-        buttons[BT_CHATTARGETS] = std::make_unique<MapleButton>(mainbar["chatTarget"]["base"]);
+            chat_strip = base["chat"];
+            chat_target_box = base["chatTarget"];
+            chat_input_row = {
+                statusbar::chat_log_width(), 17,
+                Geometry::BLACK, 0.66f
+            };
+            chat_target_label = { Text::A11M, Text::CENTER, Text::BLACK };
+            apply_chat_target_label();
 
-        chatspace[false] = mainbar["chatSpace"];
-        chatspace[true] = mainbar["chatEnter"];
-        chatenter = mainbar["chatSpace2"];
-        chatcover = mainbar["chatCover"];
+            chatbox = {
+                statusbar::chat_log_width(),
+                1 + chatrows * CHATROWHEIGHT,
+                Geometry::BLACK, 0.6f
+            };
+        }
+        else
+        {
+            nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 
-        chattargets[CHT_ALL] = mainbar["chatTarget"]["all"];
-        chattargets[CHT_BUDDY] = mainbar["chatTarget"]["friend"];
-        chattargets[CHT_GUILD] = mainbar["chatTarget"]["guild"];
-        chattargets[CHT_ALLIANCE] = mainbar["chatTarget"]["association"];
-        chattargets[CHT_PARTY] = mainbar["chatTarget"]["party"];
-        chattargets[CHT_SQUAD] = mainbar["chatTarget"]["expedition"];
+            buttons[BT_OPENCHAT] = std::make_unique<MapleButton>(mainbar["chatOpen"]);
+            buttons[BT_CLOSECHAT] = std::make_unique<MapleButton>(mainbar["chatClose"]);
+            buttons[BT_SCROLLUP] = std::make_unique<MapleButton>(mainbar["scrollUp"]);
+            buttons[BT_SCROLLDOWN] = std::make_unique<MapleButton>(mainbar["scrollDown"]);
+            buttons[BT_CHATTARGETS] = std::make_unique<MapleButton>(mainbar["chatTarget"]["base"]);
 
-        nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
+            chatspace[false] = mainbar["chatSpace"];
+            chatspace[true] = mainbar["chatEnter"];
+            chatenter = mainbar["chatSpace2"];
+            chatcover = mainbar["chatCover"];
 
-        tapbar = chat["tapBar"];
-        tapbartop = chat["tapBarOver"];
+            chattargets[CHT_ALL] = mainbar["chatTarget"]["all"];
+            chattargets[CHT_BUDDY] = mainbar["chatTarget"]["friend"];
+            chattargets[CHT_GUILD] = mainbar["chatTarget"]["guild"];
+            chattargets[CHT_ALLIANCE] = mainbar["chatTarget"]["association"];
+            chattargets[CHT_PARTY] = mainbar["chatTarget"]["party"];
+            chattargets[CHT_SQUAD] = mainbar["chatTarget"]["expedition"];
 
-        chatbox = { 502, 1 + chatrows * CHATROWHEIGHT, Geometry::BLACK, 0.6f };
+            nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
 
-        chatfield = { Text::A11M, Text::LEFT, Text::BLACK, { { -435, -58 }, { -40, -35} }, 0 };
+            tapbar = chat["tapBar"];
+            tapbartop = chat["tapBarOver"];
+
+            chatbox = { 502, 1 + chatrows * CHATROWHEIGHT, Geometry::BLACK, 0.6f };
+        }
+
+        chatfield = {
+            Text::A11M, Text::LEFT, Text::BLACK,
+            statusbar::prechaos()
+                ? statusbar::chat_field_rect()
+                : Rectangle<int16_t>{ { -435, -58 }, { -40, -35 } },
+            0
+        };
         set_chat_open(chatopen);
         chatfield.set_enter_callback([&](std::string msg) {
             msg = trim(msg);
@@ -105,7 +134,11 @@ namespace jrc
             chatfield.set_state(Textfield::NORMAL);
         });
 
-        slider = {11, Range<int16_t>(0, CHATROWHEIGHT * chatrows - 14), -22, chatrows, 1,
+        slider = {
+            11,
+            Range<int16_t>(0, CHATROWHEIGHT * chatrows - 14),
+            statusbar::prechaos() ? statusbar::chat_slider_x() : -22,
+            chatrows, 1,
             [&](bool up) {
             int16_t next = up ?
                 rowpos - 1 :
@@ -115,12 +148,27 @@ namespace jrc
         } };
     }
 
+    void UIChatbar::apply_chat_target_label()
+    {
+        static const char* TARGET_NAMES[UIChatbar::NUM_TARGETS] = {
+            "All", "Buddy", "Guild", "Alliance", "Party", "Squad"
+        };
+
+        if (chattarget >= CHT_ALL && chattarget < NUM_TARGETS)
+        {
+            chat_target_label.change_text(TARGET_NAMES[chattarget]);
+        }
+    }
+
     void UIChatbar::set_chat_open(bool open)
     {
         chatopen = open;
-        buttons[BT_OPENCHAT]->set_active(!open);
-        buttons[BT_CLOSECHAT]->set_active(open);
-        buttons[BT_CHATTARGETS]->set_active(open);
+        if (buttons.count(BT_OPENCHAT))
+        {
+            buttons[BT_OPENCHAT]->set_active(!open);
+            buttons[BT_CLOSECHAT]->set_active(open);
+            buttons[BT_CHATTARGETS]->set_active(open);
+        }
         chatfield.set_state(open ? Textfield::NORMAL : Textfield::DISABLED);
     }
 
@@ -136,6 +184,33 @@ namespace jrc
 
     void UIChatbar::draw(float inter) const
     {
+        if (statusbar::prechaos())
+        {
+            UIElement::draw(inter);
+
+            // Input row inside the bottom strip: dark box under a thin
+            // divider (base/chat), selector box on the left.
+            chat_strip.draw(position + statusbar::chat_strip_pos());
+            chat_input_row.draw(position + Point<int16_t>(0, 54));
+            chat_target_box.draw(position + statusbar::chat_target_pos());
+            chat_target_label.draw(position + statusbar::chat_target_pos()
+                + Point<int16_t>(40, 5));
+
+            if (chatopen)
+            {
+                chatbox.draw({ 0, getchattop() + 2 });
+                draw_chatrows();
+                slider.draw({ position.x(), getchattop() + 5 });
+            }
+            else if (rowtexts.count(rowmax))
+            {
+                rowtexts.at(rowmax).draw({ 4, position.y() - CHATROWHEIGHT + 1 });
+            }
+
+            chatfield.draw(position);
+            return;
+        }
+
         chatspace[chatopen].draw(position);
         chatenter.draw(position);
 
@@ -146,22 +221,7 @@ namespace jrc
             tapbartop.draw({ position.x() - 576, getchattop() });
             chatbox.draw({ 0, getchattop() + 2 });
 
-            int16_t chatheight = CHATROWHEIGHT * chatrows;
-            int16_t yshift = -chatheight;
-            for (int16_t i = 0; i < chatrows; i++)
-            {
-                int16_t rowid = rowpos - i;
-                if (!rowtexts.count(rowid))
-                    break;
-
-                int16_t textheight = rowtexts.at(rowid).height() / CHATROWHEIGHT;
-                while (textheight > 0)
-                {
-                    yshift += CHATROWHEIGHT;
-                    textheight--;
-                }
-                rowtexts.at(rowid).draw({ 4, getchattop() - yshift - 1 });
-            }
+            draw_chatrows();
 
             slider.draw({ position.x(), getchattop() + 5 });
 
@@ -175,6 +235,26 @@ namespace jrc
         else if (rowtexts.count(rowmax))
         {
             rowtexts.at(rowmax).draw(position + Point<int16_t>(-500, -60));
+        }
+    }
+
+    void UIChatbar::draw_chatrows() const
+    {
+        int16_t chatheight = CHATROWHEIGHT * chatrows;
+        int16_t yshift = -chatheight;
+        for (int16_t i = 0; i < chatrows; i++)
+        {
+            int16_t rowid = rowpos - i;
+            if (!rowtexts.count(rowid))
+                break;
+
+            int16_t textheight = rowtexts.at(rowid).height() / CHATROWHEIGHT;
+            while (textheight > 0)
+            {
+                yshift += CHATROWHEIGHT;
+                textheight--;
+            }
+            rowtexts.at(rowid).draw({ 4, getchattop() - yshift - 1 });
         }
     }
 
@@ -209,6 +289,17 @@ namespace jrc
 
     bool UIChatbar::is_in_range(Point<int16_t> cursorpos) const
     {
+        if (statusbar::prechaos())
+        {
+            const Rectangle<int16_t> bounds(
+                0,
+                statusbar::chat_log_width(),
+                static_cast<int16_t>(getchattop() - 6),
+                static_cast<int16_t>(position.y() + statusbar::BAR_HEIGHT)
+            );
+            return bounds.contains(cursorpos);
+        }
+
         Point<int16_t> absp(0, getchattop() - 16);
         Point<int16_t> dim(500, chatrows * CHATROWHEIGHT + CHATYOFFSET + 16);
         return Rectangle<int16_t>(absp, absp + dim)
@@ -225,6 +316,27 @@ namespace jrc
 
     UIElement::CursorResult UIChatbar::send_cursor(bool clicking, Point<int16_t> cursorpos)
     {
+        if (statusbar::prechaos())
+        {
+            // The v83 chat target selector is a plain bitmap: hit-test it
+            // here instead of routing through a MapleButton.
+            const Point<int16_t> target_pos = position + statusbar::chat_target_pos();
+            const Rectangle<int16_t> target_bounds(
+                target_pos,
+                target_pos + Point<int16_t>(81, 20)
+            );
+            if (target_bounds.contains(cursorpos))
+            {
+                if (clicking)
+                {
+                    Sound(Sound::BUTTONCLICK).play();
+                    cycle_chat_target();
+                    return { Cursor::CLICKING, true };
+                }
+                return { Cursor::CANCLICK, true };
+            }
+        }
+
         if (slider.isenabled())
         {
             auto cursoroffset = cursorpos - Point<int16_t>(position.x(), getchattop() + 5);
@@ -244,8 +356,11 @@ namespace jrc
             }
         }
 
+        const int16_t drag_width = statusbar::prechaos()
+            ? statusbar::chat_log_width()
+            : 502;
         auto chattop = Rectangle<int16_t>(
-            0,  502,
+            0,  drag_width,
             getchattop(),
             getchattop() + 6
             );
@@ -330,11 +445,13 @@ namespace jrc
         }
 
         chattarget = target;
+        apply_chat_target_label();
     }
 
     void UIChatbar::cycle_chat_target()
     {
         chattarget = static_cast<ChatTarget>((chattarget + 1) % NUM_TARGETS);
+        apply_chat_target_label();
     }
 
     void UIChatbar::set_pending_party_invite(int32_t in_party_id, const std::string& inviter)
@@ -511,6 +628,13 @@ namespace jrc
 
     int16_t UIChatbar::getchattop() const
     {
+        if (statusbar::prechaos())
+        {
+            // The v83 log sits flush on top of the status bar.
+            return position.y() - chatrows * CHATROWHEIGHT
+                - statusbar::chat_top_gap();
+        }
+
         return position.y() - chatrows * CHATROWHEIGHT - CHATYOFFSET;
     }
 }

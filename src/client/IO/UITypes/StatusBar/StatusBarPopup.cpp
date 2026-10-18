@@ -17,6 +17,24 @@ namespace jrc
 
     StatusBarPopup::StatusBarPopup()
     {
+        if (statusbar::prechaos())
+        {
+            initialize_panel_prechaos(menu, {
+                { "Character Info", Action::STATS },
+                { "Equip", Action::EQUIPS },
+                { "Inventory", Action::ITEMS },
+                { "Skills", Action::SKILLS },
+                { "Quests", Action::NONE }
+            });
+            initialize_panel_prechaos(system, {
+                { "Key Config", Action::KEY_CONFIG },
+                { "Pet Options", Action::PET_OPTIONS },
+                { "Game Options", Action::NONE },
+                { "Quit Game", Action::LOGOUT }
+            });
+            return;
+        }
+
         nl::node main_bar = nl::nx::ui["StatusBar2.img"]["mainBar"];
         initialize_panel(menu, main_bar["Menu"], {
             { "BtStat", Action::STATS },
@@ -78,6 +96,46 @@ namespace jrc
         }
     }
 
+    void StatusBarPopup::initialize_panel_prechaos(
+        PanelData& panel, const std::vector<ItemSpec>& specs)
+    {
+        // v83 popup frame: ContextMenu t (top with tail), c (row body, drawn
+        // stretched), s (bottom cap). Rows are plain centered text.
+        nl::node frame = nl::nx::ui["UIWindow.img"]["ContextMenu"];
+        panel.top = frame["t"];
+        panel.middle = frame["c"];
+        panel.bottom = frame["s"];
+
+        const size_t rows = specs.size();
+        panel.middle_height = static_cast<int16_t>(
+            rows * statusbar::popup_row_height() - 13
+        );
+        panel.width = statusbar::popup_width();
+        panel.height = static_cast<int16_t>(
+            panel.top.height() + panel.middle_height
+            + statusbar::popup_bottom_height()
+        );
+
+        panel.hover_row = ColorBox(
+            static_cast<int16_t>(
+                statusbar::popup_item_right() - statusbar::popup_item_left()
+            ),
+            statusbar::popup_row_height(),
+            Geometry::WHITE,
+            0.25f
+        );
+        panel.hover = -1;
+
+        panel.items.reserve(specs.size());
+        for (const ItemSpec& spec : specs)
+        {
+            panel.items.push_back({
+                Text(Text::A11M, Text::CENTER, Text::WHITE, spec.label),
+                spec.action
+            });
+        }
+    }
+
     void StatusBarPopup::draw(float) const
     {
         if (!is_open())
@@ -86,6 +144,12 @@ namespace jrc
         }
 
         const PanelData& panel = active_data();
+        if (statusbar::prechaos())
+        {
+            draw_prechaos(panel);
+            return;
+        }
+
         panel.top.draw(panel.position);
         panel.middle.draw(DrawArgument(
             panel.position + Point<int16_t>(0, panel.top.height()),
@@ -104,6 +168,43 @@ namespace jrc
         }
     }
 
+    void StatusBarPopup::draw_prechaos(const PanelData& panel) const
+    {
+        panel.top.draw(panel.position);
+        panel.middle.draw(DrawArgument(
+            panel.position + Point<int16_t>(0, panel.top.height()),
+            Point<int16_t>(0, panel.middle_height)
+        ));
+        panel.bottom.draw(
+            panel.position + Point<int16_t>(
+                0,
+                static_cast<int16_t>(panel.top.height() + panel.middle_height)
+            )
+        );
+
+        const int16_t label_x = static_cast<int16_t>(panel.width / 2);
+        for (size_t index = 0; index < panel.items.size(); ++index)
+        {
+            const int16_t row_y = static_cast<int16_t>(
+                statusbar::popup_item_top()
+                + index * statusbar::popup_row_height()
+            );
+
+            if (panel.hover == static_cast<int16_t>(index))
+            {
+                panel.hover_row.draw(
+                    panel.position + Point<int16_t>(
+                        statusbar::popup_item_left(), row_y
+                    )
+                );
+            }
+
+            panel.items[index].label.draw(
+                panel.position + Point<int16_t>(label_x, row_y + 2)
+            );
+        }
+    }
+
     void StatusBarPopup::update_anchors(Rectangle<int16_t> menu_anchor,
                                         Rectangle<int16_t> system_anchor)
     {
@@ -113,6 +214,20 @@ namespace jrc
 
     void StatusBarPopup::position_panel(PanelData& panel, Rectangle<int16_t> anchor)
     {
+        if (statusbar::prechaos())
+        {
+            // Anchor the pointer tail of ContextMenu/t on the button's left
+            // edge so the popup opens beside it and grows upwards.
+            int16_t x = static_cast<int16_t>(anchor.l() - statusbar::popup_tail_x());
+            x = std::max<int16_t>(
+                0,
+                std::min<int16_t>(x, Constants::viewwidth() - panel.width)
+            );
+            int16_t y = static_cast<int16_t>(anchor.t() - panel.height);
+            panel.position = { x, y };
+            return;
+        }
+
         int16_t x = static_cast<int16_t>(
             anchor.l() + (anchor.width() - panel.width) / 2
         );
@@ -142,6 +257,24 @@ namespace jrc
             if (entry.action == selection && entry.button->is_active())
             {
                 entry.button->set_state(Button::MOUSEOVER);
+                break;
+            }
+        }
+
+        if (statusbar::prechaos())
+        {
+            select_action(active_data(), selected_action);
+        }
+    }
+
+    void StatusBarPopup::select_action(PanelData& panel, Action action)
+    {
+        panel.hover = -1;
+        for (size_t index = 0; index < panel.items.size(); ++index)
+        {
+            if (panel.items[index].action == action)
+            {
+                panel.hover = static_cast<int16_t>(index);
                 break;
             }
         }
@@ -175,6 +308,21 @@ namespace jrc
             return std::nullopt;
 
         const PanelData& panel = active_data();
+        if (statusbar::prechaos())
+        {
+            for (size_t index = 0; index < panel.items.size(); ++index)
+            {
+                if (panel.items[index].action != action)
+                    continue;
+                Rectangle<int16_t> bounds = item_bounds(panel, index);
+                return Point<int16_t>(
+                    static_cast<int16_t>(bounds.l() + bounds.width() / 2),
+                    static_cast<int16_t>(bounds.t() + bounds.height() / 2)
+                );
+            }
+            return std::nullopt;
+        }
+
         for (const Entry& entry : panel.entries)
         {
             if (entry.action != action || !entry.button->is_active())
@@ -196,6 +344,21 @@ namespace jrc
         };
     }
 
+    Rectangle<int16_t> StatusBarPopup::item_bounds(
+        const PanelData& panel, size_t index)
+    {
+        const int16_t top = static_cast<int16_t>(
+            panel.position.y() + statusbar::popup_item_top()
+            + index * statusbar::popup_row_height()
+        );
+        return {
+            static_cast<int16_t>(panel.position.x() + statusbar::popup_item_left()),
+            static_cast<int16_t>(panel.position.x() + statusbar::popup_item_right()),
+            top,
+            static_cast<int16_t>(top + statusbar::popup_row_height())
+        };
+    }
+
     StatusBarPopup::CursorResult StatusBarPopup::send_cursor(
         bool pressed,
         Point<int16_t> cursor_position)
@@ -206,6 +369,27 @@ namespace jrc
         }
 
         PanelData& panel = active_data();
+        if (statusbar::prechaos())
+        {
+            for (size_t index = 0; index < panel.items.size(); ++index)
+            {
+                if (!item_bounds(panel, index).contains(cursor_position))
+                    continue;
+
+                if (pressed)
+                {
+                    Sound(Sound::BUTTONCLICK).play();
+                    return { Cursor::CLICKING, panel.items[index].action };
+                }
+
+                panel.hover = static_cast<int16_t>(index);
+                selection = panel.items[index].action;
+                return { Cursor::CANCLICK, Action::NONE };
+            }
+
+            return { Cursor::IDLE, Action::NONE };
+        }
+
         for (Entry& entry : panel.entries)
         {
             MapleButton& button = *entry.button;
@@ -249,6 +433,8 @@ namespace jrc
 
         reset_panel(menu);
         reset_panel(system);
+        menu.hover = -1;
+        system.hover = -1;
     }
 
     StatusBarPopup::PanelData& StatusBarPopup::active_data()

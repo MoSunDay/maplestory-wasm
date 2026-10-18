@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "MapTooltip.h"
 
+#include "TooltipFrame.h"
+
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
 
@@ -62,8 +64,17 @@ namespace jrc
 
         position.shift(Point<int16_t>(20, -3));
 
-        frame.draw(position + Point<int16_t>(fillwidth / 2 + 10, fillheight + 14), fillwidth, fillheight);
-        cover.draw(position + Point<int16_t>(-5, -2));
+        if (tooltip_frame::has_assets())
+        {
+            frame.draw(position + Point<int16_t>(fillwidth / 2 + 10, fillheight + 14), fillwidth, fillheight);
+            cover.draw(position + Point<int16_t>(-5, -2));
+        }
+        else
+        {
+            // v83 ships no UIToolTip.img; draw the chrome ourselves. The
+            // box hugs the labels (drawn from +10/+8) with an even margin.
+            tooltip_frame::draw_at(position, fillwidth + 20, fillheight + 22);
+        }
 
         Point<int16_t> cursor = position + Point<int16_t>(10, 8);
         title_label.draw(cursor + Point<int16_t>(fillwidth / 2, 0));

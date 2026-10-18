@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "UIWorldMap.h"
+#include "UIWorldMapNodes.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -35,13 +36,17 @@ namespace jrc
           search_text_dim(82, 14)
     {
         nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
-        nl::node world_map = nl::nx::ui["UIWindow2.img"]["WorldMap"];
+        nl::node world_map = worldmap_nodes::src();
         nl::node world_map_search = world_map["WorldMapSearch"];
-        nl::node border = world_map["Border"]["0"];
         nl::node background = world_map_search["backgrnd"];
         nl::node helper = nl::nx::map["MapHelper.img"]["worldMap"];
 
-        sprites.emplace_back(border);
+        // The post-Chaos frame is one ready-made sprite; the v83 frame is
+        // assembled from nine-slice pieces in draw().
+        if (worldmap_nodes::post_chaos())
+        {
+            sprites.emplace_back(world_map["Border"]["0"]);
+        }
 
         cur_pos = helper["curPos"];
         for (size_t i = 0; i < MAPSPOT_TYPE_MAX; ++i)
@@ -52,10 +57,16 @@ namespace jrc
         search_background = background;
         search_notice = world_map_search["notice"];
 
-        bg_dimensions = Texture(border).get_dimensions();
+        bg_dimensions = worldmap_nodes::post_chaos()
+            ? Texture(world_map["Border"]["0"]).get_dimensions()
+            : worldmap_nodes::frame_dimensions();
         bg_search_dimensions = search_background.get_dimensions();
-        background_dimensions = Point<int16_t>(bg_dimensions.x(), 0);
-        base_position = Point<int16_t>(bg_dimensions.x() / 2, bg_dimensions.y() / 2 + 15);
+        background_dimensions = worldmap_nodes::has_search()
+            ? Point<int16_t>(bg_dimensions.x(), 0)
+            : Point<int16_t>();
+        base_position = worldmap_nodes::post_chaos()
+            ? Point<int16_t>(bg_dimensions.x() / 2, bg_dimensions.y() / 2 + 15)
+            : worldmap_nodes::spot_base();
 
         Point<int16_t> close_pos(bg_dimensions.x() - 22, 4);
         buttons[BT_CLOSE] = std::make_unique<MapleButton>(close, close_pos);
@@ -64,6 +75,15 @@ namespace jrc
         buttons[BT_NAVIREG] = std::make_unique<MapleButton>(world_map["BtNaviRegister"]);
         buttons[BT_SEARCH_CLOSE] = std::make_unique<MapleButton>(close, close_pos + Point<int16_t>(bg_search_dimensions.x(), 0));
         buttons[BT_ALLSEARCH] = std::make_unique<MapleButton>(world_map_search["BtAllsearch"], background_dimensions);
+
+        // The v83 asset set has no search/auto-fly/register art; keep the
+        // null-node buttons dormant so set_search() can still reach them.
+        if (!worldmap_nodes::has_search())
+        {
+            buttons[BT_SEARCH]->set_active(false);
+            buttons[BT_AUTOFLY]->set_active(false);
+            buttons[BT_NAVIREG]->set_active(false);
+        }
 
         Point<int16_t> search_pos = background_dimensions + Point<int16_t>(13, 25);
         search_text = Textfield(
@@ -74,13 +94,20 @@ namespace jrc
             8
         );
 
-        set_search(true);
+        set_search(worldmap_nodes::has_search());
         dragarea = Point<int16_t>(bg_dimensions.x(), 20);
     }
 
     void UIWorldMap::draw(float alpha) const
     {
-        UIElement::draw_sprites(alpha);
+        if (worldmap_nodes::post_chaos())
+        {
+            UIElement::draw_sprites(alpha);
+        }
+        else
+        {
+            worldmap_nodes::draw_frame(position);
+        }
 
         if (search)
         {
@@ -89,7 +116,7 @@ namespace jrc
             search_text.draw(position);
         }
 
-        base_img.draw(position + base_position);
+        base_img.draw(position + worldmap_nodes::image_draw_pos(base_position));
 
         for (const auto& entry : buttons)
         {
@@ -172,7 +199,7 @@ namespace jrc
 
         if (!active)
         {
-            set_search(true);
+            set_search(worldmap_nodes::has_search());
             update_world(user_map);
         }
     }
@@ -287,6 +314,7 @@ namespace jrc
             UI::get().focus_textfield(nullptr);
         }
 
+        enable = enable && worldmap_nodes::has_search();
         search = enable;
         buttons[BT_SEARCH_CLOSE]->set_active(enable);
         buttons[BT_ALLSEARCH]->set_active(enable);
@@ -296,14 +324,26 @@ namespace jrc
 
     void UIWorldMap::update_world(const std::string& map)
     {
-        nl::node world_map = nl::nx::map["WorldMap"][map + ".img"];
+        nl::node world_map = worldmap_nodes::worldmap_data()[map + ".img"];
         if (!world_map)
         {
-            world_map = nl::nx::map["WorldMap"]["WorldMap.img"];
+            world_map = worldmap_nodes::worldmap_data()["WorldMap.img"];
         }
 
         base_img = world_map["BaseImg"][0];
         parent_map = world_map["info"]["parentMap"].get_string();
+
+        // v83 world-map images are origin-less; markers are positioned
+        // relative to the image center instead of the post-Chaos frame.
+        if (!worldmap_nodes::post_chaos())
+        {
+            const Point<int16_t> base_size = base_img.get_dimensions();
+            const Point<int16_t> content = worldmap_nodes::content_pos();
+            base_position = {
+                static_cast<int16_t>(content.x() + base_size.x() / 2),
+                static_cast<int16_t>(content.y() + base_size.y() / 2)
+            };
+        }
 
         link_images.clear();
         link_maps.clear();
