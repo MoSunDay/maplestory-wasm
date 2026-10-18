@@ -105,10 +105,9 @@ export async function verifyNpcShopFlow(driver) {
     x: await ccall1('msshop_sell_x', 0),
     y: await ccall1('msshop_sell_y', 0),
   };
-  const sellButton = await buttonCenter(1);
   const sellAllButton = await buttonCenter(23);
   const useTab = await buttonCenter(4);
-  console.log(`INFO  shop geometry row0=(${sellRow0.x},${sellRow0.y}) useTab=(${useTab.x},${useTab.y}) sellBtn=(${sellButton.x},${sellButton.y}) sellAll=(${sellAllButton.x},${sellAllButton.y})`);
+  console.log(`INFO  shop geometry row0=(${sellRow0.x},${sellRow0.y}) useTab=(${useTab.x},${useTab.y}) sellAll=(${sellAllButton.x},${sellAllButton.y})`);
 
   // 切到 USE 页签：卖侧行0 变为预备的 2000000 药水。
   await driver.retryClick(useTab.x, useTab.y, async () =>
@@ -125,12 +124,13 @@ export async function verifyNpcShopFlow(driver) {
   await sleep(300);
   await driver.screenshot('21b-row-selected');
 
-  // SELL_ITEM → UIEnterNumber（NOTICE + 数字框；键盘路径只能用默认数量 1
+  // 行双击卖出（原 SELL_ITEM 按钮已移除；同槽二连击 = sell()）→
+  // UIEnterNumber（NOTICE + 数字框；键盘路径只能用默认数量 1
   // 回车确认——数字未注册为 UI 焦点文本框，属上游移植限制）。
-  await driver.retryClick(sellButton.x, sellButton.y, async () =>
+  await driver.retryClick(sellRow0.x, sellRow0.y, async () =>
     await probe(driver, 'msui_notice_active') === 1 &&
     await driver.evaluate('MapleWasmIME.active === true'));
-  console.log('PASS  sell quantity notice opened');
+  console.log('PASS  sell quantity notice opened (row double-click)');
   await sleep(400);
   await driver.screenshot('21c-sell-notice');
   await driver.key('Enter', 'Enter', 13);

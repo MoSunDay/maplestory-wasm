@@ -74,7 +74,7 @@ namespace jrc
         enum Buttons : int16_t
         {
             BUY_ITEM = 0,
-            SELL_ITEM = 1,
+            SELL_ITEM = 1, // reserved: button removed from the layout; double-click a row to sell one item
             EXIT = 2,
             EQUIP = 3,
             USE = 4,
