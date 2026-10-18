@@ -138,6 +138,7 @@ namespace jrc
         PLAYER_UPDATE      = 0xCF,
 
         // Cash Shop
+        CHECK_CASH       = 0xE4,
         CASHSHOP_OPERATION = 0xE5,
 
         // Custom

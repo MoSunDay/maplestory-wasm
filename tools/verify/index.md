@@ -1,8 +1,8 @@
 # 验证工具索引
 
 - [MapleStory WebUI 全流程](maplestory-webui/index.md)
-- 商城纯视图策略：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/cash-shop-view.cpp src/client/IO/CashShop/CashShopView.cpp -o /tmp/cash-shop-view && /tmp/cash-shop-view`
-- 老版商城素材与 linked-server 确定性商品：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/cash-shop-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/cash-shop-ui-nx && /tmp/cash-shop-ui-nx UI.nx src/client/data/cash-shop-v83.csv`
+- 商城纯视图策略（6 卡网格/24 槽位分页）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/cash-shop-view.cpp src/client/IO/CashShop/CashShopView.cpp -o /tmp/cash-shop-view && /tmp/cash-shop-view`
+- 现代全屏 CashShop.img 素材契约（1024x768 背景、卡片/槽位面板、四态按钮、位图数字）与 linked-server 确定性商品：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/cash-shop-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/cash-shop-ui-nx && /tmp/cash-shop-ui-nx UI.nx src/client/data/cash-shop-v83.csv`
 - LazyFS 连接恢复：`node tools/verify/lazyfs-connection.mjs`
 - 位图加载分类（后台、阻塞可见、短时特效）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/bitmap-load-class.cpp -o /tmp/bitmap-load-class && /tmp/bitmap-load-class`
 - 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`

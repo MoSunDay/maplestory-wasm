@@ -1,5 +1,10 @@
 #pragma once
 
+// Sized types first: UIState.h's chain reaches Graphics/Color.h, which uses
+// size_t without including <cstddef> itself.
+#include <cstddef>
+#include <cstdint>
+
 #include "../UIState.h"
 #include "CashShopModel.h"
 #include "../../Template/EnumMap.h"

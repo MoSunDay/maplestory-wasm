@@ -10,77 +10,143 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/CashShopPackets.h"
 
-#include "nlnx/nx.hpp"
-
-#include <algorithm>
-#include <stdexcept>
-
 namespace jrc
 {
     namespace view = cash_shop_view;
+    namespace layout = cash_shop_layout;
+
+    namespace
+    {
+        Point<int16_t> currency_position(size_t index)
+        {
+            return {
+                static_cast<int16_t>(
+                    layout::CURRENCY_POS.x() + index * layout::CURRENCY_STEP_X),
+                layout::CURRENCY_POS.y()
+            };
+        }
+
+        Point<int16_t> currency_label_position(size_t index)
+        {
+            return currency_position(index) +
+                Point<int16_t>{
+                    static_cast<int16_t>(layout::CURRENCY_SIZE.x() / 2), 3 };
+        }
+
+        Point<int16_t> tab_label_position(Point<int16_t> tab_position)
+        {
+            return tab_position +
+                Point<int16_t>{
+                    static_cast<int16_t>(layout::TAB_SIZE.x() / 2), 4 };
+        }
+
+        Point<int16_t> icon_corner(const Texture& icon, Point<int16_t> center)
+        {
+            return center - icon.get_dimensions() / 2;
+        }
+    }
+
+    CashCurrency UICashShop::currency_choice(size_t index)
+    {
+        switch (index)
+        {
+        case 1: return CashCurrency::MAPLE_POINT;
+        case 2: return CashCurrency::NX_PREPAID;
+        default: return CashCurrency::NX_CREDIT;
+        }
+    }
+
+    const char* UICashShop::currency_short_name(CashCurrency value)
+    {
+        switch (value)
+        {
+        case CashCurrency::MAPLE_POINT: return "地图点 ";
+        case CashCurrency::NX_PREPAID: return "预付点 ";
+        default: return "信用点 ";
+        }
+    }
 
     UICashShop::UICashShop(std::shared_ptr<CashShopModel> value, bool is_female)
-        : model(std::move(value)), female(is_female), right_pane(view::RightPane::LOCKER),
-          currency(CashCurrency::NX_CREDIT), category(0), left_page(0), right_page(0),
-          pending(false), pending_cash_id(0), last_cursor_position(),
-          search(Text::A11M, Text::LEFT, Text::DARKGREY, {{48, 61}, {148, 79}}, 40),
-          title(Text::A11B, Text::LEFT, Text::DARKGREY, "现金商城"),
-          category_label(Text::A11M, Text::LEFT, Text::DARKGREY),
-          currency_label(Text::A11M, Text::LEFT, Text::DARKGREY),
-          search_label(Text::A11M, Text::LEFT, Text::DARKGREY, "搜索:"),
-          balance_label(Text::A11M, Text::LEFT, Text::DARKGREY),
-          right_mode_label(Text::A11B, Text::LEFT, Text::DARKGREY),
-          transfer_label(Text::A11B, Text::CENTER, Text::DARKGREY, "", 64),
-          left_page_label(Text::A11M, Text::CENTER, Text::DARKGREY, "", 100),
-          right_page_label(Text::A11M, Text::CENTER, Text::DARKGREY, "", 100)
+        : model(std::move(value)), female(is_female),
+          right_pane(view::RightPane::LOCKER),
+          currency(CashCurrency::NX_CREDIT), category(0), left_page(0),
+          right_page(0), pending(false), balance_requested(false), pending_cash_id(0),
+          last_cursor_position(),
+          skin(cash_shop_skin::load_cash_shop_skin()), screen_scale(1.0f),
+          screen_offset(),
+          search(Text::A11M, Text::LEFT, Text::DARKGREY,
+              layout::SEARCH_FIELD_BOUNDS, 40),
+          title(Text::A12B, Text::LEFT, Text::YELLOW, "现金商城"),
+          search_label(Text::A11M, Text::LEFT, Text::LIGHTGREY, "搜索:"),
+          transfer_hint(Text::A11M, Text::LEFT, Text::LIGHTGREY)
     {
-        nl::node shop = nl::nx::ui["UIWindow2.img"]["Shop"];
-        nl::node background = shop["backgrnd"];
-        dimension = Texture(background).get_dimensions();
-        if (dimension != Point<int16_t>{465, 328})
-            throw std::runtime_error("Missing required classic Shop background");
+        buttons[BT_EXIT] =
+            std::make_unique<MapleButton>(skin.exit_button, layout::EXIT_POS);
+        buttons[BT_CHARGE] = std::make_unique<MapleButton>(
+            skin.charge_button, layout::CHARGE_POS);
+        buttons[BT_BUY] = std::make_unique<MapleButton>(
+            skin.buy_button,
+            layout::GRID_POS + layout::CARD_BUY_OFFSET);
+        buttons[BT_TRANSFER] = std::make_unique<MapleButton>(
+            skin.transfer_button, layout::TRANSFER_POS);
+        buttons[BT_LEFT_PREV] = std::make_unique<MapleButton>(
+            skin.prev_button, layout::LEFT_PREV_POS);
+        buttons[BT_LEFT_NEXT] = std::make_unique<MapleButton>(
+            skin.next_button, layout::LEFT_NEXT_POS);
+        buttons[BT_RIGHT_PREV] = std::make_unique<MapleButton>(
+            skin.prev_button, layout::RIGHT_PREV_POS);
+        buttons[BT_RIGHT_NEXT] = std::make_unique<MapleButton>(
+            skin.next_button, layout::RIGHT_NEXT_POS);
 
-        sprites.emplace_back(background);
-        sprites.emplace_back(shop["backgrnd2"]);
-        sprites.emplace_back(shop["backgrnd3"]);
-        selection = shop["select"];
-
-        buttons[BT_EXIT] = std::make_unique<MapleButton>(shop["BtExit"]);
-        buttons[BT_BUY] = std::make_unique<MapleButton>(shop["BtBuy"]);
-        buttons[BT_BUY_HIT] = std::make_unique<AreaButton>(
-            Point<int16_t>{150, 42}, Point<int16_t>{80, 24});
-        buttons[BT_SELECTED_TRANSFER] = std::make_unique<AreaButton>(
-            Point<int16_t>{0, 0}, Point<int16_t>{200, 36});
-        buttons[BT_TRANSFER] = std::make_unique<AreaButton>(
-            Point<int16_t>{375, 38}, Point<int16_t>{80, 32});
-        buttons[BT_CATEGORY] = std::make_unique<AreaButton>(
-            Point<int16_t>{12, 22}, Point<int16_t>{136, 16});
-        buttons[BT_CURRENCY] = std::make_unique<AreaButton>(
-            Point<int16_t>{12, 40}, Point<int16_t>{136, 16});
-        buttons[BT_RIGHT_MODE] = std::make_unique<AreaButton>(
-            Point<int16_t>{242, 40}, Point<int16_t>{136, 20});
-        buttons[BT_LEFT_PREVIOUS] = std::make_unique<AreaButton>(
-            Point<int16_t>{12, 92}, Point<int16_t>{36, 18});
-        buttons[BT_LEFT_NEXT] = std::make_unique<AreaButton>(
-            Point<int16_t>{172, 92}, Point<int16_t>{36, 18});
-        buttons[BT_RIGHT_PREVIOUS] = std::make_unique<AreaButton>(
-            Point<int16_t>{242, 92}, Point<int16_t>{36, 18});
-        buttons[BT_RIGHT_NEXT] = std::make_unique<AreaButton>(
-            Point<int16_t>{406, 92}, Point<int16_t>{36, 18});
-
-        for (size_t row = 0; row < view::ROWS_PER_PANE; ++row)
+        for (size_t card = 0; card < view::CATALOG_PAGE_SIZE; ++card)
         {
-            buttons[BT_LEFT_FIRST + row] = std::make_unique<AreaButton>(
-                Point<int16_t>{8, static_cast<int16_t>(116 + row * 42)},
-                Point<int16_t>{200, 36});
-            buttons[BT_RIGHT_FIRST + row] = std::make_unique<AreaButton>(
-                Point<int16_t>{242, static_cast<int16_t>(116 + row * 42)},
-                Point<int16_t>{200, 36});
-            left_names[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
-            left_details[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
-            right_names[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
-            right_details[row] = Text(Text::A11M, Text::LEFT, Text::DARKGREY, "", 152);
+            buttons[BT_CARD_FIRST + card] = std::make_unique<AreaButton>(
+                layout::card_position(card), layout::CARD_SIZE);
+            card_names[card] = Text(
+                Text::A11M, Text::CENTER, Text::BLACK, "",
+                layout::CARD_NAME_WIDTH);
         }
+        for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
+        {
+            buttons[BT_SLOT_FIRST + slot] = std::make_unique<AreaButton>(
+                layout::slot_position(slot), layout::SLOT_SIZE);
+            slot_counts[slot] = Text(Text::A11M, Text::RIGHT, Text::BLACK);
+        }
+        for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+        {
+            buttons[BT_TAB_FIRST + entry] = std::make_unique<AreaButton>(
+                layout::category_position(entry), layout::CATEGORY_SIZE);
+            category_labels[entry] = Text(
+                Text::A11M, Text::LEFT, Text::LIGHTGREY,
+                view::category_name(entry));
+        }
+        for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
+        {
+            buttons[BT_CURRENCY_FIRST + choice] = std::make_unique<AreaButton>(
+                currency_position(choice), layout::CURRENCY_SIZE);
+            balance_labels[choice] = Text(
+                Text::A11M, Text::LEFT, Text::LIGHTGREY,
+                currency_short_name(currency_choice(choice)));
+            currency_labels[choice] = Text(
+                Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
+                layout::CURRENCY_SIZE.x());
+        }
+        buttons[BT_RIGHT_LOCKER_TAB] = std::make_unique<AreaButton>(
+            layout::TAB_LOCKER_POS, layout::TAB_SIZE);
+        buttons[BT_RIGHT_INVENTORY_TAB] = std::make_unique<AreaButton>(
+            layout::TAB_INVENTORY_POS, layout::TAB_SIZE);
+        tab_labels[0] = Text(
+            Text::A11M, Text::CENTER, Text::BLACK, view::pane_name(
+                view::RightPane::LOCKER), layout::TAB_LABEL_WIDTH);
+        tab_labels[1] = Text(
+            Text::A11M, Text::CENTER, Text::WHITE, view::pane_name(
+                view::RightPane::INVENTORY), layout::TAB_LABEL_WIDTH);
+        page_labels[0] = Text(
+            Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
+            layout::LEFT_PAGE_WIDTH);
+        page_labels[1] = Text(
+            Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
+            layout::RIGHT_PAGE_WIDTH);
 
         search.set_enter_callback([this](const std::string&) { rebuild_catalog(); });
         update_screen(Constants::viewwidth(), Constants::viewheight());
@@ -89,65 +155,211 @@ namespace jrc
 
     void UICashShop::draw(float alpha) const
     {
-        UIElement::draw(alpha);
-        title.draw(position + Point<int16_t>{12, 5});
-        category_label.draw(position + Point<int16_t>{12, 22});
-        currency_label.draw(position + Point<int16_t>{12, 40});
-        search_label.draw(position + Point<int16_t>{12, 62});
-        search.draw(position);
-        balance_label.draw(position + Point<int16_t>{242, 5});
-        right_mode_label.draw(position + Point<int16_t>{242, 40});
-        transfer_label.draw(position + Point<int16_t>{390, 47});
-        left_page_label.draw(position + Point<int16_t>{60, 95});
-        right_page_label.draw(position + Point<int16_t>{290, 95});
+        const auto stretched = [this](Point<int16_t> pos, Point<int16_t> size) {
+            return DrawArgument(
+                map_to_screen(pos),
+                layout::to_screen_size(size, screen_scale));
+        };
 
-        for (size_t row = 0; row < view::ROWS_PER_PANE; ++row)
+        skin.background.draw({ {}, dimension });
+        title.draw(map_to_screen(layout::TITLE_POS));
+
+        const CashBalances& balances = model->balances();
+        const int32_t balance_values[CURRENCY_CHOICES] = {
+            balances.nx_credit, balances.maple_points, balances.nx_prepaid
+        };
+        for (size_t row = 0; row < CURRENCY_CHOICES; ++row)
         {
-            const size_t left_index = left_page * view::ROWS_PER_PANE + row;
-            const size_t right_index = right_page * view::ROWS_PER_PANE + row;
-            const Point<int16_t> left = position + row_position(false, row);
-            const Point<int16_t> right = position + row_position(true, row);
+            const Point<int16_t> label{ layout::BALANCE_LABEL_X,
+                layout::BALANCE_ROWS_Y[row] };
+            const Point<int16_t> value{ layout::BALANCE_VALUE_RIGHT_X,
+                layout::BALANCE_ROWS_Y[row] };
+            balance_labels[row].draw(map_to_screen(label));
+            cash_shop_skin::draw_amount_right(
+                skin, map_to_screen(value), balance_values[row]);
+        }
 
-            if (left_index < filtered.size())
+        skin.sort_bar.draw(
+            stretched(layout::SEARCH_BAR_POS, layout::SEARCH_BAR_SIZE));
+        search_label.draw(map_to_screen(layout::SEARCH_LABEL_POS));
+        search.draw({});
+        for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
+            currency_labels[choice].draw(
+                map_to_screen(currency_label_position(choice)));
+
+        for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+        {
+            const Point<int16_t> base = layout::category_position(entry);
+            category_labels[entry].draw(
+                map_to_screen(base + layout::CATEGORY_LABEL_OFFSET));
+            if (entry == category)
+                skin.line.draw(stretched(
+                    base + layout::CATEGORY_LINE_OFFSET,
+                    layout::CATEGORY_LINE_SIZE));
+        }
+
+        const auto left_range =
+            view::page_range(left_page, filtered.size(), view::CATALOG_PAGE_SIZE);
+        if (left_range.first == left_range.second)
+        {
+            skin.no_item.draw(stretched(
+                layout::EMPTY_CATALOG_CENTER - layout::EMPTY_HINT_SIZE / 2,
+                layout::EMPTY_HINT_SIZE));
+        }
+        else
+        {
+            for (size_t card = 0; card < view::CATALOG_PAGE_SIZE; ++card)
             {
-                if (selected_left && *selected_left == left_index)
-                    selection.draw(left + Point<int16_t>{35, -1});
-                const int32_t item_id = model->catalog()[filtered[left_index]].item_id;
-                if (const ItemData& data = ItemData::get(item_id))
-                    data.get_icon(false).draw(DrawArgument(left + Point<int16_t>{0, 32}));
-                left_names[row].draw(left + Point<int16_t>{40, -1});
-                left_details[row].draw(left + Point<int16_t>{40, 17});
-            }
-            if (right_index < right_count())
-            {
-                if (selected_right && *selected_right == right_index)
-                    selection.draw(right + Point<int16_t>{35, -1});
-                if (const ItemData& data = ItemData::get(right_item_id(right_index)))
-                    data.get_icon(false).draw(DrawArgument(right + Point<int16_t>{0, 32}));
-                right_names[row].draw(right + Point<int16_t>{40, -1});
-                right_details[row].draw(right + Point<int16_t>{40, 17});
+                const size_t index = left_range.first + card;
+                const Point<int16_t> base = layout::card_position(card);
+                skin.card.draw(stretched(base, layout::CARD_SIZE));
+                if (index >= left_range.second)
+                    continue;
+                const CashCommodity& item =
+                    model->catalog()[filtered[index]];
+                if (const ItemData& data = ItemData::get(item.item_id))
+                {
+                    const Texture& icon = data.get_icon(false);
+                    icon.draw({ map_to_screen(
+                        base + layout::CARD_ICON_CENTER -
+                        icon.get_dimensions() / 2) });
+                }
+                card_names[card].draw(
+                    map_to_screen(base + layout::CARD_NAME_POS));
+                const Point<int16_t> price = map_to_screen(
+                    base + layout::CARD_PRICE_ICON_POS);
+                skin.nx_icon.draw({ price });
+                cash_shop_skin::draw_amount(
+                    skin,
+                    price + Point<int16_t>{ skin.nx_icon.width() + 2, 0 },
+                    item.price);
+                if (selected_left && *selected_left == index)
+                    skin.selected_marker.draw({ map_to_screen(
+                        base + layout::CARD_MARKER_OFFSET) });
             }
         }
+        page_labels[0].draw(map_to_screen(layout::LEFT_PAGE_POS));
+
+        const bool locker_active = right_pane == view::RightPane::LOCKER;
+        (locker_active ? skin.tab_enabled : skin.tab_disabled).draw(
+            stretched(layout::TAB_LOCKER_POS, layout::TAB_SIZE));
+        (locker_active ? skin.tab_disabled : skin.tab_enabled).draw(
+            stretched(layout::TAB_INVENTORY_POS, layout::TAB_SIZE));
+        tab_labels[0].draw(
+            map_to_screen(tab_label_position(layout::TAB_LOCKER_POS)));
+        tab_labels[1].draw(
+            map_to_screen(tab_label_position(layout::TAB_INVENTORY_POS)));
+
+        skin.inventory_panel.draw(
+            stretched(layout::PANEL_POS, layout::PANEL_SIZE));
+        const auto right_range = view::page_range(
+            right_page, right_count(), view::RIGHT_PAGE_SIZE);
+        if (right_range.first == right_range.second)
+        {
+            skin.no_item.draw(stretched(
+                layout::EMPTY_RIGHT_CENTER - layout::EMPTY_HINT_SIZE / 2,
+                layout::EMPTY_HINT_SIZE));
+        }
+        else
+        {
+            for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
+            {
+                const size_t index = right_range.first + slot;
+                if (index >= right_range.second)
+                    continue;
+                const Point<int16_t> base = layout::slot_position(slot);
+                if (const ItemData& data = ItemData::get(right_item_id(index)))
+                {
+                    const Texture& icon = data.get_icon(false);
+                    icon.draw({ map_to_screen(icon_corner(
+                        icon, base + layout::SLOT_SIZE / 2)) });
+                }
+                slot_counts[slot].draw(
+                    map_to_screen(base + layout::SLOT_COUNT_OFFSET));
+                if (selected_right && *selected_right == index)
+                    skin.selected_marker.draw({ map_to_screen(
+                        base + layout::SLOT_MARKER_OFFSET) });
+            }
+        }
+        transfer_hint.draw(map_to_screen(layout::TRANSFER_HINT_POS));
+        page_labels[1].draw(map_to_screen(layout::RIGHT_PAGE_POS));
+
+        UIElement::draw_buttons(alpha);
     }
 
     void UICashShop::update()
     {
         UIElement::update();
-        search.update(position);
+        search.update({});
+        if (!balance_requested)
+        {
+            balance_requested = true;
+            CheckCashPacket().dispatch();
+        }
     }
 
     void UICashShop::update_screen(int16_t width, int16_t height)
     {
-        position = { static_cast<int16_t>((width - dimension.x()) / 2),
-            static_cast<int16_t>((height - dimension.y()) / 2) };
+        position = {};
+        dimension = { width, height };
+        screen_scale = layout::content_scale(width, height);
+        screen_offset = layout::content_offset(width, height);
+        position_static_buttons();
+        position_buy_button();
     }
 
-    UIElement::CursorResult UICashShop::send_cursor(bool pressed, Point<int16_t> cursorpos)
+    Point<int16_t> UICashShop::map_to_screen(Point<int16_t> design) const
     {
-        last_cursor_position = cursorpos - position;
-        const Rectangle<int16_t> search_hitbox(
-            position + Point<int16_t>{12, 55}, position + Point<int16_t>{208, 86});
-        if (search_hitbox.contains(cursorpos))
+        return layout::to_screen(design, screen_scale, screen_offset);
+    }
+
+    void UICashShop::position_static_buttons()
+    {
+        buttons[BT_EXIT]->set_position(map_to_screen(layout::EXIT_POS));
+        buttons[BT_CHARGE]->set_position(map_to_screen(layout::CHARGE_POS));
+        buttons[BT_TRANSFER]->set_position(
+            map_to_screen(layout::TRANSFER_POS));
+        buttons[BT_LEFT_PREV]->set_position(
+            map_to_screen(layout::LEFT_PREV_POS));
+        buttons[BT_LEFT_NEXT]->set_position(
+            map_to_screen(layout::LEFT_NEXT_POS));
+        buttons[BT_RIGHT_PREV]->set_position(
+            map_to_screen(layout::RIGHT_PREV_POS));
+        buttons[BT_RIGHT_NEXT]->set_position(
+            map_to_screen(layout::RIGHT_NEXT_POS));
+        buttons[BT_RIGHT_LOCKER_TAB]->set_position(
+            map_to_screen(layout::TAB_LOCKER_POS));
+        buttons[BT_RIGHT_INVENTORY_TAB]->set_position(
+            map_to_screen(layout::TAB_INVENTORY_POS));
+        for (size_t card = 0; card < view::CATALOG_PAGE_SIZE; ++card)
+            buttons[BT_CARD_FIRST + card]->set_position(
+                map_to_screen(layout::card_position(card)));
+        for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
+            buttons[BT_SLOT_FIRST + slot]->set_position(
+                map_to_screen(layout::slot_position(slot)));
+        for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+            buttons[BT_TAB_FIRST + entry]->set_position(
+                map_to_screen(layout::category_position(entry)));
+        for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
+            buttons[BT_CURRENCY_FIRST + choice]->set_position(
+                map_to_screen(currency_position(choice)));
+    }
+
+    void UICashShop::position_buy_button()
+    {
+        if (!selected_left)
+            return;
+        buttons[BT_BUY]->set_position(map_to_screen(
+            layout::card_position(*selected_left % view::CATALOG_PAGE_SIZE) +
+            layout::CARD_BUY_OFFSET));
+    }
+
+    UIElement::CursorResult UICashShop::send_cursor(
+        bool pressed, Point<int16_t> cursorpos)
+    {
+        last_cursor_position =
+            layout::to_design(cursorpos, screen_scale, screen_offset);
+        if (layout::SEARCH_HITBOX.contains(last_cursor_position))
         {
             if (pressed)
                 search.set_state(Textfield::FOCUSED);
@@ -160,11 +372,14 @@ namespace jrc
 
     void UICashShop::send_scroll(double yoffset)
     {
-        size_t& page = last_cursor_position.x() < 232 ? left_page : right_page;
-        const size_t count = last_cursor_position.x() < 232 ? filtered.size() : right_count();
+        const bool over_catalog = last_cursor_position.x() < 500;
+        size_t& page = over_catalog ? left_page : right_page;
+        const size_t count = over_catalog ? filtered.size() : right_count();
+        const size_t page_size = over_catalog ? view::CATALOG_PAGE_SIZE :
+            view::RIGHT_PAGE_SIZE;
         if (yoffset > 0 && page > 0)
             --page;
-        else if (yoffset < 0 && page + 1 < view::page_count(count))
+        else if (yoffset < 0 && page + 1 < view::page_count(count, page_size))
             ++page;
         refresh();
     }
@@ -187,37 +402,53 @@ namespace jrc
             UI::get().disable();
             LeaveCashShopPacket().dispatch();
         }
-        else if (id == BT_CATEGORY)
+        else if (id == BT_CHARGE)
         {
-            category = view::next_category(category);
-            rebuild_catalog();
+            UI::get().emplace<UIOk>("当前版本暂不支持充值。", []() {});
         }
-        else if (id == BT_CURRENCY)
-        {
-            currency = view::next_currency(currency);
-            refresh();
-        }
-        else if (id == BT_RIGHT_MODE)
-        {
-            change_right_pane(view::toggle_pane(right_pane));
-        }
-        else if (id == BT_LEFT_PREVIOUS && left_page > 0)
-            --left_page;
-        else if (id == BT_LEFT_NEXT && left_page + 1 < view::page_count(filtered.size()))
-            ++left_page;
-        else if (id == BT_RIGHT_PREVIOUS && right_page > 0)
-            --right_page;
-        else if (id == BT_RIGHT_NEXT && right_page + 1 < view::page_count(right_count()))
-            ++right_page;
-        else if ((id == BT_BUY || id == BT_BUY_HIT) && selected_left)
+        else if (id == BT_BUY && selected_left)
             request_purchase(*selected_left);
         else if (id == BT_TRANSFER && selected_right)
             request_transfer(*selected_right);
-        else if (id == BT_SELECTED_TRANSFER && selected_right)
-            request_transfer(*selected_right);
-        else if (id >= BT_LEFT_FIRST && id < BT_RIGHT_FIRST)
+        else if (id >= BT_TAB_FIRST && id < BT_TAB_LAST)
         {
-            const size_t index = left_page * view::ROWS_PER_PANE + id - BT_LEFT_FIRST;
+            const int8_t entry = static_cast<int8_t>(id - BT_TAB_FIRST);
+            if (entry != category)
+            {
+                category = entry;
+                rebuild_catalog();
+            }
+        }
+        else if (id >= BT_CURRENCY_FIRST && id < BT_CURRENCY_LAST)
+        {
+            const CashCurrency choice =
+                currency_choice(id - BT_CURRENCY_FIRST);
+            if (choice != currency)
+            {
+                currency = choice;
+                refresh();
+            }
+        }
+        else if (id == BT_RIGHT_LOCKER_TAB)
+            change_right_pane(view::RightPane::LOCKER);
+        else if (id == BT_RIGHT_INVENTORY_TAB)
+            change_right_pane(view::RightPane::INVENTORY);
+        else if (id == BT_LEFT_PREV && left_page > 0)
+            --left_page;
+        else if (id == BT_LEFT_NEXT &&
+            left_page + 1 < view::page_count(filtered.size(),
+                view::CATALOG_PAGE_SIZE))
+            ++left_page;
+        else if (id == BT_RIGHT_PREV && right_page > 0)
+            --right_page;
+        else if (id == BT_RIGHT_NEXT &&
+            right_page + 1 < view::page_count(right_count(),
+                view::RIGHT_PAGE_SIZE))
+            ++right_page;
+        else if (id >= BT_CARD_FIRST && id < BT_CARD_LAST)
+        {
+            const size_t index = left_page * view::CATALOG_PAGE_SIZE +
+                (id - BT_CARD_FIRST);
             if (index < filtered.size())
             {
                 if (selected_left && *selected_left == index)
@@ -226,9 +457,10 @@ namespace jrc
                     selected_left = index;
             }
         }
-        else if (id >= BT_RIGHT_FIRST && id < BT_RIGHT_FIRST + view::ROWS_PER_PANE)
+        else if (id >= BT_SLOT_FIRST && id < BT_SLOT_LAST)
         {
-            const size_t index = right_page * view::ROWS_PER_PANE + id - BT_RIGHT_FIRST;
+            const size_t index = right_page * view::RIGHT_PAGE_SIZE +
+                (id - BT_SLOT_FIRST);
             if (index < right_count())
             {
                 if (selected_right && *selected_right == index)
@@ -240,5 +472,4 @@ namespace jrc
         refresh();
         return Button::NORMAL;
     }
-
 }

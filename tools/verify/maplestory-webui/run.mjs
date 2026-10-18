@@ -688,10 +688,11 @@ try {
       if (initial.locker < 0 || initial.inventory < 0 || initial.nxCredit < 1) {
         throw new Error(`Invalid initial cash-shop state: ${JSON.stringify(initial)}`);
       }
-      await driver.screenshot('10-cash-shop-classic');
+      await driver.screenshot('10-cash-shop-modern');
 
-      // Classic Shop is 465x328 and centered at (167,136) in the 800x600 canvas.
-      await driver.click(250, 205);
+      // Modern CashShop fills the 800x600 canvas; the search bar occupies
+      // (112,56)-(490,82) in the 800x600 design space.
+      await driver.click(300, 68);
       await requireState('cash-shop search focused', async () =>
         await driver.evaluate('MapleWasmIME.active === true'));
       await driver.compose('80000002');
@@ -700,10 +701,11 @@ try {
       await sleep(250);
       await driver.key('Enter', 'Enter', 13);
       await sleep(500);
-      await driver.click(270, 270);
+      // First catalog card sits at (118,96) with size 119x184.
+      await driver.click(177, 188);
       await sleep(250);
       await driver.screenshot('11-cash-shop-selected');
-      await driver.click(350, 190);
+      await driver.click(177, 188);
       await requireState('cash purchase confirmation visible', async () =>
         await noticeActive() === 1);
       await sleep(500);
@@ -719,7 +721,8 @@ try {
       if (lockerRow < 0) {
         throw new Error('Purchased locker item was not selected');
       }
-      await driver.click(500, 270 + lockerRow * 42);
+      // Locker slots form an 8x3 grid from (508,132) with 36px steps.
+      await driver.click(508 + (lockerRow % 8) * 36 + 18, 132 + Math.floor(lockerRow / 8) * 36 + 18);
       await requireState('cash item taken into character inventory', async () =>
         await cashShopProbe('mscashshop_pending') === 0 &&
         await cashShopProbe('mscashshop_locker_count') === initial.locker &&
@@ -730,7 +733,7 @@ try {
       if (inventoryRow < 0) {
         throw new Error('Taken cash item was not selected');
       }
-      await driver.click(500, 270 + inventoryRow * 42);
+      await driver.click(508 + (inventoryRow % 8) * 36 + 18, 132 + Math.floor(inventoryRow / 8) * 36 + 18);
       await requireState('cash item returned to locker', async () =>
         await cashShopProbe('mscashshop_pending') === 0 &&
         await cashShopProbe('mscashshop_locker_count') === initial.locker + 1 &&

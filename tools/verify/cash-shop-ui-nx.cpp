@@ -19,23 +19,75 @@ namespace nl
 
 namespace
 {
-    bool bitmap_is(nl::node node, uint16_t width = 0, uint16_t height = 0)
+    bool bitmap_is(nl::node node, uint16_t width, uint16_t height)
     {
         if (node.data_type() != nl::node::type::bitmap)
             return false;
         const auto image = node.get_bitmap();
-        return image.width() > 0 && image.height() > 0 &&
-            (width == 0 || image.width() == width) &&
-            (height == 0 || image.height() == height);
+        return image.width() == width && image.height() == height;
     }
 
-    bool button_is_complete(nl::node button)
+    bool bitmap_is(nl::node node)
+    {
+        if (node.data_type() != nl::node::type::bitmap)
+            return false;
+        const auto image = node.get_bitmap();
+        return image.width() > 0 && image.height() > 0;
+    }
+
+    bool button_is_complete(nl::node button, uint16_t width, uint16_t height)
     {
         const char* states[] = { "normal", "pressed", "disabled", "mouseOver" };
         for (const char* state : states)
-            if (!bitmap_is(button[state]["0"]))
+            if (!bitmap_is(button[state]["0"], width, height))
                 return false;
         return true;
+    }
+
+    // Number glyphs vary between 5 and 8 pixels wide on an 11px baseline.
+    bool number_is(nl::node node)
+    {
+        if (node.data_type() != nl::node::type::bitmap)
+            return false;
+        const auto image = node.get_bitmap();
+        return image.height() == 11 && image.width() >= 5 && image.width() <= 8;
+    }
+
+    bool catalog_assets_ok(nl::node shop)
+    {
+        bool ok = bitmap_is(shop["Base"]["backgrnd"], 1024, 768) &&
+            bitmap_is(shop["Base"]["noItem"], 348, 148) &&
+            bitmap_is(shop["Base"]["line"], 859, 2) &&
+            bitmap_is(shop["CSSortBar"]["backgrnd"], 491, 32) &&
+            button_is_complete(shop["CSSortBar"]["BtTop"], 42, 16) &&
+            button_is_complete(shop["CSSortBar"]["BtEnd"], 42, 16) &&
+            bitmap_is(shop["CSList"]["Base"], 119, 184) &&
+            button_is_complete(shop["CSList"]["BtBuy"], 101, 24);
+        for (uint16_t digit = 0; digit < 10; ++digit)
+            ok = ok && number_is(shop["Base"]["Number"][std::to_string(digit)]);
+        ok = ok && number_is(shop["Base"]["Number"][","]);
+        return ok;
+    }
+
+    bool inventory_assets_ok(nl::node shop)
+    {
+        return bitmap_is(shop["CSInventory"]["backgrnd"], 380, 213) &&
+            bitmap_is(shop["CSInventory"]["backgrndCover"], 346, 146) &&
+            bitmap_is(shop["CSInventory"]["Tab"]["Enable"]["0"], 70, 18) &&
+            bitmap_is(shop["CSInventory"]["Tab"]["Disable"]["0"], 70, 18) &&
+            bitmap_is(shop["CSInventory"]["Tab"]["bar"], 362, 3) &&
+            button_is_complete(
+                shop["CSLockerNew"]["LockerTransfer"]["BtTransfer"], 73, 16);
+    }
+
+    bool status_assets_ok(nl::node shop)
+    {
+        return button_is_complete(shop["CSStatus"]["BtCharge"], 77, 23) &&
+            button_is_complete(shop["CSTab"]["BtExit"], 116, 35) &&
+            button_is_complete(shop["CSBargainSale"]["BtLeft"], 30, 47) &&
+            button_is_complete(shop["CSBargainSale"]["BtRight"], 30, 47) &&
+            bitmap_is(shop["CSIcon"]["0"], 15, 14) &&
+            bitmap_is(shop["CashItem"]["1"], 12, 12);
     }
 }
 
@@ -45,12 +97,10 @@ int main(int argc, char** argv)
     const std::string catalog_path = argc > 2 ? argv[2] :
         "src/client/data/cash-shop-v83.csv";
     nl::file ui(ui_path);
-    nl::node shop = ui.root()["UIWindow2.img"]["Shop"];
+    nl::node shop = ui.root()["CashShop.img"];
 
-    bool ok = bitmap_is(shop["backgrnd"], 465, 328) &&
-        bitmap_is(shop["backgrnd2"]) && bitmap_is(shop["backgrnd3"]) &&
-        bitmap_is(shop["select"]) && button_is_complete(shop["BtBuy"]) &&
-        button_is_complete(shop["BtExit"]);
+    bool ok = catalog_assets_ok(shop) && inventory_assets_ok(shop) &&
+        status_assets_ok(shop);
 
     std::ifstream catalog_file(catalog_path, std::ios::binary);
     const std::string catalog{
@@ -61,7 +111,7 @@ int main(int argc, char** argv)
     ok = ok && commodity_ok && non_package;
 
     if (!ok)
-        std::cerr << "FAIL classic Shop assets or linked-server commodity contract\n";
+        std::cerr << "FAIL modern CashShop.img assets or linked-server commodity contract\n";
     else
     {
         nl::node cash_button = ui.root()["StatusBar2.img"]["mainBar"]
@@ -76,7 +126,8 @@ int main(int argc, char** argv)
         const auto center_image = notice["c_box"].get_bitmap();
         const auto box_image = notice["box"].get_bitmap();
         const auto bottom_image = notice["s"].get_bitmap();
-        std::cout << "PASS classic Shop 465x328, buttons, SN 80000002; cash-button="
+        std::cout << "PASS modern CashShop.img 1024x768 full-screen set, buttons, "
+                  << "SN 80000002; cash-button="
                   << origin.first << ',' << origin.second << ' '
                   << image.width() << 'x' << image.height() << "; ok-button="
                   << ok_origin.first << ',' << ok_origin.second << ' '
