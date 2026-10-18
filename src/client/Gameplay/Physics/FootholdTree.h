@@ -27,13 +27,20 @@ namespace jrc
     class Footholdtree
     {
     public:
+        enum class HorizontalCollision : uint8_t
+        {
+            NONE,
+            WALL,
+            EDGE
+        };
+
         Footholdtree(nl::node source);
         Footholdtree();
 
         void draw(Point<int16_t> pos) const;
 
         // Takes an accelerated PhysicsObject and limits its movement based on the platforms in this tree.
-        void limit_movement(PhysicsObject& touse) const;
+        HorizontalCollision limit_movement(PhysicsObject& touse) const;
         // Updates a PhysicsObject's fhid based on it's position.
         void update_fh(PhysicsObject& touse) const;
         // Determine the point on the ground below the specified position.
@@ -42,7 +49,6 @@ namespace jrc
         Range<int16_t> get_walls() const;
         // Returns the topmost and bottommost platform positions of the map.
         Range<int16_t> get_borders() const;
-
     private:
         uint16_t get_fhid_below(double fx, double fy) const;
         double get_wall(uint16_t fhid, bool left, double fy) const;
@@ -57,4 +63,3 @@ namespace jrc
         Range<int16_t> borders;
     };
 }
-

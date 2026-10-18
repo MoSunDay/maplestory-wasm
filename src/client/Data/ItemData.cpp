@@ -99,7 +99,7 @@ namespace jrc
 
     std::string ItemData::get_eqcategory(int32_t id) const
     {
-        if (id / 10000 == 181)
+        if (id / 10000 == 180 || id / 10000 == 181)
         {
             return "PetEquip";
         }

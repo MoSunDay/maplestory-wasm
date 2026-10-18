@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../../Gameplay/Physics/Physics.h"
+#include "../../Gameplay/Pet/PetFollowPolicy.h"
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Animation.h"
 #include "../../Template/EnumMap.h"
@@ -71,6 +72,12 @@ namespace jrc
         int32_t get_uniqueid() const;
         Point<int16_t> get_position() const;
         bool has_loot_target() const;
+        int32_t get_last_warp_owner_distance() const;
+        uint16_t get_foothold_id() const;
+        bool is_onground() const;
+        pet_follow::Action get_last_move_intent() const;
+        Footholdtree::HorizontalCollision get_last_horizontal_collision() const;
+        uint32_t get_jump_trigger_count() const;
         bool consume_urgent_movement();
         Movement get_movement() const;
         Stance get_stance() const;
@@ -78,6 +85,8 @@ namespace jrc
     private:
         void reset_motion();
         void warp_to(Point<int16_t> position);
+        void begin_jump(pet_follow::Action action, int32_t target_distance);
+        void finish_jump(Point<int16_t> target_position);
 
         int32_t itemid = 0;
         std::string name;
@@ -89,8 +98,15 @@ namespace jrc
         PhysicsObject phobj;
         std::optional<Point<int16_t>> loot_target;
         Text namelabel;
-        int32_t last_progress_distance = 0;
-        uint16_t stalled_frames = 0;
+        uint8_t failed_loot_jumps = 0;
+        int32_t jump_start_distance = 0;
+        int8_t jump_direction = 0;
+        bool jump_airborne = false;
+        int32_t last_warp_owner_distance = 0;
+        pet_follow::Action last_move_intent = pet_follow::Action::IDLE;
+        Footholdtree::HorizontalCollision last_horizontal_collision =
+            Footholdtree::HorizontalCollision::NONE;
+        uint32_t jump_trigger_count = 0;
         bool urgent_movement = false;
     };
 }

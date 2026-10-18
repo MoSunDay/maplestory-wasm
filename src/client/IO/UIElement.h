@@ -81,6 +81,7 @@ namespace jrc
             CASHSHOP,
             FIELDCLOCK,
             PLAYER_CONTEXT,
+            USERINFO,
             TRADE,
             NUM_TYPES
         };

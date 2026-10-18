@@ -7,7 +7,8 @@
 - 位图加载分类（后台、阻塞可见、短时特效）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/bitmap-load-class.cpp -o /tmp/bitmap-load-class && /tmp/bitmap-load-class`
 - 地图素材安全门（驻留、可见图集、稳定窗、超时重试）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/map-asset-gate.cpp -o /tmp/map-asset-gate && /tmp/map-asset-gate`
 - 自然恢复规则：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/natural-recovery.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/natural-recovery && /tmp/natural-recovery`
-- 宠物内建能力、药品选择、自动补给、拾取重试与 150px 跟随策略：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc tools/verify/pet-automation.cpp src/client/Gameplay/Pet/PetAutomation.cpp src/client/Gameplay/Pet/PetCapabilityPolicy.cpp src/client/Gameplay/Pet/PetFollowPolicy.cpp src/client/Gameplay/Pet/PetLootPolicy.cpp -o /tmp/pet-automation && /tmp/pet-automation`
+- 宠物内建能力、药品选择、自动补给、真实受阻跳跃与 300px 唯一瞬移门槛：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc tools/verify/pet-automation.cpp src/client/Gameplay/Pet/PetAutomation.cpp src/client/Gameplay/Pet/PetCapabilityPolicy.cpp src/client/Gameplay/Pet/PetFollowPolicy.cpp src/client/Gameplay/Pet/PetLootPolicy.cpp -o /tmp/pet-automation && /tmp/pet-automation`
+- 宠物对齐人物的斜坡、墙体和平台末端实际碰撞：`c++ -std=c++17 -Wall -Wextra -Werror -Wno-narrowing -Wno-unused-function -Isrc/client -Isrc -Isrc/nlnx tools/verify/pet-physics-nx.cpp src/client/Gameplay/Pet/PetFollowPolicy.cpp src/client/Gameplay/Physics/Physics.cpp src/client/Gameplay/Physics/FootholdTree.cpp src/client/Gameplay/Physics/Foothold.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/pet-physics-nx && /tmp/pet-physics-nx Map.nx`
 - 浏览器恢复帧时间限制：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/runtime/frame-timing.cpp src/client/Character/Recovery/NaturalRecovery.cpp -o /tmp/frame-timing && /tmp/frame-timing`
 - 死亡幽灵轨迹：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-orbit.cpp -o /tmp/death-tomb-orbit && /tmp/death-tomb-orbit`
 - 死亡墓碑落地点：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/death-tomb-ground.cpp -o /tmp/death-tomb-ground && /tmp/death-tomb-ground`
@@ -29,6 +30,9 @@
 - 面对面交易纯状态（9 格物品、金币、聊天、双方确认）：`c++ -std=c++17 -Isrc/client tools/verify/trade-state.cpp src/client/IO/Trade/TradeState.cpp -o /tmp/trade-state && /tmp/trade-state`
 - 交易物品封包（普通物品、装备、宠物完整消费）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/trade-item-parser.cpp src/client/Net/Protocol/TradeProtocol.cpp src/client/Net/InPacket.cpp -o /tmp/trade-item-parser && /tmp/trade-item-parser`
 - 交易窗口 NX 素材契约：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/trade-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/trade-ui-nx && /tmp/trade-ui-nx UI.nx`
+- 人物信息、最多三只宠物及人气增减协议：`c++ -std=c++17 -Wall -Wextra -Werror -Isrc/client -Isrc tools/verify/character-info-protocol.cpp src/client/Net/InPacket.cpp src/client/Net/CharacterInfo/CharacterInfoProtocol.cpp -o /tmp/character-info-protocol && /tmp/character-info-protocol`
+- 老版人物/宠物信息卡片 NX 素材契约：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/user-info-ui-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/user-info-ui-nx && /tmp/user-info-ui-nx UI.nx`
+- linked server 人物信息、人气模式与 opcode 契约：`node tools/verify/character-info-server-contract.mjs`
 - linked server 交易原子提交、合法性与 v83 opcode：`node tools/verify/trade-server-contract.mjs`
 - 好友封包编码、事件解析与好友/队伍纯状态转换：`c++ -std=c++17 -Wall -Wextra -Werror tools/verify/social-protocol.cpp src/client/IO/Social/SocialState.cpp src/client/Net/Protocol/SocialProtocol.cpp src/client/Net/InPacket.cpp -Isrc/client -Isrc -o /tmp/social-protocol && /tmp/social-protocol`
 - Cosmic 完整角色数据（Java 定长 UTF-8、戒指、新年贺卡、小游戏门禁）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/character-data-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/CharacterDataParser.cpp -o /tmp/character-data-parser && /tmp/character-data-parser`

@@ -92,8 +92,27 @@ namespace jrc
         Point<int16_t> cursor,
         Point<int16_t> view_position) const
     {
+        return find_target_from(cursor, view_position, nullptr);
+    }
+
+    std::optional<PlayerTarget> MapChars::find_target_with(
+        Point<int16_t> cursor,
+        Point<int16_t> view_position,
+        const PlayerTarget& additional_target) const
+    {
+        return find_target_from(cursor, view_position, &additional_target);
+    }
+
+    std::optional<PlayerTarget> MapChars::find_target_from(
+        Point<int16_t> cursor,
+        Point<int16_t> view_position,
+        const PlayerTarget* additional_target) const
+    {
         std::vector<PlayerTarget> candidates;
-        candidates.reserve(chars.size());
+        candidates.reserve(chars.size() + (additional_target ? 1 : 0));
+
+        if (additional_target)
+            candidates.push_back(*additional_target);
 
         for (const auto& iter : chars)
         {

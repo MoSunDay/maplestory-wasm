@@ -85,7 +85,7 @@ namespace jrc
 
     private:
         void try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos,
-            int32_t& closest_distance_sq, Loot& closest_loot) const;
+            int64_t& closest_distance_sq, Loot& closest_loot) const;
         static bool pet_can_target(const Drop& drop, const PetLootQuery& query);
 
         MapObjects drops;

@@ -291,6 +291,7 @@ namespace jrc
                 UIElement::PARTY,
                 UIElement::TRADE,
                 UIElement::PLAYER_CONTEXT,
+                UIElement::USERINFO,
                 UIElement::STATSINFO,
                 UIElement::NOTICE
             };

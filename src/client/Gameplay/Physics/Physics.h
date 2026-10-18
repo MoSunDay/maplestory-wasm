@@ -24,11 +24,20 @@ namespace jrc
     class Physics
     {
     public:
+        struct MoveResult
+        {
+            double start_x = 0.0;
+            double end_x = 0.0;
+            bool grounded = false;
+            Footholdtree::HorizontalCollision horizontal_collision =
+                Footholdtree::HorizontalCollision::NONE;
+        };
+
         Physics(nl::node src);
         Physics();
 
         // Move the specified object over the specified game-time.
-        void move_object(PhysicsObject& tomove) const;
+        MoveResult move_object(PhysicsObject& tomove) const;
         // Determine the point on the ground below the specified position.
         Point<int16_t> get_y_below(Point<int16_t> position) const;
         // Return a reference to the collection of platforms.
@@ -42,4 +51,3 @@ namespace jrc
         Footholdtree fht;
     };
 }
-
