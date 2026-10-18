@@ -48,10 +48,29 @@ int main()
         std::vector<size_t>({1}), "SN search");
     ok &= expect(filter_catalog(catalog, {true, 0, "Female"}) ==
         std::vector<size_t>({2}), "name search");
-    ok &= expect(page_count(0) == 1 && page_count(5) == 1 && page_count(6) == 2,
-        "page counts");
-    ok &= expect(clamp_page(9, 6) == 1 && page_range(9, 6) ==
-        std::pair<size_t, size_t>({5, 6}), "page clamping");
+    ok &= expect(
+        page_count(0, CATALOG_PAGE_SIZE) == 1 &&
+        page_count(5, CATALOG_PAGE_SIZE) == 1 &&
+        page_count(6, CATALOG_PAGE_SIZE) == 1 &&
+        page_count(7, CATALOG_PAGE_SIZE) == 2,
+        "catalog page counts");
+    ok &= expect(
+        clamp_page(9, 7, CATALOG_PAGE_SIZE) == 1 &&
+        page_range(9, 7, CATALOG_PAGE_SIZE) ==
+            std::pair<size_t, size_t>({6, 7}) &&
+        page_range(0, 7, CATALOG_PAGE_SIZE) ==
+            std::pair<size_t, size_t>({0, 6}),
+        "catalog page clamping");
+    ok &= expect(
+        page_count(0, RIGHT_PAGE_SIZE) == 1 &&
+        page_count(24, RIGHT_PAGE_SIZE) == 1 &&
+        page_count(25, RIGHT_PAGE_SIZE) == 2 &&
+        clamp_page(9, 25, RIGHT_PAGE_SIZE) == 1 &&
+        page_range(9, 25, RIGHT_PAGE_SIZE) ==
+            std::pair<size_t, size_t>({24, 25}) &&
+        page_range(0, 50, RIGHT_PAGE_SIZE) ==
+            std::pair<size_t, size_t>({0, 24}),
+        "right pane paging");
     ok &= expect(next_category(6) == 0, "category cycling");
     ok &= expect(next_currency(CashCurrency::NX_PREPAID) == CashCurrency::NX_CREDIT,
         "currency cycling");

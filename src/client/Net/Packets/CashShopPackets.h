@@ -11,6 +11,14 @@ namespace jrc
         EnterCashShopPacket() : OutPacket(ENTER_CASHSHOP) {}
     };
 
+    /// Requests the player's current Cash Shop balances.
+    /// Opcode: CHECK_CASH(0xE4); server replies with QUERY_CASH_RESULT.
+    class CheckCashPacket : public OutPacket
+    {
+    public:
+        CheckCashPacket() : OutPacket(CHECK_CASH) {}
+    };
+
     class LeaveCashShopPacket : public OutPacket
     {
     public:

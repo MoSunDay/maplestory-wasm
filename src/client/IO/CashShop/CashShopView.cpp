@@ -37,21 +37,23 @@ namespace jrc::cash_shop_view
         return filtered;
     }
 
-    size_t page_count(size_t item_count)
+    size_t page_count(size_t item_count, size_t page_size)
     {
-        return std::max<size_t>(1, (item_count + ROWS_PER_PANE - 1) / ROWS_PER_PANE);
+        return std::max<size_t>(
+            1, (item_count + page_size - 1) / page_size);
     }
 
-    size_t clamp_page(size_t page, size_t item_count)
+    size_t clamp_page(size_t page, size_t item_count, size_t page_size)
     {
-        return std::min(page, page_count(item_count) - 1);
+        return std::min(page, page_count(item_count, page_size) - 1);
     }
 
-    std::pair<size_t, size_t> page_range(size_t page, size_t item_count)
+    std::pair<size_t, size_t> page_range(
+        size_t page, size_t item_count, size_t page_size)
     {
-        const size_t safe_page = clamp_page(page, item_count);
-        const size_t begin = std::min(item_count, safe_page * ROWS_PER_PANE);
-        return { begin, std::min(item_count, begin + ROWS_PER_PANE) };
+        const size_t safe_page = clamp_page(page, item_count, page_size);
+        const size_t begin = std::min(item_count, safe_page * page_size);
+        return { begin, std::min(item_count, begin + page_size) };
     }
 
     int8_t next_category(int8_t category)

@@ -20,7 +20,8 @@ namespace jrc
     void UICashShop::replace_locker(std::vector<CashLockerItem> items)
     {
         model->replace_locker(std::move(items));
-        right_page = view::clamp_page(right_page, right_count());
+        right_page = view::clamp_page(
+            right_page, right_count(), view::RIGHT_PAGE_SIZE);
         selected_right.reset();
         refresh();
     }
@@ -83,53 +84,78 @@ namespace jrc
 
     void UICashShop::refresh()
     {
-        left_page = view::clamp_page(left_page, filtered.size());
-        right_page = view::clamp_page(right_page, right_count());
-        category_label.change_text(std::string("分类: ") + view::category_name(category) + " >");
-        currency_label.change_text(std::string("支付: ") + view::currency_name(currency) + " >");
-        const CashBalances& balance = model->balances();
-        balance_label.change_text("NX " + view::format_amount(balance.nx_credit) +
-            "  点 " + view::format_amount(balance.maple_points) +
-            "  预 " + view::format_amount(balance.nx_prepaid));
-        right_mode_label.change_text(std::string(view::pane_name(right_pane)) + "  >");
-        transfer_label.change_text(view::transfer_name(right_pane));
-        left_page_label.change_text("<  " + std::to_string(left_page + 1) + "/" +
-            std::to_string(view::page_count(filtered.size())) + "  >");
-        right_page_label.change_text("<  " + std::to_string(right_page + 1) + "/" +
-            std::to_string(view::page_count(right_count())) + "  >");
+        left_page = view::clamp_page(
+            left_page, filtered.size(), view::CATALOG_PAGE_SIZE);
+        right_page = view::clamp_page(
+            right_page, right_count(), view::RIGHT_PAGE_SIZE);
+        for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+            category_labels[entry].change_color(
+                entry == category ? Text::YELLOW : Text::LIGHTGREY);
+        for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
+            currency_labels[choice].change_color(
+                currency == currency_choice(choice) ? Text::YELLOW :
+                    Text::LIGHTGREY);
+        const bool locker_active = right_pane == view::RightPane::LOCKER;
+        tab_labels[0].change_color(locker_active ? Text::BLACK : Text::WHITE);
+        tab_labels[1].change_color(locker_active ? Text::WHITE : Text::BLACK);
+        transfer_hint.change_text(locker_active ?
+            "再次点击物品可快速取出" : "再次点击物品可快速存入");
+        page_labels[0].change_text(std::to_string(left_page + 1) + "/" +
+            std::to_string(view::page_count(
+                filtered.size(), view::CATALOG_PAGE_SIZE)));
+        page_labels[1].change_text(std::to_string(right_page + 1) + "/" +
+            std::to_string(view::page_count(
+                right_count(), view::RIGHT_PAGE_SIZE)));
         refresh_rows();
     }
 
     void UICashShop::refresh_rows()
     {
-        const auto left_range = view::page_range(left_page, filtered.size());
-        const auto right_range = view::page_range(right_page, right_count());
-        for (size_t row = 0; row < view::ROWS_PER_PANE; ++row)
+        const auto left_range = view::page_range(
+            left_page, filtered.size(), view::CATALOG_PAGE_SIZE);
+        const auto right_range = view::page_range(
+            right_page, right_count(), view::RIGHT_PAGE_SIZE);
+        for (size_t card = 0; card < view::CATALOG_PAGE_SIZE; ++card)
         {
-            const size_t left_index = left_range.first + row;
-            const size_t right_index = right_range.first + row;
-            const bool left_active = left_index < left_range.second;
-            const bool right_active = right_index < right_range.second;
-            buttons[BT_LEFT_FIRST + row]->set_active(!pending && left_active);
-            buttons[BT_RIGHT_FIRST + row]->set_active(!pending && right_active);
-            left_names[row].change_text(left_active ?
-                model->catalog()[filtered[left_index]].name : "");
-            left_details[row].change_text(left_active ?
-                view::format_amount(model->catalog()[filtered[left_index]].price) + " NX" : "");
-            right_names[row].change_text(right_active ?
-                CashShopModel::item_name(right_item_id(right_index)) : "");
-            right_details[row].change_text(right_active ?
-                (right_pane == view::RightPane::LOCKER ? "再次点击取出" : "再次点击存入") : "");
+            const size_t index = left_range.first + card;
+            const bool active = index < left_range.second;
+            buttons[BT_CARD_FIRST + card]->set_active(!pending && active);
+            std::string name;
+            if (active)
+            {
+                const CashCommodity& item =
+                    model->catalog()[filtered[index]];
+                name = item.name;
+                if (item.count > 1)
+                    name += " x" + std::to_string(item.count);
+            }
+            card_names[card].change_text(name);
         }
+        for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
+        {
+            const size_t index = right_range.first + slot;
+            const bool active = index < right_range.second;
+            buttons[BT_SLOT_FIRST + slot]->set_active(!pending && active);
+            const int16_t count = active ? right_item_count(index) : 0;
+            slot_counts[slot].change_text(
+                count > 1 ? std::to_string(count) : "");
+        }
+        for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+            buttons[BT_TAB_FIRST + entry]->set_active(!pending);
+        for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
+            buttons[BT_CURRENCY_FIRST + choice]->set_active(!pending);
         buttons[BT_BUY]->set_active(!pending && selected_left.has_value());
-        buttons[BT_BUY_HIT]->set_active(!pending && selected_left.has_value());
+        position_buy_button();
         buttons[BT_TRANSFER]->set_active(!pending && selected_right.has_value());
-        buttons[BT_SELECTED_TRANSFER]->set_active(!pending && selected_right.has_value());
-        if (selected_right)
-        {
-            buttons[BT_SELECTED_TRANSFER]->set_position(
-                row_position(true, *selected_right % view::ROWS_PER_PANE));
-        }
+        buttons[BT_CHARGE]->set_active(!pending);
+        buttons[BT_EXIT]->set_active(!pending);
+        buttons[BT_LEFT_PREV]->set_active(!pending);
+        buttons[BT_LEFT_NEXT]->set_active(!pending);
+        buttons[BT_RIGHT_PREV]->set_active(!pending);
+        buttons[BT_RIGHT_NEXT]->set_active(!pending);
+        const bool locker_tab = right_pane == view::RightPane::LOCKER;
+        buttons[BT_RIGHT_LOCKER_TAB]->set_active(!pending && !locker_tab);
+        buttons[BT_RIGHT_INVENTORY_TAB]->set_active(!pending && locker_tab);
     }
 
     void UICashShop::change_right_pane(view::RightPane pane)
@@ -155,7 +181,8 @@ namespace jrc
         });
         selected_right = found == items.end() ? std::optional<size_t>{} :
             std::optional<size_t>{static_cast<size_t>(found - items.begin())};
-        right_page = selected_right ? *selected_right / view::ROWS_PER_PANE : 0;
+        right_page = selected_right ?
+            *selected_right / view::RIGHT_PAGE_SIZE : 0;
         refresh();
     }
 
@@ -168,7 +195,8 @@ namespace jrc
         });
         selected_right = found == items.end() ? std::optional<size_t>{} :
             std::optional<size_t>{static_cast<size_t>(found - items.begin())};
-        right_page = selected_right ? *selected_right / view::ROWS_PER_PANE : 0;
+        right_page = selected_right ?
+            *selected_right / view::RIGHT_PAGE_SIZE : 0;
         refresh();
     }
 
@@ -228,11 +256,13 @@ namespace jrc
         return Stage::get().get_player().get_inventory().get_cash_items()[index].cash_id;
     }
 
-    Point<int16_t> UICashShop::row_position(bool right, size_t row) const
+    int16_t UICashShop::right_item_count(size_t index) const
     {
-        return { static_cast<int16_t>(right ? 246 : 12),
-            static_cast<int16_t>(116 + row * 42) };
+        if (right_pane == view::RightPane::LOCKER)
+            return model->locker()[index].count;
+        return Stage::get().get_player().get_inventory().get_cash_items()[index].count;
     }
+
 
     int32_t UICashShop::locker_count() const
     {
@@ -252,7 +282,8 @@ namespace jrc
 
     int32_t UICashShop::selected_right_row() const
     {
-        return selected_right ? static_cast<int32_t>(*selected_right % view::ROWS_PER_PANE) : -1;
+        return selected_right ?
+            static_cast<int32_t>(*selected_right % view::RIGHT_PAGE_SIZE) : -1;
     }
 
     int64_t UICashShop::transfer_cash_id() const
