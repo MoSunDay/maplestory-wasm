@@ -137,14 +137,12 @@ namespace jrc
             return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 8, 62 };
         }
 
-        inline Point<int16_t> sell_button_pos()
-        {
-            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 82, 62 };
-        }
-
         inline Point<int16_t> sell_all_button_pos()
         {
-            return post_chaos() ? Point<int16_t>{ 0, -20 } : Point<int16_t>{ 156, 62 };
+            // Single sell button of the window: it occupies the natural
+            // BtSell slot (post-Chaos node origin / pre-Chaos sell column).
+            // Selling a single item is done by double-clicking a row.
+            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 82, 62 };
         }
 
         inline Point<int16_t> exit_button_pos()

@@ -47,7 +47,6 @@ namespace jrc
         }
 
         buttons[BUY_ITEM]  = std::make_unique<MapleButton>(src["BtBuy"], shop_nodes::buy_button_pos());
-        buttons[SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"], shop_nodes::sell_button_pos());
         buttons[SELL_ALL]  = std::make_unique<MapleButton>(src["BtSell"], shop_nodes::sell_all_button_pos());
         buttons[EXIT]      = std::make_unique<MapleButton>(src["BtExit"], shop_nodes::exit_button_pos());
         if (nl::node rechargenode = src["BtRecharge"])
@@ -197,9 +196,6 @@ namespace jrc
             {
             case BUY_ITEM:
                 buystate.buy();
-                return Button::NORMAL;
-            case SELL_ITEM:
-                sellstate.sell();
                 return Button::NORMAL;
             case SELL_ALL:
                 if (!sellstate.has_sellable_items())

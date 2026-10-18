@@ -427,7 +427,8 @@ extern "C"
         return shop ? shop->sell_selection() : MISSING_COORDINATE;
     }
 
-    // id follows UIShop::Buttons: 0=BUY_ITEM, 1=SELL_ITEM, 2=EXIT, 23=SELL_ALL.
+    // id follows UIShop::Buttons: 0=BUY_ITEM, 2=EXIT, 23=SELL_ALL
+    // (1 reserved: SELL_ITEM removed; double-click a row to sell one item).
     int msshop_button_x(int16_t id)
     {
         auto shop = jrc::UI::get().get_element<jrc::UIShop>();
