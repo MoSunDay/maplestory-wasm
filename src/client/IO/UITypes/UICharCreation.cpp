@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "UICharCreation.h"
+#include "../UiAssetVersion.h"
 
 #include "../Components/MapleButton.h"
 #include "../UI.h"
@@ -49,7 +50,7 @@ namespace jrc
         sprites.emplace_back(bgsrc["16"], Point<int16_t>(200, 400));
         sprites.emplace_back(bgsrc["17"], Point<int16_t>(160, 263));
         sprites.emplace_back(bgsrc["18"], Point<int16_t>(349, 1220));
-        sprites.emplace_back(src["Common"]["frame"], Point<int16_t>(400, 300));
+        sprites.emplace_back(src["Common"]["frame"], Point<int16_t>(400, login_frame_y()));
 
         nameboard = crsrc["charName"];
 

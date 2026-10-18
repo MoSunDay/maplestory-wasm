@@ -3,6 +3,7 @@
 #include "Components/Textfield.h"
 #include "CashShop/UICashShop.h"
 #include "UI.h"
+#include "../Constants.h"
 #include "UITypes/UICharCreation.h"
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
@@ -53,6 +54,9 @@ namespace jrc
         focusedfield = field;
 
         Rectangle<int16_t> bounds = field->get_bounds();
+        // The scene is rendered shifted down by VIEWYOFFSET; report the
+        // on-screen position so the DOM caret and IME candidates track the
+        // drawn glyphs instead of the unshifted field bounds.
         std::string text = field->get_text();
         int caret = static_cast<int>(field->caret_utf16());
 
@@ -62,7 +66,9 @@ namespace jrc
                 window.MapleWasmIME.onFocus($0, $1, $2, $3, UTF8ToString($4), $5);
             }
         },
-            bounds.getlt().x(), bounds.getlt().y(), bounds.width(), bounds.height(),
+            bounds.getlt().x(),
+            static_cast<int16_t>(bounds.getlt().y() + Constants::VIEWYOFFSET),
+            bounds.width(), bounds.height(),
             text.c_str(), caret);
     }
 
