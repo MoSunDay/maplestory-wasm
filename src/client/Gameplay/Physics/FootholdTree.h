@@ -20,6 +20,7 @@
 #include "PhysicsObject.h"
 
 #include <unordered_map>
+#include <vector>
 
 namespace jrc
 {
@@ -55,7 +56,9 @@ namespace jrc
         double get_edge(uint16_t fhid, bool left) const;
         const Foothold& get_fh(uint16_t fhid) const;
 
-        std::unordered_map<uint16_t, Foothold> footholds;
+        // Foothold ids are dense uint16 values, so they index the vector
+        // directly; holes keep default-constructed (invalid) footholds.
+        std::vector<Foothold> footholds;
         std::unordered_multimap<int16_t, uint16_t> footholdsbyx;
 
         Foothold nullfh;

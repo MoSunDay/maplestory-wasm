@@ -19,7 +19,14 @@ namespace LazyFS
 	bool LazyFileLoader::open()
 	{
 		backend_ = std::make_unique<LazyFileBackend>();
-		return backend_->open(path_);
+		if (!backend_->open(path_))
+		{
+			return false;
+		}
+
+		const size_t file_size = backend_->size();
+		chunk_slots_.assign(file_size / CHUNK_SIZE + 1, nullptr);
+		return true;
 	}
 
 	size_t LazyFileLoader::size() const
@@ -181,14 +188,17 @@ namespace LazyFS
 	{
 		access_counter_++;
 
-		// Check cache
-		for (auto& chunk : cache_)
+		// Out-of-range chunk means an invalid offset for this file.
+		if (chunk_index >= chunk_slots_.size())
 		{
-			if (chunk->index == chunk_index)
-			{
-				chunk->last_access = access_counter_;
-				return chunk.get();
-			}
+			return nullptr;
+		}
+
+		// O(1) cache hit path
+		if (Chunk* cached = chunk_slots_[chunk_index])
+		{
+			cached->last_access = access_counter_;
+			return cached;
 		}
 
 		// Not in cache, load it
@@ -231,11 +241,15 @@ namespace LazyFS
 					lru_it = it;
 				}
 			}
+
+			chunk_slots_[(*lru_it)->index] = nullptr;
 			cache_.erase(lru_it);
 		}
 
+		Chunk* loaded = new_chunk.get();
 		cache_.push_back(std::move(new_chunk));
-		return cache_.back().get();
+		chunk_slots_[chunk_index] = loaded;
+		return loaded;
 	}
 
 } // namespace LazyFS

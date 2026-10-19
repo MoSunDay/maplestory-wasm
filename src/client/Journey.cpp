@@ -28,6 +28,8 @@
 #include "Gameplay/Combat/DamageNumber.h"
 #include "Gameplay/Stage.h"
 #include "Graphics/GraphicsGL.h"
+#include "IO/Display/ResolutionStore.h"
+#include "IO/Display/Viewport.h"
 #include "IO/UI.h"
 #include "IO/Window.h"
 #include "Net/Session.h"
@@ -122,6 +124,11 @@ namespace jrc
         loadConfigString("ProxyPort", Setting<ProxyPort>::get());
         loadConfigString("AssetsServerProtocol", Setting<AssetsServerProtocol>::get());
 #endif
+
+        const display::Resolution boot_resolution = display::preset(
+            display_store::load_index()
+        );
+        viewport::apply_boot(boot_resolution);
 
         if (Error error = Session::get().init())
         {
@@ -265,6 +272,16 @@ namespace jrc
     static int64_t period = 0;
     static int32_t samples = 0;
 
+    // Rolling frame-time average (microseconds) published through the
+    // _msframe_avg_us probe so optimizations can be measured in the browser.
+    constexpr int32_t FRAME_TIME_SAMPLES = 100;
+    int64_t frame_avg_us = 0;
+
+    extern "C" EMSCRIPTEN_KEEPALIVE int msframe_avg_us()
+    {
+        return static_cast<int>(frame_avg_us);
+    }
+
     void main_tick()
     {
         const bool connection_lost = browser_connection_lost();
@@ -303,19 +320,16 @@ namespace jrc
             first_frame_presented = true;
         }
 
-        bool show_fps = true; // Hardcoded or from config
-        if (show_fps)
+        if (samples < FRAME_TIME_SAMPLES)
         {
-            if (samples < 100)
-            {
-                period += elapsed;
-                samples++;
-            }
-            else if (period)
-            {
-                period = 0;
-                samples = 0;
-            }
+            period += elapsed;
+            samples++;
+        }
+        else
+        {
+            frame_avg_us = samples > 0 ? period / samples : 0;
+            period = 0;
+            samples = 0;
         }
     }
 #endif
