@@ -35,6 +35,7 @@
 #include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
 
+#include <string>
 #include <vector>
 #include <optional>
 
@@ -98,6 +99,7 @@ namespace jrc
         void initialize_postchaos();
         void initialize_prechaos(nl::node statusbar);
         void draw_prechaos() const;
+        void ensure_stat_labels(bool prechaos) const;
         void dispatch_popup_action(StatusBarPopup::Action action);
         float getexppercent() const;
         float gethppercent() const;
@@ -147,5 +149,20 @@ namespace jrc
         Texture quickslot_panel;
         Texture quickslot_keys[8];
         mutable ColorBox gauge_covers[3];
+
+        // Stat label cache, rebuilt only when the displayed values or the
+        // label format change; draw() is const, hence the mutables.
+        mutable std::string hp_label;
+        mutable std::string mp_label;
+        mutable std::string exp_label;
+        mutable std::string level_label;
+        mutable int8_t label_format = -1;
+        mutable int16_t cached_level = -1;
+        mutable int16_t cached_hp = -1;
+        mutable int16_t cached_mp = -1;
+        mutable int32_t cached_maxhp = -1;
+        mutable int32_t cached_maxmp = -1;
+        mutable int64_t cached_exp = -1;
+        mutable int16_t cached_exppercent = -1;
     };
 }

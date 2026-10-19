@@ -109,6 +109,9 @@ namespace jrc
         nl::node marker_node;
         Texture map_sprite;
         Animation player_marker;
+        Animation portal_marker;
+        Animation npc_marker;
+        Animation other_marker;
         int16_t combined_text_width;
         int16_t middle_right_x;
         int16_t bt_min_width;

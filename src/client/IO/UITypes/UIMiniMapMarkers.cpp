@@ -52,7 +52,6 @@ namespace jrc
             return;
         }
 
-        Animation npc_marker(marker_node["npc"]);
         Point<int16_t> npc_offset = npc_marker.get_dimensions() / Point<int16_t>(2, 1);
 
         MapObjects* npcs = Stage::get().get_npcs().get_npcs();
@@ -62,7 +61,6 @@ namespace jrc
             npc_marker.draw((npc_pos + center_offset) / scale - npc_offset + Point<int16_t>(map_draw_origin_x, map_draw_origin_y) + init_pos, alpha);
         }
 
-        Animation other_marker(marker_node["another"]);
         Point<int16_t> other_offset = other_marker.get_dimensions() / Point<int16_t>(2, 1);
 
         MapObjects* chars = Stage::get().get_chars().get_chars();

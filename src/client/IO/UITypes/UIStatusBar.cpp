@@ -20,6 +20,7 @@
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "Pet/UIPetOptions.h"
+#include "Settings/UIGameOptions.h"
 
 #include "../../Character/ExpTable.h"
 #include "../../Console.h"
@@ -163,6 +164,52 @@ namespace jrc
             statusbar["BtClaim"], statusbar::claim_pos());
     }
 
+    void UIStatusbar::ensure_stat_labels(bool prechaos) const
+    {
+        int16_t level = stats.get_stat(Maplestat::LEVEL);
+        int16_t hp    = stats.get_stat(Maplestat::HP);
+        int16_t mp    = stats.get_stat(Maplestat::MP);
+        int32_t maxhp = stats.get_total(Equipstat::HP);
+        int32_t maxmp = stats.get_total(Equipstat::MP);
+        int64_t exp   = stats.get_exp();
+        int16_t exppercent = static_cast<int16_t>(100.0f * getexppercent() + 0.5f);
+
+        const int8_t format = prechaos ? 1 : 0;
+        if (format == label_format && level == cached_level && hp == cached_hp
+            && mp == cached_mp && maxhp == cached_maxhp && maxmp == cached_maxmp
+            && exp == cached_exp && exppercent == cached_exppercent)
+        {
+            return;
+        }
+
+        label_format = format;
+        cached_level = level;
+        cached_hp = hp;
+        cached_mp = mp;
+        cached_maxhp = maxhp;
+        cached_maxmp = maxmp;
+        cached_exp = exp;
+        cached_exppercent = exppercent;
+
+        if (prechaos)
+        {
+            // The v83 number font maps brackets/slash/percent to their node
+            // names, so the composed strings reuse those glyphs.
+            hp_label  = "L" + std::to_string(hp) + "s" + std::to_string(maxhp) + "R";
+            mp_label  = "L" + std::to_string(mp) + "s" + std::to_string(maxmp) + "R";
+            exp_label = std::to_string(exp) + "L" + std::to_string(exppercent) + "pR";
+        }
+        else
+        {
+            std::string expstring = std::to_string(100 * getexppercent());
+            exp_label = std::to_string(exp) + "[" + expstring.substr(0, expstring.find('.') + 3) + "%]";
+            hp_label  = "[" + std::to_string(hp) + "/" + std::to_string(maxhp) + "]";
+            mp_label  = "[" + std::to_string(mp) + "/" + std::to_string(maxmp) + "]";
+        }
+
+        level_label = std::to_string(level);
+    }
+
     void UIStatusbar::draw(float alpha) const
     {
         UIElement::draw(alpha);
@@ -179,30 +226,12 @@ namespace jrc
         hpbar.draw(position + Point<int16_t>(-261, -31));
         mpbar.draw(position + Point<int16_t>(-90, -31));
 
-        int16_t level = stats.get_stat(Maplestat::LEVEL);
-        int16_t hp    = stats.get_stat(Maplestat::HP);
-        int16_t mp    = stats.get_stat(Maplestat::MP);
-        int32_t maxhp = stats.get_total(Equipstat::HP);
-        int32_t maxmp = stats.get_total(Equipstat::MP);
-        int64_t exp   = stats.get_exp();
+        ensure_stat_labels(statusbar::prechaos());
 
-        std::string expstring = std::to_string(100 * getexppercent());
-        statset.draw(
-            std::to_string(exp) + "[" + expstring.substr(0, expstring.find('.') + 3) + "%]",
-            position + Point<int16_t>(47, -13)
-        );
-        statset.draw(
-            "[" + std::to_string(hp) + "/" + std::to_string(maxhp) + "]",
-            position + Point<int16_t>(-124, -29)
-        );
-        statset.draw(
-            "[" + std::to_string(mp) + "/" + std::to_string(maxmp) + "]",
-            position + Point<int16_t>(47, -29)
-        );
-        levelset.draw(
-            std::to_string(level),
-            position + Point<int16_t>(-480, -24)
-        );
+        statset.draw(exp_label, position + Point<int16_t>(47, -13));
+        statset.draw(hp_label, position + Point<int16_t>(-124, -29));
+        statset.draw(mp_label, position + Point<int16_t>(47, -29));
+        levelset.draw(level_label, position + Point<int16_t>(-480, -24));
 
         joblabel.draw(position + Point<int16_t>(-435, -21));
         namelabel.draw(position + Point<int16_t>(-435, -36));
@@ -243,41 +272,31 @@ namespace jrc
 
         gauge_graduation.draw(gauge_pos);
 
-        int16_t level = stats.get_stat(Maplestat::LEVEL);
-        int16_t hp    = stats.get_stat(Maplestat::HP);
-        int16_t mp    = stats.get_stat(Maplestat::MP);
-        int32_t maxhp = stats.get_total(Equipstat::HP);
-        int32_t maxmp = stats.get_total(Equipstat::MP);
-        int64_t exp   = stats.get_exp();
+        ensure_stat_labels(true);
 
-        // The v83 number font maps brackets/slash/percent to their node
-        // names, so the composed strings reuse those glyphs.
         statset.draw(
-            "L" + std::to_string(hp) + "s" + std::to_string(maxhp) + "R",
+            hp_label,
             gauge_pos + Point<int16_t>(
                 statusbar::gauge_number_right(statusbar::Gauge::HP),
                 statusbar::gauge_number_y()
             )
         );
         statset.draw(
-            "L" + std::to_string(mp) + "s" + std::to_string(maxmp) + "R",
+            mp_label,
             gauge_pos + Point<int16_t>(
                 statusbar::gauge_number_right(statusbar::Gauge::MP),
                 statusbar::gauge_number_y()
             )
         );
-        const int16_t exppercent = static_cast<int16_t>(
-            100.0f * getexppercent() + 0.5f
-        );
         statset.draw(
-            std::to_string(exp) + "L" + std::to_string(exppercent) + "pR",
+            exp_label,
             gauge_pos + Point<int16_t>(
                 statusbar::gauge_number_right(statusbar::Gauge::EXP),
                 statusbar::gauge_number_y()
             )
         );
 
-        levelset.draw(std::to_string(level), position + statusbar::level_pos());
+        levelset.draw(level_label, position + statusbar::level_pos());
         namelabel.draw(position + statusbar::name_pos());
         joblabel.draw(position + statusbar::job_pos());
 
@@ -521,6 +540,9 @@ namespace jrc
             break;
         case StatusBarPopup::Action::PET_OPTIONS:
             UI::get().emplace<UIPetOptions>();
+            break;
+        case StatusBarPopup::Action::GAME_OPTIONS:
+            UI::get().emplace<UIGameOptions>();
             break;
         case StatusBarPopup::Action::LOGOUT:
         {
