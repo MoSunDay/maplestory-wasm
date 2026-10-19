@@ -53,6 +53,7 @@ namespace jrc
         void set_body(int32_t skinid);
         void set_face(int32_t faceid);
         void add_equip(int32_t equipid);
+        void add_equip(int32_t equipid, Texture::LoadMode load_mode);
         void remove_equip(Equipslot::Id slot);
 
         void attack(bool degenerate);
@@ -80,7 +81,6 @@ namespace jrc
         void set_hair(int32_t hairid, Texture::LoadMode load_mode);
         void set_body(int32_t skinid, Texture::LoadMode load_mode);
         void set_face(int32_t faceid, Texture::LoadMode load_mode);
-        void add_equip(int32_t equipid, Texture::LoadMode load_mode);
         void updatetwohanded();
         void draw(const DrawArgument& args, Stance::Id interstance,
             Expression::Id interexp, uint8_t interframe, uint8_t interfcframe) const;
