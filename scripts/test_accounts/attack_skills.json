@@ -1,0 +1,1483 @@
+{
+  "112": {
+    "suffix": "Hero",
+    "kind": "melee",
+    "skills": [
+      {
+        "id": 1001005,
+        "name": "Slash Blast",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1100002,
+        "name": "Final Attack : Sword",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1111002,
+        "name": "Combo Attack",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1111005,
+        "name": "Coma: Sword",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 8,
+        "mpCon": 26,
+        "cooldown": 4,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1111008,
+        "name": "Shout",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 3,
+        "mpCon": 50,
+        "cooldown": 10,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1120003,
+        "name": "Advanced Combo Attack",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1121006,
+        "name": "Rush",
+        "level": 30,
+        "mobCount": 5,
+        "attackCount": 4,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1121008,
+        "name": "Brandish",
+        "level": 30,
+        "mobCount": 6,
+        "attackCount": 5,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "122": {
+    "suffix": "Pala",
+    "kind": "melee",
+    "skills": [
+      {
+        "id": 1001005,
+        "name": "Slash Blast",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1200003,
+        "name": "Final Attack : BW",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1211002,
+        "name": "Charged Blow",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 30,
+        "cooldown": 4,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1211004,
+        "name": "Flame Charge: BW",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 35,
+        "cooldown": 200,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1211006,
+        "name": "Blizzard Charge: BW",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 35,
+        "cooldown": 200,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1211008,
+        "name": "Lightning Charge: BW",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 35,
+        "cooldown": 200,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1211009,
+        "name": "Magic Crash",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 1,
+        "mpCon": 7,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1220010,
+        "name": "Advanced Charge",
+        "level": 10,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1221004,
+        "name": "Divine Charge : BW",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 1,
+        "mpCon": 30,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1221007,
+        "name": "Rush",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 4,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1221009,
+        "name": "Blast",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 5,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "132": {
+    "suffix": "DK",
+    "kind": "melee",
+    "skills": [
+      {
+        "id": 1001005,
+        "name": "Slash Blast",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1300002,
+        "name": "Final Attack : Spear",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1311001,
+        "name": "Spear Crusher",
+        "level": 30,
+        "mobCount": 6,
+        "attackCount": 6,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1311003,
+        "name": "Dragon Fury: Spear",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 6,
+        "mpCon": 20,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1311004,
+        "name": "Dragon Fury: Pole Arm",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 4,
+        "mpCon": 20,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1311007,
+        "name": "Power Crash",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 1,
+        "mpCon": 7,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1320006,
+        "name": "Berserk",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 1321003,
+        "name": "Rush",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 4,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "212": {
+    "suffix": "FPA",
+    "kind": "magic",
+    "skills": [
+      {
+        "id": 2001005,
+        "name": "Magic Claw",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 3,
+        "mpCon": 20,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2101001,
+        "name": "Meditation",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2101004,
+        "name": "Fire Arrow",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 3,
+        "mpCon": 100,
+        "cooldown": 6,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2101005,
+        "name": "Poison Breath",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 3,
+        "mpCon": 50,
+        "cooldown": 50,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2111002,
+        "name": "Explosion",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2111003,
+        "name": "Poison Mist",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 100,
+        "cooldown": 40,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2111006,
+        "name": "Element Composition",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 3,
+        "mpCon": 500,
+        "cooldown": 40,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2121003,
+        "name": "Fire Demon",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 6,
+        "mpCon": 100,
+        "cooldown": 15,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2121005,
+        "name": "Elquines",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 3,
+        "mpCon": 1000,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2121006,
+        "name": "Paralyze",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 5,
+        "mpCon": 500,
+        "cooldown": 15,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2121007,
+        "name": "Meteor Shower",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 4,
+        "mpCon": 1500,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "222": {
+    "suffix": "ILA",
+    "kind": "magic",
+    "skills": [
+      {
+        "id": 2001005,
+        "name": "Magic Claw",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 3,
+        "mpCon": 20,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2201001,
+        "name": "Meditation",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2201004,
+        "name": "Cold Beam",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 2,
+        "mpCon": 24,
+        "cooldown": 5,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2201005,
+        "name": "Thunder Bolt",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2211002,
+        "name": "Ice Strike",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 50,
+        "cooldown": 2,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2211003,
+        "name": "Thunder Spear",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 3,
+        "mpCon": 160,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2211006,
+        "name": "Element Composition",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 3,
+        "mpCon": 50,
+        "cooldown": 5,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2221003,
+        "name": "Ice Demon",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 6,
+        "mpCon": 34,
+        "cooldown": 15,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2221005,
+        "name": "Ifrit",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 3,
+        "mpCon": 1000,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2221006,
+        "name": "Chain Lightning",
+        "level": 30,
+        "mobCount": 6,
+        "attackCount": 6,
+        "mpCon": 25,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2221007,
+        "name": "Blizzard",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 1,
+        "mpCon": 3500,
+        "cooldown": 3,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "232": {
+    "suffix": "Bish",
+    "kind": "magic",
+    "skills": [
+      {
+        "id": 2001005,
+        "name": "Magic Claw",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 3,
+        "mpCon": 20,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2301003,
+        "name": "Invincible",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2301005,
+        "name": "Holy Arrow",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 2,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2311004,
+        "name": "Shining Ray",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 6,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2321001,
+        "name": "Big Bang",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 3,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": true,
+        "special": ""
+      },
+      {
+        "id": 2321003,
+        "name": "Bahamut",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 3,
+        "mpCon": 1000,
+        "cooldown": 3600,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2321007,
+        "name": "Angel Ray",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 6,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 2321008,
+        "name": "Genesis",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 4,
+        "mpCon": 1500,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "312": {
+    "suffix": "BM",
+    "kind": "ranged",
+    "skills": [
+      {
+        "id": 3000001,
+        "name": "Critical Shot",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3001004,
+        "name": "Arrow Blow",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3100001,
+        "name": "Final Attack : Bow",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3101003,
+        "name": "Power Knock-Back",
+        "level": 20,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3101005,
+        "name": "Arrow Bomb : Bow",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 1,
+        "mpCon": 50,
+        "cooldown": 6,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3110001,
+        "name": "Mortal Blow",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3111004,
+        "name": "Arrow Rain",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 4,
+        "mpCon": 80,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3111006,
+        "name": "Strafe",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3121003,
+        "name": "Dragon's Breath",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 1,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3121004,
+        "name": "Hurricane",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 15,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "322": {
+    "suffix": "MM",
+    "kind": "ranged",
+    "skills": [
+      {
+        "id": 3000001,
+        "name": "Critical Shot",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3001004,
+        "name": "Arrow Blow",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3200001,
+        "name": "Final Attack : Crossbow",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 2,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3201003,
+        "name": "Power Knock-Back",
+        "level": 20,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3201005,
+        "name": "Iron Arrow : Crossbow",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3210001,
+        "name": "Mortal Blow",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3211004,
+        "name": "Arrow Eruption",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 5,
+        "mpCon": 80,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3211006,
+        "name": "Strafe",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3221001,
+        "name": "Piercing Arrow",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 1,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3221003,
+        "name": "Dragon's Breath",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 1,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 3221007,
+        "name": "Snipe",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 1000,
+        "cooldown": 0,
+        "charge": false,
+        "special": "snipe_fixed_damage"
+      }
+    ]
+  },
+  "412": {
+    "suffix": "NL",
+    "kind": "ranged",
+    "skills": [
+      {
+        "id": 4001334,
+        "name": "Double Stab",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4001344,
+        "name": "Lucky Seven",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 10,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4100001,
+        "name": "Critical Throw",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4101005,
+        "name": "Drain",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 2000,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4111005,
+        "name": "Avenger",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 1,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4120005,
+        "name": "Venomous Star",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 30,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4121007,
+        "name": "Triple Throw",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4121008,
+        "name": "Ninja Storm",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 5,
+        "mpCon": 100,
+        "cooldown": 1,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "422": {
+    "suffix": "Shad",
+    "kind": "melee",
+    "skills": [
+      {
+        "id": 4001334,
+        "name": "Double Stab",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4001344,
+        "name": "Lucky Seven",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 10,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4201004,
+        "name": "Steal",
+        "level": 30,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4201005,
+        "name": "Savage Blow",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 5,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4211002,
+        "name": "Assaulter",
+        "level": 30,
+        "mobCount": 6,
+        "attackCount": 1,
+        "mpCon": 500,
+        "cooldown": 20,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4211004,
+        "name": "Band of Thieves",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 100,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4211006,
+        "name": "Meso Explosion",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 8,
+        "mpCon": 1500,
+        "cooldown": 0,
+        "charge": false,
+        "special": "meso_explosion",
+        "kind": "skip"
+      },
+      {
+        "id": 4220005,
+        "name": "Venomous Stab",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 30,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4221001,
+        "name": "Assassinate",
+        "level": 30,
+        "mobCount": 3,
+        "attackCount": 5,
+        "mpCon": 40,
+        "cooldown": 12,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 4221007,
+        "name": "Boomerang Step",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 5,
+        "mpCon": 50,
+        "cooldown": 2,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "512": {
+    "suffix": "Bucc",
+    "kind": "melee",
+    "skills": [
+      {
+        "id": 5001001,
+        "name": "Flash Fist",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 14,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5001002,
+        "name": "Sommersault Kick",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5001003,
+        "name": "Double Shot",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 7,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5101002,
+        "name": "Backspin Blow",
+        "level": 20,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 30,
+        "cooldown": 1,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5101003,
+        "name": "Double Uppercut",
+        "level": 20,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 30,
+        "cooldown": 1,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5101004,
+        "name": "Corkscrew Blow",
+        "level": 20,
+        "mobCount": 8,
+        "attackCount": 2,
+        "mpCon": 36,
+        "cooldown": 0,
+        "charge": true,
+        "special": ""
+      },
+      {
+        "id": 5110000,
+        "name": "Stun Mastery",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5110001,
+        "name": "Energy Charge",
+        "level": 40,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 300,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5111002,
+        "name": "Energy Blast",
+        "level": 30,
+        "mobCount": 6,
+        "attackCount": 8,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5111004,
+        "name": "Energy Drain",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5111006,
+        "name": "Shockwave",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 4,
+        "mpCon": 200,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5121001,
+        "name": "Dragon Strike",
+        "level": 30,
+        "mobCount": 15,
+        "attackCount": 5,
+        "mpCon": 200,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5121002,
+        "name": "Energy Orb",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 4,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5121004,
+        "name": "Demolition",
+        "level": 30,
+        "mobCount": 6,
+        "attackCount": 6,
+        "mpCon": 50,
+        "cooldown": 1,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5121005,
+        "name": "Snatch",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 3,
+        "mpCon": 50,
+        "cooldown": 1,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  },
+  "522": {
+    "suffix": "CS",
+    "kind": "ranged",
+    "skills": [
+      {
+        "id": 5001001,
+        "name": "Flash Fist",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 14,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5001002,
+        "name": "Sommersault Kick",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 2,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5001003,
+        "name": "Double Shot",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 7,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5201001,
+        "name": "Invisible Shot",
+        "level": 20,
+        "mobCount": 8,
+        "attackCount": 1,
+        "mpCon": 25,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5201002,
+        "name": "Grenade",
+        "level": 20,
+        "mobCount": 6,
+        "attackCount": 1,
+        "mpCon": 27,
+        "cooldown": 0,
+        "charge": true,
+        "special": ""
+      },
+      {
+        "id": 5201004,
+        "name": "Blank Shot",
+        "level": 20,
+        "mobCount": 5,
+        "attackCount": 2,
+        "mpCon": 50,
+        "cooldown": 4,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5201006,
+        "name": "Recoil Shot",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 2,
+        "mpCon": 26,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5210000,
+        "name": "Burst Fire",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 22,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5211004,
+        "name": "Flamethrower",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 3,
+        "mpCon": 100,
+        "cooldown": 5,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5211005,
+        "name": "Ice Splitter",
+        "level": 30,
+        "mobCount": 10,
+        "attackCount": 3,
+        "mpCon": 200,
+        "cooldown": 3,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5211006,
+        "name": "Homing Beacon",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5220001,
+        "name": "Elemental Boost",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 0,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5220011,
+        "name": "Bullseye",
+        "level": 20,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 40,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5221003,
+        "name": "Aerial Strike",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 4,
+        "mpCon": 500,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5221004,
+        "name": "Rapid Fire",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 1,
+        "mpCon": 30,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5221007,
+        "name": "Battleship Cannon",
+        "level": 30,
+        "mobCount": 1,
+        "attackCount": 5,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      },
+      {
+        "id": 5221008,
+        "name": "Battleship Torpedo",
+        "level": 30,
+        "mobCount": 12,
+        "attackCount": 6,
+        "mpCon": 50,
+        "cooldown": 0,
+        "charge": false,
+        "special": ""
+      }
+    ]
+  }
+}

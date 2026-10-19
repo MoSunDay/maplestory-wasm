@@ -38,6 +38,9 @@ STARTER_MESO = 1000000000
 STARTER_FAME = 30000
 CHARACTER_MAP = 910000000  # Free Market
 INSERT_CHUNK = 500
+# Space=NPCCHAT, Alt=JUMP, Ctrl=ATTACK; without rows the server KEYMAP packet
+# blanks every slot and these actions stop working.
+DEFAULT_KEYMAP = ((57, 5, 54), (56, 5, 53), (29, 5, 52))
 EQUIP_BONUS_COLUMNS = (
     "str", "dex", "int", "luk", "hp", "mp", "watk", "matk",
     "wdef", "mdef", "acc", "avoid", "hands", "speed", "jump",
@@ -158,6 +161,12 @@ def character_sql(name, char_index, blueprint, quest_ids, world=4):
             "INSERT INTO queststatus (characterid, quest, status, time, expires,"
             " forfeited, info) VALUES %s;" % values
         )
+
+    keymap_values = ",".join("(@chr, %d, %d, %d)" % row for row in DEFAULT_KEYMAP)
+    stmts.append(
+        "INSERT INTO keymap (characterid, `key`, type, action) VALUES %s;"
+        % keymap_values
+    )
     return stmts
 
 
