@@ -51,6 +51,8 @@ namespace jrc
         void show_buff(int32_t cid, int32_t skillid, int8_t level);
         // Show a buff effect.
         void show_player_buff(int32_t skillid);
+        // Show damage a remote source dealt to a mob (e.g. damage over time).
+        void show_damage(int32_t oid, int32_t damage);
 
     private:
         struct DamageEffect

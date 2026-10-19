@@ -362,7 +362,7 @@ namespace jrc
             }
 
             if (control && aggro && action_kind == ActionKind::NONE
-                && !action_hit_pending)
+                && !action_hit_pending && stance != HIT)
             {
                 update_aggro_action();
             }
@@ -436,7 +436,7 @@ namespace jrc
             {
                 counter++;
 
-                if (aggro)
+                if (aggro && stance != HIT)
                 {
                     if (counter >= 30)
                     {

@@ -3439,9 +3439,10 @@ mobOid    int
 ```
 Field      Type   Notes
 mobOid     int    Object ID
-dmgType    byte   0=normal, 1=heal
-damage     int    Damage amount
-[byte]     byte   0
+dmgType    byte   0 = normal, 1 = friendly mob
+damage     int    Damage amount (negative = heal)
+curHp      int    Current HP (0 in the common variant)
+maxHp      int    Maximum HP (0 in the common variant)
 ```
 
 ---
