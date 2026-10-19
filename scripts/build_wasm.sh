@@ -59,11 +59,16 @@ mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
 # Determine Build Type
-# Always use RelWithDebInfo to balance performance (-O2) and debuggability (-g)
+# Release pins -O3 -DNDEBUG (asserts compiled out) for both C and C++;
+# the flags are passed explicitly so toolchain defaults cannot regress them.
 BUILD_TYPE="Release"
 
 # Run CMake and Make
-emcmake cmake "$SOURCE_DIR" -DDEBUG_SYMBOLS=$DEBUG_SYMBOLS_FLAG -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+emcmake cmake "$SOURCE_DIR" \
+    -DDEBUG_SYMBOLS=$DEBUG_SYMBOLS_FLAG \
+    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+    -DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG" \
+    -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG"
 emmake make -j$J_ARG
 
 echo "Build finished successfully."

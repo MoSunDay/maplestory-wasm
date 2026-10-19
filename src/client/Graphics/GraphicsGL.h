@@ -273,6 +273,9 @@ namespace jrc
         std::vector<Quad> quads;
         GLuint vbo;
         GLuint ibo;
+        // Quad capacity currently covered by the shared index buffer; the
+        // contents only depend on the quad count, so it is refilled on growth.
+        size_t index_quads = 0;
         GLuint atlas;
 
         GLint program;

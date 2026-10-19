@@ -92,6 +92,9 @@ namespace LazyFS
 		std::string path_;
 		std::unique_ptr<LazyFileBackend> backend_;
 		std::vector<std::unique_ptr<Chunk>> cache_;
+		// Direct chunk-index lookup table (one slot per chunk in the file);
+		// turns cache hits into O(1) instead of a linear scan over cache_.
+		std::vector<Chunk*> chunk_slots_;
 		uint64_t access_counter_ = 0;
 
 		std::vector<uint8_t> stitch_buffer_;

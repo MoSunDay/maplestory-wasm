@@ -66,11 +66,12 @@ namespace jrc
                         continue;
                     }
 
-                    const Foothold& foothold = footholds.emplace(
-                        std::piecewise_construct,
-                        std::forward_as_tuple(id),
-                        std::forward_as_tuple(lastf, id, layer)
-                    ).first->second;
+                    if (footholds.size() <= id)
+                    {
+                        footholds.resize(id + 1);
+                    }
+                    footholds[id] = Foothold(lastf, id, layer);
+                    const Foothold& foothold = footholds[id];
 
                     if (foothold.l() < leftw)
                     {
@@ -306,13 +307,7 @@ namespace jrc
 
     const Foothold& Footholdtree::get_fh(uint16_t fhid) const
     {
-        auto iter = footholds.find(fhid);
-        if (iter == footholds.end())
-        {
-            return nullfh;
-        }
-
-        return iter->second;
+        return fhid < footholds.size() ? footholds[fhid] : nullfh;
     }
 
     double Footholdtree::get_wall(uint16_t curid, bool left, double fy) const
@@ -400,7 +395,7 @@ namespace jrc
         auto range = footholdsbyx.equal_range(x);
         for (auto iter = range.first; iter != range.second; ++iter)
         {
-            const Foothold& fh = footholds.at(iter->second);
+            const Foothold& fh = get_fh(iter->second);
             double ycomp = fh.ground_below(fx);
             if (comp >= ycomp && ycomp >= fy)
             {
