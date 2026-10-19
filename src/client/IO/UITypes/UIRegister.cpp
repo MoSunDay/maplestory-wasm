@@ -75,10 +75,17 @@ namespace jrc
         confirmation.set_enter_callback([&](std::string) { submit(); });
         password.set_cryptchar('*');
         confirmation.set_cryptchar('*');
-        account.set_state(Textfield::FOCUSED);
 
         dimension = { 260, 211 };
         update_screen(Constants::viewwidth(), Constants::viewheight());
+
+        // Establish the parent position before focusing so the IME bridge
+        // receives real bounds rather than (0, 0).
+        account.update(position);
+        password.update(position);
+        confirmation.update(position);
+
+        account.set_state(Textfield::FOCUSED);
         active = true;
     }
 

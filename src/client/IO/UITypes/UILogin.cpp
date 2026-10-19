@@ -156,6 +156,18 @@ namespace jrc
         if (saveid)
         {
             account.change_text(Setting<DefaultAccount>::get().load());
+        }
+
+        // The focused field must know its parent position before the IME
+        // bridge is told about it, otherwise it reports (0, 0) bounds.
+        position = ui_layout::origin();
+        dimension = {800, 600};
+
+        account.update(position);
+        password.update(position);
+
+        if (saveid)
+        {
             password.set_state(Textfield::FOCUSED);
         }
         else
@@ -163,8 +175,6 @@ namespace jrc
             account.set_state(Textfield::FOCUSED);
         }
 
-        position = ui_layout::origin();
-        dimension = {800, 600};
         active = true;
     }
 

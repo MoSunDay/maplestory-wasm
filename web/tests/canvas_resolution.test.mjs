@@ -9,11 +9,23 @@ function fakeCanvas(width = 800, height = 600) {
     return { width, height, style: {} };
 }
 
+function fakeViewport(size = { width: 1280, height: 720 }) {
+    const listeners = {};
+    return {
+        width: size.width,
+        height: size.height,
+        offsetLeft: Number.isFinite(size.offsetLeft) ? size.offsetLeft : 0,
+        offsetTop: Number.isFinite(size.offsetTop) ? size.offsetTop : 0,
+        listeners,
+        addEventListener(type, handler) { listeners[type] = handler; }
+    };
+}
+
 function fakeWindow(canvas, viewport = { width: 1280, height: 720 }) {
     const listeners = {};
     return {
         Module: undefined,
-        visualViewport: viewport,
+        visualViewport: fakeViewport(viewport),
         innerWidth: viewport.width,
         innerHeight: viewport.height,
         document: {
@@ -88,6 +100,7 @@ test('controller applies CSS scale without mutating the render surface', () => {
     assert.deepEqual(controller.applyScale(), { width: 960, height: 720 });
     assert.equal(canvas.style.width, '960px');
     assert.equal(canvas.style.height, '720px');
+    assert.equal(canvas.style.left, '640px');
     assert.equal(canvas.style.top, '0px');
     assert.equal(canvas.width, 800);
     assert.equal(canvas.height, 600);
@@ -126,6 +139,52 @@ test('controller falls back to canvas dimensions and documentElement viewport', 
     assert.equal(canvas.style.height, '450px');
 });
 
+test('controller centers the canvas inside visualViewport offsets', () => {
+    const canvas = fakeCanvas();
+    const win = fakeWindow(canvas, {
+        width: 1280, height: 720, offsetLeft: 20, offsetTop: 30
+    });
+    const controller = resolution.createController({
+        getModule: () => undefined,
+        getCanvas: () => canvas,
+        getWindow: () => win
+    });
+
+    assert.deepEqual(controller.applyScale(), { width: 960, height: 720 });
+    assert.equal(canvas.style.width, '960px');
+    assert.equal(canvas.style.height, '720px');
+    // translateX(-50%) stays in CSS, so left is the visual-viewport center.
+    assert.equal(canvas.style.left, '660px');
+    assert.equal(canvas.style.top, '30px');
+});
+
+test('applyScale repositions the installed IME bridge when present', () => {
+    const canvas = fakeCanvas();
+    const win = fakeWindow(canvas);
+    let repositions = 0;
+    win.MapleWasmIME = {
+        reposition() { repositions += 1; }
+    };
+    const controller = resolution.createController({
+        getModule: () => undefined,
+        getCanvas: () => canvas,
+        getWindow: () => win
+    });
+
+    assert.deepEqual(controller.applyScale(), { width: 960, height: 720 });
+    assert.equal(repositions, 1);
+    assert.equal(canvas.style.left, '640px');
+
+    win.MapleWasmIME = {
+        reposition() { throw new Error('ime unavailable'); }
+    };
+    assert.deepEqual(controller.applyScale(), { width: 960, height: 720 });
+    assert.equal(repositions, 1);
+
+    win.MapleWasmIME = undefined;
+    assert.doesNotThrow(() => controller.applyScale());
+});
+
 test('install exposes a frozen controller and hooks viewport changes', () => {
     const canvas = fakeCanvas();
     const win = fakeWindow(canvas);
@@ -140,7 +199,24 @@ test('install exposes a frozen controller and hooks viewport changes', () => {
     assert.equal(Object.isFrozen(controller), true);
     assert.equal(typeof win.listeners.resize, 'function');
     assert.equal(typeof win.listeners['doc:fullscreenchange'], 'function');
+    assert.equal(win.visualViewport.listeners.resize, controller.applyScale);
+    assert.equal(win.visualViewport.listeners.scroll, controller.applyScale);
     assert.equal(canvas.style.width, '960px');
     assert.equal(canvas.width, 800);
     assert.equal(resolution.install({ window: win }), controller);
+});
+
+test('install tolerates a visualViewport without addEventListener', () => {
+    const canvas = fakeCanvas();
+    const win = fakeWindow(canvas);
+    delete win.visualViewport.addEventListener;
+    const controller = resolution.install({
+        window: win,
+        getModule: () => undefined,
+        getCanvas: () => canvas,
+        getWindow: () => win
+    });
+
+    assert.equal(win.MapleWasmUI, controller);
+    assert.equal(canvas.style.width, '960px');
 });

@@ -45,4 +45,68 @@ assert.deepStrictEqual(
         100, 100, 200, 100),
     { left: 100, top: 100, width: 200, height: 100, fontSize: 80 });
 
+// createBridge keeps the focused field rectangle and can replay it after the
+// canvas presentation changes (pinch zoom, resolution switch, and so on).
+function fakeDom(initialRect) {
+    const document = {
+        activeElement: null,
+        getElementById(id) {
+            if (id === 'canvas') return canvas;
+            if (id === 'ime-input') return textarea;
+            return null;
+        },
+        addEventListener() {}
+    };
+    const canvas = {
+        rect: initialRect,
+        getBoundingClientRect() { return canvas.rect; },
+        focus() { document.activeElement = canvas; }
+    };
+    const textarea = {
+        style: {},
+        value: '',
+        selectionStart: 0,
+        selectionEnd: 0,
+        setSelectionRange(start, end) {
+            textarea.selectionStart = start;
+            textarea.selectionEnd = end;
+        },
+        focus() { document.activeElement = textarea; },
+        addEventListener() {}
+    };
+    return { document, canvas, textarea };
+}
+
+const dom = fakeDom({ left: 0, top: 0, width: 800, height: 600 });
+assert.strictEqual(ime.createBridge({ getElementById: () => null }, () => null,
+    callback => callback()), null);
+const bridge = ime.createBridge(dom.document, () => null, callback => callback());
+assert.ok(bridge);
+assert.strictEqual(bridge.reposition(), false);
+
+bridge.onFocus(200, 100, 400, 100, 'hi', 2);
+assert.strictEqual(bridge.active, true);
+assert.strictEqual(dom.textarea.style.left, '200px');
+assert.strictEqual(dom.textarea.style.top, '100px');
+assert.strictEqual(dom.textarea.style.width, '400px');
+assert.strictEqual(dom.textarea.style.height, '100px');
+
+dom.canvas.rect = { left: 40, top: 20, width: 1280, height: 720 };
+assert.strictEqual(bridge.reposition(), true);
+assert.strictEqual(dom.textarea.style.left, '360px');
+assert.strictEqual(dom.textarea.style.top, '140px');
+assert.strictEqual(dom.textarea.style.width, '640px');
+assert.strictEqual(dom.textarea.style.height, '120px');
+
+assert.strictEqual(bridge.reposition(240, 60, 100, 40), true);
+assert.strictEqual(dom.textarea.style.left, '424px');
+assert.strictEqual(dom.textarea.style.top, '92px');
+assert.strictEqual(dom.textarea.style.width, '160px');
+assert.strictEqual(dom.textarea.style.height, '48px');
+
+bridge.onBlur();
+assert.strictEqual(bridge.active, false);
+assert.strictEqual(bridge.reposition(), false);
+assert.strictEqual(dom.textarea.style.left, '-9999px');
+
 console.log('IME input policy verification passed');

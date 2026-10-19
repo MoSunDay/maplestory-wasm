@@ -80,6 +80,22 @@
         let settlingComposition = false;
         let lastCompositionEnd = 0;
         let lastSynced = { value: '', caret: 0 };
+        // Most recent design-space field rectangle, kept so the IME textarea
+        // can be repositioned after the canvas presentation changes.
+        let fieldRect = null;
+
+        function allFinite(x, y, width, height) {
+            return Number.isFinite(x) && Number.isFinite(y)
+                && Number.isFinite(width) && Number.isFinite(height);
+        }
+
+        function rememberFieldRect(x, y, width, height) {
+            if (!allFinite(x, y, width, height)) {
+                return fieldRect;
+            }
+            fieldRect = { x: x, y: y, width: width, height: height };
+            return fieldRect;
+        }
 
         function moduleReady() {
             const module = moduleProvider();
@@ -135,6 +151,7 @@
             onFocus: function (x, y, width, height, text, caretUtf16) {
                 const value = text || '';
                 const caret = clampCaret(value, caretUtf16);
+                rememberFieldRect(x, y, width, height);
                 placeTextarea(x, y, width, height);
                 active = true;
                 composing = false;
@@ -148,6 +165,7 @@
                 active = false;
                 composing = false;
                 settlingComposition = false;
+                fieldRect = null;
                 textarea.value = '';
                 lastSynced = { value: '', caret: 0 };
                 textarea.style.left = '-9999px';
@@ -156,6 +174,14 @@
                 if (canvas) {
                     canvas.focus({ preventScroll: true });
                 }
+            },
+            reposition: function (x, y, width, height) {
+                const rect = rememberFieldRect(x, y, width, height);
+                if (!active || !rect) {
+                    return false;
+                }
+                placeTextarea(rect.x, rect.y, rect.width, rect.height);
+                return true;
             },
             onText: function (text, caretUtf16) {
                 if (!active || composing || settlingComposition) {

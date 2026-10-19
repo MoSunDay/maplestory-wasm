@@ -170,7 +170,6 @@ namespace jrc
         buttons[BT_CHARC_GEMDERR]->set_active(false);
 
         namechar = { Text::A13M, Text::LEFT, Text::WHITE, { { 490, 219 }, { 630, 243 } }, 12 };
-        namechar.set_state(Textfield::FOCUSED);
 
         facename = { Text::A11M, Text::CENTER, Text::BLACK };
         hairname = { Text::A11M, Text::CENTER, Text::BLACK };
@@ -242,6 +241,12 @@ namespace jrc
 
         position = ui_layout::origin();
         dimension = { 800, 600 };
+
+        // Focus after the parent position exists so the IME bridge can
+        // report the real field bounds instead of (0, 0).
+        namechar.update(position);
+        namechar.set_state(Textfield::FOCUSED);
+
         active = true;
         cloudfx = 200.0f;
     }
