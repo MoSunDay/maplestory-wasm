@@ -118,13 +118,23 @@ export async function assertWorldSelectNovaTopSlot(driver) {
 
 // Char-select: page arrows sit at (46,240)/(533,240), occupied slots ride
 // disc platforms at char_slot_pos(i) = (130+120i, 270) with their white
-// nametags just below at y 282-290. bgAbove samples the strip between the
-// card tops and the right arrow and bgAboveL the sky strip above the left
+// nametags just below at y 281-297 (NAMETAG_OFFSET 19 clears the disc
+// body). Top right, the post-Chaos selectWorld banner is anchored at
+// (578,42): bannerBoard (opaque rows ~43-107) must read bright with the
+// dark backdrop gap strip below it, and the NX-positioned charSlot count
+// window stays bright at y ~127-144. With the old pre-Chaos anchor
+// (578,112) the banner slid into the window zone and bannerBoard read
+// 32.2 instead of 155, so these two margins lock the anchor fix.
+// bgAbove samples the strip between the card tops and the right arrow and
+// bgAboveL the sky strip above the left
 // arrow - both card-independent references (measured 54.1/44.9 vs arrowL
 // 115.7), so the arrow checks hold on empty accounts too; the old bgR
 // rect (590,241)-(620,287) overlapped the charInfo board and read high
 // (146.9 vs 44.9).
 const charSelectRects = Object.freeze([
+  { name: 'bannerBoard', x0: 600, y0: 50, x1: 740, y1: 100 },
+  { name: 'gapStrip', x0: 610, y0: 120, x1: 730, y1: 124 },
+  { name: 'countWindow', x0: 600, y0: 127, x1: 740, y1: 144 },
   { name: 'arrowL', x0: 47, y0: 241, x1: 83, y1: 287 },
   { name: 'arrowR', x0: 534, y0: 241, x1: 571, y1: 287 },
   { name: 'bgAbove', x0: 536, y0: 196, x1: 568, y1: 226 },
@@ -136,6 +146,11 @@ const charSelectRects = Object.freeze([
 export async function assertCharSelectModernLayout(driver, firstSlotOccupied = true) {
   const means = await sampleLuminance(driver, charSelectRects);
   const failures = [];
+  // Top-right stack: banner board, dark gap, then the NX-positioned count
+  // window (y ~127-144). Measured 155.0/52.2/154.7 post-fix; the pre-fix
+  // anchor put the board across the gap and read 32.2 there.
+  requireMargin(failures, 'bannerBoard-gapStrip', means.bannerBoard, means.gapStrip, 60);
+  requireMargin(failures, 'countWindow-gapStrip', means.countWindow, means.gapStrip, 60);
   requireMargin(failures, 'arrowL-bgAboveL', means.arrowL, means.bgAboveL, 20);
   requireMargin(failures, 'arrowR-bgAbove', means.arrowR, means.bgAbove, 20);
   if (firstSlotOccupied) {
@@ -147,6 +162,8 @@ export async function assertCharSelectModernLayout(driver, firstSlotOccupied = t
   // means 242.7 vs 167.4 across x), so old-grid second-row sprites are not
   // luminance-separable; nametag y + page-arrow band + PAGESIZE lock single-row.
   const summary = JSON.stringify({
+    bannerBoard: means.bannerBoard, gapStrip: means.gapStrip,
+    countWindow: means.countWindow,
     arrowL: means.arrowL, arrowR: means.arrowR, bgAboveL: means.bgAboveL,
     bgAbove: means.bgAbove, bgL: means.bgL,
     nametag0: firstSlotOccupied ? means.nametag0 : 'skipped'
