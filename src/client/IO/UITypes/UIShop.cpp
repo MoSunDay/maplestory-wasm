@@ -19,11 +19,13 @@
 #include "UINotice.h"
 #include "UIShopNodes.h"
 
+#include "../UILayout.h"
 #include "../UI.h"
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 
+#include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
 #include "../../Util/Misc.h"
@@ -125,7 +127,15 @@ namespace jrc
 
         active    = false;
         dimension = Texture(src["backgrnd"]).get_dimensions();
-        position  = { 400 - dimension.x() / 2, 240 - dimension.y() / 2 };
+        update_screen(Constants::viewwidth(), Constants::viewheight());
+    }
+
+    void UIShop::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin() + Point<int16_t>(
+            400 - dimension.x() / 2,
+            240 - dimension.y() / 2
+        );
     }
 
     void UIShop::draw(float alpha) const

@@ -19,12 +19,14 @@
 #include "UINotice.h"
 #include "UIStorageNodes.h"
 
+#include "../UILayout.h"
 #include "../UI.h"
 #include "../Components/AreaButton.h"
 #include "../Components/Charset.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 
+#include "../../Constants.h"
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../Data/ItemData.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
@@ -152,8 +154,16 @@ namespace jrc
         refresh_inventory_tab();
 
         dimension = Texture(src["backgrnd"]).get_dimensions();
-        position = { 400 - dimension.x() / 2, 240 - dimension.y() / 2 };
+        update_screen(Constants::viewwidth(), Constants::viewheight());
         active = false;
+    }
+
+    void UIStorage::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin() + Point<int16_t>(
+            400 - dimension.x() / 2,
+            240 - dimension.y() / 2
+        );
     }
 
     void UIStorage::draw(float alpha) const

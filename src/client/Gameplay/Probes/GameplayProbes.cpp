@@ -1,5 +1,6 @@
 #include "../Stage.h"
 
+#include "../../Constants.h"
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../IO/Field/UIFieldClock.h"
 #include "../../IO/CharacterInfo/UIUserInfo.h"
@@ -7,6 +8,7 @@
 #include "../../IO/Trade/UIPlayerContext.h"
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/Pet/UIPetOptions.h"
+#include "../../IO/UITypes/Settings/UIGameOptions.h"
 #include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 
@@ -42,6 +44,75 @@ namespace
 
 extern "C"
 {
+    int msui_resolution_width()
+    {
+        return jrc::Constants::viewwidth();
+    }
+
+    int msui_resolution_height()
+    {
+        return jrc::Constants::viewheight();
+    }
+
+    int msgame_options_active()
+    {
+        return jrc::UI::get().is_element_active(
+            jrc::UIElement::GAMEOPTIONS
+        ) ? 1 : 0;
+    }
+
+    int msgame_options_index()
+    {
+        auto options = jrc::UI::get().get_element<jrc::UIGameOptions>();
+        return options
+            ? static_cast<int>(options->selected_index())
+            : -1;
+    }
+
+    int msgame_options_next_x()
+    {
+        auto options = jrc::UI::get().get_element<jrc::UIGameOptions>();
+        return options ? options->next_center().x() : MISSING_COORDINATE;
+    }
+
+    int msgame_options_next_y()
+    {
+        auto options = jrc::UI::get().get_element<jrc::UIGameOptions>();
+        return options ? options->next_center().y() : MISSING_COORDINATE;
+    }
+
+    int msgame_options_ok_x()
+    {
+        auto options = jrc::UI::get().get_element<jrc::UIGameOptions>();
+        return options ? options->ok_center().x() : MISSING_COORDINATE;
+    }
+
+    int msgame_options_ok_y()
+    {
+        auto options = jrc::UI::get().get_element<jrc::UIGameOptions>();
+        return options ? options->ok_center().y() : MISSING_COORDINATE;
+    }
+
+    int msgame_options_menu_x()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        auto point = statusbar
+            ? statusbar->popup_action_center(
+                jrc::StatusBarPopup::Action::GAME_OPTIONS)
+            : std::nullopt;
+        return point ? point->x() : MISSING_COORDINATE;
+    }
+
+    int msgame_options_menu_y()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        auto point = statusbar
+            ? statusbar->popup_action_center(
+                jrc::StatusBarPopup::Action::GAME_OPTIONS)
+            : std::nullopt;
+        return point ? point->y() : MISSING_COORDINATE;
+    }
+
     int msmap_id()
     {
         return jrc::Stage::get().get_mapid();

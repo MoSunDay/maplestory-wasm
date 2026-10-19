@@ -3,9 +3,11 @@
 #include "UILogin.h"
 #include "UILoginWait.h"
 
+#include "../UILayout.h"
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 
+#include "../../Constants.h"
 #include "../../Net/Packets/LoginPackets.h"
 
 #include "nlnx/nx.hpp"
@@ -75,9 +77,14 @@ namespace jrc
         confirmation.set_cryptchar('*');
         account.set_state(Textfield::FOCUSED);
 
-        position = { 270, 190 };
         dimension = { 260, 211 };
+        update_screen(Constants::viewwidth(), Constants::viewheight());
         active = true;
+    }
+
+    void UIRegister::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin() + Point<int16_t>(270, 190);
     }
 
     UIRegister::~UIRegister()

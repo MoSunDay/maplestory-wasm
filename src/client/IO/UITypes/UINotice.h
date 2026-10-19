@@ -32,6 +32,8 @@ namespace jrc
         static constexpr bool FOCUSED = true;
         static constexpr bool TOGGLED = false;
 
+        void update_screen(int16_t width, int16_t height) override;
+
     protected:
         UINotice(std::string question);
 

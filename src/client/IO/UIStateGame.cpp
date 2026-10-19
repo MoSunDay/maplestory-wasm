@@ -126,6 +126,16 @@ namespace jrc
         {
             view_width = new_width;
             view_height = new_height;
+
+            // Inactive windows still need their saved anchors refreshed.
+            for (auto iter : elements)
+            {
+                UIElement* element = iter.second.get();
+                if (element)
+                {
+                    element->update_screen(new_width, new_height);
+                }
+            }
         }
 
         for (const auto& type : elementorder)
@@ -133,10 +143,6 @@ namespace jrc
             auto& element = elements[type];
             if (element && element->is_active())
             {
-                if (screen_changed)
-                {
-                    element->update_screen(new_width, new_height);
-                }
                 element->update();
             }
         }
@@ -630,6 +636,7 @@ namespace jrc
             elementorder.remove(type);
             elementorder.push_back(type);
             element->toggle_active();
+            element->update_screen(Constants::viewwidth(), Constants::viewheight());
             return elements.end();
         }
         else

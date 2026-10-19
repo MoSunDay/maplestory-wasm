@@ -38,6 +38,7 @@ namespace jrc
         UISoftkey(Callback callback);
 
         void draw(float alpha) const override;
+        void update_screen(int16_t width, int16_t height) override;
 
     protected:
         Button::State button_pressed(uint16_t) override;

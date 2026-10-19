@@ -17,9 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UILoginNotice.h"
 
+#include "../UILayout.h"
 #include "../Components/MapleButton.h"
 #include "../UI.h"
 
+#include "../../Constants.h"
 #include "../../Graphics/Sprite.h"
 
 #include "nlnx/nx.hpp"
@@ -42,9 +44,14 @@ namespace jrc
 
         buttons[BT_OK] = std::make_unique<MapleButton>(notice["BtYes"], Point<int16_t>(100, 100));
 
-        position = { 292, 200 };
         dimension = { 362, 219 };
+        update_screen(Constants::viewwidth(), Constants::viewheight());
         active = true;
+    }
+
+    void UILoginNotice::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin() + Point<int16_t>(292, 200);
     }
 
     void UILoginNotice::draw(float alpha) const

@@ -96,6 +96,7 @@ namespace jrc
         UILoginNotice(int8_t message);
 
         void draw(float alpha) const override;
+        void update_screen(int16_t width, int16_t height) override;
         Message get_message() const;
 
     protected:

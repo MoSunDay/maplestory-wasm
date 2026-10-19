@@ -154,8 +154,8 @@ export class BrowserDriver {
       const canvas = document.getElementById('canvas');
       const bounds = canvas.getBoundingClientRect();
       return {
-        x: bounds.left + ${gameX} * bounds.width / 800,
-        y: bounds.top + ${gameY} * bounds.height / 600
+        x: bounds.left + ${gameX} * bounds.width / canvas.width,
+        y: bounds.top + ${gameY} * bounds.height / canvas.height
       };
     })()`);
     await this.send('Input.dispatchMouseEvent', {
@@ -184,8 +184,8 @@ export class BrowserDriver {
       const canvas = document.getElementById('canvas');
       const bounds = canvas.getBoundingClientRect();
       return {
-        x: bounds.left + ${gameX} * bounds.width / 800,
-        y: bounds.top + ${gameY} * bounds.height / 600
+        x: bounds.left + ${gameX} * bounds.width / canvas.width,
+        y: bounds.top + ${gameY} * bounds.height / canvas.height
       };
     })()`);
     await this.send('Input.dispatchMouseEvent', {
@@ -203,10 +203,11 @@ export class BrowserDriver {
 
   async drag(fromX, fromY, toX, toY) {
     const points = await this.evaluate(`(() => {
-      const bounds = document.getElementById('canvas').getBoundingClientRect();
+      const canvas = document.getElementById('canvas');
+      const bounds = canvas.getBoundingClientRect();
       const point = (x, y) => ({
-        x: bounds.left + x * bounds.width / 800,
-        y: bounds.top + y * bounds.height / 600
+        x: bounds.left + x * bounds.width / canvas.width,
+        y: bounds.top + y * bounds.height / canvas.height
       });
       return { from: point(${fromX}, ${fromY}), to: point(${toX}, ${toY}) };
     })()`);
@@ -231,8 +232,8 @@ export class BrowserDriver {
       const bounds = canvas.getBoundingClientRect();
       canvas.dispatchEvent(new MouseEvent('click', {
         bubbles: true, cancelable: true,
-        clientX: bounds.left + ${gameX} * bounds.width / 800,
-        clientY: bounds.top + ${gameY} * bounds.height / 600,
+        clientX: bounds.left + ${gameX} * bounds.width / canvas.width,
+        clientY: bounds.top + ${gameY} * bounds.height / canvas.height,
         button: 0, buttons: 0, view: window
       }));
     })()`);

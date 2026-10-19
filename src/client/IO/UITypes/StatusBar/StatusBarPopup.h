@@ -32,6 +32,7 @@ namespace jrc
             SKILLS,
             KEY_CONFIG,
             PET_OPTIONS,
+            GAME_OPTIONS,
             LOGOUT
         };
 

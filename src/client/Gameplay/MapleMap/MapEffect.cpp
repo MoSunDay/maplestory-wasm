@@ -436,8 +436,7 @@ namespace jrc
         : finished(false),
           scene_mode(false),
           elapsed_ms(0),
-          position(Constants::viewwidth() / 2, 250),
-          scene_origin(Constants::viewwidth() / 2, Constants::viewheight() / 2)
+          position(Constants::viewwidth() / 2, 250)
     {
         nl::node effect_node = resolve_effect_node(path);
         if (!effect_node)
@@ -510,12 +509,18 @@ namespace jrc
     MapEffect::MapEffect()
         : finished(true),
           scene_mode(false),
-          elapsed_ms(0),
-          scene_origin(Constants::viewwidth() / 2, Constants::viewheight() / 2)
+          elapsed_ms(0)
     {}
 
     void MapEffect::draw_scene() const
     {
+        // Use the live viewport so a resize after map load still centers
+        // the intro scene instead of the stale constructor origin.
+        const Point<int16_t> scene_center(
+            static_cast<int16_t>(Constants::viewwidth() / 2),
+            static_cast<int16_t>(Constants::viewheight() / 2)
+        );
+
         for (const SceneVisual& visual : scene_visuals)
         {
             if (elapsed_ms < visual.start_ms)
@@ -545,7 +550,7 @@ namespace jrc
                 offset = Point<int16_t>(x, y);
             }
 
-            visual.animation.draw(DrawArgument(scene_origin + offset), 1.0f);
+            visual.animation.draw(DrawArgument(scene_center + offset), 1.0f);
         }
     }
 

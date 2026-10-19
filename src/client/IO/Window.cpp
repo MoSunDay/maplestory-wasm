@@ -189,9 +189,14 @@ namespace jrc
         if (width > 0 && height > 0)
         {
 #ifdef MS_PLATFORM_WASM
-            // Browser resizes only change CSS scaling; the game keeps a fixed internal viewport.
-            Constants::set_viewsize(Constants::VIEWWIDTH, Constants::VIEWHEIGHT);
-            glViewport(0, 0, Constants::VIEWWIDTH, Constants::VIEWHEIGHT);
+            // The browser viewport follows the runtime display preset; GLFW's
+            // framebuffer size is not authoritative for it.
+            glViewport(
+                0,
+                0,
+                Constants::viewwidth(),
+                Constants::viewheight()
+            );
 #else
             Constants::set_viewsize(width, height);
             glViewport(0, 0, width, height);
@@ -215,8 +220,8 @@ namespace jrc
 #ifdef MS_PLATFORM_WASM
         glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
         glwnd = glfwCreateWindow(
-            Constants::VIEWWIDTH,
-            Constants::VIEWHEIGHT,
+            Constants::viewwidth(),
+            Constants::viewheight(),
             "Journey",
             fullscreen ? glfwGetPrimaryMonitor() : nullptr,
             nullptr
@@ -252,8 +257,8 @@ namespace jrc
         }
 
         glwnd = glfwCreateWindow(
-            Constants::VIEWWIDTH,
-            Constants::VIEWHEIGHT,
+            Constants::viewwidth(),
+            Constants::viewheight(),
             "Journey",
             fullscreen ? glfwGetPrimaryMonitor() : nullptr,
             context
@@ -271,7 +276,12 @@ namespace jrc
         glfwSwapInterval(vsync ? 1 : 0);
 #endif
 
-        glViewport(0, 0, Constants::VIEWWIDTH, Constants::VIEWHEIGHT);
+        glViewport(
+            0,
+            0,
+            Constants::viewwidth(),
+            Constants::viewheight()
+        );
 #ifndef MS_PLATFORM_WASM
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();

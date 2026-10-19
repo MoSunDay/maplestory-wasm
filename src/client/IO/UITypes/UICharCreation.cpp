@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UICharCreation.h"
 #include "../UiAssetVersion.h"
+#include "../UILayout.h"
 
 #include "../Components/MapleButton.h"
 #include "../UI.h"
@@ -239,10 +240,15 @@ namespace jrc
 
         newchar.set_direction(true);
 
-        position = { 0, 0 };
+        position = ui_layout::origin();
         dimension = { 800, 600 };
         active = true;
         cloudfx = 200.0f;
+    }
+
+    void UICharcreation::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin();
     }
 
     void UICharcreation::randomize_look()
@@ -565,22 +571,34 @@ namespace jrc
 
     void UICharcreation::draw(float alpha) const
     {
+        const Point<int16_t> origin = ui_layout::origin();
+
+        const int16_t skywidth = sky.width();
         for (int16_t i = 0; i < 2; i++)
         {
-            for (int16_t k = 0; k < 800; k += sky.width())
+            for (int16_t k = 0;
+                 skywidth > 0 && k < ui_layout::DESIGN_WIDTH;
+                 k += skywidth)
             {
-                sky.draw(Point<int16_t>(k, (400 * i) - 100));
+                sky.draw(Point<int16_t>(k, (400 * i) - 100) + origin);
             }
         }
 
-        int16_t cloudx = static_cast<int16_t>(cloudfx) % 800;
-        cloud.draw(Point<int16_t>(cloudx - cloud.width(), 300));
-        cloud.draw(Point<int16_t>(cloudx, 300));
-        cloud.draw(Point<int16_t>(cloudx + cloud.width(), 300));
+        const int16_t cloudwidth = cloud.width();
+        if (cloudwidth > 0)
+        {
+            int16_t cloudx = static_cast<int16_t>(cloudfx) % ui_layout::DESIGN_WIDTH;
+            for (int16_t x = cloudx - cloudwidth;
+                 x < ui_layout::DESIGN_WIDTH;
+                 x += cloudwidth)
+            {
+                cloud.draw(Point<int16_t>(x, 300) + origin);
+            }
+        }
 
         if (!CharacterCreation::shows_customization(creation_flow.phase))
         {
-            nameboard.draw(Point<int16_t>(455, 115 ));
+            nameboard.draw(Point<int16_t>(455, 115) + origin);
             namechar.draw(position);
         }
         else
@@ -593,19 +611,19 @@ namespace jrc
 
         UIElement::draw(alpha);
 
-        newchar.draw({ 360, 348 }, alpha);
+        newchar.draw(Point<int16_t>(360, 348) + origin, alpha);
 
         if (CharacterCreation::shows_customization(creation_flow.phase))
         {
-            facename.draw(Point<int16_t>(591, 214));
-            hairname.draw(Point<int16_t>(591, 233));
-            haircname.draw(Point<int16_t>(591, 252));
-            bodyname.draw(Point<int16_t>(591, 271));
-            topname.draw(Point<int16_t>(591, 290));
-            botname.draw(Point<int16_t>(591, 309));
-            shoename.draw(Point<int16_t>(591, 328));
-            wepname.draw(Point<int16_t>(591, 347));
-            gendername.draw(Point<int16_t>(591, 366));
+            facename.draw(Point<int16_t>(591, 214) + origin);
+            hairname.draw(Point<int16_t>(591, 233) + origin);
+            haircname.draw(Point<int16_t>(591, 252) + origin);
+            bodyname.draw(Point<int16_t>(591, 271) + origin);
+            topname.draw(Point<int16_t>(591, 290) + origin);
+            botname.draw(Point<int16_t>(591, 309) + origin);
+            shoename.draw(Point<int16_t>(591, 328) + origin);
+            wepname.draw(Point<int16_t>(591, 347) + origin);
+            gendername.draw(Point<int16_t>(591, 366) + origin);
         }
     }
 

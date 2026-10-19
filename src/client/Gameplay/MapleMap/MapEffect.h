@@ -44,7 +44,6 @@ namespace jrc
         int32_t elapsed_ms;
         Animation effect;
         Point<int16_t> position;
-        Point<int16_t> scene_origin;
         std::vector<SceneVisual> scene_visuals;
         std::vector<SceneSound> scene_sounds;
     };

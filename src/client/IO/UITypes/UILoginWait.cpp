@@ -18,6 +18,9 @@
 //#pragma once
 #include "UILoginWait.h"
 
+#include "../UILayout.h"
+
+#include "../../Constants.h"
 #include "../../Graphics/Sprite.h"
 
 #include "nlnx/nx.hpp"
@@ -32,9 +35,14 @@ namespace jrc
         background = src["backgrnd"];
         circle     = { src["circle"], { 125, 72 } };
 
-        position  = { 292, 200 };
         dimension = { 282, 144 };
+        update_screen(Constants::viewwidth(), Constants::viewheight());
         active    = true;
+    }
+
+    void UILoginwait::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin() + Point<int16_t>(292, 200);
     }
 
     void UILoginwait::draw(float alpha) const

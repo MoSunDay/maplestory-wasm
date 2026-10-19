@@ -20,6 +20,8 @@
 
 #include "../Configuration.h"
 
+#include <algorithm>
+
 namespace jrc
 {
     template <typename T>
@@ -27,6 +29,21 @@ namespace jrc
     class UIDragElement : public UIElement
     {
     public:
+        void update_screen(int16_t width, int16_t height) override
+        {
+            // Keep the drag handle reachable when the viewport shrinks.
+            const int16_t max_x = std::max<int16_t>(
+                0, static_cast<int16_t>(width - dragarea.x())
+            );
+            const int16_t max_y = std::max<int16_t>(
+                0, static_cast<int16_t>(height - dragarea.y())
+            );
+            position = Point<int16_t>(
+                std::max<int16_t>(0, std::min(position.x(), max_x)),
+                std::max<int16_t>(0, std::min(position.y(), max_y))
+            );
+        }
+
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override
         {
             if (dragged)

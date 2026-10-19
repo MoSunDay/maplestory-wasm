@@ -1,5 +1,6 @@
 #include "UICashShop.h"
 
+#include "../UILayout.h"
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Graphics/GraphicsGL.h"
