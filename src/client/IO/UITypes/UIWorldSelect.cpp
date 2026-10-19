@@ -17,10 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UIWorldSelect.h"
 #include "../UiAssetVersion.h"
+#include "../UILayout.h"
 #include "WorldSelectPolicy.h"
 
 #include "../../Console.h"
-#include "../../Graphics/GraphicsGL.h"
 #include "../../Graphics/Sprite.h"
 #include "../../IO/UI.h"
 #include "../../IO/Components/MapleButton.h"
@@ -46,38 +46,20 @@ namespace jrc
         constexpr Point<int16_t> PRECH_ENTER_POS{ 270, 228 };
         constexpr Point<int16_t> PRECH_CHANNEL_POS{ 100, 100 };
         constexpr int16_t PRECH_CHANNEL_STEP_Y = 36;
-        // Post-Chaos channel grid baked into BtChannel/layer:bg: five
-        // columns by six rows of disabled channel cells. Cell (0,0)
-        // starts at (22,76) in the bitmap; button origins encode the
-        // per-slot offsets from the same window anchor.
-        constexpr Point<int16_t> POSTCH_GRID_POS{ 22, 76 };
-        constexpr int16_t POSTCH_CELL_W = 68;
-        constexpr int16_t POSTCH_CELL_H = 27;
-        constexpr int16_t POSTCH_STEP_X = 71;
-        constexpr int16_t POSTCH_STEP_Y = 30;
-        constexpr uint8_t POSTCH_COLS = 5;
-        constexpr uint8_t POSTCH_ROWS = 6;
         // Post-Chaos right sidebar (layer:bg, 144x513) top-left on screen
         // when the window sprites are anchored at CHANNEL_WINDOW_CENTER.
         constexpr Point<int16_t> POSTCH_SIDEBAR_POS{ 650, 45 };
         // First baked world slot inside the sidebar, matching button:10's
         // origin (-14,-14).
         constexpr Point<int16_t> POSTCH_SIDEBAR_TOP_SLOT{ 14, 14 };
-        // Panel colour calibrated against the rendered row-gap strip of
-        // layer:bg (raw PPM average renders brighter through the texture
-        // path than an untextured quad, so the fill is scaled down).
-        constexpr float POSTCH_PANEL_R = 0.26f;
-        constexpr float POSTCH_PANEL_G = 0.35f;
-        constexpr float POSTCH_PANEL_B = 0.44f;
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
-        : UIElement({ 0, 0 }, { 800, 600 }),
+        : UIElement(ui_layout::origin(), { 800, 600 }),
           worldid(0),
           channelid(world_select::selected_channel_id()),
           channelcount(0),
-          request_pending(false),
-          postch_window(false) {
+          request_pending(false) {
 
         nl::node back = nl::nx::map["Back"]["login.img"]["back"];
         nl::node worldsel = nl::nx::ui["Login.img"]["WorldSelect"];
@@ -88,19 +70,16 @@ namespace jrc
         // the channel window as WorldSelect/chBackgrn with per-channel
         // bitmaps under WorldSelect/channel, not in the BtChannel subtree.
         const bool post_chaos = static_cast<bool>(channelsrc["layer:bg"]);
-        postch_window = post_chaos;
 
         // Same 11 -> 0 fallback as the other login screens: some UI.nx
         // variants do not ship the login backdrop under back/11.
         if (back["11"])
         {
-            // Modern back/11 is 1280x720 with origin (600,373); this anchor
-            // centers it exactly in the 800x600 window (top-left (-240,-60)).
             sprites.emplace_back(back["11"], Point<int16_t>(360, 313));
         }
         else if (back["0"])
         {
-            sprites.emplace_back(back["0"], Point<int16_t>(400, 300));
+            sprites.emplace_back(back["0"], Point<int16_t>(370, 300));
         }
         if (post_chaos)
             sprites.emplace_back(worldsrc["layer:bg"], Point<int16_t>(650, 45));
@@ -199,63 +178,12 @@ namespace jrc
 
     void UIWorldSelect::draw(float alpha) const
     {
-        draw_sprites(alpha);
-        draw_channel_cover();
-        draw_buttons(alpha);
+        UIElement::draw(alpha);
     }
 
-    void UIWorldSelect::draw_channel_cover() const
+    void UIWorldSelect::update_screen(int16_t, int16_t)
     {
-        if (!postch_window)
-            return;
-
-        const int16_t band_l = CHANNEL_WINDOW_CENTER.x() + POSTCH_GRID_POS.x();
-        const int16_t band_t = CHANNEL_WINDOW_CENTER.y() + POSTCH_GRID_POS.y();
-        const int16_t band_r = band_l + POSTCH_STEP_X * (POSTCH_COLS - 1) + POSTCH_CELL_W;
-        const int16_t band_b = band_t + POSTCH_STEP_Y * (POSTCH_ROWS - 1) + POSTCH_CELL_H;
-        const uint8_t rows_used = (channelcount + POSTCH_COLS - 1) / POSTCH_COLS;
-
-        if (rows_used >= POSTCH_ROWS)
-            return;
-
-        // Cover in two pieces so no baked cell (nor the light row
-        // separator strip under the last used row) stays visible:
-        // 1. the unused tail of the partially used row, if any;
-        // 2. one continuous rectangle over every row below it.
-        const uint8_t partial_row = rows_used == 0 ? 0 : rows_used - 1;
-        const uint8_t used = channelcount - POSTCH_COLS * partial_row;
-
-        if (used > 0 && used < POSTCH_COLS)
-        {
-            const int16_t x = band_l + POSTCH_STEP_X * used;
-            GraphicsGL::get().drawrectangle(
-                x,
-                band_t + POSTCH_STEP_Y * partial_row,
-                band_r - x,
-                POSTCH_CELL_H,
-                POSTCH_PANEL_R,
-                POSTCH_PANEL_G,
-                POSTCH_PANEL_B,
-                1.0f
-            );
-        }
-
-        const int16_t below_y = channelcount > 0
-            ? band_t + POSTCH_STEP_Y * partial_row + POSTCH_CELL_H
-            : band_t;
-        if (below_y < band_b)
-        {
-            GraphicsGL::get().drawrectangle(
-                band_l,
-                below_y,
-                band_r - band_l,
-                band_b - below_y,
-                POSTCH_PANEL_R,
-                POSTCH_PANEL_G,
-                POSTCH_PANEL_B,
-                1.0f
-            );
-        }
+        position = ui_layout::origin();
     }
 
     uint8_t UIWorldSelect::get_world_id() const

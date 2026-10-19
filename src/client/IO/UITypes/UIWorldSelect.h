@@ -33,6 +33,7 @@ namespace jrc
         UIWorldSelect(std::vector<World> worlds, uint8_t worldcount);
 
         void draw(float alpha) const override;
+        void update_screen(int16_t width, int16_t height) override;
         void doubleclick(Point<int16_t> cursorpos) override;
 
         uint8_t get_world_id() const;
@@ -55,11 +56,5 @@ namespace jrc
         uint8_t channelid;
         uint8_t channelcount;
         bool request_pending;
-        bool postch_window;
-
-        // The post-Chaos window art bakes a full grid of disabled
-        // channel cells into its background; paint over the cells
-        // that have no rendered plate (see UIWorldSelect.cpp).
-        void draw_channel_cover() const;
     };
 }

@@ -86,6 +86,9 @@ namespace jrc
         }
 
         player_marker = Animation(marker_node["user"]);
+        portal_marker = Animation(marker_node["portal"]);
+        npc_marker = Animation(marker_node["npc"]);
+        other_marker = Animation(marker_node["another"]);
         selected_marker = Animation(minimap_node["iconNpc"]);
         map_draw_origin_x = 0;
         map_draw_origin_y = 0;
@@ -122,8 +125,6 @@ namespace jrc
 
             if (has_map)
             {
-                Animation portal_marker(marker_node["portal"]);
-
                 for (const auto& portal : static_marker_info)
                 {
                     portal_marker.draw(position + portal.second, alpha);
@@ -149,8 +150,6 @@ namespace jrc
 
             if (has_map)
             {
-                Animation portal_marker(marker_node["portal"]);
-
                 for (const auto& portal : static_marker_info)
                 {
                     portal_marker.draw(position + portal.second + Point<int16_t>(0, minimap_nodes::max_adjust()), alpha);
