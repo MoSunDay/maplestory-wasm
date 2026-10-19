@@ -290,6 +290,26 @@ namespace jrc
         }
     }
 
+    bool Animation::is_visible(const DrawArgument& args, float alpha) const
+    {
+        // Match draw(): the scale wrapper is the only geometry change the
+        // draw path applies on top of the caller's argument. Opacity never
+        // moves pixels, so the visibility rect stays exact either way.
+        const Frame& framedata = frames[frame.get(alpha)];
+        const float interscale = xyscale.get(alpha) / 100;
+        const DrawArgument geometry = args + DrawArgument(
+            interscale,
+            interscale,
+            1.0f
+        );
+        return GraphicsGL::get().isonscreen(
+            geometry.get_rectangle(
+                framedata.get_origin(),
+                framedata.get_dimensions()
+            )
+        );
+    }
+
     bool Animation::is_valid() const
     {
         return !frames.empty() && std::all_of(

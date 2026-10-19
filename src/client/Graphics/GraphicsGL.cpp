@@ -379,6 +379,33 @@ namespace jrc
         getoffset(bmp);
     }
 
+    namespace
+    {
+        // Issue the LazyFS fetch matching the load class. Runs once when a
+        // bitmap enters the pending set and once more only when an already
+        // pending wait is promoted to the priority lane; repeated draws of
+        // the same pending bitmap must not cross the JS bridge per frame.
+        void fetch_pending_bitmap(
+            const nl::bitmap& bmp,
+            GraphicsGL::BitmapLoadClass load_class
+        )
+        {
+            switch (load_class)
+            {
+            case GraphicsGL::BitmapLoadClass::BACKGROUND:
+            case GraphicsGL::BitmapLoadClass::MAP_REQUIRED:
+                bmp.prefetch();
+                break;
+            case GraphicsGL::BitmapLoadClass::BLOCKING_VISIBLE:
+                bmp.request();
+                break;
+            case GraphicsGL::BitmapLoadClass::TRANSIENT_EFFECT:
+                bmp.prioritize();
+                break;
+            }
+        }
+    }
+
     void GraphicsGL::queuebitmap(const nl::bitmap& bmp, BitmapLoadClass load_class)
     {
         const size_t id = bmp.id();
@@ -399,20 +426,11 @@ namespace jrc
             pending_blocking_bitmap_ids.insert(id);
         }
 
-        switch (load_class)
-        {
-        case BitmapLoadClass::BACKGROUND:
-        case BitmapLoadClass::MAP_REQUIRED:
-            bmp.prefetch();
-            break;
-        case BitmapLoadClass::BLOCKING_VISIBLE:
-            bmp.request();
-            break;
-        case BitmapLoadClass::TRANSIENT_EFFECT:
-            bmp.prioritize();
-            break;
-        }
-
+        // Deduplicate before any EM_ASM fetch: animated maps redraw the same
+        // pending bitmap from hundreds of tile cells every frame, and each
+        // request()/prioritize() crossing rebuilds key strings and scans the
+        // JS prefetch queue. A queued bitmap only needs one live fetch; the
+        // blocking gate above still records the escalation.
         auto pending = pending_bitmap_ids.find(id);
         if (pending != pending_bitmap_ids.end())
         {
@@ -429,6 +447,7 @@ namespace jrc
                 {
                     pending_priority_bitmaps.push_back(*queued);
                     pending_bitmaps.erase(queued);
+                    fetch_pending_bitmap(bmp, load_class);
                 }
             }
             return;
@@ -443,6 +462,7 @@ namespace jrc
             pending_bitmaps.push_back(bmp);
         }
         pending_bitmap_ids.insert(id);
+        fetch_pending_bitmap(bmp, load_class);
 #else
         (void)load_class;
         addbitmap(bmp);
