@@ -48,6 +48,72 @@
   退回仓库与退出商城均通过，浏览器异常 0；还原截图确认顶栏、搜索、币种、
   分类、卡片、右侧面板、details 与按钮的 y 坐标和布局常量一致。
 
+## 内容扩充
+
+用户复核现代版截图后认为「内容太少」，要求把 `CashShop.img` 中尚未使用的可用素材
+和现有目录/仓库字段补进可见界面。本轮只扩充展示，不改变购买、仓库协议、分页选择
+与探针 API。
+
+- 顶栏余额前补 `CSIcon/0`、`CSIcon/1` 图标（预付点复用 NX 图标），图标与右对齐
+  位图余额分开定位，长余额不会压住图标。
+- 分类栏每行右侧显示该分类在当前性别/搜索条件下的商品数，选中分类用黑字、其余
+  灰字；搜索栏上方增加「分类 · N 件」筛选摘要。
+- 商品卡片补 `CSEffect` 徽章与期限标签。徽章优先级：多件→特惠、1-30 天→限时、
+  礼包→活动、priority≥10→新品、priority≥8→热卖，其余无徽章。
+- 左侧空余区域新增徽章图例：五枚 24×22 徽章配「特惠/限时/活动/新品/热卖」
+  释义和底部说明。
+- 右栏详情由单行扩展为名称、数量、SN、期限/性别/赠送来源/有期限四组字段；仅
+  商城仓库读取 SN、赠送与到期数据，切到角色现金栏时不复用仓库字段。
+- 右栏底部新增「本期推荐」面板：随目录页轮换 `Base/Preview/0..2` 暗化底图，
+  展示当前筛选首个商品的图标、名称×数量、分类·期限和价格；点击面板选中当前页
+  高亮项，不重置分页与搜索，空结果显示「当前筛选没有在售商品」。
+- 左右库存槽位补 `CSInventory/backgrndCover`/`CSLocker/backgrndCover`
+  7×3 半透明格底，保留原素材槽位层次。
+- `CashShopSkin` 对 `Base/Preview/0..2`、`CSEffect/{new,hot,sale,event,limited}/0`、
+  `CSIcon/0..1`、`CSLocker/backgrndCover` 增加尺寸硬契约；`CashShopView` 新增
+  纯函数 `commodity_badge`/`badge_name`，便于单测优先级。
+
+### 验证
+
+- `docker compose run --rm wasm-builder`：WASM 构建通过。
+- `cash-shop-view`：新增 SALE/LIMITED/EVENT/NEW/HOT/NONE 六种徽章与阈值断言，
+  连同 12/21 分页 PASS。
+- `cash-shop-ui-nx assets/UI.nx src/client/data/cash-shop-v83.csv`：预览帧、五枚
+  徽章、两张货币图标和仓库格底尺寸契约 PASS。
+- `E2E_CASH_SHOP=1 E2E_CREATE_CHARACTER=0`：搜索 SN、购买、入库、取出、退回与
+  退出 PASS，浏览器异常 0；还原截图确认顶栏图标、分类件数、卡片徽章、图例、
+  详情四行、推荐面板和槽位格底均可见。
+
+## 人物穿戴预览
+
+用户反馈「本期推荐」只显示商品图标，要求把高亮装备穿到当前角色身上预览。实现复用
+`CharLook` 现有绘制栈，不改动商品模型、封包与探针 API。
+
+- `CashShopView` 新增纯函数 `is_previewable_equip` 与 `highlighted_index`：前者只
+  接受 CharLook 有可见层的装备槽位（帽、脸饰、眼饰、耳环、上衣、套服、下装、鞋、
+  手套、披风、盾与 130-149 武器组），戒指、坠饰、腰带、勋章及非装备返回 false；
+  后者优先返回当前页内的选中项，未选中或选中项不在本页时取本页首项，空页返回
+  `nullopt`，供面板绘制与点击选择共用同一高亮口径。
+- `UICashShop` 进入商城时把玩家 `CharLook` 复制为 `preview_look`，高亮项可试穿时
+  调用 `add_equip(item_id, Texture::LoadMode::DEFERRED)`；重建筛选只置
+  `preview_dirty`，真正的 `refresh_preview()` 延后到 `update()` 执行，避免 IME
+  Enter 回调在 Asyncify 挂起栈内重入角色换装。
+- 推荐面板内新增 92×98 头像框，位于 (504,452)，按 `STAND1`/`DEFAULT` 绘制并带
+  y=548 地板线；标题在「本期推荐」「试穿预览」间切换，提示区分「点击卡片选中并
+  试穿」「已穿戴 · 点击其他装备试穿」与「角色预览不可用」，不可试穿时保留商品
+  图标。
+- `BT_FEATURED` 点击时把当前页高亮项写入选中态，不重置分页、搜索与分类。
+
+### 验证
+
+- `docker compose run --rm wasm-builder`：WASM 构建 PASS。
+- `cash-shop-view`：新增可见装备槽位/回退范围与 `highlighted_index` 跨页选择断言，
+  连同既有徽章与分页断言 PASS。
+- `E2E_CASH_SHOP=1 E2E_CREATE_CHARACTER=0`：搜索 SN `20000016`（在售帽子
+  `1002000`）并点选卡片后输出截图 `10b-cash-shop-avatar-preview`，确认推荐面板
+  绘制当前角色试穿；随后继续 SN `80000002` 购买、取出、退回与退出流程 PASS，
+  浏览器异常 0。
+
 ## 余额请求恢复
 
 - `Net/OutPacket.h`: 补回发送侧 `CHECK_CASH = 0xE4` 枚举(HEAD 链上缺失,仅存于 `origin/add_cashshop`)。

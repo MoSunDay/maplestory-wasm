@@ -109,6 +109,9 @@ namespace jrc::cash_shop_skin
         nl::node root = nl::nx::ui["CashShop.img"];
         CashShopSkin skin;
         skin.background = require_bitmap(root, "Base/backgrnd", 1024, 768);
+        for (size_t frame = 0; frame < 3; ++frame)
+            skin.preview[frame] = require_bitmap(
+                root, "Base/Preview/" + std::to_string(frame), 366, 238);
         for (size_t digit = 0; digit < COMMA_GLYPH; ++digit)
             skin.number[digit] =
                 require_number(root, "Base/Number/" + std::to_string(digit));
@@ -118,6 +121,11 @@ namespace jrc::cash_shop_skin
         skin.sort_bar = require_bitmap(root, "CSSortBar/backgrnd", 491, 32);
         skin.card = require_bitmap(root, "CSList/Base", 119, 184);
         skin.buy_button = require_button(root, "CSList/BtBuy", 101, 24);
+        skin.badge_new = require_bitmap(root, "CSEffect/new/0", 31, 29);
+        skin.badge_hot = require_bitmap(root, "CSEffect/hot/0", 31, 29);
+        skin.badge_sale = require_bitmap(root, "CSEffect/sale/0", 31, 29);
+        skin.badge_event = require_bitmap(root, "CSEffect/event/0", 31, 29);
+        skin.badge_limited = require_bitmap(root, "CSEffect/limited/0", 31, 29);
         skin.inventory_panel =
             require_bitmap(root, "CSInventory/backgrnd", 380, 213);
         skin.inventory_cover =
@@ -129,12 +137,17 @@ namespace jrc::cash_shop_skin
         skin.tab_bar = require_bitmap(root, "CSInventory/Tab/bar", 362, 3);
         skin.transfer_button = require_button(
             root, "CSLockerNew/LockerTransfer/BtTransfer", 73, 16);
+        skin.locker_cover =
+            require_bitmap(root, "CSLocker/backgrndCover", 346, 146);
         skin.charge_button =
             require_button(root, "CSStatus/BtCharge", 77, 23);
         skin.exit_button = require_button(root, "CSTab/BtExit", 116, 35);
         skin.prev_button = require_button(root, "CSBargainSale/BtLeft", 30, 47);
         skin.next_button =
             require_button(root, "CSBargainSale/BtRight", 30, 47);
+        for (size_t currency = 0; currency < 2; ++currency)
+            skin.currency_icon[currency] = require_bitmap(
+                root, "CSIcon/" + std::to_string(currency), 15, 14);
         skin.nx_icon = require_bitmap(root, "CSIcon/0", 15, 14);
         skin.selected_marker = require_bitmap(root, "CashItem/1", 12, 12);
         return skin;

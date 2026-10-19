@@ -29,6 +29,7 @@ namespace jrc::cash_shop_skin
     struct CashShopSkin
     {
         Texture background;
+        Texture preview[3];
         Texture number[NUMBER_GLYPHS];
         Texture no_item;
         Texture line;
@@ -39,8 +40,15 @@ namespace jrc::cash_shop_skin
         Texture tab_enabled;
         Texture tab_disabled;
         Texture tab_bar;
+        Texture badge_new;
+        Texture badge_hot;
+        Texture badge_sale;
+        Texture badge_event;
+        Texture badge_limited;
+        Texture currency_icon[2];
         Texture nx_icon;
         Texture selected_marker;
+        Texture locker_cover;
 
         // Four-state action buttons, drawn stretched on the screen grid.
         CashShopButtonSkin buy_button;
