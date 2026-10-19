@@ -10,11 +10,13 @@ the index into the client Keytable (src/client/IO/Keyboard.cpp), so a row
 
 Skill rosters come from --json (attack_skills.json, schema
 {"112": {"suffix": "Hero", "kind": "melee",
-         "skills": [{"id": 1221009, "name": "...", "special": ""}]}}).
-Entries with a non-empty "special" are skipped (buff/summon toggles that do
-not play a normal attack animation). The browser-side key roster needed to
-press the keys is written to --out (default /tmp/skill_keymap.json) and is
-consumed by tools/verify/maplestory-webui/skill-anim-flow.mjs.
+         "skills": [{"id": 1221009, "name": "...", "serverBuff": false}]}}).
+Entries with serverBuff:true are skipped (SkillFactory.isBuff buffs that
+play no attack animation); special attacks (Meso Explosion, Snipe) stay
+bound because their cast animation is key-triggerable. The browser-side
+key roster needed to press the keys is written to --out (default
+/tmp/skill_keymap.json) and is consumed by
+tools/verify/maplestory-webui/skill-anim-flow.mjs.
 
 Account grouping mirrors create_accounts.py (4 jobs per account in JOBS
 order): test1 = Hero/Pala/DK/FPA, test2 = ILA/Bish/BM/MM,
@@ -74,7 +76,16 @@ def mysql_rows(cfg, sql):
 
 
 def load_attack_skills(path):
-    """Flatten attack_skills.json into {jobid: [(skillid, name), ...]}."""
+    """Flatten attack_skills.json into {jobid: [(skillid, name, special,
+    summon, client_attack), ...]} - the manifest's per-skill special marker,
+    summon flag and clientAttack classification ride along so the browser
+    roster can surface them.
+
+    Only skills the server classifies as buffs (serverBuff:true, parsed
+    from SkillFactory's isBuff switch by attack_skills.py) are dropped:
+    they play no attack animation. Special attacks such as Meso Explosion
+    and Snipe stay bound - their cast animation is key-triggerable.
+    """
     with open(path, "r", encoding="utf-8") as handle:
         raw = json.load(handle)
     jobs = {}
@@ -82,11 +93,17 @@ def load_attack_skills(path):
         skills = []
         for skill in entry.get("skills", []):
             if isinstance(skill, dict):
-                if str(skill.get("special", "") or "") != "":
-                    continue  # buffs/summons: no plain attack animation
-                skills.append((int(skill["id"]), str(skill.get("name", "") or "")))
+                if bool(skill.get("serverBuff")):
+                    continue  # server-side buff: no plain attack animation
+                skills.append((
+                    int(skill["id"]),
+                    str(skill.get("name", "") or ""),
+                    str(skill.get("special", "") or ""),
+                    bool(skill.get("summon", False)),
+                    bool(skill.get("clientAttack", False)),
+                ))
             else:
-                skills.append((int(skill), ""))
+                skills.append((int(skill), "", "", False, False))
         jobs[int(jobid)] = {"suffix": entry.get("suffix", ""), "skills": skills}
     return jobs
 
@@ -143,13 +160,13 @@ def prepare(cfg, roster, skills_by_job, prefix, world):
 
         bindings = []
         for (letter, maple_index), skill in zip(LETTER_KEYS, entry["skills"]):
-            bindings.append((letter, maple_index, skill[0], skill[1]))
+            bindings.append((letter, maple_index, skill[0], skill[1], skill[2], skill[3], skill[4]))
         bindings = bindings[:MAX_BOUND_KEYS]
 
         statements = ["DELETE FROM keymap WHERE characterid = %d;" % ids[name]]
         values = ",".join(
             "(%d, %d, %d, %d)" % (ids[name], maple_index, KEY_TYPE_SKILL, skill_id)
-            for _, maple_index, skill_id, _ in bindings
+            for _, maple_index, skill_id, _, _, _, _ in bindings
         )
         statements.append(
             "INSERT INTO keymap (characterid, `key`, type, action) VALUES %s;" % values)
@@ -158,7 +175,7 @@ def prepare(cfg, roster, skills_by_job, prefix, world):
         print("%s: bound %d skill(s) to keys %s..%s (maple idx %d..%d)"
               % (name, len(bindings), bindings[0][0], bindings[-1][0],
                  bindings[0][1], bindings[-1][1]))
-        for letter, maple_index, skill_id, skill_name in bindings:
+        for letter, maple_index, skill_id, skill_name, _special, _summon, _client_attack in bindings:
             print(json.dumps({
                 "char": name, "mapleindex": maple_index,
                 "glfw": "GLFW_KEY_%s" % letter, "key": letter,
@@ -166,8 +183,12 @@ def prepare(cfg, roster, skills_by_job, prefix, world):
             }, sort_keys=True))
         browser_roster.append({
             "char": name,
-            "keys": [{"key": letter, "skill": skill_id, "name": skill_name}
-                     for letter, _, skill_id, skill_name in bindings],
+            "keys": [{"key": letter, "skill": skill_id, "name": skill_name,
+                      "special": special, "summon": summon,
+                      "clientAttack": client_attack}
+                     for letter, _, skill_id, skill_name, special, summon,
+                         client_attack
+                     in bindings],
         })
     return browser_roster
 
