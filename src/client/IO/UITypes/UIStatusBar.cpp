@@ -348,14 +348,18 @@ namespace jrc
 
             // v83 has a single menu button; the system popup opens to its
             // left so both stay on screen.
-            Rectangle<int16_t> menu_anchor = buttons[BT_MENU]->bounds(position);
-            Rectangle<int16_t> system_anchor(
-                static_cast<int16_t>(menu_anchor.l() - 108),
-                static_cast<int16_t>(menu_anchor.l() - 4),
-                menu_anchor.t(),
-                menu_anchor.b()
-            );
-            popup.update_anchors(menu_anchor, system_anchor);
+            auto menu = buttons.find(BT_MENU);
+            if (menu != buttons.end() && menu->second)
+            {
+                Rectangle<int16_t> menu_anchor = menu->second->bounds(position);
+                Rectangle<int16_t> system_anchor(
+                    static_cast<int16_t>(menu_anchor.l() - 108),
+                    static_cast<int16_t>(menu_anchor.l() - 4),
+                    menu_anchor.t(),
+                    menu_anchor.b()
+                );
+                popup.update_anchors(menu_anchor, system_anchor);
+            }
             return;
         }
 
@@ -364,10 +368,54 @@ namespace jrc
             static_cast<int16_t>(Constants::viewheight() - Constants::VIEWYOFFSET)
         };
         chatbar.set_position(position);
-        popup.update_anchors(
-            buttons[BT_MENU]->bounds(position),
-            buttons[BT_OPTIONS]->bounds(position)
-        );
+
+        auto menu = buttons.find(BT_MENU);
+        auto options = buttons.find(BT_OPTIONS);
+        if (menu != buttons.end() && menu->second
+            && options != buttons.end() && options->second)
+        {
+            popup.update_anchors(
+                menu->second->bounds(position),
+                options->second->bounds(position)
+            );
+        }
+    }
+
+    void UIStatusbar::update_screen(int16_t, int16_t)
+    {
+        // The v83 chrome is right-anchored to the live view width, so the big
+        // buttons and shortcut icons must follow every screen change.
+        if (statusbar::prechaos())
+        {
+            constexpr uint16_t BIG_BUTTONS[3] = { BT_TRADE, BT_CASHSHOP, BT_MENU };
+            constexpr uint16_t ICON_BUTTONS[6] = {
+                BT_CHARACTER, BT_STATS, BT_INVENTORY,
+                BT_EQUIPS, BT_SKILL, BT_QUEST
+            };
+
+            auto place = [this](uint16_t id, Point<int16_t> pos) {
+                auto iter = buttons.find(id);
+                if (iter != buttons.end() && iter->second)
+                {
+                    iter->second->set_position(pos);
+                }
+            };
+
+            for (int16_t i = 0; i < 3; ++i)
+            {
+                place(BIG_BUTTONS[i], {
+                    statusbar::big_button_x(i), statusbar::big_button_y()
+                });
+            }
+            for (int16_t i = 0; i < 6; ++i)
+            {
+                place(ICON_BUTTONS[i], statusbar::icon_button_pos(i));
+            }
+        }
+
+        // Refresh the popup anchors so the menu keeps opening beside its
+        // moved button.
+        update_layout_position();
     }
 
     Button::State UIStatusbar::button_pressed(uint16_t id)

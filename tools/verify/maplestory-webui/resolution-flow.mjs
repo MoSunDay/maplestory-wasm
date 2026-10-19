@@ -200,6 +200,9 @@ async function openGameOptions(driver) {
   if (!await waitFor(async () => await probe(driver, 'msgame_options_active') === 1, 10))
     throw new Error('Game Options window did not activate');
   await sleep(250);
+  // The menu probe only resolves while the popup is open, so hand the point
+  // captured before the click back to the caller for anchoring checks.
+  return point;
 }
 
 function nextButton(driver) {
@@ -244,9 +247,11 @@ async function main() {
       'missing stored value falls back to 800x600');
 
     await loginAndEnterGame(driver);
-    await openGameOptions(driver);
+    const narrowMenu = await openGameOptions(driver);
     report(await probe(driver, 'msgame_options_index') === 0,
       'Game Options opens on the active 800x600 preset');
+    report(narrowMenu.x > 0 && narrowMenu.x < 800 && narrowMenu.y > 0,
+      `800x600 status bar menu is right-anchored (${JSON.stringify(narrowMenu)})`);
 
     const narrowNext = await nextButton(driver);
     const narrowOk = await okButton(driver);
@@ -304,7 +309,7 @@ async function main() {
 
     // 5. Reopen at 1280: the settings panel and menu coordinates must follow
     // the centered 800x600 design canvas while the status bar stays full-width.
-    await openGameOptions(driver);
+    const wideMenu = await openGameOptions(driver);
     const wideNext = await nextButton(driver);
     const wideOkButton = await okButton(driver);
     report(pointMatches(wideNext, {
@@ -315,6 +320,8 @@ async function main() {
       x: designOk.x + wideOrigin.x,
       y: designOk.y + wideOrigin.y
     }), `1280x720 OK control is design-origin shifted (${JSON.stringify(wideOkButton)})`);
+    report(wideMenu.x > 0 && wideMenu.x < 1280 && wideMenu.y > 0,
+      `status bar menu remains visible at 1280x720 (${JSON.stringify(wideMenu)})`);
     await driver.screenshot('20-resolution-1280x720-options');
     await driver.click(wideOkButton.x, wideOkButton.y);
     await waitFor(async () => await probe(driver, 'msgame_options_active') === 0, 10);

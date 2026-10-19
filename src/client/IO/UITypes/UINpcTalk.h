@@ -35,6 +35,7 @@ namespace jrc
         UINpcTalk();
 
         void draw(float inter) const override;
+        void update_screen(int16_t width, int16_t height) override;
         bool is_in_range(Point<int16_t> cursorpos) const override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
         void send_scroll(double yoffset) override;
