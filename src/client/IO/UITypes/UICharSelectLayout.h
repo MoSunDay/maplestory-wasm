@@ -23,10 +23,13 @@ namespace jrc
 
         // character/0 is a 62x8 disc with origin (29,7), so drawing it at
         // the feet anchor sinks the feet into the art. Shifting the disc
-        // down puts its top face at feet level; the name tag follows just
-        // below the disc.
+        // down puts its top face at feet level; the disc body then spans
+        // charpos.y..charpos.y+8. The name tag (86x16, origin (36,8),
+        // anchored at its vertical center) must clear that body:
+        // offset 19 puts the tag top 3px below the disc's lower rim
+        // instead of burying its upper half in the disc art.
         constexpr Point<int16_t> PLATFORM_OFFSET{ 0, 7 };
-        constexpr Point<int16_t> NAMETAG_OFFSET{ 0, 9 };
+        constexpr Point<int16_t> NAMETAG_OFFSET{ 0, 19 };
 
         // The arrows flank the roster row: the right one squeezes
         // between the widest buyCharacter frame (right edge ~531) and

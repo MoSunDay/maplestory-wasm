@@ -116,13 +116,20 @@ namespace jrc
         */
 
         // Pre BB
-        // Post-Chaos keeps the upstream anchor. The pre-Chaos board
-        // (charInfo1, 183x151, origin (45,57)) would run flush against
-        // the right screen edge there, so it is shifted left.
+        // Post-Chaos restores the upstream post-BB anchors: the
+        // selectWorld banner (190x89, origin (11,11), opaque rows 12-76)
+        // then ends exactly above the NX-positioned charSlot window
+        // (589,106), instead of colliding with it as the pre-Chaos
+        // (578,112) anchor did. The charInfo board follows 50px lower,
+        // clearing the count window and seating BtSelect on the board's
+        // bottom section. The pre-Chaos board (charInfo1, 183x151,
+        // origin (45,57)) would run flush against the right screen edge
+        // at the upstream x, so it is shifted left.
         const bool post_chaos_assets = charselect_nodes::post_chaos();
-        charinfopos = post_chaos_assets ? Point<int16_t>(662, 305)
+        charinfopos = post_chaos_assets ? Point<int16_t>(662, 355)
                                         : Point<int16_t>(625, 305);
-        selworldpos = Point<int16_t>(578, 112);
+        selworldpos = post_chaos_assets ? Point<int16_t>(578, 42)
+                                        : Point<int16_t>(578, 112);
 
         sprites.emplace_back(charselect_nodes::info_board(),      charinfopos);
         sprites.emplace_back(common["selectWorld"],               selworldpos);
