@@ -73,14 +73,39 @@ String 名称双语端同步：
 - assets-server stale-reload：注入后无需重启，`get_size`/尾块与磁盘
   逐字节一致（复用 2026-10-18 AssetCache 修复）。
 
+## UI 端到端确认（浏览器 + 真实 WASM 客户端）
+
+`tools/verify/maplestory-webui/fm-map-flow.mjs`（CDP 驱动 headless Chromium，
+角色 fmflow1/card0）单次跑通 18 项断言，全部 PASS：
+
+- 出生：map=910000000、x=-128 y=23（spawnpoint=0 → sp 门落地面层）。
+- 妮娜 9270052：Space 开对话（`msnpc_active=1`）→ Escape 关闭后归 0。
+- 跳上店门层：x≈1293 y=-1（地面 y=23 与店门层之间 24px 台阶）。
+- 弗兰德里 9030000：邻近 x=1583（仓库 NPC，只取证不按 Space）。
+- 上行链：up00→up01 y=-282、up01→up02 y=-566、up02→up03 y=-852。
+- 下行链：dn00→dn01 y=-566、dn01→dn02 y=-282、dn02→dn03 y=-1。
+- 房间：in01 → 910000001；out00 按 Up → 910000000，落点 x=1332 y=-2（in01）。
+- 视觉取证（readPixels 16×10 ASCII + 色相桶）：入口层蓝绿 0.026/暖 0.011，
+  店门层 0.036/0.089，二~四层 0.018~0.023/0.041~0.046，房间 0.143/0.099
+  （房间近景墙面占屏更多，蓝绿占比显著高于大厅，符合两种场景差异），
+  四层色调一致、无花屏/黑屏。截图 `fm00-entry..fm05-room1.png` 位于
+  `/tmp/maplestory-webui-*/`。
+
+过程中确认的三个环境事实（已写入 `tools/verify/maplestory-webui/index.md`）：
+
+1. 服务端 KEYMAP 包按 DB `keymap` 表下发整张键位表，空表 = 全空 → Space/
+   Alt 失效。`create_accounts.py` 现默认写 Space=57/5/54、Alt=56/5/53、
+   Ctrl=29/5/52。
+2. 角色落点由 `characters.spawnpoint` 恢复，跑前必须重置 map/spawnpoint。
+3. 本客户端 `check_portals()` 只在 Up 键按下时调用，pt=2 的 touch 门
+   （房间 out00）不会自动传送，同样需要按 Up；数据侧 pt=2 保持 079 原值。
+
 ## 已知限制
 
 - NPC fh 吸附（seg232/seg123）为按几何最近承载面的推断，待用户追认。
 - 910000023/910000024 的地图名两端仍为 v83（079 客户端缺失，无从取证）。
-- 浏览器端到端冒烟（进图渲染/传送门跳转/NPC 对话）尚未执行。
 
 ## 待办
 
-- 浏览器 e2e 冒烟 910000000 整图。
 - 用户追认两个 NPC 的落点（如需微调 x/fh）。
 - 评估是否回填 SQL `wz_customlife` 的新 fh，避免后续再导出时复用陈旧值。

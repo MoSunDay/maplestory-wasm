@@ -10,7 +10,7 @@ set -euo pipefail
 # starting the container again, then verifies all listeners came up.
 
 CONTAINER=ms-game-server
-GAME_PORTS='7575|7675|7775|7875|7975'
+GAME_PORTS='7575|7675|7775|7875|7975|8484'
 ALL_PORTS='7575|7675|7775|7875|7975|8484'
 RELEASE_TIMEOUT=180
 READY_TIMEOUT=120
