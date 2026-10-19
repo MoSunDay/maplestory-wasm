@@ -72,3 +72,41 @@ node tools/verify/maplestory-webui/cash-shop-equip-flow.mjs
 ```
 
 环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`CASH_EQUIP_DEBUG_PORT`（默认 9249）、`CASH_EQUIP_ACCOUNT`/`CASH_EQUIP_PASSWORD`（默认 test1/test1）、`CASH_EQUIP_CARD`（角色卡索引 0..3，默认 1，选卡前先核对该账号名下角色）、`CASH_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。无需 GM 等级；登录偶发 reason=7（账号残留 loggedin 状态）时重跑即可。
+
+## 自由市场 910000000 079 复刻流程
+
+`fm-map-flow.mjs` 验收 079MAX4 自由市场 1:1 复刻：出生点、妮娜（9270052）
+Space 对话、跳上店门层（L4 平台 y=-1）、弗兰德里（9030000）邻近取证、
+up00→up01→up02→up03 上行链（地面→-284→-568→-851）、dn00..dn03 下行链、
+in01 进房间 910000001、房间 out00 返回并断言落回 in01。每站用页面内
+WebGL readPixels 输出 16×10 亮度 ASCII + 色相桶（mean/蓝绿/暖/绿/暗）取证。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser \
+FM_FLOW_ACCOUNT=fmflow1 FM_FLOW_PASSWORD=fmflow1 FM_FLOW_CARD=0 \
+node tools/verify/maplestory-webui/fm-map-flow.mjs
+```
+
+前置条件（每个新会话重置一次）：
+
+```sql
+update accounts set loggedin=0 where name='fmflow1';
+update characters set map=910000000, spawnpoint=0 where accountid=42;
+```
+
+- 角色登录位置由 `characters.spawnpoint` 恢复，不重置会从上次断点开始。
+- 服务端 KEYMAP 包会按 DB `keymap` 表下发整张键位表（空表 = 全空），
+  必须带 Space=5/54、Alt=5/53 等行，否则 Space/Alt 全部失效；
+  `scripts/test_accounts/create_accounts.py` 已默认写入。
+- 本客户端所有门（含 pt=2）都只在 Up 按下瞬间触发，touch 门不会自动传送；
+  WARPCD≈0.8s，刚落地后首次 Up 可能被冷却吞掉，脚本内置重试。
+- 地面 y=23 与店门层 y=-1 之间有 24px 台阶（x=1179 竖墙），需跳上台；
+  up00(1227,-3)/in01(1332,-4)/dn03(2281,-5) 都在该平台上。
+- NPC 对话 = Space（±120px 最近 NPC）；弗兰德里在本服是仓库 NPC，
+  且全局 Escape 名单不含 STORAGE，故只做邻近截图、不按 Space。
+
+环境变量：`CHROME_BIN`、`FM_FLOW_DEBUG_PORT`（默认 9251）、
+`FM_FLOW_ACCOUNT`/`FM_FLOW_PASSWORD`（默认 test1/test1）、`FM_FLOW_CARD`
+（角色卡索引 0..3，默认 1）、`FM_FLOW_URL`（默认 http://127.0.0.1:8000/web/index.html）。
+产物在 `/tmp/maplestory-webui-*/`（`fm00-entry..fm05-room1.png` 六张截图 +
+browser-console/errors.log）。
