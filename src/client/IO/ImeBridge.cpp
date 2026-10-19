@@ -261,6 +261,24 @@ extern "C"
         return shop && shop->is_pending() ? 1 : 0;
     }
 
+    EMSCRIPTEN_KEEPALIVE int mscashshop_filtered_count()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->filtered_count() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_equip_sub()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->equip_sub_index() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_equip_menu_open()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop && shop->is_equip_menu_open() ? 1 : 0;
+    }
+
     // Browser click compatibility entry point. UIWorldSelect makes this
     // idempotent with the normal GLFW mouse-down route.
     EMSCRIPTEN_KEEPALIVE int msworldselect_enter()
