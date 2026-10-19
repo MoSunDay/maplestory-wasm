@@ -166,14 +166,20 @@ namespace jrc
         {
             for (int16_t ty = 0; ty < th; ty += cy)
             {
-                animation.draw(
-                    DrawArgument(
-                        Point<int16_t>(ix + tx, iy + ty),
-                        flipped,
-                        opacity / 255
-                    ),
-                    alpha
+                DrawArgument arg(
+                    Point<int16_t>(ix + tx, iy + ty),
+                    flipped,
+                    opacity / 255
                 );
+                // Tiled grids sprawl far past the viewport (dense animated
+                // sparkle fields tile a 10x7 sprite across ~3x88 cells).
+                // Cull each cell before the full draw path so off-screen
+                // tiles cost one rect test instead of interpolation plus
+                // texture bookkeeping.
+                if (animation.is_visible(arg, alpha))
+                {
+                    animation.draw(arg, alpha);
+                }
             }
         }
     }

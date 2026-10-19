@@ -78,6 +78,9 @@ namespace jrc
         void prepare_map_required() const;
         void prepare_effect() const;
         void prepare_visible(const DrawArgument& arguments, float inter) const;
+        // Cheap on-screen test mirroring draw()'s geometry (frame at alpha,
+        // per-frame scale), so callers can skip off-screen work early.
+        bool is_visible(const DrawArgument& arguments, float inter) const;
 
         bool is_valid() const;
         bool is_ready() const;
