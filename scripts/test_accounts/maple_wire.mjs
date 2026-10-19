@@ -101,6 +101,7 @@ class MapleSession {
     this.queue = [];
     this.waiters = [];
     this.pending = Buffer.alloc(0);
+    this.dataWaiters = [];
     this.attached = false;
     this.expectedClose = null;
   }
@@ -140,6 +141,9 @@ class MapleSession {
   _feed(data) {
     this.pending = Buffer.concat([this.pending, data]);
     this._pump();
+    const waiters = this.dataWaiters;
+    this.dataWaiters = [];
+    for (const w of waiters) w();
   }
   _pump() {
     if (this.byteWaiter && this.pending.length >= this.byteWaiter.n) {
@@ -175,14 +179,38 @@ class MapleSession {
     this.sendRaw(Buffer.concat([header, body]));
     return len;
   }
+  // Resolve(true) on the next _feed, resolve(false) on timeout. Never consumes.
+  waitForMore(timeout) {
+    return new Promise((res) => {
+      const fire = () => { clearTimeout(t); res(true); };
+      const t = setTimeout(() => {
+        this.dataWaiters = this.dataWaiters.filter((w) => w !== fire);
+        res(false);
+      }, timeout);
+      this.dataWaiters.push(fire);
+    });
+  }
+
+  // Atomic frame read: peeks the length header, waits until the WHOLE frame is
+  // buffered and only then consumes + decrypts it. A timeout rejects without
+  // consuming anything, so a short read timeout can never desync the stream
+  // (the old header-then-body variant ate the 4-byte header on a mid-frame
+  // timeout and permanently misframed every later packet).
   async recvPacket(timeout = 10000) {
-    const header = await this.readBytes(4, timeout);
-    const hm = header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24);
-    let len = ((hm >> 16) ^ (hm & 0xFFFF)) & 0xFFFF;
-    let body = await this.readBytes(len, timeout);
-    aesofb(body, this.recviv);
-    mapledecrypt(body);
-    return body;
+    for (;;) {
+      if (this.pending.length >= 4) {
+        const hm = this.pending[0] | (this.pending[1] << 8) | (this.pending[2] << 16) | (this.pending[3] << 24);
+        const len = ((hm >> 16) ^ (hm & 0xFFFF)) & 0xFFFF;
+        if (this.pending.length >= 4 + len) {
+          const body = this.pending.subarray(4, 4 + len);
+          this.pending = this.pending.subarray(4 + len);
+          aesofb(body, this.recviv);
+          mapledecrypt(body);
+          return body;
+        }
+      }
+      if (!(await this.waitForMore(timeout))) throw new Error('recv timeout');
+    }
   }
 }
 

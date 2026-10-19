@@ -12,16 +12,23 @@ packets for the level-200 test characters:
   melee  -> CLOSE_RANGE_ATTACK (0x2C): jobs 112 122 132 422 512
   ranged -> RANGED_ATTACK      (0x2D): jobs 312 322 412 522
   magic  -> MAGIC_ATTACK       (0x2E): jobs 212 222 232
+  meso   -> CLOSE_RANGE_ATTACK (0x2C) with Meso Explosion's meso-id layout
 
 Two packet-layout quirks are flagged per skill (mirroring the server's
 AbstractDealDamageHandler#parseDamage):
   - charge skills read one extra int32 before the rest of the payload;
   - Meso Explosion (4211006) has its own meso-id based layout, so it is
-    marked kind "skip" / special "meso_explosion" (entry-level "kind" key
+    marked kind "meso" / special "meso_explosion" (entry-level "kind" key
     is only emitted when it overrides the job default).
 Skills the heuristic cannot see (no wz damage key) but the server treats
 as attacks are force-included: Snipe (3221007, server-fixed damage) and
 Meso Explosion itself.
+
+Every entry also carries "serverBuff": true when the server's own
+SkillFactory isBuff switch (link_repos/MapleStory-Server/src/client/
+SkillFactory.java, ids resolved from src/constants/skills/*.java) forces
+the skill to load as a buff - parsed at runtime via server_buff_ids(),
+never hardcoded here.
 
 Skill names: Skill.wz carries no <string name="name"> in this dump, so the
 String.wz/Skill.img.xml table is used as fallback. Output is written to
@@ -29,6 +36,7 @@ attack_skills.json next to this script, plus a stdout summary table.
 """
 import json
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 from functools import lru_cache
@@ -45,7 +53,7 @@ KIND_BY_JOB = {
     312: "ranged", 322: "ranged", 412: "ranged", 522: "ranged",
     212: "magic", 222: "magic", 232: "magic",
 }
-OPCODE_BY_KIND = {"melee": "0x2C", "ranged": "0x2D", "magic": "0x2E"}
+OPCODE_BY_KIND = {"melee": "0x2C", "ranged": "0x2D", "magic": "0x2E", "meso": "0x2C"}
 
 # Server reads one extra charge int32 for these skill ids; the non-explorer
 # entries (ThunderBreaker/NightWalker/Evan) can never match a line here but
@@ -58,12 +66,146 @@ CHARGE_SKILLS = frozenset({
 })
 
 # skill id -> special marker. 4211006 Meso Explosion uses its own meso-id
-# packet layout ("skip" kind); 3221007 Snipe is server-fixed damage and
+# packet layout (kind "meso"); 3221007 Snipe is server-fixed damage and
 # carries no wz damage key. Both are force-included as attacks.
 SPECIAL_BY_SKILL = {4211006: "meso_explosion", 3221007: "snipe_fixed_damage"}
-KIND_OVERRIDE_BY_SKILL = {4211006: "skip"}
+KIND_OVERRIDE_BY_SKILL = {4211006: "meso"}
 FORCE_ATTACK_SKILLS = frozenset(SPECIAL_BY_SKILL)
-SKIP_KIND = "skip"
+
+# ---------------------------------------------------------------------------
+# Server-buff classification - parsed at runtime from the server source so
+# this manifest stays the single source of truth (no hardcoded id sets).
+# SkillFactory.loadFromData computes `isBuff` for every skill; the
+# authoritative part is its `switch (id)` override right before the level
+# effects are loaded, whose case labels are constants/skills/*.java ids.
+# ---------------------------------------------------------------------------
+SERVER_REPO = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..",
+    "link_repos", "MapleStory-Server",
+)
+SKILL_FACTORY_JAVA = os.path.join(SERVER_REPO, "src", "client", "SkillFactory.java")
+SKILLS_CONSTANTS_DIR = os.path.join(SERVER_REPO, "src", "constants", "skills")
+MAPLE_STAT_EFFECT_JAVA = os.path.join(SERVER_REPO, "src", "server", "MapleStatEffect.java")
+CLIENT_SKILLID_H = "/data/maplestory-wasm/src/client/Character/SkillId.h"
+CLIENT_SKILLDATA_CPP = "/data/maplestory-wasm/src/client/Data/SkillData.cpp"
+
+_SWITCH_HEAD_RE = re.compile(r"switch\s*\(id\)\s*\{")
+_CASE_OR_ASSIGN_RE = re.compile(
+    r"case\s+([A-Za-z_][A-Za-z0-9_.]*)\s*:|isBuff\s*=\s*(true|false)\s*;"
+)
+_CONST_DEF_RE = re.compile(r"\b([A-Z][A-Z0-9_]*)\s*=\s*(\d+)\s*;")
+
+
+@lru_cache(maxsize=None)
+def _skill_constants():
+    """{"Class.CONSTANT": skill id} from every constants/skills/*.java."""
+    consts = {}
+    for name in sorted(os.listdir(SKILLS_CONSTANTS_DIR)):
+        if not name.endswith(".java"):
+            continue
+        path = os.path.join(SKILLS_CONSTANTS_DIR, name)
+        with open(path, "r", encoding="utf-8") as handle:
+            src = handle.read()
+        for match in _CONST_DEF_RE.finditer(src):
+            consts["%s.%s" % (name[:-5], match.group(1))] = int(match.group(2))
+    return consts
+
+
+@lru_cache(maxsize=None)
+def _isbuff_switch_groups():
+    """(forced-true ids, forced-false ids) of the isBuff switch.
+
+    The switch sits between `switch (id) {` and the `MapData level` read
+    that follows it; case labels accumulate until the next `isBuff = ...;`
+    assignment, which closes the group.
+    """
+    with open(SKILL_FACTORY_JAVA, "r", encoding="utf-8") as handle:
+        src = handle.read()
+    # `switch (id)` appears twice (a small action switch sits above); the
+    # isBuff override is the tightest switch whose body, up to the
+    # `MapData level` read that terminates loadFromData's classification
+    # block, holds the isBuff assignments.
+    candidates = []
+    for head in _SWITCH_HEAD_RE.finditer(src):
+        end = src.find("MapData level", head.end())
+        body = src[head.end():end if end > 0 else len(src)]
+        if re.search(r"isBuff\s*=", body):
+            candidates.append((len(body), body))
+    if not candidates:
+        raise RuntimeError("no isBuff switch in %s" % SKILL_FACTORY_JAVA)
+    _len, body = min(candidates)
+    consts = _skill_constants()
+    groups, labels = [], []
+    for match in _CASE_OR_ASSIGN_RE.finditer(body):
+        if match.group(1) is not None:
+            labels.append(match.group(1))
+            continue
+        groups.append((match.group(2), labels))
+        labels = []
+    if labels or sorted(value for value, _ in groups) != ["false", "true"]:
+        raise RuntimeError(
+            "unexpected isBuff switch shape in %s (groups=%r, dangling=%r)"
+            % (SKILL_FACTORY_JAVA, [value for value, _ in groups], labels)
+        )
+    resolved = {}
+    for value, case_labels in groups:
+        ids = {consts[label] for label in case_labels}
+        missing = [label for label in case_labels if label not in consts]
+        if missing:
+            raise RuntimeError("unresolved skill constants: %s" % missing)
+        resolved[value] = frozenset(ids)
+    return resolved["true"], resolved["false"]
+
+
+def server_buff_ids():
+    """Skill ids the server's SkillFactory isBuff switch forces to true.
+
+    MapleStatEffects of these skills are loaded as buffs, so an "attack"
+    packet for them never settles damage on the server.
+    """
+    return _isbuff_switch_groups()[0]
+
+
+@lru_cache(maxsize=None)
+def summon_ids():
+    """Skill ids that spawn a summon (MapleStatEffect statup switch groups
+    containing MapleBuffStat.SUMMON; case labels resolve via constants)."""
+    with open(MAPLE_STAT_EFFECT_JAVA, "r", encoding="utf-8") as handle:
+        src = handle.read()
+    consts = _skill_constants()
+    found = set()
+    for segment in src.split("break;"):
+        if "MapleBuffStat.SUMMON" not in segment:
+            continue
+        for match in re.finditer(r"case\s+([A-Za-z_][A-Za-z0-9_.]*)\s*:", segment):
+            label = match.group(1)
+            if label not in consts:
+                raise RuntimeError("unresolved skill constant: %s" % label)
+            found.add(consts[label])
+    if not found:
+        raise RuntimeError("no summon groups in %s" % MAPLE_STAT_EFFECT_JAVA)
+    return frozenset(found)
+
+
+@lru_cache(maxsize=None)
+def client_attack_ids():
+    """Skill ids the WASM client itself plays as a local attack
+    (SkillData::flags_of ATTACK table; SkillId.h resolves the constants)."""
+    with open(CLIENT_SKILLID_H, "r", encoding="utf-8") as handle:
+        enum_src = handle.read()
+    ids = {m.group(1): int(m.group(2))
+           for m in re.finditer(r"([A-Z_0-9]+)\s*=\s*(\d+)", enum_src)}
+    with open(CLIENT_SKILLDATA_CPP, "r", encoding="utf-8") as handle:
+        table_src = handle.read()
+    found = {ids[m.group(1)]
+             for m in re.finditer(r"\{\s*SkillId::([A-Z_0-9]+),\s*ATTACK\b[^}]*\}", table_src)
+             if m.group(1) in ids}
+    if not found:
+        raise RuntimeError("empty client ATTACK table in %s" % CLIENT_SKILLDATA_CPP)
+    if len(found) < 30:
+        sys.stderr.write("warning: client ATTACK table shrank to %d ids (expect ~59); "
+                         "skip counts may be inflated\n" % len(found))
+    return frozenset(found)
 
 
 def load_string_skill_names():
@@ -121,7 +263,7 @@ def is_attack(kv):
     return "damage" in kv or "mad" in kv
 
 
-def attack_record(sid, name, level, kv, kind, default_kind):
+def attack_record(sid, name, level, kv, kind, default_kind, buff_ids, summon_set, client_atk):
     """One manifest entry; "kind" only kept when it overrides the default."""
     special = SPECIAL_BY_SKILL.get(sid, "")
     record = {
@@ -134,6 +276,13 @@ def attack_record(sid, name, level, kv, kind, default_kind):
         "cooldown": _to_int(kv.get("cooldown") or kv.get("time"), 0),
         "charge": sid in CHARGE_SKILLS,
         "special": special,
+        # SkillFactory.isBuff()==true: server loads the effect as a buff,
+        # so an attack packet for it cannot settle damage.
+        "serverBuff": sid in buff_ids,
+        # MapleStatEffect adds a MapleBuffStat.SUMMON statup: the damage
+        # comes from the summon's own attacks, not the player's packet.
+        "summon": sid in summon_set,
+        "clientAttack": sid in client_atk or sid in FORCE_ATTACK_SKILLS,
     }
     if kind != default_kind:
         record["kind"] = kind
@@ -145,6 +294,9 @@ def job_entry(job, string_names):
     _code, job_id, imgs = job[0], job[1], job[2]
     suffix = job[-1]
     default_kind = KIND_BY_JOB[job_id]
+    buff_ids = server_buff_ids()
+    summon_set = summon_ids()
+    client_set = client_attack_ids()
     attacks = []
     total = 0
     for sid, skill in line_skills(imgs):
@@ -153,7 +305,7 @@ def job_entry(job, string_names):
         kind = KIND_OVERRIDE_BY_SKILL.get(sid, default_kind)
         if not is_attack(kv) and sid not in FORCE_ATTACK_SKILLS:
             continue
-        record = attack_record(sid, skill_name(skill, string_names), level, kv, kind, default_kind)
+        record = attack_record(sid, skill_name(skill, string_names), level, kv, kind, default_kind, buff_ids, summon_set, client_set)
         attacks.append(record)
     attacks.sort(key=lambda r: r["id"])
     return str(job_id), {
@@ -175,12 +327,14 @@ def build_manifest(jobs):
 
 
 def print_summary(manifest, totals):
-    """job code | suffix | total skills | attack skills table on stdout."""
-    header = ("job", "suffix", "total", "attacks")
-    print("%-5s %-6s %6s %8s" % header)
+    """job code | suffix | total | attacks | serverBuff marks on stdout."""
+    header = ("job", "suffix", "total", "attacks", "buffs")
+    print("%-5s %-6s %6s %8s %6s" % header)
     for code, entry in manifest.items():
-        print("%-5s %-6s %6d %8d" % (code, entry["suffix"], totals[code], len(entry["skills"])))
-    kinds = sorted({e["kind"] for e in manifest.values()})
+        buffs = sum(1 for s in entry["skills"] if s["serverBuff"])
+        print("%-5s %-6s %6d %8d %6d" % (code, entry["suffix"], totals[code], len(entry["skills"]), buffs))
+    kinds = sorted({e["kind"] for e in manifest.values()}
+                   | {s.get("kind", e["kind"]) for e in manifest.values() for s in e["skills"]})
     ops = ", ".join("%s=%s" % (k, OPCODE_BY_KIND[k]) for k in kinds)
     print("kinds: %s" % ops)
 

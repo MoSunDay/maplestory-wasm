@@ -100,7 +100,10 @@ async function loginAndEnterGame(driver) {
   for (let attempt = 0; attempt < 3 && !advanced; attempt += 1) {
     await driver.clickField(340, 260);
     await driver.typeAscii(account);
-    await driver.clickField(340, 285);
+    // Tab advances to the password field without a second click: a lost
+    // click focus would type the password into the account box, silently
+    // logging in as "<account><password>" (other agents own such accounts).
+    await driver.key('Tab', 'Tab', 9);
     await driver.typeAscii(password);
     await driver.key('Enter', 'Enter', 13);
     advanced = await waitFor(async () =>
@@ -119,11 +122,23 @@ async function loginAndEnterGame(driver) {
   if (!await waitFor(stateIs(driver, uiState.characters), 45))
     throw new Error('character-select UI did not activate');
   // 等角色预览流结束 + 资产空闲：预览未挂载/流式加载中点击卡片会被丢弃。
-  if (!await waitFor(async () => {
+  const previewGate = async () => {
     const ready = await probe(driver, 'mscharlist_preview_ready');
     const total = await probe(driver, 'mscharlist_preview_total');
-    return total > 0 && ready === total;
-  }, 90)) throw new Error('character previews never settled');
+    return total > 0 && ready === total ? true : `ready=${ready} total=${total}`;
+  };
+  {
+    let last = '';
+    const okPreview = await waitFor(async () => {
+      const v = await previewGate();
+      if (v !== true) last = String(v);
+      return v === true;
+    }, 90);
+    if (!okPreview) {
+      await driver.screenshot('preview-stuck');
+      throw new Error(`character previews never settled (${last}, state=${await probe(driver, 'msui_state')})`);
+    }
+  }
   if (!await waitFor(() => assetsIdle(driver), 60)) throw new Error('char-select assets never idle');
   const center = cardCenter(charIndex);
   let entered = false;
@@ -180,10 +195,25 @@ async function damageLuma(driver, state) {
   return means.damage;
 }
 
+async function approachNearestMob(driver) {
+  const state = await sampleState(driver);
+  if (state.mobX === MISSING_COORDINATE) return;
+  const viewX = state.playerScreenX - state.playerX;
+  const viewY = state.playerScreenY - state.playerY;
+  // Click the ground ~50px above the mob's feet, clamped inside the field
+  // viewport (y <= 375 keeps the click off the chat bar at the bottom).
+  const x = Math.min(Math.max(Math.round(state.mobX + viewX), 30), 770);
+  const y = Math.min(Math.max(Math.round(state.mobY + viewY - 50), 40), 375);
+  await driver.click(x, y);
+  await sleep(900);
+}
+
 async function verifySkill(driver, charName, skill) {
   const letter = String(skill.key || '').toUpperCase();
   if (!/^[A-Z]$/.test(letter)) throw new Error(`bad key binding: ${JSON.stringify(skill)}`);
   const press = keyPressEvent(letter);
+  // summon: 6s window — damage numbers come from the summon's own attacks
+  const sampleCount = skill.summon || skill.special === 'summon' ? 60 : SAMPLE_COUNT;
 
   const baseline = await sampleState(driver);
   const baselineLuma = baseline.mobX !== MISSING_COORDINATE
@@ -201,7 +231,7 @@ async function verifySkill(driver, charName, skill) {
   let frameCount = 0;
   try {
     await driver.keyHold(press.key, press.code, press.vk, ATTACK_HOLD_MS);
-    for (let i = 0; i < SAMPLE_COUNT; i += 1) {
+    for (let i = 0; i < sampleCount; i += 1) {
       await sleep(SAMPLE_STEP_MS);
       const state = await sampleState(driver);
       frames.add(state.frame);
@@ -226,6 +256,7 @@ async function verifySkill(driver, charName, skill) {
   return {
     skill: skill.skill, name: skill.name || '', key: letter,
     animation: animation ? 'ok' : 'fail', damageVisual: damageVisual ? 'ok' : 'fail',
+    summon: skill.summon || skill.special === 'summon' ? true : false,
     frames: frames.size, frameCount, stanceMax, afterimage,
     lumaBaseline: baselineLuma, lumaDeltaMax,
     stances: [...stances].sort((a, b) => a - b),
@@ -261,6 +292,16 @@ async function main() {
     await driver.screenshot(`${charName}-entry`);
     for (const skill of skills) {
       try {
+        if (!skill.clientAttack && !skill.summon) {
+          // This WASM client port plays no local attack for the skill
+          // (SkillData::flags_of ATTACK table), so key-press produces no
+          // animation/damage numbers. Record as skip, not failure.
+          results.push({ skill: skill.skill, name: skill.name || '', key: skill.key,
+            animation: 'skip', damageVisual: 'skip' });
+          console.log(`SKIP   ${charName} skill ${skill.skill}${skill.name ? ` (${skill.name})` : ''} key ${skill.key}: not a client-side attack in this port`);
+          continue;
+        }
+        await approachNearestMob(driver);
         const verdict = await verifySkill(driver, charName, skill);
         results.push(verdict);
         report(verdict.animation === 'ok' && verdict.damageVisual === 'ok',
@@ -273,8 +314,9 @@ async function main() {
         report(false, `${charName} skill ${skill.skill} key ${skill.key}: ${error.message}`);
       }
     }
-    const ok = results.filter(r => r.animation === 'ok' && r.damageVisual === 'ok').length;
-    console.log(`SUMMARY  ${charName}: ${ok}/${results.length} skill(s) passed animation+damage checks`);
+    const graded = results.filter(r => r.animation !== 'skip');
+    const ok = graded.filter(r => r.animation === 'ok' && r.damageVisual === 'ok').length;
+    console.log(`SUMMARY  ${charName}: ${ok}/${graded.length} skill(s) passed animation+damage checks (${results.length - graded.length} skipped)`);
   } catch (error) {
     report(false, `flow aborted: ${error.message}`);
   } finally {

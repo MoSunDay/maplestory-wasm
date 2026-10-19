@@ -12,7 +12,8 @@ and starter consumables.
 
 Usage:
   python3 create_accounts.py [--prefix test] [--count 3]
-                             [--chars-per-account 4] [--dry-run] [--config PATH]
+                             [--chars-per-account 4] [--dry-run] [--skip-existing]
+                             [--config PATH]
 
 DB credentials are read at runtime from the game server configuration.ini
 (never hardcoded). The account password comes from MS_TEST_ACCOUNT_PASSWORD;
@@ -45,9 +46,20 @@ EQUIP_BONUS_COLUMNS = (
     "str", "dex", "int", "luk", "hp", "mp", "watk", "matk",
     "wdef", "mdef", "acc", "avoid", "hands", "speed", "jump",
 )
+# Per-character tables wiped by cleanup_sql. Every entry is confirmed to
+# exist in link_repos/MapleStory-Server/sql/db_database.sql AND to be keyed
+# by a literal `characterid` column. Siblings keyed by `charid`
+# (area_info, cooldowns, monsterbook, playerdiseases) or `cid`
+# (family_character, fredstorage, mts_cart) are out of scope here.
+# The set mirrors the server's own per-character delete cascade
+# (MapleCharacter.deleteCharacterFromDB: medalmaps/questprogress/queststatus,
+# famelog, keymap, savedlocations, trocklocations, skillmacros, skills,
+# eventstats, server_queue) plus buddies, which is characterid-keyed too.
 CHILD_TABLES = (
     "questprogress", "medalmaps", "queststatus",
     "skills", "skillmacros", "keymap",
+    "famelog", "savedlocations", "trocklocations",
+    "eventstats", "server_queue", "buddies",
 )
 
 
@@ -75,11 +87,11 @@ def read_db_config(path):
     }
 
 
-def mysql_run(cfg, sql):
+def mysql_run(cfg, sql, flags=()):
     env = dict(os.environ)
     env["MYSQL_PWD"] = cfg["password"]
     proc = subprocess.run(
-        ["mysql", "-h", cfg["host"], "-u", cfg["user"], cfg["database"]],
+        ["mysql", "-h", cfg["host"], "-u", cfg["user"], cfg["database"], *flags],
         input=sql, text=True, capture_output=True, env=env,
     )
     if proc.returncode != 0:
@@ -87,11 +99,38 @@ def mysql_run(cfg, sql):
     return proc.stdout
 
 
+def existing_accounts(cfg, account_names):
+    """Return the subset of account_names already present in accounts."""
+    names = ",".join("'%s'" % n for n in account_names)
+    out = mysql_run(cfg, "SELECT name FROM accounts WHERE name IN (%s);" % names,
+                    flags=("-N",))
+    return {row.strip() for row in out.splitlines() if row.strip()}
+
+
+def account_slot(account_name):
+    """Split an account name into (base, slot): 'test2' -> ('test', 2).
+
+    The slot is the account's 1-based blueprint/character-name number, so
+    skipping existing accounts never shifts names or job blocks.
+    """
+    base = account_name.rstrip("0123456789")
+    return base, int(account_name[len(base):] or 1)
+
+
 def account_password_hash(password):
     return hashlib.sha512(password.encode("utf-8")).hexdigest()
 
 
 def cleanup_sql(account_names):
+    """Build DELETE statements wiping the named accounts and every row tied
+    to their characters.
+
+    Character-keyed tables removed (one DELETE per CHILD_TABLES entry, all
+    keyed by `characterid`): questprogress, medalmaps, queststatus, skills,
+    skillmacros, keymap, famelog, savedlocations, trocklocations, eventstats,
+    server_queue, buddies. inventoryequipment/inventoryitems are joined
+    separately, then characters and the accounts themselves.
+    """
     names = ",".join("'%s'" % n for n in account_names)
     stmts = [(
         "CREATE TEMPORARY TABLE _del_acc (id INT PRIMARY KEY);"
@@ -226,7 +265,7 @@ def verify_sql(account_names):
 def build_sql(account_names, blueprints, quest_ids, password=None, chars_per_account=4, world=4):
     stmts = ["SET NAMES utf8mb4;"]
     stmts.extend(cleanup_sql(account_names))
-    for index, account_name in enumerate(account_names, start=1):
+    for account_name in account_names:
         account_password = password if password is not None else account_name
         stmts.append(
             "INSERT INTO accounts (name, password, characterslots, gender, birthday,"
@@ -236,9 +275,12 @@ def build_sql(account_names, blueprints, quest_ids, password=None, chars_per_acc
             )
         )
         stmts.append("SET @acc = LAST_INSERT_ID();")
-        chunk = blueprints[(index - 1) * chars_per_account : index * chars_per_account]
+        # Blueprint block and character names follow the account's own number
+        # (test2 -> test2Hero...), so a --skip-existing subset keeps its slots.
+        base, slot = account_slot(account_name)
+        chunk = blueprints[(slot - 1) * chars_per_account : slot * chars_per_account]
         for char_index, blueprint in enumerate(chunk):
-            name = "%s%d%s" % (account_names[0].rstrip("0123456789"), index, blueprint["suffix"])
+            name = "%s%d%s" % (base, slot, blueprint["suffix"])
             stmts.extend(character_sql(name, char_index, blueprint, quest_ids, world))
             for equip in blueprint["equips"]:
                 stmts.extend(equipped_item_sql(equip))
@@ -254,11 +296,28 @@ def main():
     parser.add_argument("--chars-per-account", type=int, default=int(os.environ.get("MS_TEST_CHARS_PER_ACCOUNT", "4")))
     parser.add_argument("--config", default="/data/maplestory-wasm/link_repos/MapleStory-Server/configuration.ini")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="only create accounts that do not exist yet;"
+                             " existing ones (and their characters) stay untouched")
     args = parser.parse_args()
 
     password = os.environ.get("MS_TEST_ACCOUNT_PASSWORD")
     account_names = ["%s%d" % (args.prefix, i) for i in range(1, args.count + 1)]
     blueprints = [character_blueprint(job) for job in JOBS]
+
+    cfg = None
+    if args.skip_existing:
+        cfg = read_db_config(args.config)
+        existing = existing_accounts(cfg, account_names)
+        skipped = [name for name in account_names if name in existing]
+        account_names = [name for name in account_names if name not in existing]
+        if skipped:
+            print("skip-existing: skipped: %s (already exist, left untouched)" % ",".join(skipped))
+        if not account_names:
+            print("skip-existing: nothing to create, all accounts already exist")
+            return
+
+    # Guard counts only the accounts actually being created.
     if len(blueprints) > len(account_names) * args.chars_per_account:
         print("error: %d blueprints but %d accounts * %d chars each;"
               " need --count >= ceil(%d / chars-per-account) = %d" % (
@@ -274,7 +333,8 @@ def main():
             ",".join(account_names), len(quest_ids), args.chars_per_account))
         return
 
-    cfg = read_db_config(args.config)
+    if cfg is None:
+        cfg = read_db_config(args.config)
     sql = build_sql(account_names, blueprints, quest_ids, password, world=args.world,
                     chars_per_account=args.chars_per_account)
     mysql_run(cfg, sql)
