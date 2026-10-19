@@ -54,6 +54,9 @@ namespace jrc
         for (auto sub : levelsrc)
         {
             float damage = (float)sub["damage"] / 100;
+            // 079MAX4 stores Arrow Bomb's (3101005) damage percent in "x".
+            if (damage <= 0.0f)
+                damage = (float)sub["x"] / 100;
             int32_t matk = sub["mad"];
             int32_t fixdamage = sub["fixdamage"];
             int32_t mastery = sub["mastery"];
@@ -105,12 +108,15 @@ namespace jrc
             { SkillId::AXE_PANIC, ATTACK },
             { SkillId::SWORD_COMA, ATTACK },
             { SkillId::AXE_COMA, ATTACK },
+            { SkillId::ARMOR_CRASH, ATTACK },
+            { SkillId::SHOUT, ATTACK },
             // Hero
             { SkillId::RUSH_HERO, ATTACK },
             { SkillId::BRANDISH, ATTACK },
             // Page
             // White Knight
             { SkillId::CHARGE, ATTACK },
+            { SkillId::MAGIC_CRASH, ATTACK },
             // Paladin
             { SkillId::RUSH_PALADIN, ATTACK },
             { SkillId::BLAST, ATTACK },
@@ -123,6 +129,7 @@ namespace jrc
             { SkillId::PA_FURY, ATTACK },
             { SkillId::SACRIFICE, ATTACK },
             { SkillId::DRAGONS_ROAR, ATTACK },
+            { SkillId::POWER_CRASH, ATTACK },
             // Dark Knight
             { SkillId::RUSH_DK, ATTACK },
             // Mage
@@ -141,6 +148,15 @@ namespace jrc
             { SkillId::FIRE_DEMON, ATTACK },
             { SkillId::PARALYZE, ATTACK | RANGED },
             { SkillId::METEOR_SHOWER, ATTACK },
+            // I/L Mage
+            { SkillId::COLD_BEAM, ATTACK | RANGED },
+            { SkillId::THUNDERBOLT, ATTACK | RANGED },
+            // Priest
+            { SkillId::HOLY_ARROW, ATTACK | RANGED },
+            // Hunter
+            { SkillId::ARROW_BOMB, ATTACK | RANGED },
+            // Crossbowman
+            { SkillId::IRON_ARROW, ATTACK | RANGED },
             // Rogue
             { SkillId::DISORDER, ATTACK },
             { SkillId::LUCKY_SEVEN, ATTACK | RANGED },
@@ -148,11 +164,23 @@ namespace jrc
             { SkillId::DRAIN, ATTACK },
             { SkillId::AVENGER, ATTACK | RANGED },
             { SkillId::TRIPLE_THROW, ATTACK | RANGED },
+            // Bandit
+            { SkillId::STEAL, ATTACK },
+            { SkillId::SAVAGE_BLOW, ATTACK },
             // Chief Bandit / Shadower
             { SkillId::ASSAULTER, ATTACK },
             { SkillId::BAND_OF_THIEVES, ATTACK },
             { SkillId::ASSASSINATE, ATTACK },
-            { SkillId::BOOMERANG_STEP, ATTACK }
+            { SkillId::BOOMERANG_STEP, ATTACK },
+            // Brawler
+            { SkillId::BACK_SPIN_BLOW, ATTACK },
+            { SkillId::DOUBLE_UPPERCUT, ATTACK },
+            { SkillId::CORKSCREW_BLOW, ATTACK },
+            // Gunslinger
+            { SkillId::INVISIBLE_SHOT, ATTACK | RANGED },
+            { SkillId::GRENADE, ATTACK | RANGED },
+            { SkillId::BLANK_SHOT, ATTACK },
+            { SkillId::RECOIL_SHOT, ATTACK | RANGED }
         };
 
         auto iter = skill_flags.find(id);

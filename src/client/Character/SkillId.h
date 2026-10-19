@@ -58,6 +58,7 @@ namespace jrc
             AXE_PANIC = 1111004,
             SWORD_COMA = 1111005,
             AXE_COMA = 1111006,
+            ARMOR_CRASH = 1111007,
             SHOUT = 1111008,
 
             // Hero
@@ -85,6 +86,7 @@ namespace jrc
             BW_ICE_CHARGE = 1211006,
             SWORD_LIT_CHARGE = 1211007,
             BW_LIT_CHARGE = 1211008,
+            MAGIC_CRASH = 1211009,
 
             // Paladin
             ACHILLES_PALADIN = 1220005,
@@ -113,6 +115,7 @@ namespace jrc
             PA_FURY = 1311004,
             SACRIFICE = 1311005,
             DRAGONS_ROAR = 1311006,
+            POWER_CRASH = 1311007,
 
             // Dark Knight
             ACHILLES_DK = 1320005,
@@ -155,15 +158,20 @@ namespace jrc
 
             // I/L Mage
             IL_TELEPORT = 2201002,
+            COLD_BEAM = 2201004,
+            THUNDERBOLT = 2201005,
 
             // Priest
             PRIEST_TELEPORT = 2301001,
+            HOLY_ARROW = 2301005,
 
             // Hunter
             BOW_MASTERY = 3100000,
+            ARROW_BOMB = 3101005,
 
             // Crossbowman
             CROSSBOW_MASTERY = 3200000,
+            IRON_ARROW = 3201005,
 
             // Hermit
             DRAIN = 4101005,
@@ -190,13 +198,22 @@ namespace jrc
 
             // Bandit
             DAGGER_MASTERY = 4200000,
+            STEAL = 4201004,
+            SAVAGE_BLOW = 4201005,
             MESO_EXPLOSION = 4211006,
 
             // Brawler
             KNUCKLER_MASTERY = 5100001,
+            BACK_SPIN_BLOW = 5101002,
+            DOUBLE_UPPERCUT = 5101003,
+            CORKSCREW_BLOW = 5101004,
 
             // Gunslinger
             GUN_MASTERY = 5200000,
+            INVISIBLE_SHOT = 5201001,
+            GRENADE = 5201002,
+            BLANK_SHOT = 5201004,
+            RECOIL_SHOT = 5201006,
 
             // Aran
             POLEARM_MASTERY_ARAN = 21100000,
