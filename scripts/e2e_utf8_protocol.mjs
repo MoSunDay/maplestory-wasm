@@ -79,10 +79,19 @@ function updateiv(iv) {
 
 function aesofb(b, iv) {
   const miv = Buffer.alloc(16);
-  for (let i = 0; i < 16; i++) miv[i] = iv[i % 4];
-  for (let x = 0; x < b.length; x++) {
-    if (x % 16 === 0) aesEncryptBlock(miv).copy(miv);
-    b[x] ^= miv[x % 16];
+  let remaining = b.length;
+  let llength = 0x5b0;
+  let start = 0;
+  while (remaining > 0) {
+    for (let i = 0; i < 16; i++) miv[i] = iv[i % 4];
+    if (remaining < llength) llength = remaining;
+    for (let x = start; x < start + llength; x++) {
+      if ((x - start) % 16 === 0) aesEncryptBlock(miv).copy(miv);
+      b[x] ^= miv[(x - start) % 16];
+    }
+    start += llength;
+    remaining -= llength;
+    llength = 0x5b4;
   }
   updateiv(iv);
 }

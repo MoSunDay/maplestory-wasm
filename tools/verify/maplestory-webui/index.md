@@ -60,3 +60,15 @@ node tools/verify/maplestory-webui/gm-shop-flow.mjs
 ```
 
 前置条件：所选角色 `characters.gm` ≥ 2（是 characters 表的 gm 列而非 accounts；`update characters set gm=2 where id=<该角色id>;` 验后还原 0）。账号 test1/test1 实测登录进的是账号 test1test1(id 26)，角色列表 card0=e2efix1 card1=wt1210 card2=验证员一，与直觉的账号 25 不同；`GM_SHOP_CARD`（角色卡索引 0..3，默认 1）选卡前先核对该账号名下角色。环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`GM_SHOP_DEBUG_PORT`（默认 9248）、`GM_SHOP_ACCOUNT`/`GM_SHOP_PASSWORD`（默认 test1/test1）、`GM_SHOP_CARD`（默认 1）、`GM_SHOP_URL`（默认 http://127.0.0.1:8000/web/index.html）。
+
+## 现金商城装备分类菜单流程
+
+`cash-shop-equip-flow.mjs` 登录进图后点击状态栏商城按钮进入现金商城，专项目检「装备」分类二级菜单：点击分类栏「装备」展开浮层（`mscashshop_equip_menu_open`/`mscashshop_equip_sub`/`mscashshop_filtered_count` 只读探针驱动状态断言），依次选择「武器」「帽子」「全部装备」核对过滤数量（实测全部 1977 件中装备 1448、武器 233、帽子 336，切回全部装备数量复原），「×」收起后过滤保持、再次点击「装备」可重新展开/收起（toggle），切回「全部」分类时子分类复位且目录数量恢复初始值，最后 Escape 退出商城回游戏。视觉层用页面内 WebGL readPixels 断言选中行为暖橙高亮（R>G>B 且 R-B>40，实测 rgb≈184/111/37）而未选中行为深色（≈26/28/34），菜单收起后原「武器」行带不再出现暖色高亮（卡面 artwork 偏蓝 rgb≈178/186/196）。
+
+```bash
+CASH_EQUIP_ACCOUNT=test1 CASH_EQUIP_PASSWORD=test1 CASH_EQUIP_CARD=1 \
+CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/cash-shop-equip-flow.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`CASH_EQUIP_DEBUG_PORT`（默认 9249）、`CASH_EQUIP_ACCOUNT`/`CASH_EQUIP_PASSWORD`（默认 test1/test1）、`CASH_EQUIP_CARD`（角色卡索引 0..3，默认 1，选卡前先核对该账号名下角色）、`CASH_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。无需 GM 等级；登录偶发 reason=7（账号残留 loggedin 状态）时重跑即可。
