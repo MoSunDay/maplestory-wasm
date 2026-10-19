@@ -206,6 +206,9 @@ namespace jrc
 
         Rectangle<int16_t> area(26, 232, belowtext, belowtext + 20);
         numfield = Textfield(Text::A11M, Text::LEFT, Text::LIGHTGREY, area, 9);
+        // The base notice constructor already positioned the dialog; update
+        // the field before focusing so the IME bridge gets real bounds.
+        numfield.update(position);
         numfield.set_state(Textfield::FOCUSED);
         numfield.change_text(std::to_string(de));
         numfield.select_all();

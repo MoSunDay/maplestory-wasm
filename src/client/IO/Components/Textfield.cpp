@@ -69,7 +69,15 @@ namespace jrc
             return;
         }
 
+        Point<int16_t> previousparentpos = parentpos;
         parentpos = parent;
+
+        if (state == FOCUSED && previousparentpos != parent)
+        {
+            // A field can be focused before the owning UI reports its final
+            // position; track layout changes so the DOM bridge stays aligned.
+            ImeBridge::reposition_field(this);
+        }
 
         elapsed += Constants::TIMESTEP;
         if (elapsed > 256)

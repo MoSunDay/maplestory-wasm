@@ -81,11 +81,19 @@
         function viewportSize() {
             const win = getWindow();
             if (!win) {
-                return { width: DESIGN_WIDTH, height: DESIGN_HEIGHT };
+                return {
+                    width: DESIGN_WIDTH, height: DESIGN_HEIGHT,
+                    offsetLeft: 0, offsetTop: 0
+                };
             }
             const viewport = win.visualViewport;
             if (viewport && validSize(viewport.width, viewport.height)) {
-                return { width: viewport.width, height: viewport.height };
+                return {
+                    width: viewport.width,
+                    height: viewport.height,
+                    offsetLeft: Number.isFinite(viewport.offsetLeft) ? viewport.offsetLeft : 0,
+                    offsetTop: Number.isFinite(viewport.offsetTop) ? viewport.offsetTop : 0
+                };
             }
             const documentElement = win.document && win.document.documentElement;
             const width = documentElement && documentElement.clientWidth
@@ -95,9 +103,25 @@
                 ? documentElement.clientHeight
                 : win.innerHeight;
             if (validSize(width, height)) {
-                return { width: width, height: height };
+                return { width: width, height: height, offsetLeft: 0, offsetTop: 0 };
             }
-            return { width: DESIGN_WIDTH, height: DESIGN_HEIGHT };
+            return {
+                width: DESIGN_WIDTH, height: DESIGN_HEIGHT,
+                offsetLeft: 0, offsetTop: 0
+            };
+        }
+
+        function repositionIme() {
+            const win = getWindow();
+            const ime = win && win.MapleWasmIME;
+            if (!ime || typeof ime.reposition !== 'function') {
+                return;
+            }
+            try {
+                ime.reposition();
+            } catch (error) {
+                // IME placement must never break layout scaling.
+            }
         }
 
         function applyScale() {
@@ -108,11 +132,15 @@
 
             if (canvas && canvas.style) {
                 // The render surface keeps its selected resolution. Only the
-                // presented size changes; horizontal centering stays in CSS.
+                // presented size changes. #canvas keeps translateX(-50%), so
+                // left is the canvas center inside the visual viewport; top is
+                // its visual-viewport offset.
                 canvas.style.width = fitted.width + 'px';
                 canvas.style.height = fitted.height + 'px';
-                canvas.style.top = '0px';
+                canvas.style.left = (viewport.offsetLeft + viewport.width / 2) + 'px';
+                canvas.style.top = viewport.offsetTop + 'px';
             }
+            repositionIme();
             return fitted;
         }
 
@@ -175,6 +203,13 @@
             if (win.document && typeof win.document.addEventListener === 'function') {
                 win.document.addEventListener('fullscreenchange', controller.applyScale);
             }
+        }
+        const viewport = win.visualViewport;
+        if (viewport && typeof viewport.addEventListener === 'function') {
+            // Pinch zoom and the soft keyboard change the visual viewport
+            // without a window resize; keep the fitted surface in sync.
+            viewport.addEventListener('resize', controller.applyScale);
+            viewport.addEventListener('scroll', controller.applyScale);
         }
         controller.applyScale();
         installedControllers.set(win, controller);

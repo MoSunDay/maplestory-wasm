@@ -25,6 +25,8 @@ namespace jrc
         void focus_field(Textfield* field);
         void blur_field();
         void sync_field(const Textfield* field);
+        // Move the DOM textarea/bridge anchor without touching text or focus.
+        void reposition_field(const Textfield* field);
         void select_all(const Textfield* field);
 
         // Entry points behind the exported WASM functions.

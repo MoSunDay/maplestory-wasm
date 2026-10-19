@@ -113,6 +113,26 @@ namespace jrc
         }, text.c_str(), caret);
     }
 
+    void ImeBridge::reposition_field(const Textfield* field)
+    {
+        if (!active || field != focusedfield)
+        {
+            return;
+        }
+
+        Rectangle<int16_t> bounds = field->get_bounds();
+        // Same scene offset as focus_field: report where the field is drawn.
+        EM_ASM({
+            if (window.MapleWasmIME && window.MapleWasmIME.reposition)
+            {
+                window.MapleWasmIME.reposition($0, $1, $2, $3);
+            }
+        },
+            bounds.getlt().x(),
+            static_cast<int16_t>(bounds.getlt().y() + Constants::VIEWYOFFSET),
+            bounds.width(), bounds.height());
+    }
+
     void ImeBridge::select_all(const Textfield* field)
     {
         if (!active || field != focusedfield)
@@ -317,6 +337,8 @@ namespace jrc
     void ImeBridge::blur_field() {}
 
     void ImeBridge::sync_field(const Textfield*) {}
+
+    void ImeBridge::reposition_field(const Textfield*) {}
 
     void ImeBridge::select_all(const Textfield*) {}
 

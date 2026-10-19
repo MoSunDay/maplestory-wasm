@@ -58,6 +58,41 @@ function probe(driver, name) {
     `Module.ccall(${JSON.stringify(name)}, 'number', [], [])`);
 }
 
+async function imeState(driver) {
+  return await driver.evaluate(`(() => {
+    const canvas = document.getElementById('canvas').getBoundingClientRect();
+    const input = document.getElementById('ime-input');
+    const rect = input.getBoundingClientRect();
+    return {
+      active: !!(window.MapleWasmIME && window.MapleWasmIME.active),
+      resolution: window.MapleWasmUI
+        ? window.MapleWasmUI.getResolution() : null,
+      canvas: {
+        left: canvas.left, top: canvas.top,
+        width: canvas.width, height: canvas.height
+      },
+      rect: {
+        left: rect.left, top: rect.top,
+        width: rect.width, height: rect.height
+      }
+    };
+  })()`);
+}
+
+function imeFieldMatches(ime, origin, field) {
+  if (!ime.active || !ime.resolution) return false;
+  const scaleX = ime.canvas.width / ime.resolution.width;
+  const scaleY = ime.canvas.height / ime.resolution.height;
+  const expectedLeft = ime.canvas.left + (field.x + origin.x) * scaleX;
+  const expectedTop = ime.canvas.top + (field.y + origin.y) * scaleY;
+  const expectedWidth = Math.max(40, field.width * scaleX);
+  const expectedHeight = Math.max(24, field.height * scaleY);
+  return Math.abs(ime.rect.left - expectedLeft) <= 1
+    && Math.abs(ime.rect.top - expectedTop) <= 1
+    && Math.abs(ime.rect.width - expectedWidth) <= 1
+    && Math.abs(ime.rect.height - expectedHeight) <= 1;
+}
+
 function uiStateIs(driver, expected) {
   return async () => await probe(driver, 'msui_state') === expected;
 }
@@ -100,7 +135,11 @@ async function resolutionState(driver) {
       origin: ui ? ui.getDesignOrigin() : null,
       viewportSize: {
         width: visualViewport ? visualViewport.width : innerWidth,
-        height: visualViewport ? visualViewport.height : innerHeight
+        height: visualViewport ? visualViewport.height : innerHeight,
+        offsetLeft: visualViewport && Number.isFinite(visualViewport.offsetLeft)
+          ? visualViewport.offsetLeft : 0,
+        offsetTop: visualViewport && Number.isFinite(visualViewport.offsetTop)
+          ? visualViewport.offsetTop : 0
       },
       loadingHidden: document.getElementById('loading-screen')
         .classList.contains('is-hidden'),
@@ -114,12 +153,40 @@ function isResolution(state, width, height) {
     && state.width === width && state.height === height;
 }
 
+function fitSize(viewWidth, viewHeight, gameWidth, gameHeight) {
+  const validGame = Number.isFinite(gameWidth) && gameWidth > 0
+    && Number.isFinite(gameHeight) && gameHeight > 0;
+  const designWidth = validGame ? gameWidth : 800;
+  const designHeight = validGame ? gameHeight : 600;
+  if (viewWidth * designHeight <= viewHeight * designWidth) {
+    const fittedWidth = Math.max(1, Math.floor(viewWidth));
+    return {
+      width: fittedWidth,
+      height: Math.max(1, Math.floor(fittedWidth * designHeight / designWidth))
+    };
+  }
+  const fittedHeight = Math.max(1, Math.floor(viewHeight));
+  return {
+    width: Math.max(1, Math.floor(fittedHeight * designWidth / designHeight)),
+    height: fittedHeight
+  };
+}
+
 function centeredCss(state) {
-  const center = state.viewportSize.width / 2;
-  return Math.abs((state.rect.left + state.rect.width / 2) - center) <= 1
-    && Math.abs(state.rect.top) <= 1
-    && state.rect.width <= state.viewportSize.width + 1
-    && state.rect.height <= state.viewportSize.height + 1;
+  const view = state.viewportSize;
+  const ui = state.ui || {};
+  const fitted = fitSize(view.width, view.height,
+    Number.isFinite(ui.width) ? ui.width : 800,
+    Number.isFinite(ui.height) ? ui.height : 600);
+  const offsetLeft = Number.isFinite(view.offsetLeft) ? view.offsetLeft : 0;
+  const offsetTop = Number.isFinite(view.offsetTop) ? view.offsetTop : 0;
+  // #canvas keeps translateX(-50%), so its left edge sits at the fitted
+  // center; the visual viewport offset shifts that center on pinch zoom.
+  const center = offsetLeft + view.width / 2;
+  return Math.abs(state.rect.width - fitted.width) <= 1
+    && Math.abs(state.rect.height - fitted.height) <= 1
+    && Math.abs((state.rect.left + state.rect.width / 2) - center) <= 1
+    && Math.abs(state.rect.top - offsetTop) <= 1;
 }
 
 async function assertBootResolution(driver, width, height, origin) {
@@ -240,6 +307,17 @@ async function main() {
     report((await resolutionState(driver)).stored === '1',
       'boot read the persisted preset index');
 
+    // The login account field is focused by the UILogin constructor. Its DOM
+    // IME anchor must already include the 1280x720 design origin and the
+    // VIEWYOFFSET scene shift, not just the field's local bounds.
+    if (!await waitFor(() => driver.evaluate(
+      "!!(window.MapleWasmIME && window.MapleWasmIME.active)"), 10))
+      throw new Error('login IME field did not activate');
+    const loginIme = await imeState(driver);
+    report(imeFieldMatches(loginIme, wideOrigin, {
+      x: 315, y: 249 + 10, width: 150, height: 24
+    }), `login IME anchor follows the 1280x720 origin (${JSON.stringify(loginIme)})`);
+
     // 2. Clear it and boot the default before exercising the in-game flow.
     await setStoredResolution(driver, null);
     await assertBootResolution(driver, 800, 600, { x: 0, y: 0 });
@@ -272,7 +350,8 @@ async function main() {
     await driver.click(narrowNext.x, narrowNext.y);
     await sleep(200);
     await driver.key('Escape', 'Escape', 27);
-    await waitFor(async () => await probe(driver, 'msgame_options_active') === 0, 5);
+    if (!await waitFor(async () => await probe(driver, 'msgame_options_active') === 0, 5))
+      throw new Error('Game Options did not close after Escape');
     const cancelled = await resolutionState(driver);
     report(isResolution(cancelled, 800, 600),
       'Escape cancels without changing the render surface');
@@ -324,7 +403,8 @@ async function main() {
       `status bar menu remains visible at 1280x720 (${JSON.stringify(wideMenu)})`);
     await driver.screenshot('20-resolution-1280x720-options');
     await driver.click(wideOkButton.x, wideOkButton.y);
-    await waitFor(async () => await probe(driver, 'msgame_options_active') === 0, 10);
+    if (!await waitFor(async () => await probe(driver, 'msgame_options_active') === 0, 10))
+      throw new Error('Game Options did not close after OK on the already-active preset');
     report(isResolution(await resolutionState(driver), 1280, 720),
       'OK on the already-active preset keeps the render surface stable');
 
@@ -366,6 +446,12 @@ async function main() {
     if (driver.errors.length)
       fs.writeFileSync(`${driver.artifactDir}/browser-errors.log`,
         `${driver.errors.join('\n')}\n`);
+    // Runtime.exceptionThrown entries have no prefix; transport failures are
+    // logged with one and must not fail the flow.
+    const exceptions = driver.errors.filter(
+      entry => !entry.startsWith('Network load failed:'));
+    if (exceptions.length)
+      report(false, `browser runtime exception: ${exceptions[0]}`);
     fs.writeFileSync(`${driver.artifactDir}/browser-console.log`,
       `${driver.logs.join('\n')}\n`);
     console.log(`artifacts: ${driver.artifactDir}`);
