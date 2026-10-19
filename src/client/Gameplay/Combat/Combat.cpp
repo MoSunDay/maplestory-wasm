@@ -546,6 +546,19 @@ namespace jrc
             .apply_useeffects(player);
     }
 
+    void Combat::show_damage(int32_t oid, int32_t damage)
+    {
+        if (damage <= 0 || !mobs.contains(oid))
+            return;
+
+        Point<int16_t> body_position = mobs.get_mob_body_position(oid);
+        damagenumbers.emplace_back(DamageNumber::NORMAL, damage, body_position.y());
+        damagenumbers.back().set_x(body_position.x());
+
+        const bool toleft = body_position.x() >= player.get_position().x();
+        mobs.apply_damage(oid, damage, toleft, {}, regularattack);
+    }
+
     const SpecialMove& Combat::get_move(int32_t move_id)
     {
         if (move_id == 0)

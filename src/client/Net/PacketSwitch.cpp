@@ -149,6 +149,7 @@ namespace jrc
         MOVE_MOB_RESPONSE = 240,
         APPLY_MOB_STATUS   = 242,
         CANCEL_MOB_STATUS  = 243,
+        DAMAGE_MONSTER    = 246,
         SHOW_MOB_HP       = 250,
         SPAWN_NPC         = 257,
         SPAWN_NPC_C       = 259,
@@ -214,6 +215,7 @@ namespace jrc
         emplace<MOVE_MOB_RESPONSE, MoveMobResponseHandler>();
         emplace<APPLY_MOB_STATUS, ApplyMobStatusHandler>();
         emplace<CANCEL_MOB_STATUS, CancelMobStatusHandler>();
+        emplace<DAMAGE_MONSTER, DamageMonsterHandler>();
         emplace<SHOW_MOB_HP, ShowMobHpHandler>();
         emplace<KILL_MOB, KillMobHandler>();
         emplace<DROP_LOOT, DropLootHandler>();

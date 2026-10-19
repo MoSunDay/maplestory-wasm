@@ -140,6 +140,13 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    // Show damage dealt to a mob by a remote source (e.g. damage over time).
+    // Opcode: DAMAGE_MONSTER(246)
+    class DamageMonsterHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
     class SpawnMistHandler : public PacketHandler
     {
         void handle(InPacket& recv) const override;

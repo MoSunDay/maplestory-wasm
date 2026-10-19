@@ -30,6 +30,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/Spawn.h"
 
+#include <algorithm>
 #include <optional>
 #include <vector>
 
@@ -428,6 +429,35 @@ namespace jrc
         const uint32_t first_mask = static_cast<uint32_t>(recv.read_int());
         const uint32_t second_mask = static_cast<uint32_t>(recv.read_int());
         Stage::get().get_mobs().cancel_status(oid, first_mask, second_mask);
+    }
+
+    void DamageMonsterHandler::handle(InPacket& recv) const
+    {
+        if (recv.length() < 17)
+        {
+            throw PacketError("Truncated DAMAGE_MONSTER payload");
+        }
+
+        const int32_t oid = recv.read_int();
+        recv.read_byte(); // type: 0 = normal, 1 = friendly mob
+        const int32_t damage = recv.read_int();
+        const int32_t curhp = recv.read_int();
+        const int32_t maxhp = recv.read_int();
+
+        if (damage > 0)
+        {
+            Stage::get().get_combat().show_damage(oid, damage);
+        }
+
+        if (maxhp > 0 && curhp >= 0)
+        {
+            const int64_t raw = 100LL * curhp / maxhp;
+            const int8_t percent = static_cast<int8_t>(
+                std::clamp(raw, int64_t{0}, int64_t{100}));
+            const uint16_t playerlevel = Stage::get().get_player()
+                .get_stats().get_stat(Maplestat::LEVEL);
+            Stage::get().get_mobs().send_mobhp(oid, percent, playerlevel);
+        }
     }
 
     void SpawnMistHandler::handle(InPacket& recv) const
