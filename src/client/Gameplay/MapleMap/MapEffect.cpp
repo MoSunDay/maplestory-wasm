@@ -567,7 +567,13 @@ namespace jrc
             return;
         }
 
-        effect.draw(DrawArgument(position), 1.0f);
+        // Center on the live viewport so a resize after map load does not
+        // leave the effect at its constructor-time x.
+        const Point<int16_t> effect_center(
+            static_cast<int16_t>(Constants::viewwidth() / 2),
+            position.y()
+        );
+        effect.draw(DrawArgument(effect_center), 1.0f);
     }
 
     void MapEffect::update_scene()

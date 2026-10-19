@@ -1,6 +1,5 @@
 #include "UIChatBar.h"
 
-#include "../UILayout.h"
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "StatusBar/StatusBarPreChaos.h"
@@ -185,8 +184,6 @@ namespace jrc
 
     void UIChatbar::draw(float inter) const
     {
-        const Point<int16_t> origin = ui_layout::origin();
-
         if (statusbar::prechaos())
         {
             UIElement::draw(inter);
@@ -201,16 +198,13 @@ namespace jrc
 
             if (chatopen)
             {
-                chatbox.draw(Point<int16_t>(origin.x(), getchattop() + 2));
+                chatbox.draw({ 0, getchattop() + 2 });
                 draw_chatrows();
                 slider.draw({ position.x(), getchattop() + 5 });
             }
             else if (rowtexts.count(rowmax))
             {
-                rowtexts.at(rowmax).draw(Point<int16_t>(
-                    static_cast<int16_t>(origin.x() + 4),
-                    static_cast<int16_t>(position.y() - CHATROWHEIGHT + 1)
-                ));
+                rowtexts.at(rowmax).draw({ 4, position.y() - CHATROWHEIGHT + 1 });
             }
 
             chatfield.draw(position);
@@ -225,7 +219,7 @@ namespace jrc
         if (chatopen)
         {
             tapbartop.draw({ position.x() - 576, getchattop() });
-            chatbox.draw(Point<int16_t>(origin.x(), getchattop() + 2));
+            chatbox.draw({ 0, getchattop() + 2 });
 
             draw_chatrows();
 
@@ -240,15 +234,12 @@ namespace jrc
         }
         else if (rowtexts.count(rowmax))
         {
-            rowtexts.at(rowmax).draw(
-                position + Point<int16_t>(-500, -60) + origin
-            );
+            rowtexts.at(rowmax).draw(position + Point<int16_t>(-500, -60));
         }
     }
 
     void UIChatbar::draw_chatrows() const
     {
-        const int16_t origin_x = ui_layout::origin().x();
         int16_t chatheight = CHATROWHEIGHT * chatrows;
         int16_t yshift = -chatheight;
         for (int16_t i = 0; i < chatrows; i++)
@@ -263,10 +254,7 @@ namespace jrc
                 yshift += CHATROWHEIGHT;
                 textheight--;
             }
-            rowtexts.at(rowid).draw(Point<int16_t>(
-                static_cast<int16_t>(origin_x + 4),
-                static_cast<int16_t>(getchattop() - yshift - 1)
-            ));
+            rowtexts.at(rowid).draw({ 4, getchattop() - yshift - 1 });
         }
     }
 
@@ -301,19 +289,18 @@ namespace jrc
 
     bool UIChatbar::is_in_range(Point<int16_t> cursorpos) const
     {
-        const int16_t origin_x = ui_layout::origin().x();
         if (statusbar::prechaos())
         {
             const Rectangle<int16_t> bounds(
-                origin_x,
-                static_cast<int16_t>(origin_x + statusbar::chat_log_width()),
+                0,
+                statusbar::chat_log_width(),
                 static_cast<int16_t>(getchattop() - 6),
                 static_cast<int16_t>(position.y() + statusbar::BAR_HEIGHT)
             );
             return bounds.contains(cursorpos);
         }
 
-        Point<int16_t> absp(origin_x, getchattop() - 16);
+        Point<int16_t> absp(0, getchattop() - 16);
         Point<int16_t> dim(500, chatrows * CHATROWHEIGHT + CHATYOFFSET + 16);
         return Rectangle<int16_t>(absp, absp + dim)
             .contains(cursorpos);
@@ -372,10 +359,8 @@ namespace jrc
         const int16_t drag_width = statusbar::prechaos()
             ? statusbar::chat_log_width()
             : 502;
-        const int16_t origin_x = ui_layout::origin().x();
         auto chattop = Rectangle<int16_t>(
-            origin_x,
-            static_cast<int16_t>(origin_x + drag_width),
+            0,  drag_width,
             getchattop(),
             getchattop() + 6
             );

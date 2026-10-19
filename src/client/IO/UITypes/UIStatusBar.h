@@ -52,6 +52,7 @@ namespace jrc
 
         void draw(float alpha) const override;
         void update() override;
+        void update_screen(int16_t width, int16_t height) override;
 
         bool is_in_range(Point<int16_t> cursorpos) const override;
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override;

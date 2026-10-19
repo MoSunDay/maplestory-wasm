@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UINpcTalk.h"
 
+#include "../UILayout.h"
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
@@ -430,6 +431,15 @@ namespace jrc
             static_cast<int16_t>(Constants::viewheight() / 2 - dimension.y() / 2)
         };
 
+    }
+
+    void UINpcTalk::update_screen(int16_t, int16_t)
+    {
+        // Re-center the laid-out dialog on the shared design canvas. The text
+        // wrap depends on the dialog width only, so no relayout is needed and
+        // the buttons stay correct because they are stored relative to
+        // `position`.
+        position = ui_layout::centered_box(dimension.x(), dimension.y());
     }
 
     void UINpcTalk::send_key(int32_t, bool pressed, bool escape)
