@@ -708,6 +708,23 @@ try {
       }
       await driver.screenshot('10-cash-shop-modern');
 
+      // Previewable equipment: SN 20000016 is an on-sale cap (1002000).
+      // Selecting it makes the featured panel render the current character
+      // wearing the cap instead of the fallback item icon.
+      await driver.click(300, 50);
+      await requireState('cash-shop preview search focused', async () =>
+        await driver.evaluate('MapleWasmIME.active === true'));
+      await driver.compose('20000016');
+      await requireState('cash-shop preview SN entered', async () =>
+        await driver.evaluate("document.getElementById('ime-input').value === '20000016'"));
+      await sleep(250);
+      await driver.key('Enter', 'Enter', 13);
+      await sleep(900);
+      await driver.click(155, 120);
+      await sleep(1000);
+      await requireAssetIdle('cash-shop avatar preview assets ready');
+      await driver.screenshot('10b-cash-shop-avatar-preview');
+
       // Modern CashShop fills the 800x600 canvas; the search field occupies
       // (109,34)-(493,59) in canvas coordinates.
       await driver.click(300, 50);
