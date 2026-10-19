@@ -22,8 +22,29 @@
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
+#include <cstdlib>
+#include <optional>
+
 namespace jrc
 {
+    namespace
+    {
+        // Frame children in body stances are named numerically ("0", "1", ...).
+        // Some stances omit "0", so frames must be read from the child names.
+        std::optional<uint8_t> frame_by_name(const std::string& name)
+        {
+            if (name.empty() || name.front() < '0' || name.front() > '9')
+                return std::nullopt;
+
+            char* end = nullptr;
+            long value = std::strtol(name.c_str(), &end, 10);
+            if (*end != '\0' || value < 0 || value > 255)
+                return std::nullopt;
+
+            return static_cast<uint8_t>(value);
+        }
+    }
+
     void BodyDrawinfo::init()
     {
         nl::node bodynode = nl::nx::character["00002000.img"];
@@ -34,8 +55,13 @@ namespace jrc
             std::string ststr = stancenode.name();
 
             uint16_t attackdelay = 0;
-            for (uint8_t frame = 0; nl::node framenode = stancenode[frame]; ++frame)
+            for (nl::node framenode : stancenode)
             {
+                std::optional<uint8_t> framenumber = frame_by_name(framenode.name());
+                if (!framenumber)
+                    continue;
+
+                uint8_t frame = *framenumber;
                 bool isaction = framenode["action"].data_type() == nl::node::type::string;
                 if (isaction)
                 {

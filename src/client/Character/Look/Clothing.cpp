@@ -24,10 +24,31 @@
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
+#include <cstdlib>
+#include <optional>
 #include <unordered_set>
 
 namespace jrc
 {
+    namespace
+    {
+        // Frame children in equip stances are named numerically ("0", "1", ...).
+        // Some glove stances (swingO1, swingT2) start at "1" and have no "0",
+        // so frames must be taken from the actual child names, not probed.
+        std::optional<uint8_t> frame_by_name(const std::string& name)
+        {
+            if (name.empty() || name.front() < '0' || name.front() > '9')
+                return std::nullopt;
+
+            char* end = nullptr;
+            long value = std::strtol(name.c_str(), &end, 10);
+            if (*end != '\0' || value < 0 || value > 255)
+                return std::nullopt;
+
+            return static_cast<uint8_t>(value);
+        }
+    }
+
     Clothing::Clothing(int32_t id, const BodyDrawinfo& drawinfo,
                        Texture::LoadMode load_mode) : itemid(id)
     {
@@ -130,8 +151,13 @@ namespace jrc
                 continue;
             }
 
-            for (uint8_t frame = 0; nl::node framenode = stancenode[frame]; ++frame)
+            for (nl::node framenode : stancenode)
             {
+                std::optional<uint8_t> framenumber = frame_by_name(framenode.name());
+                if (!framenumber)
+                    continue;
+
+                uint8_t frame = *framenumber;
                 for (nl::node partnode : framenode)
                 {
                     std::string part = partnode.name();
@@ -184,8 +210,18 @@ namespace jrc
                     case Equipslot::FACEACC:
                         shift -= parentpos;
                         break;
-                    case Equipslot::SHOES:
                     case Equipslot::GLOVES:
+                        if (parent == "handMove")
+                        {
+                            shift += drawinfo.get_hand_position(stance, frame);
+                        }
+                        else
+                        {
+                            shift += drawinfo.get_body_position(stance, frame);
+                        }
+                        shift -= parentpos;
+                        break;
+                    case Equipslot::SHOES:
                     case Equipslot::TOP:
                     case Equipslot::TOP_DEFAULT:
                     case Equipslot::PANTS:
