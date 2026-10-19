@@ -18,8 +18,11 @@
 #include "UINotice.h"
 #include "Notice/NumberInputPolicy.h"
 
+#include "../UILayout.h"
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+
+#include "../../Constants.h"
 
 #include "nlnx/nx.hpp"
 
@@ -41,7 +44,15 @@ namespace jrc
 
         height = question.height();
         dimension = Point<int16_t>(top.width(), top.height() + height + bottom.height());
-        position = Point<int16_t>(400 - dimension.x() / 2, 240 - dimension.y() / 2);
+        update_screen(Constants::viewwidth(), Constants::viewheight());
+    }
+
+    void UINotice::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin() + Point<int16_t>(
+            400 - dimension.x() / 2,
+            240 - dimension.y() / 2
+        );
     }
 
     void UINotice::draw(bool textfield) const

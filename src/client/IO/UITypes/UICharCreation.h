@@ -41,6 +41,7 @@ namespace jrc
 
         void draw(float) const override;
         void update() override;
+        void update_screen(int16_t width, int16_t height) override;
 
         CursorResult send_cursor(bool, Point<int16_t>) override;
 

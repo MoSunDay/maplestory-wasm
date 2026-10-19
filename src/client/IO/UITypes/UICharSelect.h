@@ -47,6 +47,7 @@ namespace jrc
 
         void draw(float alpha) const override;
         void update() override;
+        void update_screen(int16_t width, int16_t height) override;
         Button::State button_pressed(uint16_t id) override;
         void doubleclick(Point<int16_t> pos) override;
 

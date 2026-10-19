@@ -22,6 +22,7 @@ namespace jrc
 
         void draw(float alpha) const override;
         void update() override;
+        void update_screen(int16_t width, int16_t height) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
         CursorResult send_cursor(bool clicked, Point<int16_t> cursor_pos) override;
 

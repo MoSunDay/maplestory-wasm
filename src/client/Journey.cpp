@@ -275,7 +275,7 @@ namespace jrc
     // Rolling frame-time average (microseconds) published through the
     // _msframe_avg_us probe so optimizations can be measured in the browser.
     constexpr int32_t FRAME_TIME_SAMPLES = 100;
-    int64_t frame_avg_us = 0;
+    static int64_t frame_avg_us = 0;
 
     extern "C" EMSCRIPTEN_KEEPALIVE int msframe_avg_us()
     {

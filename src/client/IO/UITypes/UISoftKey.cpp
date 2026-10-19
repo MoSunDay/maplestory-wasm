@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UISoftKey.h"
 
+#include "../UILayout.h"
 #include "../Components/MapleButton.h"
 
 #include "../../Net/Packets/SelectCharPackets.h"
@@ -58,9 +59,14 @@ namespace jrc
 
         shufflekeys();
 
-        position = { 330, 160 };
+        position = ui_layout::origin() + Point<int16_t>(330, 160);
         dimension = { 140, 280 };
         active = true;
+    }
+
+    void UISoftkey::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin() + Point<int16_t>(330, 160);
     }
 
     void UISoftkey::draw(float alpha) const

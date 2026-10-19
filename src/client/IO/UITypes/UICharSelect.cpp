@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UICharSelect.h"
 #include "../UiAssetVersion.h"
+#include "../UILayout.h"
 #include "UICharSelectNodes.h"
 
 #include "UISoftKey.h"
@@ -68,9 +69,14 @@ namespace jrc
             character_preview::LoadState::PENDING
         );
 
-        position  = { 0, 0 };
+        position  = ui_layout::origin();
         dimension = { 800, 600 };
         active    = true;
+    }
+
+    void UICharSelect::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin();
     }
 
     void UICharSelect::initialize_ui()
@@ -223,12 +229,13 @@ namespace jrc
             return;
         }
 
+        const Point<int16_t> origin = ui_layout::origin();
         const bool post_chaos_assets = charselect_nodes::post_chaos();
-        slotcountlabel.draw(slotcountpos);
+        slotcountlabel.draw(slotcountpos + origin);
 
         for (uint8_t i = 0; i < charcount_relative; ++i)
         {
-            const Point<int16_t> charpos = charselect_layout::char_slot_pos(i);
+            const Point<int16_t> charpos = charselect_layout::char_slot_pos(i) + origin;
             const uint8_t index = i + page * PAGESIZE;
             // The post-Chaos disc origin sinks the feet; the pre-Chaos
             // platform already sits correctly at the feet anchor.
@@ -247,15 +254,15 @@ namespace jrc
         if (selected_absolute < charcount_absolute)
         {
             const StatsEntry& stats = characters[selected_absolute].stats;
-            const Point<int16_t> data_origin = charinfopos + charselect_layout::CHARACTER_DATA_OFFSET;
+            const Point<int16_t> data_origin = charinfopos + charselect_layout::CHARACTER_DATA_OFFSET + origin;
 
             std::string levelstr = std::to_string(stats.stats[Maplestat::LEVEL]);
             if (charselect_nodes::has_level_charset())
             {
-                int16_t lvx = levelset.draw(levelstr, charinfopos + Point<int16_t>(23, -93));
-                levelset.draw('l', charinfopos + Point<int16_t>(-7 - lvx / 2, -93));
+                int16_t lvx = levelset.draw(levelstr, charinfopos + Point<int16_t>(23, -93) + origin);
+                levelset.draw('l', charinfopos + Point<int16_t>(-7 - lvx / 2, -93) + origin);
 
-                namelabel.draw(charinfopos + Point<int16_t>(0, -85));
+                namelabel.draw(charinfopos + Point<int16_t>(0, -85) + origin);
             }
             else
             {
@@ -265,9 +272,9 @@ namespace jrc
                 // name right below it.
                 Text& lvlabel = charselect_nodes::level_label();
                 lvlabel.change_text("Lv. " + levelstr);
-                lvlabel.draw(charinfopos + Point<int16_t>(46, -37));
+                lvlabel.draw(charinfopos + Point<int16_t>(46, -37) + origin);
 
-                namelabel.draw(charinfopos + Point<int16_t>(46, -13));
+                namelabel.draw(charinfopos + Point<int16_t>(46, -13) + origin);
             }
 
             for (size_t i = 0; i < NUM_LABELS; ++i)
@@ -279,7 +286,7 @@ namespace jrc
 
         for (uint8_t i = charcount_relative; i < slots_relative; ++i)
         {
-            const Point<int16_t> position_slot = charselect_layout::char_slot_pos(i);
+            const Point<int16_t> position_slot = charselect_layout::char_slot_pos(i) + origin;
             if (post_chaos_assets)
             {
                 charplatform.draw(position_slot + charselect_layout::PLATFORM_OFFSET, alpha);

@@ -83,6 +83,7 @@ namespace jrc
             PLAYER_CONTEXT,
             USERINFO,
             TRADE,
+            GAMEOPTIONS,
             NUM_TYPES
         };
 

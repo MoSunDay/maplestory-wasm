@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UILogin.h"
 #include "../UiAssetVersion.h"
+#include "../UILayout.h"
 #include "UILoginWait.h"
 #include "UIRegister.h"
 
@@ -162,9 +163,14 @@ namespace jrc
             account.set_state(Textfield::FOCUSED);
         }
 
-        position = {0, 0};
+        position = ui_layout::origin();
         dimension = {800, 600};
         active = true;
+    }
+
+    void UILogin::update_screen(int16_t, int16_t)
+    {
+        position = ui_layout::origin();
     }
 
     void UILogin::draw(float alpha) const

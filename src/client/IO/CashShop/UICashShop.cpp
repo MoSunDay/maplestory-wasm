@@ -247,7 +247,7 @@ namespace jrc
         (void)alpha;
         // The backdrop fills the current viewport, independent of the 800x600
         // content origin; the shader shifts it back by VIEWYOFFSET.
-        skin.background.draw({ 0, -Constants::VIEWYOFFSET }, { Constants::viewwidth(), Constants::viewheight() });
+        skin.background.draw({ { 0, -Constants::VIEWYOFFSET }, { Constants::viewwidth(), Constants::viewheight() } });
 
         const auto state_of = [this](uint16_t id) -> Button::State
         {

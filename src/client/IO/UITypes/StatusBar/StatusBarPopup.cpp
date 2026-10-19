@@ -29,7 +29,7 @@ namespace jrc
             initialize_panel_prechaos(system, {
                 { "Key Config", Action::KEY_CONFIG },
                 { "Pet Options", Action::PET_OPTIONS },
-                { "Game Options", Action::NONE },
+                { "Game Options", Action::GAME_OPTIONS },
                 { "Quit Game", Action::LOGOUT }
             });
             return;
@@ -55,7 +55,7 @@ namespace jrc
         initialize_panel(system, main_bar["System"], {
             { "BtChannel", Action::NONE },
             { "BtGameOption", Action::PET_OPTIONS },
-            { "BtSystemOption", Action::NONE },
+            { "BtSystemOption", Action::GAME_OPTIONS },
             { "BtKeySetting", Action::KEY_CONFIG },
             { "BtJoyPad", Action::NONE },
             { "BtOption", Action::NONE },

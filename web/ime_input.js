@@ -7,8 +7,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
     'use strict';
 
-    const GAME_WIDTH = 800;
-    const GAME_HEIGHT = 600;
+    const FALLBACK_RESOLUTION = Object.freeze({ width: 800, height: 600 });
     const FORWARD_KEYS = Object.freeze({ 13: true, 9: true, 27: true, 38: true, 40: true });
 
     function shouldSync(active, composing, focused) {
@@ -33,6 +32,41 @@
         return selectAll && value.length > 0
             ? { start: 0, end: value.length }
             : { start: caret, end: caret };
+    }
+
+    function validResolution(resolution) {
+        return resolution
+            && Number.isFinite(resolution.width) && resolution.width > 0
+            && Number.isFinite(resolution.height) && resolution.height > 0;
+    }
+
+    function scaleField(rect, x, y, width, height, resolution) {
+        const box = rect || { left: 0, top: 0, width: 0, height: 0 };
+        const size = validResolution(resolution) ? resolution : FALLBACK_RESOLUTION;
+        const scaleX = box.width / size.width;
+        const scaleY = box.height / size.height;
+        return {
+            left: box.left + x * scaleX,
+            top: box.top + y * scaleY,
+            width: Math.max(40, width * scaleX),
+            height: Math.max(24, height * scaleY),
+            fontSize: Math.max(12, height * scaleY * 0.8)
+        };
+    }
+
+    function currentResolution(uiRoot) {
+        const ui = uiRoot && uiRoot.MapleWasmUI;
+        if (ui && typeof ui.getResolution === 'function') {
+            try {
+                const resolution = ui.getResolution();
+                if (validResolution(resolution)) {
+                    return resolution;
+                }
+            } catch (error) {
+                // Fall through to the design resolution.
+            }
+        }
+        return FALLBACK_RESOLUTION;
     }
 
     function createBridge(document, moduleProvider, schedule) {
@@ -80,14 +114,15 @@
             if (!canvas) {
                 return;
             }
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = rect.width / GAME_WIDTH;
-            const scaleY = rect.height / GAME_HEIGHT;
-            textarea.style.left = (rect.left + x * scaleX) + 'px';
-            textarea.style.top = (rect.top + y * scaleY) + 'px';
-            textarea.style.width = Math.max(40, width * scaleX) + 'px';
-            textarea.style.height = Math.max(24, height * scaleY) + 'px';
-            textarea.style.fontSize = Math.max(12, height * scaleY * 0.8) + 'px';
+            const layout = scaleField(
+                canvas.getBoundingClientRect(),
+                x, y, width, height,
+                currentResolution(root));
+            textarea.style.left = layout.left + 'px';
+            textarea.style.top = layout.top + 'px';
+            textarea.style.width = layout.width + 'px';
+            textarea.style.height = layout.height + 'px';
+            textarea.style.fontSize = layout.fontSize + 'px';
         }
 
         const bridge = {
@@ -264,6 +299,7 @@
     }
 
     return Object.freeze({
-        shouldSync, isImeOwnedKey, clampCaret, sameSnapshot, selectionRange, createBridge, install
+        shouldSync, isImeOwnedKey, clampCaret, sameSnapshot, selectionRange,
+        scaleField, createBridge, install
     });
 });

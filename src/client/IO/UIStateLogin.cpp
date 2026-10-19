@@ -72,6 +72,16 @@ namespace jrc
         {
             view_width = new_width;
             view_height = new_height;
+
+            // Inactive screens keep their layout state for later reuse.
+            for (auto iter : elements)
+            {
+                UIElement* element = iter.second.get();
+                if (element)
+                {
+                    element->update_screen(new_width, new_height);
+                }
+            }
         }
 
         for (auto iter : elements)
@@ -79,10 +89,6 @@ namespace jrc
             UIElement* element = iter.second.get();
             if (element && element->is_active())
             {
-                if (screen_changed)
-                {
-                    element->update_screen(new_width, new_height);
-                }
                 element->update();
             }
         }
