@@ -44,6 +44,10 @@ const MISSING_COORDINATE = -32768; // GameplayProbes 缺省坐标哨兵
 const ATTACK_HOLD_MS = 600;
 const SAMPLE_STEP_MS = 100;
 const SAMPLE_COUNT = 15; // 1.5s 采样窗口
+const CANVAS_W = 800, CANVAS_H = 600; // 游戏逻辑画布尺寸（sampleLuminance 同款坐标）
+const DAMAGE_REGION_W = 80, DAMAGE_REGION_H = 30; // 怪头上方伤害数字区原始尺寸
+const PROBE_MIN_W = 24, PROBE_MIN_H = 12; // 探测区最低有效宽高
+const PROBE_APPROACH_RETRIES = 3; // 探测区无效时的最大走位重试次数
 const uiState = Object.freeze({ login: 1, world: 2, characters: 3, game: 5 });
 const cardCenter = i => ({ x: 105 + 120 * i + 25, y: 210 });
 
@@ -67,10 +71,10 @@ async function waitFor(predicate, seconds = 45, stepMs = 250) {
 // roster：本账号名下的第 charIndex 张卡对应的 keymap 条目。
 function loadRoster() {
   const data = JSON.parse(fs.readFileSync(keymapPath, 'utf8'));
-  if (!Array.isArray(data)) throw new Error(`E2E_KEYMAP_JSON is not a list: ${keymapPath}`);
-  const mine = data.filter(entry => String(entry.char || '').startsWith(account));
+  const roster = Array.isArray(data) ? data : data.chars;
+  const mine = roster.filter(entry => String(entry.char || '').startsWith(account));
   if (mine.length === 0) console.log(`WARN  no roster entries start with "${account}"; falling back to entry ${charIndex} of the whole file`);
-  const pool = mine.length > 0 ? mine : data;
+  const pool = mine.length > 0 ? mine : roster;
   const entry = pool[charIndex];
   if (!entry || !Array.isArray(entry.keys)) {
     throw new Error(`no keymap entry for account ${account} index ${charIndex} in ${keymapPath}`);
@@ -180,18 +184,33 @@ function mobDamageRegion(state) {
   const viewY = state.playerScreenY - state.playerY;
   const cx = Math.round(state.mobX + viewX);
   const cy = Math.round(state.mobY + viewY - 60);
-  return { name: 'damage', x0: cx - 40, y0: cy - 15, x1: cx + 40, y1: cy + 15 };
+  return { name: 'damage', x0: cx - DAMAGE_REGION_W / 2, y0: cy - DAMAGE_REGION_H / 2,
+    x1: cx + DAMAGE_REGION_W / 2, y1: cy + DAMAGE_REGION_H / 2 };
 }
 
 function clampRect(rect) {
   const clamp = (value, low, high) => Math.min(Math.max(Math.round(value), low), high);
-  const x0 = clamp(rect.x0, 0, 799), x1 = clamp(rect.x1, x0 + 1, 800);
-  const y0 = clamp(rect.y0, 0, 599), y1 = clamp(rect.y1, y0 + 1, 600);
+  const x0 = clamp(rect.x0, 0, CANVAS_W - 1), x1 = clamp(rect.x1, x0 + 1, CANVAS_W);
+  const y0 = clamp(rect.y0, 0, CANVAS_H - 1), y1 = clamp(rect.y1, y0 + 1, CANVAS_H);
   return { name: rect.name, x0, y0, x1, y1 };
 }
 
-async function damageLuma(driver, state) {
-  const means = await sampleLuminance(driver, [clampRect(mobDamageRegion(state))]);
+// 探测区有效性：最近怪缺失，或夹取后任边贴画布边缘（目标多半在画布外，
+// clampRect 把区域夹成了画布边缘的静止条），或宽高低于下限 / 较原始
+// 80x30 缩水过半 → 无效返回 null；有效返回夹取后的 rect。
+function validProbeRect(state) {
+  if (state.mobX === MISSING_COORDINATE) return null;
+  const rect = clampRect(mobDamageRegion(state));
+  const width = rect.x1 - rect.x0;
+  const height = rect.y1 - rect.y0;
+  const offCanvas = rect.x0 <= 0 || rect.y0 <= 0 || rect.x1 >= CANVAS_W || rect.y1 >= CANVAS_H;
+  const undersized = width < PROBE_MIN_W || height < PROBE_MIN_H
+    || width * 2 < DAMAGE_REGION_W || height * 2 < DAMAGE_REGION_H;
+  return offCanvas || undersized ? null : rect;
+}
+
+async function damageLuma(driver, rect) {
+  const means = await sampleLuminance(driver, [rect]);
   return means.damage;
 }
 
@@ -208,6 +227,19 @@ async function approachNearestMob(driver) {
   await sleep(900);
 }
 
+// 采样前建立有效探测：最近怪屏坐标缺失或探测区无效（见 validProbeRect）→
+// 重走位贴怪后重建 region 再校验；最多 PROBE_APPROACH_RETRIES 次重试，
+// 仍无效返回 null（调用方记 damageVisual=no-valid-probe）。
+async function establishDamageProbe(driver) {
+  for (let attempt = 0; ; attempt += 1) {
+    const state = await sampleState(driver);
+    const rect = validProbeRect(state);
+    if (rect) return { state, rect };
+    if (attempt >= PROBE_APPROACH_RETRIES) return null;
+    await approachNearestMob(driver);
+  }
+}
+
 async function verifySkill(driver, charName, skill) {
   const letter = String(skill.key || '').toUpperCase();
   if (!/^[A-Z]$/.test(letter)) throw new Error(`bad key binding: ${JSON.stringify(skill)}`);
@@ -215,9 +247,17 @@ async function verifySkill(driver, charName, skill) {
   // summon: 6s window — damage numbers come from the summon's own attacks
   const sampleCount = skill.summon || skill.special === 'summon' ? 60 : SAMPLE_COUNT;
 
-  const baseline = await sampleState(driver);
-  const baselineLuma = baseline.mobX !== MISSING_COORDINATE
-    ? await damageLuma(driver, baseline) : null;
+  // 采样前先确保有效探测区：缺失/无效则走位贴怪重建（最多 3 次重试），
+  // 仍无效则本技能伤害判定记 no-valid-probe 并 console.warn（map 40001
+  // ~27 只蜗牛，正常走位总能贴上一只，出现即说明有新问题）。
+  const damageProbe = await establishDamageProbe(driver);
+  if (!damageProbe) {
+    console.warn(`WARN  no-valid-probe: ${charName} skill ${skill.skill} key ${letter}:`
+      + ` no on-canvas damage region after ${PROBE_APPROACH_RETRIES} approach retries`);
+  }
+  const baseline = damageProbe ? damageProbe.state : await sampleState(driver);
+  const baselineLuma = damageProbe ? await damageLuma(driver, damageProbe.rect) : null;
+  const mobCountStart = baseline.mobCount;
 
   const frames = new Set([baseline.frame]);
   const stances = new Set([baseline.stance]);
@@ -225,6 +265,7 @@ async function verifySkill(driver, charName, skill) {
   let stanceMax = baseline.stance;
   let mobCountMax = baseline.mobCount;
   let lumaDeltaMax = 0;
+  let mobDepleted = false;
   const lumaSeries = [baselineLuma];
 
   await driver.startScreencast(`${charName}-${skill.skill}`);
@@ -239,8 +280,12 @@ async function verifySkill(driver, charName, skill) {
       stanceMax = Math.max(stanceMax, state.stance);
       if (state.afterimage === 1) afterimage = true;
       mobCountMax = Math.max(mobCountMax, state.mobCount);
-      if (state.mobX !== MISSING_COORDINATE && baselineLuma !== null) {
-        const luma = await damageLuma(driver, state);
+      // 窗口期怪枯竭守卫：mobCount 较窗口起点跌超 30%（清场技打空探测区）
+      // 时提前收窗，调用方会重走位后重测该技能一次。
+      if (mobCountStart > 0 && state.mobCount < mobCountStart * 0.7) { mobDepleted = true; break; }
+      const rect = baselineLuma !== null ? validProbeRect(state) : null;
+      if (rect) {
+        const luma = await damageLuma(driver, rect);
         lumaSeries.push(luma);
         lumaDeltaMax = Math.max(lumaDeltaMax, Math.abs(luma - baselineLuma));
       }
@@ -252,13 +297,14 @@ async function verifySkill(driver, charName, skill) {
   const animationAdvanced = frames.size >= 2;               // (a) 帧推进
   const stanceOrAfterimage = stanceMax !== 0 || afterimage; // (b) 非待机或有残影
   const animation = animationAdvanced && stanceOrAfterimage && frameCount >= 3; // (c)
-  const damageVisual = baselineLuma !== null && lumaDeltaMax >= damageLumaDelta; // (d)
+  const damageVisual = baselineLuma === null ? 'no-valid-probe'
+    : lumaDeltaMax >= damageLumaDelta ? 'ok' : 'fail';      // (d)
   return {
     skill: skill.skill, name: skill.name || '', key: letter,
-    animation: animation ? 'ok' : 'fail', damageVisual: damageVisual ? 'ok' : 'fail',
+    animation: animation ? 'ok' : 'fail', damageVisual,
     summon: skill.summon || skill.special === 'summon' ? true : false,
     frames: frames.size, frameCount, stanceMax, afterimage,
-    lumaBaseline: baselineLuma, lumaDeltaMax,
+    lumaBaseline: baselineLuma, lumaDeltaMax, mobDepleted,
     stances: [...stances].sort((a, b) => a - b),
     lumaSeries: lumaSeries.map(value => Math.round(value * 100) / 100),
     mobCountMax
@@ -302,7 +348,14 @@ async function main() {
           continue;
         }
         await approachNearestMob(driver);
-        const verdict = await verifySkill(driver, charName, skill);
+        let verdict = await verifySkill(driver, charName, skill);
+        // 怪枯竭守卫触发且该窗口未取到伤害证据：重走位贴怪后重测一次（取
+        // 重测结果；首轮已 ok 则保留，避免丢掉已捕获的波峰）。
+        if (verdict.mobDepleted && verdict.damageVisual !== 'ok') {
+          console.log(`INFO  ${charName} skill ${verdict.skill}: mob count dropped >30% mid-window, re-approach + retest once`);
+          await approachNearestMob(driver);
+          verdict = await verifySkill(driver, charName, skill);
+        }
         results.push(verdict);
         report(verdict.animation === 'ok' && verdict.damageVisual === 'ok',
           `${charName} skill ${verdict.skill}${verdict.name ? ` (${verdict.name})` : ''} key ${verdict.key}:`

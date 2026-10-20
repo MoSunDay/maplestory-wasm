@@ -59,6 +59,14 @@ namespace jrc
                 damage = (float)sub["x"] / 100;
             int32_t matk = sub["mad"];
             int32_t fixdamage = sub["fixdamage"];
+            // Snipe (server-sided fixed damage) and Meso Explosion carry no
+            // damage percent in this dataset; fall back to a basic hit so
+            // the client rolls and reports plausible numbers.
+            if (damage <= 0.0f && matk == 0 && fixdamage == 0
+                && (id == SkillId::SNIPE || id == SkillId::MESO_EXPLOSION))
+            {
+                damage = 1.0f;
+            }
             int32_t mastery = sub["mastery"];
             uint8_t  attackcount = (uint8_t)sub["attackCount"].get_integer(1);
             uint8_t  mobcount = (uint8_t)sub["mobCount"].get_integer(1);
@@ -85,7 +93,10 @@ namespace jrc
         }
 
         element = src["elemAttr"].get_string();
-        reqweapon = Weapon::by_value(100 + (int32_t)src["weapon"]);
+        if (nl::node wsrc = src["weapon"])
+            reqweapon = Weapon::by_value(100 + (int32_t)wsrc);
+        else
+            reqweapon = Weapon::NONE;
         masterlevel = static_cast<int32_t>(stats.size());
         passive = (id % 10000) / 1000 == 0;
         flags = flags_of(id);
@@ -141,6 +152,7 @@ namespace jrc
             { SkillId::POISON_BREATH, ATTACK | RANGED },
             // F/P ArchMage
             { SkillId::EXPLOSION, ATTACK },
+            { SkillId::POISON_MIST, ATTACK },
             { SkillId::POISON_BREATH, ATTACK },
             { SkillId::SEAL_FP, ATTACK },
             { SkillId::ELEMENT_COMPOSITION_FP, ATTACK | RANGED },
@@ -151,19 +163,45 @@ namespace jrc
             // I/L Mage
             { SkillId::COLD_BEAM, ATTACK | RANGED },
             { SkillId::THUNDERBOLT, ATTACK | RANGED },
+            { SkillId::THUNDER_SPEAR, ATTACK | RANGED },
+            { SkillId::ELEMENT_COMPOSITION_IL, ATTACK | RANGED },
+            { SkillId::ICE_STRIKE, ATTACK },
+            // I/L ArchMage
+            { SkillId::ICE_DEMON, ATTACK },
+            { SkillId::CHAIN_LIGHTNING, ATTACK | RANGED },
+            { SkillId::BLIZZARD, ATTACK },
             // Priest
             { SkillId::HOLY_ARROW, ATTACK | RANGED },
+            { SkillId::SHINING_RAY, ATTACK },
+            // Bishop
+            { SkillId::BIG_BANG, ATTACK },
+            { SkillId::ANGEL_RAY, ATTACK | RANGED },
+            { SkillId::GENESIS, ATTACK },
             // Hunter
             { SkillId::ARROW_BOMB, ATTACK | RANGED },
+            { SkillId::ARROW_BLOW, ATTACK | RANGED },
+            { SkillId::POWER_KNOCKBACK_BOW, ATTACK },
+            { SkillId::ARROW_RAIN, ATTACK },
+            { SkillId::STRAFE_HUNTER, ATTACK | RANGED },
+            { SkillId::DRAGONS_BREATH_HUNTER, ATTACK | RANGED },
+            { SkillId::HURRICANE, ATTACK | RANGED },
             // Crossbowman
             { SkillId::IRON_ARROW, ATTACK | RANGED },
+            { SkillId::POWER_KNOCKBACK_XBOW, ATTACK },
+            { SkillId::ARROW_ERUPTION, ATTACK },
+            { SkillId::STRAFE_SNIPER, ATTACK | RANGED },
+            { SkillId::PIERCING_ARROW, ATTACK | RANGED },
+            { SkillId::DRAGONS_BREATH_SNIPER, ATTACK | RANGED },
+            { SkillId::SNIPE, ATTACK | RANGED },
             // Rogue
             { SkillId::DISORDER, ATTACK },
             { SkillId::LUCKY_SEVEN, ATTACK | RANGED },
+            { SkillId::DOUBLE_STAB, ATTACK },
             // Hermit / Night Lord
             { SkillId::DRAIN, ATTACK },
             { SkillId::AVENGER, ATTACK | RANGED },
             { SkillId::TRIPLE_THROW, ATTACK | RANGED },
+            { SkillId::NINJA_STORM, ATTACK },
             // Bandit
             { SkillId::STEAL, ATTACK },
             { SkillId::SAVAGE_BLOW, ATTACK },
@@ -172,15 +210,38 @@ namespace jrc
             { SkillId::BAND_OF_THIEVES, ATTACK },
             { SkillId::ASSASSINATE, ATTACK },
             { SkillId::BOOMERANG_STEP, ATTACK },
+            { SkillId::MESO_EXPLOSION, ATTACK },
+            // Pirate
+            { SkillId::FLASH_FIST, ATTACK },
+            { SkillId::SOMERSAULT_KICK, ATTACK },
+            { SkillId::DOUBLE_SHOT, ATTACK | RANGED },
             // Brawler
             { SkillId::BACK_SPIN_BLOW, ATTACK },
             { SkillId::DOUBLE_UPPERCUT, ATTACK },
             { SkillId::CORKSCREW_BLOW, ATTACK },
+            // Marauder
+            { SkillId::ENERGY_BLAST, ATTACK },
+            { SkillId::ENERGY_DRAIN, ATTACK },
+            { SkillId::SHOCKWAVE, ATTACK },
+            // Buccaneer
+            { SkillId::DRAGON_STRIKE, ATTACK },
+            { SkillId::ENERGY_ORB, ATTACK },
+            { SkillId::DEMOLITION, ATTACK },
+            { SkillId::SNATCH, ATTACK },
             // Gunslinger
             { SkillId::INVISIBLE_SHOT, ATTACK | RANGED },
             { SkillId::GRENADE, ATTACK | RANGED },
             { SkillId::BLANK_SHOT, ATTACK },
-            { SkillId::RECOIL_SHOT, ATTACK | RANGED }
+            { SkillId::RECOIL_SHOT, ATTACK | RANGED },
+            // Outlaw
+            { SkillId::FLAMETHROWER, ATTACK | RANGED },
+            { SkillId::ICE_SPLITTER, ATTACK | RANGED },
+            { SkillId::HOMING_BEACON, ATTACK | RANGED },
+            // Corsair
+            { SkillId::AERIAL_STRIKE, ATTACK },
+            { SkillId::RAPID_FIRE, ATTACK | RANGED },
+            { SkillId::BATTLESHIP_CANNON, ATTACK | RANGED },
+            { SkillId::BATTLESHIP_TORPEDO, ATTACK | RANGED }
         };
 
         auto iter = skill_flags.find(id);

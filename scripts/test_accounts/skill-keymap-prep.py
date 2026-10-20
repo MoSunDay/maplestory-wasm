@@ -10,12 +10,27 @@ the index into the client Keytable (src/client/IO/Keyboard.cpp), so a row
 
 Skill rosters come from --json (attack_skills.json, schema
 {"112": {"suffix": "Hero", "kind": "melee",
-         "skills": [{"id": 1221009, "name": "...", "serverBuff": false}]}}).
+         "skills": [{"id": 1221009, "name": "...", "serverBuff": false,
+                     "weapon": 0}]}}).
 Entries with serverBuff:true are skipped (SkillFactory.isBuff buffs that
 play no attack animation); special attacks (Meso Explosion, Snipe) stay
-bound because their cast animation is key-triggerable. The browser-side
-key roster needed to press the keys is written to --out (default
-/tmp/skill_keymap.json) and is consumed by
+bound because their cast animation is key-triggerable.
+
+Cross-character weapon dedup: shared-line skill ids (1st-job imgs such
+as Slash Blast or Double Stab) appear in several characters' rosters,
+but the client gate in Skill::can_use drops the attack whenever the wz
+skill-scope "weapon" requirement (Weapon::by_value(100 + weapon)) does
+not match the equipped weapon type (Weapon.h codes: 133 dagger, 137
+wand, 138 staff, 145 bow, 146 crossbow, 147 claw, 148 knuckle, 149 gun,
+130-132/140-144 warrior arms). Each skill id is therefore claimed by the
+first roster character (JOBS order) whose weapon passes the requirement
+(weapon 0 = no requirement); other characters do not rebind it and are
+summarized in the output's coveredElsewhere key for report transparency.
+
+The browser-side key roster needed to press the keys is written to --out
+(default /tmp/skill_keymap.json) as
+{"chars": [{"char", "keys": [...]}], "coveredElsewhere":
+[{"skill", "name", "on"}]} and is consumed by
 tools/verify/maplestory-webui/skill-anim-flow.mjs.
 
 Account grouping mirrors create_accounts.py (4 jobs per account in JOBS
@@ -53,6 +68,28 @@ LETTER_KEYS = (
     ("M", 50),
 )
 
+# Equipped weapon (inventoryitems.position = -11) of each test character,
+# measured read-only in the server DB, mapped to the client Weapon::Type
+# code the itemid prefix stands for (src/client/Character/Inventory/
+# Weapon.h): 1402xxx -> 140 SWORD_2H, 1322xxx -> 132 MACE_1H (BW),
+# 1432xxx -> 143 SPEAR, 1382xxx -> 138 STAFF, 1452xxx -> 145 BOW,
+# 1462xxx -> 146 CROSSBOW, 1472xxx -> 147 CLAW, 1332xxx -> 133 DAGGER,
+# 1482xxx -> 148 KNUCKLE, 1492xxx -> 149 GUN.
+WEAPON_OF_SUFFIX = {
+    "Hero": 140,
+    "Pala": 132,
+    "DK": 143,
+    "FPA": 138,
+    "ILA": 138,
+    "Bish": 138,
+    "BM": 145,
+    "MM": 146,
+    "NL": 147,
+    "Shad": 133,
+    "Bucc": 148,
+    "CS": 149,
+}
+
 
 def character_roster(prefix, chars_per_account):
     """The 12 test characters, in create_accounts.py JOBS/suffix order."""
@@ -77,9 +114,10 @@ def mysql_rows(cfg, sql):
 
 def load_attack_skills(path):
     """Flatten attack_skills.json into {jobid: [(skillid, name, special,
-    summon, client_attack), ...]} - the manifest's per-skill special marker,
-    summon flag and clientAttack classification ride along so the browser
-    roster can surface them.
+    summon, client_attack, weapon), ...]} - the manifest's per-skill
+    special marker, summon flag, clientAttack classification and wz
+    weapon requirement ride along so the browser roster can surface them
+    and the cross-character dedup can apply the client weapon gate.
 
     Only skills the server classifies as buffs (serverBuff:true, parsed
     from SkillFactory's isBuff switch by attack_skills.py) are dropped:
@@ -101,11 +139,52 @@ def load_attack_skills(path):
                     str(skill.get("special", "") or ""),
                     bool(skill.get("summon", False)),
                     bool(skill.get("clientAttack", False)),
+                    int(skill.get("weapon", 0) or 0),
                 ))
             else:
-                skills.append((int(skill), "", "", False, False))
+                skills.append((int(skill), "", "", False, False, 0))
         jobs[int(jobid)] = {"suffix": entry.get("suffix", ""), "skills": skills}
     return jobs
+
+
+def weapon_compatible(weapon_code, suffix):
+    """Client Skill::can_use weapon gate (Gameplay/Combat/Skill.cpp): the
+    wz skill-scope weapon value maps to Weapon::by_value(100 + weapon);
+    0 means no requirement, otherwise it must equal the character's
+    equipped weapon type (WEAPON_OF_SUFFIX, DB-measured)."""
+    return weapon_code == 0 or WEAPON_OF_SUFFIX.get(suffix) == 100 + weapon_code
+
+
+def claim_rosters(roster, skills_by_job):
+    """Cross-character weapon dedup over the 12 characters in roster order.
+
+    A skill id is claimed by the first character whose weapon passes the
+    manifest weapon requirement; later characters - and characters whose
+    own weapon mismatches (Double Stab style cross-weapon duplicates) -
+    do not rebind it. Returns ({character name -> kept skill tuples},
+    coveredElsewhere rows naming the claiming suffix per dropped skill).
+    """
+    claimed = {}
+    per_char = {}
+    for character in roster:
+        name, suffix = character["name"], character["suffix"]
+        skills = skills_by_job.get(character["job"], {"skills": []})["skills"]
+        kept = []
+        for skill in skills:
+            if skill[0] in claimed or not weapon_compatible(skill[5], suffix):
+                continue
+            claimed[skill[0]] = suffix
+            kept.append(skill)
+        per_char[name] = kept
+    covered = []
+    for character in roster:
+        suffix = character["suffix"]
+        skills = skills_by_job.get(character["job"], {"skills": []})["skills"]
+        for skill in skills:
+            owner = claimed.get(skill[0])
+            if owner is not None and owner != suffix:
+                covered.append({"skill": skill[0], "name": skill[1], "on": owner})
+    return per_char, covered
 
 
 def quoted(names):
@@ -143,6 +222,11 @@ def prepare(cfg, roster, skills_by_job, prefix, world):
         )
     }
 
+    per_char, covered = claim_rosters(roster, skills_by_job)
+    for row in covered:
+        print("dedup %-7d %-24s kept on %s (covered elsewhere)"
+              % (row["skill"], row["name"], row["on"]))
+
     browser_roster = []
     for character in roster:
         name, job = character["name"], character["job"]
@@ -158,11 +242,16 @@ def prepare(cfg, roster, skills_by_job, prefix, world):
             print("WARN  %s: JSON suffix %r != roster suffix %r"
                   % (name, entry["suffix"], character["suffix"]))
 
+        kept = per_char.get(name, [])
         bindings = []
-        for (letter, maple_index), skill in zip(LETTER_KEYS, entry["skills"]):
+        for (letter, maple_index), skill in zip(LETTER_KEYS, kept):
             bindings.append((letter, maple_index, skill[0], skill[1], skill[2], skill[3], skill[4]))
         bindings = bindings[:MAX_BOUND_KEYS]
 
+        if not bindings:
+            print("WARN  %s: every attack skill is covered elsewhere;"
+                  " keymap left untouched" % name)
+            continue
         statements = ["DELETE FROM keymap WHERE characterid = %d;" % ids[name]]
         values = ",".join(
             "(%d, %d, %d, %d)" % (ids[name], maple_index, KEY_TYPE_SKILL, skill_id)
@@ -190,7 +279,7 @@ def prepare(cfg, roster, skills_by_job, prefix, world):
                          client_attack
                      in bindings],
         })
-    return browser_roster
+    return browser_roster, covered
 
 
 def main():
@@ -230,20 +319,29 @@ def main():
     if missing:
         print("WARN  no JSON entry for jobs of: %s" % ",".join(missing))
 
+    per_char, covered = claim_rosters(roster, skills_by_job)
     if args.dry_run:
         for character in roster:
             entry = skills_by_job.get(character["job"], {"skills": []})
-            bound = min(len(entry["skills"]), MAX_BOUND_KEYS)
-            print("dry-run %s: would bind %d skill(s) to %s"
+            bound = min(len(per_char.get(character["name"], [])), MAX_BOUND_KEYS)
+            dropped = len(entry.get("skills", [])) - len(per_char.get(character["name"], []))
+            print("dry-run %s: would bind %d skill(s) to %s%s"
                   % (character["name"], bound,
-                     ",".join(letter for letter, _ in LETTER_KEYS[:bound]) or "-"))
+                     ",".join(letter for letter, _ in LETTER_KEYS[:bound]) or "-",
+                     " (%d covered elsewhere)" % dropped if dropped else ""))
+        for row in covered:
+            print("dry-run dedup: %d %s kept on %s"
+                  % (row["skill"], row["name"], row["on"]))
         return
 
-    browser_roster = prepare(cfg, roster, skills_by_job, args.prefix, args.world)
+    browser_roster, covered = prepare(cfg, roster, skills_by_job, args.prefix,
+                                      args.world)
     with open(args.out, "w", encoding="utf-8") as handle:
-        json.dump(browser_roster, handle, ensure_ascii=False, indent=2)
+        json.dump({"chars": browser_roster, "coveredElsewhere": covered},
+                  handle, ensure_ascii=False, indent=2)
         handle.write("\n")
-    print("wrote %s (%d chars)" % (args.out, len(browser_roster)))
+    print("wrote %s (%d chars, %d coveredElsewhere row(s))"
+          % (args.out, len(browser_roster), len(covered)))
     print("next: E2E_ACCOUNT=<account> E2E_CHAR_INDEX=<0-3>"
           " E2E_KEYMAP_JSON=%s node"
           " tools/verify/maplestory-webui/skill-anim-flow.mjs" % args.out)

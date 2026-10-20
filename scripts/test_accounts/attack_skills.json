@@ -15,21 +15,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 1100002,
-        "name": "Final Attack : Sword",
-        "level": 30,
-        "mobCount": 8,
-        "attackCount": 2,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1111002,
@@ -43,7 +31,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1111005,
@@ -57,7 +47,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1111008,
@@ -71,21 +63,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 1120003,
-        "name": "Advanced Combo Attack",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1121006,
@@ -99,7 +79,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1121008,
@@ -113,7 +95,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -133,21 +117,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 1200003,
-        "name": "Final Attack : BW",
-        "level": 30,
-        "mobCount": 8,
-        "attackCount": 2,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1211002,
@@ -161,7 +133,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1211004,
@@ -175,7 +149,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1211006,
@@ -189,7 +165,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1211008,
@@ -203,7 +181,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1211009,
@@ -217,21 +197,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 1220010,
-        "name": "Advanced Charge",
-        "level": 10,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1221004,
@@ -245,7 +213,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1221007,
@@ -259,7 +229,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1221009,
@@ -273,7 +245,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -293,21 +267,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 1300002,
-        "name": "Final Attack : Spear",
-        "level": 30,
-        "mobCount": 8,
-        "attackCount": 2,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1311001,
@@ -321,7 +283,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 43
       },
       {
         "id": 1311003,
@@ -335,7 +299,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 43
       },
       {
         "id": 1311004,
@@ -349,7 +315,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 43
       },
       {
         "id": 1311007,
@@ -363,21 +331,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 1320006,
-        "name": "Berserk",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 1321003,
@@ -391,7 +347,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -411,7 +369,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2101001,
@@ -425,7 +385,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2101004,
@@ -439,7 +401,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2101005,
@@ -453,7 +417,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2111002,
@@ -467,7 +433,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2111003,
@@ -481,7 +449,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2111006,
@@ -495,7 +465,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2121003,
@@ -509,7 +481,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2121005,
@@ -523,7 +497,9 @@
         "special": "",
         "serverBuff": false,
         "summon": true,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2121006,
@@ -537,7 +513,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2121007,
@@ -551,7 +529,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -571,7 +551,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2201001,
@@ -585,7 +567,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2201004,
@@ -599,7 +583,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2201005,
@@ -613,7 +599,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2211002,
@@ -627,7 +615,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2211003,
@@ -641,7 +631,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2211006,
@@ -655,7 +647,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2221003,
@@ -669,7 +663,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2221005,
@@ -683,7 +679,9 @@
         "special": "",
         "serverBuff": false,
         "summon": true,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2221006,
@@ -697,7 +695,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2221007,
@@ -711,7 +711,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -731,7 +733,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2301003,
@@ -745,7 +749,9 @@
         "special": "",
         "serverBuff": true,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2301005,
@@ -759,7 +765,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2311004,
@@ -773,7 +781,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2321001,
@@ -787,7 +797,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2321003,
@@ -801,7 +813,9 @@
         "special": "",
         "serverBuff": false,
         "summon": true,
-        "clientAttack": false
+        "clientAttack": false,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2321007,
@@ -815,7 +829,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 2321008,
@@ -829,7 +845,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -837,20 +855,6 @@
     "suffix": "BM",
     "kind": "ranged",
     "skills": [
-      {
-        "id": 3000001,
-        "name": "Critical Shot",
-        "level": 20,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
-      },
       {
         "id": 3001004,
         "name": "Arrow Blow",
@@ -863,21 +867,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
-      },
-      {
-        "id": 3100001,
-        "name": "Final Attack : Bow",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 3101003,
@@ -891,7 +883,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 45
       },
       {
         "id": 3101005,
@@ -905,21 +899,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 3110001,
-        "name": "Mortal Blow",
-        "level": 20,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 45
       },
       {
         "id": 3111004,
@@ -933,7 +915,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 45
       },
       {
         "id": 3111006,
@@ -947,7 +931,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 45
       },
       {
         "id": 3121003,
@@ -961,7 +947,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 45
       },
       {
         "id": 3121004,
@@ -975,7 +963,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 45
       }
     ]
   },
@@ -983,20 +973,6 @@
     "suffix": "MM",
     "kind": "ranged",
     "skills": [
-      {
-        "id": 3000001,
-        "name": "Critical Shot",
-        "level": 20,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
-      },
       {
         "id": 3001004,
         "name": "Arrow Blow",
@@ -1009,21 +985,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
-      },
-      {
-        "id": 3200001,
-        "name": "Final Attack : Crossbow",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 2,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 3201003,
@@ -1037,7 +1001,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 46
       },
       {
         "id": 3201005,
@@ -1051,21 +1017,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 3210001,
-        "name": "Mortal Blow",
-        "level": 20,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 46
       },
       {
         "id": 3211004,
@@ -1079,7 +1033,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 46
       },
       {
         "id": 3211006,
@@ -1093,7 +1049,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 46
       },
       {
         "id": 3221001,
@@ -1107,7 +1065,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 46
       },
       {
         "id": 3221003,
@@ -1121,7 +1081,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 46
       },
       {
         "id": 3221007,
@@ -1135,7 +1097,9 @@
         "special": "snipe_fixed_damage",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -1155,7 +1119,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 4001344,
@@ -1169,21 +1135,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 4100001,
-        "name": "Critical Throw",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 47
       },
       {
         "id": 4101005,
@@ -1197,7 +1151,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 47
       },
       {
         "id": 4111005,
@@ -1211,21 +1167,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 4120005,
-        "name": "Venomous Star",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 30,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 4121007,
@@ -1239,7 +1183,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 47
       },
       {
         "id": 4121008,
@@ -1253,7 +1199,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 47
       }
     ]
   },
@@ -1273,7 +1221,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 4001344,
@@ -1287,7 +1237,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 47
       },
       {
         "id": 4201004,
@@ -1301,7 +1253,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 4201005,
@@ -1315,7 +1269,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 33
       },
       {
         "id": 4211002,
@@ -1329,7 +1285,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 33
       },
       {
         "id": 4211004,
@@ -1343,7 +1301,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 33
       },
       {
         "id": 4211006,
@@ -1358,21 +1318,9 @@
         "serverBuff": false,
         "summon": false,
         "clientAttack": true,
+        "passive": false,
+        "weapon": 0,
         "kind": "meso"
-      },
-      {
-        "id": 4220005,
-        "name": "Venomous Stab",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 30,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
       },
       {
         "id": 4221001,
@@ -1386,7 +1334,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 33
       },
       {
         "id": 4221007,
@@ -1400,7 +1350,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 33
       }
     ]
   },
@@ -1420,7 +1372,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5001002,
@@ -1434,7 +1388,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5001003,
@@ -1448,7 +1404,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5101002,
@@ -1462,7 +1420,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5101003,
@@ -1476,7 +1436,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5101004,
@@ -1490,35 +1452,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 5110000,
-        "name": "Stun Mastery",
-        "level": 20,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
-      },
-      {
-        "id": 5110001,
-        "name": "Energy Charge",
-        "level": 40,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 300,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5111002,
@@ -1532,7 +1468,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5111004,
@@ -1546,7 +1484,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5111006,
@@ -1560,7 +1500,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5121001,
@@ -1574,7 +1516,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5121002,
@@ -1588,7 +1532,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5121004,
@@ -1602,7 +1548,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5121005,
@@ -1616,7 +1564,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       }
     ]
   },
@@ -1636,7 +1586,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5001002,
@@ -1650,7 +1602,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5001003,
@@ -1664,7 +1618,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5201001,
@@ -1678,7 +1634,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5201002,
@@ -1692,7 +1650,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5201004,
@@ -1706,7 +1666,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5201006,
@@ -1720,21 +1682,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": true
-      },
-      {
-        "id": 5210000,
-        "name": "Burst Fire",
-        "level": 20,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 22,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5211004,
@@ -1748,7 +1698,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5211005,
@@ -1762,7 +1714,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5211006,
@@ -1776,35 +1730,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
-      },
-      {
-        "id": 5220001,
-        "name": "Elemental Boost",
-        "level": 30,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 0,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
-      },
-      {
-        "id": 5220011,
-        "name": "Bullseye",
-        "level": 20,
-        "mobCount": 1,
-        "attackCount": 1,
-        "mpCon": 40,
-        "cooldown": 0,
-        "charge": false,
-        "special": "",
-        "serverBuff": false,
-        "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5221003,
@@ -1818,7 +1746,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 0
       },
       {
         "id": 5221004,
@@ -1832,7 +1762,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5221007,
@@ -1846,7 +1778,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       },
       {
         "id": 5221008,
@@ -1860,7 +1794,9 @@
         "special": "",
         "serverBuff": false,
         "summon": false,
-        "clientAttack": false
+        "clientAttack": true,
+        "passive": false,
+        "weapon": 49
       }
     ]
   }
