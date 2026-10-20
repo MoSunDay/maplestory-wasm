@@ -24,6 +24,16 @@ Skills the heuristic cannot see (no wz damage key) but the server treats
 as attacks are force-included: Snipe (3221007, server-fixed damage) and
 Meso Explosion itself.
 
+The damage-key heuristic alone cannot separate actives from passives -
+passive stat lines also carry "damage" (Berserk %, Final Attack trigger
+damage, Critical Shot critical damage) - so the client's own judgment
+(SkillData.cpp: passive = (id % 10000) / 1000 == 0) is applied first and
+passives never enter the attack roster. Every record carries that
+"passive" flag plus the skill-scope wz "weapon" requirement (the client
+gate is Weapon::by_value(100 + weapon) in Skill::can_use; 0 = no
+requirement), which keymap prep uses to keep cross-weapon duplicates of
+one skill id from landing on a character holding the wrong weapon type.
+
 Every entry also carries "serverBuff": true when the server's own
 SkillFactory isBuff switch (link_repos/MapleStory-Server/src/client/
 SkillFactory.java, ids resolved from src/constants/skills/*.java) forces
@@ -249,6 +259,17 @@ def highest_level(skill):
     return _to_int(top.get("name")), scalar_kv(top)
 
 
+def skill_scope_kv(skill, level_kv):
+    """Level-entry scalars layered over the skill-node scalars the client
+    reads at skill scope (SkillData.cpp reads src["weapon"], not the
+    level entry). Keys are whitespace-stripped because the dump spells
+    Double Shot's (5001003) requirement as 'weapon ' with a trailing
+    space; level-entry scalars win on collision."""
+    merged = {key.strip(): value for key, value in scalar_kv(skill).items()}
+    merged.update(level_kv)
+    return merged
+
+
 def skill_name(skill, string_names):
     """Skill.wz root name if present, else the String.wz table, else ''."""
     node = skill.find('string[@name="name"]')
@@ -283,6 +304,13 @@ def attack_record(sid, name, level, kv, kind, default_kind, buff_ids, summon_set
         # comes from the summon's own attacks, not the player's packet.
         "summon": sid in summon_set,
         "clientAttack": sid in client_atk or sid in FORCE_ATTACK_SKILLS,
+        # Client SkillData decides passivity from the id alone
+        # (passive = (id % 10000) / 1000 == 0); the wz "damage" key cannot
+        # (passive stat lines carry "damage" too).
+        "passive": (sid % 10000) // 1000 == 0,
+        # wz skill-scope weapon requirement: the client gate in
+        # Skill::can_use is Weapon::by_value(100 + weapon); 0 = none.
+        "weapon": _to_int(kv.get("weapon"), 0),
     }
     if kind != default_kind:
         record["kind"] = kind
@@ -302,8 +330,16 @@ def job_entry(job, string_names):
     for sid, skill in line_skills(imgs):
         total += 1
         level, kv = highest_level(skill)
+        kv = skill_scope_kv(skill, kv)
         kind = KIND_OVERRIDE_BY_SKILL.get(sid, default_kind)
-        if not is_attack(kv) and sid not in FORCE_ATTACK_SKILLS:
+        # The client classifies passives purely from the skill id
+        # (src/client/Data/SkillData.cpp: passive = (id % 10000) / 1000 == 0),
+        # and the wz damage/mad heuristic cannot tell them apart: passive
+        # stat lines also carry "damage" (Berserk %, Final Attack trigger
+        # damage, Critical Shot critical damage). Passives therefore never
+        # enter the attack roster; only FORCE_ATTACK_SKILLS overrides.
+        passive = (sid % 10000) // 1000 == 0
+        if (passive or not is_attack(kv)) and sid not in FORCE_ATTACK_SKILLS:
             continue
         record = attack_record(sid, skill_name(skill, string_names), level, kv, kind, default_kind, buff_ids, summon_set, client_set)
         attacks.append(record)

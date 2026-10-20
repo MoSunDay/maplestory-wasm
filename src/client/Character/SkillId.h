@@ -160,18 +160,46 @@ namespace jrc
             IL_TELEPORT = 2201002,
             COLD_BEAM = 2201004,
             THUNDERBOLT = 2201005,
+            ICE_STRIKE = 2211002,
+            THUNDER_SPEAR = 2211003,
+            ELEMENT_COMPOSITION_IL = 2211006,
+
+            // I/L ArchMage
+            ICE_DEMON = 2221003,
+            CHAIN_LIGHTNING = 2221006,
+            BLIZZARD = 2221007,
 
             // Priest
             PRIEST_TELEPORT = 2301001,
             HOLY_ARROW = 2301005,
+            SHINING_RAY = 2311004,
+
+            // Bishop
+            BIG_BANG = 2321001,
+            ANGEL_RAY = 2321007,
+            GENESIS = 2321008,
+
+            // Archer
+            ARROW_BLOW = 3001004,
 
             // Hunter
             BOW_MASTERY = 3100000,
             ARROW_BOMB = 3101005,
+            POWER_KNOCKBACK_BOW = 3101003,
+            ARROW_RAIN = 3111004,
+            STRAFE_HUNTER = 3111006,
+            DRAGONS_BREATH_HUNTER = 3121003,
+            HURRICANE = 3121004,
 
             // Crossbowman
             CROSSBOW_MASTERY = 3200000,
             IRON_ARROW = 3201005,
+            POWER_KNOCKBACK_XBOW = 3201003,
+            ARROW_ERUPTION = 3211004,
+            STRAFE_SNIPER = 3211006,
+            PIERCING_ARROW = 3221001,
+            DRAGONS_BREATH_SNIPER = 3221003,
+            SNIPE = 3221007,
 
             // Hermit
             DRAIN = 4101005,
@@ -180,10 +208,12 @@ namespace jrc
 
             // Night Lord
             TRIPLE_THROW = 4121007,
+            NINJA_STORM = 4121008,
 
             // Rogue
             DISORDER = 4001002,
             LUCKY_SEVEN = 4001344,
+            DOUBLE_STAB = 4001334,
 
             // Assassin
             CLAW_MASTERY = 4100000,
@@ -202,11 +232,27 @@ namespace jrc
             SAVAGE_BLOW = 4201005,
             MESO_EXPLOSION = 4211006,
 
+            // Pirate
+            FLASH_FIST = 5001001,
+            SOMERSAULT_KICK = 5001002,
+            DOUBLE_SHOT = 5001003,
+
             // Brawler
             KNUCKLER_MASTERY = 5100001,
             BACK_SPIN_BLOW = 5101002,
             DOUBLE_UPPERCUT = 5101003,
             CORKSCREW_BLOW = 5101004,
+
+            // Marauder
+            ENERGY_BLAST = 5111002,
+            ENERGY_DRAIN = 5111004,
+            SHOCKWAVE = 5111006,
+
+            // Buccaneer
+            DRAGON_STRIKE = 5121001,
+            ENERGY_ORB = 5121002,
+            DEMOLITION = 5121004,
+            SNATCH = 5121005,
 
             // Gunslinger
             GUN_MASTERY = 5200000,
@@ -214,6 +260,17 @@ namespace jrc
             GRENADE = 5201002,
             BLANK_SHOT = 5201004,
             RECOIL_SHOT = 5201006,
+
+            // Outlaw
+            FLAMETHROWER = 5211004,
+            ICE_SPLITTER = 5211005,
+            HOMING_BEACON = 5211006,
+
+            // Corsair
+            AERIAL_STRIKE = 5221003,
+            RAPID_FIRE = 5221004,
+            BATTLESHIP_CANNON = 5221007,
+            BATTLESHIP_TORPEDO = 5221008,
 
             // Aran
             POLEARM_MASTERY_ARAN = 21100000,
