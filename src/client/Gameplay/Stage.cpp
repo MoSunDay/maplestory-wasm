@@ -49,7 +49,7 @@ namespace jrc
     }
 
     Stage::Stage()
-        : combat(player, chars, mobs, physics)
+        : combat(player, chars, mobs, drops, physics)
         , last_pickup_time(0)
         , pet_automation()
         , pet_loot_target_oid(0)

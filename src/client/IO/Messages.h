@@ -37,6 +37,7 @@ namespace jrc
             SKILL_NOBULLETS,
             SKILL_NOSTARS,
             SKILL_COOLDOWN,
+            SKILL_NOCOMBO,
 
             // Scrolling result
             SCROLL_SUCCESS,

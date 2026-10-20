@@ -147,6 +147,13 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    // Show damage a player received.
+    // Opcode: DAMAGE_PLAYER(192)
+    class DamagePlayerHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
     class SpawnMistHandler : public PacketHandler
     {
         void handle(InPacket& recv) const override;

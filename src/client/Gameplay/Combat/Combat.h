@@ -17,10 +17,12 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "Attack.h"
+#include "FinalAttack.h"
 #include "RegularAttack.h"
 #include "Skill.h"
 
 #include "../MapleMap/MapChars.h"
+#include "../MapleMap/MapDrops.h"
 #include "../MapleMap/MapMobs.h"
 #include "../Physics/Physics.h"
 
@@ -33,7 +35,7 @@ namespace jrc
     {
     public:
         Combat(Player& player, MapChars& chars, MapMobs& mobs,
-            Physics& physics);
+            MapDrops& drops, Physics& physics);
 
         // Draw bullets, damage numbers etc.
         void draw(double viewx, double viewy, float alpha) const;
@@ -42,6 +44,9 @@ namespace jrc
 
         // Make the player use a special move. Returns true if the move was used.
         bool use_move(int32_t move_id);
+        // Queue a final-attack follow-up roll after a successful skill attack.
+        void schedule_final_attack(const SpecialMove& move,
+            const Attack& attack, const AttackResult& result);
         // Reset transient state (e.g. on map change).
         void clear();
 
@@ -89,14 +94,21 @@ namespace jrc
         Point<int16_t> find_teleport_target_vertical(bool up, int16_t range);
         Point<int16_t> find_teleport_target_horizontal(int16_t range);
 
+        // Fire a proc'd final attack after the primary swing ends.
+        void perform_final_attack();
+
         Player& player;
         MapChars& chars;
         MapMobs& mobs;
+        MapDrops& drops;
         Physics& physics;
 
         std::unordered_map<int32_t, Skill> skills;
         RegularAttack regularattack;
         int16_t teleport_cooldown = 0;
+
+        // Skill id of a proc'd final attack waiting to fire, or 0.
+        int32_t final_attack_pending = 0;
 
         TimedQueue<AttackResult> attackresults;
         TimedQueue<BulletEffect> bulleteffects;

@@ -82,13 +82,17 @@ namespace jrc
             float ignoredef = 0.0f;
             float hrange = (float)sub["range"].get_real(100.0) / 100;
             Rectangle<int16_t> range = sub;
+            // Raw values: 'x' is the combo orb cap of combo skills, 'prop' the
+            // percent chance of e.g. Advanced Combo's double orb gain.
+            int32_t x = (int32_t)sub["x"].get_integer(0);
+            int32_t prop = (int32_t)sub["prop"].get_integer(0);
             int32_t level = string_conversion::or_default<int32_t>(sub.name(), -1);
             stats.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(level),
                 std::forward_as_tuple(damage, matk, fixdamage, mastery, attackcount, mobcount,
                     bulletcount, bulletcost, hpcost, mpcost, hprecovery, mprecovery,
-                    recoverytime, chance, critical, ignoredef, hrange, range)
+                    recoverytime, chance, critical, ignoredef, hrange, range, x, prop)
             );
         }
 
@@ -282,7 +286,7 @@ namespace jrc
         if (iter == stats.end())
         {
             static constexpr Stats null_stats{ 0.0f, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, {} };
+                0, 0, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, {}, 0, 0 };
             return null_stats;
         }
         return iter->second;

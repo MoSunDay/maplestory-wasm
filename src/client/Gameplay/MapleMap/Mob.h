@@ -109,6 +109,11 @@ namespace jrc
         Point<int16_t> get_body_position() const;
         /// Return the head position.
         Point<int16_t> get_head_position() const;
+        /// Return the currently applied first status mask.
+        uint32_t get_status_first_mask() const
+        {
+            return status_first_mask;
+        }
 
     private:
         enum FlyDirection

@@ -1,5 +1,7 @@
 #include "Mob.h"
 
+#include "MobStatus.h"
+
 #include <algorithm>
 #include <utility>
 
@@ -13,8 +15,24 @@ namespace jrc
         if (!dead)
         {
             const float interpolated_opacity = opacity.get(alpha);
+            const Color status_color = mob_status::tint(get_status_first_mask());
+            const Color draw_color{
+                status_color.r(),
+                status_color.g(),
+                status_color.b(),
+                interpolated_opacity
+            };
             current_animation().draw(
-                DrawArgument(position, flip && !noflip, interpolated_opacity), alpha);
+                DrawArgument(
+                    position,
+                    position,
+                    Point<int16_t>{},
+                    flip && !noflip ? -1.0f : 1.0f,
+                    1.0f,
+                    draw_color,
+                    0.0f
+                ),
+                alpha);
             if (showhp)
             {
                 namelabel.draw(position);

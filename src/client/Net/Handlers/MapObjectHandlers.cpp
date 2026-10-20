@@ -58,6 +58,31 @@ namespace jrc
                 payload.position
             });
         }
+
+        // Disease (debuff) bits of the second buff mask. Debuff packets use
+        // a wider per-flag layout than regular foreign buffs: every disease
+        // flag carries three shorts instead of one.
+        constexpr uint64_t POISON_FLAG = 0x4000000000000;
+
+        bool is_disease_flag(uint64_t flag)
+        {
+            switch (flag)
+            {
+                case 0x1:                // slow
+                case 0x80:               // seduce
+                case 0x4000:             // zombify
+                case 0x80000:            // confuse
+                case 0x2000000000000:    // stun
+                case POISON_FLAG:        // poison
+                case 0x8000000000000:    // seal
+                case 0x10000000000000:   // darkness
+                case 0x4000000000000000: // weaken
+                case 0x8000000000000000: // curse
+                    return true;
+                default:
+                    return false;
+            }
+        }
     }
 
     void SpawnCharHandler::handle(InPacket& recv) const
@@ -264,9 +289,13 @@ namespace jrc
 
             Stage::get().get_combat().show_buff(cid, skillid, effect);
         }
-        else
+        else if (effect == 0) // level up
         {
-            // todo
+            Stage::get().show_character_effect(cid, CharEffect::LEVELUP);
+        }
+        else if (effect == 8) // job advance
+        {
+            Stage::get().show_character_effect(cid, CharEffect::JOBCHANGE);
         }
     }
 
@@ -285,19 +314,41 @@ namespace jrc
 
         // Parse the complete packet before mutating character state. A
         // truncated packet must not leave half of a multi-buff update applied.
-        auto collect_mask_values = [&](uint64_t mask, bool first) {
-            for (uint64_t flag : buff_mask::ordered_flags(mask))
-            {
-                int16_t value = recv.read_short();
-                if (!first && flag == Buffstat::second_codes.at(Buffstat::COMBO))
-                    updates.push_back({ Buffstat::COMBO, value });
-                else if (!first && flag == Buffstat::second_codes.at(Buffstat::WK_CHARGE))
-                    updates.push_back({ Buffstat::WK_CHARGE, value });
-            }
-        };
+        const size_t first_count = buff_mask::ordered_flags(firstmask).size();
+        for (size_t i = 0; i < first_count; ++i)
+        {
+            recv.read_short();
+        }
 
-        collect_mask_values(firstmask, true);
-        collect_mask_values(secondmask, false);
+        // The second mask mixes regular buffs (one value short) with
+        // diseases (a value short, then skill id and skill level shorts).
+        const auto second_ids = buff_mask::ordered_ids<Buffstat::Id>(
+            secondmask, Buffstat::second_codes);
+        for (const Buffstat::Id stat : second_ids.ids)
+        {
+            const uint64_t flag = Buffstat::second_codes.at(stat);
+            if (flag == POISON_FLAG)
+            {
+                const int16_t value = recv.read_short();
+                recv.read_short(); // skill id
+                recv.read_short(); // skill level
+                updates.push_back({ Buffstat::POISON, value });
+            }
+            else if (is_disease_flag(flag))
+            {
+                recv.read_short(); // mob skill value, unused
+                recv.read_short(); // skill id
+                recv.read_short(); // skill level
+                updates.push_back({ stat, 1 });
+            }
+            else
+            {
+                const int16_t value = recv.read_short();
+                if (stat == Buffstat::COMBO || stat == Buffstat::WK_CHARGE)
+                    updates.push_back({ stat, value });
+            }
+        }
+
         for (const VisualUpdate& update : updates)
             Stage::get().get_chars().set_visual_buff(cid, update.stat, update.value);
     }
@@ -313,6 +364,13 @@ namespace jrc
             Stage::get().get_chars().cancel_visual_buff(cid, Buffstat::COMBO);
         if (secondmask & Buffstat::second_codes.at(Buffstat::WK_CHARGE))
             Stage::get().get_chars().cancel_visual_buff(cid, Buffstat::WK_CHARGE);
+
+        for (const Buffstat::Id stat : {Buffstat::SLOW, Buffstat::SEDUCE, Buffstat::ZOMBIFY, Buffstat::CONFUSE,
+             Buffstat::STUN, Buffstat::POISON, Buffstat::SEAL, Buffstat::DARKNESS, Buffstat::WEAKEN, Buffstat::CURSE})
+        {
+            if (secondmask & Buffstat::second_codes.at(stat))
+                Stage::get().get_chars().cancel_visual_buff(cid, stat);
+        }
     }
 
 
@@ -457,6 +515,33 @@ namespace jrc
             const uint16_t playerlevel = Stage::get().get_player()
                 .get_stats().get_stat(Maplestat::LEVEL);
             Stage::get().get_mobs().send_mobhp(oid, percent, playerlevel);
+        }
+    }
+
+    void DamagePlayerHandler::handle(InPacket& recv) const
+    {
+        if (recv.length() < 9)
+        {
+            throw PacketError("Truncated DAMAGE_PLAYER payload");
+        }
+
+        const int32_t cid = recv.read_int();
+        const int8_t skill = recv.read_byte();
+        const int32_t damage = recv.read_int();
+
+        if (damage <= 0)
+            return;
+
+        if (cid == Stage::get().get_player().get_oid())
+        {
+            // Contact damage is already shown by the local prediction, so
+            // only damage over time (skill -4) is displayed here.
+            if (skill == -4)
+                Stage::get().get_player().show_damage(damage);
+        }
+        else if (Optional<OtherChar> chr = Stage::get().get_chars().get_char(cid))
+        {
+            chr->show_damage(damage);
         }
     }
 

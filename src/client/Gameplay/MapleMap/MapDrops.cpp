@@ -241,6 +241,22 @@ namespace jrc
         return drop && drop->is_lootable();
     }
 
+    std::vector<int32_t> MapDrops::collect_mesoids(
+        const Rectangle<int16_t>& range) const
+    {
+        std::vector<int32_t> mesoids;
+        for (const auto& entry : drops)
+        {
+            Optional<const Drop> drop = entry.second.get();
+            if (!drop || !drop->is_meso() || !drop->is_lootable())
+                continue;
+
+            if (range.contains(drop->get_position()))
+                mesoids.push_back(entry.first);
+        }
+        return mesoids;
+    }
+
     size_t MapDrops::size() const
     {
         return drops.size();

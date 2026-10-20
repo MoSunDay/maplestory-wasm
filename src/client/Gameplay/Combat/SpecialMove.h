@@ -37,6 +37,7 @@ namespace jrc
             FBR_MPCOST,
             FBR_BULLETCOST,
             FBR_COOLDOWN,
+            FBR_NOCOMBO,
             FBR_OTHER
         };
 
