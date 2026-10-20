@@ -21,6 +21,10 @@
 #include "../../Gameplay/Combat/Attack.h"
 #include "../../Gameplay/MobCombat/DamageEncoding.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <vector>
+
 namespace jrc
 {
     // Notifies the server of an attack. The opcode is determined by the attack type.
@@ -35,9 +39,10 @@ namespace jrc
 
             skip(1);
 
-            write_byte((attack.mobcount << 4) | attack.hitcount);
+            write_byte((std::min(attack.mobcount, uint8_t(15)) << 4)
+                | std::min(attack.hitcount, uint8_t(15)));
             write_int(attack.skill);
-            if (attack.charge > 0)
+            if (attack.charge > 0 || is_charge_skill(attack.skill))
                 write_int(attack.charge);
 
             skip(8);
@@ -55,7 +60,8 @@ namespace jrc
                 skip(1);
                 write_byte(attack.toleft);
                 skip(7);
-                // skip(4); if hurricane, piercing arrow or rapidfire
+                if (is_ranged_extra_skill(attack.skill))
+                    skip(4);
             }
             else
             {
@@ -74,12 +80,47 @@ namespace jrc
                         singledamage.first, singledamage.second));
                 }
 
-                if (attack.skill != 5221004)
-                    skip(4);
+                skip(4);
             }
         }
 
     private:
+        // Skills for which the server always reads the four byte charge,
+        // even when it is zero.
+        static bool is_charge_skill(int32_t skillid)
+        {
+            switch (skillid)
+            {
+            case 2121001: // FP ArchMage - Big Bang
+            case 2221001: // IL ArchMage - Big Bang
+            case 2321001: // Bishop - Big Bang
+            case 5201002: // Gunslinger - Grenade
+            case 5101004: // Brawler - Cork Screw Blow
+            case 15101003: // Thunder Breaker - Cork Screw Blow
+            case 14111006: // Night Walker - Poison Bomb
+            case 22121000: // Evan - Ice Breath
+            case 22151001: // Evan - Fire Breath
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        // Ranged skills which send four additional bytes.
+        static bool is_ranged_extra_skill(int32_t skillid)
+        {
+            switch (skillid)
+            {
+            case 3121004: // Bowmaster - Hurricane
+            case 3221001: // Marksman - Piercing Arrow
+            case 5221004: // Corsair - Rapid Fire
+            case 13111002: // Wind Archer - Hurricane
+                return true;
+            default:
+                return false;
+            }
+        }
+
         static OutPacket::Opcode opcodefor(Attack::Type type)
         {
             switch (type)
@@ -90,6 +131,87 @@ namespace jrc
                 return RANGED_ATTACK;
             default:
                 return MAGIC_ATTACK;
+            }
+        }
+    };
+
+
+    // Notifies the server of a Meso Explosion attack, which detonates meso
+    // drops next to the attacked mobs. Daggers are close combat, so this
+    // always uses the close attack opcode.
+    // Opcode: CLOSE_ATTACK(44)
+    class MesoExplosionPacket : public OutPacket
+    {
+    public:
+        MesoExplosionPacket(const AttackResult& attack,
+            const std::vector<int32_t>& mesoids)
+            : OutPacket(CLOSE_ATTACK) {
+
+            skip(1);
+
+            const bool mesoonly = attack.damagelines.empty();
+            if (mesoonly)
+            {
+                write_byte(0);
+            }
+            else
+            {
+                write_byte((std::min(attack.mobcount, uint8_t(15)) << 4)
+                    | std::min(attack.hitcount, uint8_t(15)));
+            }
+
+            write_int(attack.skill);
+
+            // The server reads no charge for Meso Explosion.
+
+            skip(8);
+
+            write_byte(attack.display);
+            write_byte(attack.toleft);
+            write_byte(attack.stance);
+
+            if (mesoonly)
+            {
+                skip(10);
+
+                write_mesoids(mesoids);
+            }
+            else
+            {
+                skip(6);
+
+                for (auto& damagetomob : attack.damagelines)
+                {
+                    write_int(damagetomob.first);
+
+                    skip(12);
+
+                    write_byte(static_cast<uint8_t>(
+                        damagetomob.second.size()));
+                    for (auto& singledamage : damagetomob.second)
+                    {
+                        write_int(damage_encoding::encode(
+                            singledamage.first, singledamage.second));
+                    }
+
+                    skip(4);
+                }
+
+                // The server reads one more oid before the meso list.
+                skip(4);
+
+                write_mesoids(mesoids);
+            }
+        }
+
+    private:
+        void write_mesoids(const std::vector<int32_t>& mesoids)
+        {
+            write_byte(static_cast<uint8_t>(mesoids.size()));
+            for (int32_t mesoid : mesoids)
+            {
+                write_int(mesoid);
+                skip(1);
             }
         }
     };

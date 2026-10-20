@@ -32,6 +32,7 @@ namespace jrc
         "You do not have enough bullets to use this attack.",
         "You do not have enough throwing stars to use this attack.",
         "You cannot use this skill as it is on cooldown.",
+        "You need at least one combo orb to use this skill.",
         "The scroll lights up and it's mysterious powers have been transferred to the item.",
         "The scroll lights up but the item remains as if nothing happened.",
         "The item has been destroyed due to the overwhelming power of the scroll."
@@ -68,6 +69,8 @@ namespace jrc
             return Messages::SKILL_MPCOST;
         case SpecialMove::FBR_COOLDOWN:
             return Messages::SKILL_COOLDOWN;
+        case SpecialMove::FBR_NOCOMBO:
+            return Messages::SKILL_NOCOMBO;
         case SpecialMove::FBR_BULLETCOST:
             return message_by_weapon(weapon);
         default:

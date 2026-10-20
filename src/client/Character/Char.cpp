@@ -7,6 +7,8 @@
 #include "../Data/WeaponData.h"
 #include "../Util/Misc.h"
 
+#include "Effects/ComboOrbs.h"
+
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
@@ -37,6 +39,10 @@ namespace jrc
         {
             color = { 1.0f, 1.0f, 1.0f, 0.4f };
         }
+        else if (get_visual_buff_value(Buffstat::POISON) > 0)
+        {
+            color = { 0.62f, 1.0f, 0.55f, 1.0f };
+        }
         else
         {
             color = Color::WHITE;
@@ -62,10 +68,14 @@ namespace jrc
         }
         else
         {
+            combo_orbs::draw_aura(*this, absp);
+
             look.draw({ absp, color }, alpha);
             chair.draw({ absp, flip }, alpha, false);
 
             afterimage.draw(look.get_frame(), { absp, flip }, alpha);
+
+            combo_orbs::draw_orbs(*this, absp);
 
             if (ironbody)
             {

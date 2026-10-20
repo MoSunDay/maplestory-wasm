@@ -16,12 +16,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Player.h"
+
 #include "PlayerStates.h"
 
 #include "../Constants.h"
 #include "../Data/WeaponData.h"
 #include "../Data/ItemData.h"
 #include "../Data/SkillData.h"
+#include "../Gameplay/Combat/ComboAttack.h"
 #include "../IO/UI.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UIStatsInfo.h"
@@ -391,6 +393,12 @@ namespace jrc
         if (has_cooldown(move.get_id()))
         {
             return SpecialMove::FBR_COOLDOWN;
+        }
+
+        if (combo_attack::is_finisher(move.get_id()) &&
+            !combo_attack::can_use_finisher(get_visual_buff_value(Buffstat::COMBO)))
+        {
+            return SpecialMove::FBR_NOCOMBO;
         }
 
         int32_t level       = skillbook.get_level(move.get_id());

@@ -21,12 +21,14 @@
 
 #include "../Spawn.h"
 #include "../../Graphics/Animation.h"
+#include "../../Template/Rectangle.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <queue>
+#include <vector>
 
 namespace jrc
 {
@@ -80,6 +82,9 @@ namespace jrc
         PetLootTarget find_pet_loot(const PetLootQuery& query) const;
         bool has_drop(int32_t oid) const;
         bool has_lootable_drop(int32_t oid) const;
+        // Collect the oids of lootable meso drops inside the range.
+        std::vector<int32_t> collect_mesoids(
+            const Rectangle<int16_t>& range) const;
         size_t size() const;
         uint32_t pet_pickup_count() const;
 

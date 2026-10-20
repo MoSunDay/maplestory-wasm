@@ -125,6 +125,7 @@ namespace jrc
         ATTACKED_RANGED = 187,
         ATTACKED_MAGIC  = 188,
 
+        DAMAGE_PLAYER         = 192,
         SHOW_ITEM_EFFECT      = 194,
         SHOW_CHAIR            = 196,
         UPDATE_CHARLOOK       = 197,
@@ -204,6 +205,7 @@ namespace jrc
         emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
         emplace<GIVE_FOREIGN_BUFF, GiveForeignBuffHandler>();
         emplace<CANCEL_FOREIGN_BUFF, CancelForeignBuffHandler>();
+        emplace<DAMAGE_PLAYER, DamagePlayerHandler>();
         emplace<REMOVE_CHAR, RemoveCharHandler>();
         emplace<SPAWN_PET, SpawnPetHandler>();
         emplace<MOVE_PET, PetMovedHandler>();

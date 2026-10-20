@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "Combat.h"
 
+#include "ComboAttack.h"
+
+#include "../../Character/Buff.h"
 #include "../../Character/SkillId.h"
 #include "../../Data/SkillData.h"
 #include "../../IO/KeyAction.h"
@@ -39,14 +42,68 @@ namespace jrc
         constexpr int16_t TELEPORT_STEP = 8;
         // Max ground-height delta (px) before treating a step as a wall.
         constexpr int16_t TELEPORT_WALL_THRESHOLD = 35;
+
+        // While Shadow Partner is active, the server expects doubled damage
+        // lines per mob: all real hits first, then the shadow hits, each for
+        // half the damage. Meso Explosion is excluded.
+        void apply_shadow_partner(const Player& player, AttackResult& result)
+        {
+            if (result.skill == SkillId::MESO_EXPLOSION)
+                return;
+            if (!player.has_buff(Buffstat::SHADOWPARTNER))
+                return;
+            if (result.hitcount == 0 || result.hitcount * 2 > 15)
+                return;
+
+            for (auto& damagetomob : result.damagelines)
+            {
+                std::vector<std::pair<int32_t, bool>> lines =
+                    damagetomob.second;
+                for (const auto& line : damagetomob.second)
+                {
+                    lines.emplace_back(
+                        std::max(line.first / 2, 1), line.second);
+                }
+                damagetomob.second = std::move(lines);
+            }
+
+            result.hitcount = static_cast<uint8_t>(result.hitcount * 2);
+        }
+
+        // Build the attack's world-space hitbox, like MapMobs::send_attack.
+        Rectangle<int16_t> world_range(const Attack& attack)
+        {
+            Point<int16_t> origin    = attack.origin;
+            Rectangle<int16_t> range = attack.range;
+            int16_t hrange = static_cast<int16_t>(range.l() * attack.hrange);
+            if (attack.toleft)
+            {
+                return {
+                    origin.x() + hrange,
+                    origin.x() + range.r(),
+                    origin.y() + range.t(),
+                    origin.y() + range.b()
+                };
+            }
+            else
+            {
+                return {
+                    origin.x() - range.r(),
+                    origin.x() - hrange,
+                    origin.y() + range.t(),
+                    origin.y() + range.b()
+                };
+            }
+        }
     }
 
     Combat::Combat(Player& in_player,
         MapChars& in_chars, MapMobs& in_mobs,
-        Physics& in_physics) :
+        MapDrops& in_drops, Physics& in_physics) :
         player(in_player),
         chars(in_chars),
         mobs(in_mobs),
+        drops(in_drops),
         physics(in_physics),
         attackresults([&](const AttackResult& attack) {
             apply_attack(attack);
@@ -99,11 +156,16 @@ namespace jrc
         damagenumbers.remove_if([](DamageNumber& dn) {
             return dn.update();
         });
+
+        if (final_attack_pending && !player.is_attacking()
+            && player.can_attack())
+            perform_final_attack();
     }
 
     void Combat::clear()
     {
         teleport_cooldown = 0;
+        final_attack_pending = 0;
     }
 
     bool Combat::use_move(int32_t move_id)
@@ -141,15 +203,35 @@ namespace jrc
             player.set_afterimage(move.get_id());
 
             move.apply_stats(player, attack);
+            combo_attack::apply_damage(player, attack);
 
             AttackResult result = mobs.send_attack(attack);
             result.attacker = player.get_oid();
+            apply_shadow_partner(player, result);
             extract_effects(player, move, result);
 
             apply_use_movement(move);
-            apply_result_movement(move, result);
 
-            AttackPacket(result).dispatch();
+            if (move.get_id() == SkillId::MESO_EXPLOSION)
+            {
+                // Meso Explosion detonates dropped mesos as well and uses
+                // its own packet layout.
+                std::vector<int32_t> mesoids =
+                    drops.collect_mesoids(world_range(attack));
+                if (mesoids.size() > 100)
+                    mesoids.resize(100);
+
+                if (!mesoids.empty() || !result.damagelines.empty())
+                    MesoExplosionPacket(result, mesoids).dispatch();
+            }
+            else
+            {
+                apply_result_movement(move, result);
+
+                AttackPacket(result).dispatch();
+
+                schedule_final_attack(move, attack, result);
+            }
         }
         else if (is_teleport_skill(move.get_id()))
         {
@@ -174,6 +256,53 @@ namespace jrc
             int32_t level = player.get_skills().get_level(moveid);
             UseSkillPacket(moveid, level).dispatch();
         }
+    }
+
+    void Combat::schedule_final_attack(const SpecialMove& move,
+        const Attack& attack, const AttackResult& result)
+    {
+        final_attack_pending = 0;
+
+        if (!move.is_skill() || attack.type != Attack::CLOSE)
+            return;
+        if (result.damagelines.empty())
+            return;
+
+        Weapon::Type weapon = player.get_stats().get_weapontype();
+        int32_t fa_skill =
+            final_attack::find_skill(move.get_id(), player.get_skills(), weapon);
+        if (fa_skill == 0)
+            return;
+
+        bool proc = final_attack::roll(fa_skill, player.get_skills());
+        if (proc)
+            final_attack_pending = fa_skill;
+    }
+
+    void Combat::perform_final_attack()
+    {
+        int32_t fa_skill = final_attack_pending;
+        final_attack_pending = 0;
+
+        const SpecialMove& move = get_move(fa_skill);
+        Attack attack = player.prepare_attack(true);
+
+        move.apply_useeffects(player);
+
+        player.attack(false);
+
+        player.set_afterimage(fa_skill);
+
+        move.apply_stats(player, attack);
+        combo_attack::apply_damage(player, attack);
+        attack.stance = player.get_look().get_stance();
+
+        AttackResult result = mobs.send_attack(attack);
+        result.attacker = player.get_oid();
+        apply_shadow_partner(player, result);
+        extract_effects(player, move, result);
+
+        AttackPacket(result).dispatch();
     }
 
     void Combat::apply_use_movement(const SpecialMove& move)

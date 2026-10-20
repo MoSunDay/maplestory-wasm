@@ -77,6 +77,7 @@ Stage 内部组合了所有地图实体管理器。
 - `Combat`: 战斗协调器
 - `Attack` / `RegularAttack`: 攻击定义
 - `Skill` / `SkillAction` / `SkillBullet`: 技能执行
+- `ComboAttack`: 斗气珠伤害倍率、终结技（Coma/Panic）门控与进阶外观判定（纯函数命名空间）
 - `DamageNumber`: 伤害数字显示
 - `Bullet`: 弹道投射物
 - 攻击输入按按键按下沿触发；固定帧循环只维持跳跃等持续动作，不重复发起攻击。

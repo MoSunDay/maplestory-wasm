@@ -24,6 +24,8 @@
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
 
+#include <algorithm>
+
 
 namespace jrc
 {
@@ -249,16 +251,17 @@ namespace jrc
         }
         attack.critical  += stats.critical;
         attack.ignoredef += stats.ignoredef;
-        attack.mobcount = stats.mobcount;
+        // The attacked/hit counts are sent as nibbles, so cap them at 15.
+        attack.mobcount = std::min(stats.mobcount, uint8_t(15));
         attack.hrange   = stats.hrange;
 
         switch (attack.type)
         {
         case Attack::RANGED:
-            attack.hitcount = stats.bulletcount;
+            attack.hitcount = std::min(stats.bulletcount, uint8_t(15));
             break;
         default:
-            attack.hitcount = stats.attackcount;
+            attack.hitcount = std::min(stats.attackcount, uint8_t(15));
         }
 
         if (!stats.range.empty())
