@@ -758,7 +758,7 @@ try {
         throw new Error('Purchased locker item was not selected');
       }
       // Locker slots form a 7x3 grid from (504,102) with 39px steps.
-      await driver.click(504 + (lockerRow % 7) * 39 + 18, 102 + Math.floor(lockerRow / 7) * 39 + 18);
+      await driver.doubleClick(504 + (lockerRow % 7) * 39 + 18, 102 + Math.floor(lockerRow / 7) * 39 + 18);
       await requireState('cash item taken into character inventory', async () =>
         await cashShopProbe('mscashshop_pending') === 0 &&
         await cashShopProbe('mscashshop_locker_count') === initial.locker &&
@@ -769,7 +769,7 @@ try {
       if (inventoryRow < 0) {
         throw new Error('Taken cash item was not selected');
       }
-      await driver.click(504 + (inventoryRow % 7) * 39 + 18, 102 + Math.floor(inventoryRow / 7) * 39 + 18);
+      await driver.doubleClick(504 + (inventoryRow % 7) * 39 + 18, 102 + Math.floor(inventoryRow / 7) * 39 + 18);
       await requireState('cash item returned to locker', async () =>
         await cashShopProbe('mscashshop_pending') === 0 &&
         await cashShopProbe('mscashshop_locker_count') === initial.locker + 1 &&

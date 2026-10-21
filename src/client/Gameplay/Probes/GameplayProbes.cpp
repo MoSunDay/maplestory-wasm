@@ -10,6 +10,7 @@
 #include "../../IO/UITypes/Pet/UIPetOptions.h"
 #include "../../IO/UITypes/Settings/UIGameOptions.h"
 #include "../../IO/UITypes/UIShop.h"
+#include "../../IO/UITypes/UIItemInventory.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 
 #include <cstdint>
@@ -527,6 +528,64 @@ extern "C"
         return type == jrc::InventoryType::NONE
             ? 0
             : jrc::Stage::get().get_player().get_inventory().find_item(type, item_id);
+    }
+
+    int msinventory_equipped(int16_t slot)
+    {
+        return jrc::Stage::get().get_player().get_look().get_equips()
+            .get_equip(static_cast<jrc::Equipslot::Id>(slot));
+    }
+
+    int msinventory_equipped_marker(int16_t slot)
+    {
+        const auto& inventory = jrc::Stage::get().get_player().get_inventory();
+        const uint64_t cash_id = static_cast<uint64_t>(inventory.get_cash_id(
+            jrc::InventoryType::EQUIPPED, slot));
+        return static_cast<int32_t>(cash_id ^ (cash_id >> 32));
+    }
+
+
+    int msiteminventory_active()
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items && items->is_active() ? 1 : 0;
+    }
+
+    int msiteminventory_x()
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items ? items->layout_position().x() : -1;
+    }
+
+    int msiteminventory_y()
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items ? items->layout_position().y() : -1;
+    }
+
+    int msiteminventory_tab()
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items ? static_cast<int>(items->layout_tab()) : -1;
+    }
+
+    int msiteminventory_first_slot()
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items ? items->visible_first_slot() : -1;
+    }
+
+    int msiteminventory_last_slot()
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items ? items->visible_last_slot() : -1;
+    }
+
+    int msiteminventory_slot_at(int x, int y)
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items ? items->hit_test(jrc::Point<int16_t>(
+            static_cast<int16_t>(x), static_cast<int16_t>(y))) : -1;
     }
 
     int msnpc_active()

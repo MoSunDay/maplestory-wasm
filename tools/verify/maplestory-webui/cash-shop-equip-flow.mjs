@@ -253,39 +253,45 @@ async function verifyEquipMenu(driver) {
         `unselected row rgb=${JSON.stringify(openSample.rows.other)}`);
   }
 
-  // 2. 选择「武器」（最后一个子分类）。
+  // 2. 选择「武器」（最后一个子分类）：选中后浮层自动收起。
   await driver.click(subCategories.weapon.x, subCategories.weapon.y);
   await sleep(500);
-  if (!await waitFor(menuStateIs(driver, { open: 1, sub: 16 }), 10)) {
-    report(false, 'weapon sub-category was not selected');
+  if (!await waitFor(menuStateIs(driver, { open: 0, sub: 16 }), 10)) {
+    report(false, 'weapon sub-category selected and flyout auto-closed');
     return;
   }
   const weaponCount = await filteredCount();
   report(weaponCount >= 0 && weaponCount <= equipAll,
-    `weapon filter applied (weapons=${weaponCount} <= equip-all=${equipAll})`);
+    `weapon filter applied, flyout folded (weapons=${weaponCount} <= equip-all=${equipAll})`);
   await driver.screenshot('12-equip-weapon-selected');
 
-  // 3. 选择「帽子」。
+  // 3. 重新展开后选择「帽子」：同样自动收起。
+  await driver.click(rail.equip.x, rail.equip.y);
+  await sleep(400);
   await driver.click(subCategories.hat.x, subCategories.hat.y);
   await sleep(500);
-  if (!await waitFor(menuStateIs(driver, { open: 1, sub: 1 }), 10)) {
-    report(false, 'hat sub-category was not selected');
+  if (!await waitFor(menuStateIs(driver, { open: 0, sub: 1 }), 10)) {
+    report(false, 'hat sub-category selected and flyout auto-closed');
     return;
   }
   const hatCount = await filteredCount();
   report(hatCount >= 0 && hatCount <= equipAll,
-    `hat filter applied (hats=${hatCount} <= equip-all=${equipAll})`);
+    `hat filter applied, flyout folded (hats=${hatCount} <= equip-all=${equipAll})`);
   await driver.screenshot('13-equip-hat-selected');
 
-  // 4. 回到「全部装备」：数量应恢复。
+  // 4. 重新展开后回到「全部装备」：数量应恢复、浮层收起。
+  await driver.click(rail.equip.x, rail.equip.y);
+  await sleep(400);
   await driver.click(subCategories.all.x, subCategories.all.y);
   await sleep(500);
   const restored = await filteredCount();
-  report(await waitFor(menuStateIs(driver, { open: 1, sub: 0 }), 10) &&
+  report(await waitFor(menuStateIs(driver, { open: 0, sub: 0 }), 10) &&
     restored === equipAll,
-    `全部装备 restored (filtered=${restored} === equip-all=${equipAll})`);
+    `全部装备 restored, flyout folded (filtered=${restored} === equip-all=${equipAll})`);
 
-  // 5. 「×」收起：过滤保持，菜单关闭。
+  // 5. 展开后用「×」收起：过滤保持，菜单关闭。
+  await driver.click(rail.equip.x, rail.equip.y);
+  await sleep(400);
   await driver.click(equipClose.x, equipClose.y);
   await sleep(500);
   const closedCount = await filteredCount();

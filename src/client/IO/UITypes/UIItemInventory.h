@@ -50,6 +50,13 @@ namespace jrc
         void enable_sort();
         void enable_gather();
 
+        Point<int16_t> layout_position() const { return position; }
+        Point<int16_t> layout_dimension() const { return dimension; }
+        InventoryType::Id layout_tab() const { return tab; }
+        int16_t visible_first_slot() const { return slotrange.first; }
+        int16_t visible_last_slot() const { return slotrange.second; }
+        int16_t hit_test(Point<int16_t> cursorpos) const;
+
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
 

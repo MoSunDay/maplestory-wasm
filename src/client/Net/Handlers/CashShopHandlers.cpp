@@ -7,6 +7,8 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/CashShop/UICashShop.h"
+#include "../../IO/UITypes/UIEquipInventory.h"
+#include "../../IO/UITypes/UIItemInventory.h"
 #include "../Packets/LoginPackets.h"
 #include "../Session.h"
 
@@ -166,8 +168,26 @@ namespace jrc
         {
             int16_t slot = recv.read_short();
             const int64_t cash_id = shop ? shop->transfer_cash_id() : 0;
-            ItemParser::parse_item_auto(
-                recv, slot, Stage::get().get_player().get_inventory(), cash_id);
+            Player& player = Stage::get().get_player();
+            Inventory& inventory = player.get_inventory();
+            const InventoryType::Id type = ItemParser::parse_item_auto(
+                recv, slot, inventory, cash_id);
+            slot = static_cast<int16_t>(slot < 0 ? -slot : slot);
+
+            if (type == InventoryType::EQUIPPED)
+            {
+                if (auto equips = UI::get().get_element<UIEquipInventory>())
+                    equips->modify(slot, Inventory::ADD, 0);
+                player.change_equip(slot);
+                player.recalc_stats(true);
+            }
+            else if (type != InventoryType::NONE &&
+                type != InventoryType::LENGTH)
+            {
+                if (auto items = UI::get().get_element<UIItemInventory>())
+                    items->modify(type, slot, Inventory::ADD, 0);
+            }
+
             if (shop)
                 shop->take_succeeded();
             return;

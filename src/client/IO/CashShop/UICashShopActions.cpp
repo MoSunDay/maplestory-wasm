@@ -2,6 +2,7 @@
 
 #include "../UI.h"
 #include "../UITypes/UINotice.h"
+#include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/CashShopPackets.h"
@@ -85,6 +86,24 @@ namespace jrc
         select_new_locker_item(cash_id);
     }
 
+    void UICashShop::doubleclick(Point<int16_t> cursorpos)
+    {
+        if (pending)
+            return;
+        for (uint16_t id = BT_SLOT_FIRST; id < BT_SLOT_LAST; ++id)
+        {
+            const auto found = buttons.find(id);
+            if (found == buttons.end() || !found->second->is_active() ||
+                !found->second->bounds(position).contains(cursorpos))
+                continue;
+            const size_t index = right_page * view::RIGHT_PAGE_SIZE +
+                (id - BT_SLOT_FIRST);
+            if (index < right_count())
+                request_transfer(index);
+            return;
+        }
+    }
+
     void UICashShop::show_error(const std::string& message)
     {
         set_pending(false);
@@ -116,10 +135,17 @@ namespace jrc
             return;
         }
         const int8_t sub = static_cast<int8_t>(id - BT_EQSUB_FIRST);
+        // Picking a sub-category folds the flyout away so the catalog grid
+        // underneath becomes clickable again.
+        equip_menu_open = false;
         if (sub != equip_sub)
         {
             equip_sub = sub;
             rebuild_catalog();
+        }
+        else
+        {
+            refresh();
         }
     }
 
@@ -136,13 +162,39 @@ namespace jrc
 
     void UICashShop::refresh_preview()
     {
+        // The preview avatar is always the player look plus the accumulated
+        // try-on set; same-slot picks override earlier ones until the reset
+        // button clears the set back to the plain player look.
         preview_look = Stage::get().get_player().get_look();
-        const auto highlighted = highlighted_index();
-        if (!highlighted)
+        for (int32_t item_id : tryon_items)
+            preview_look.add_equip(item_id, Texture::LoadMode::DEFERRED);
+    }
+
+    void UICashShop::add_tryon(size_t filtered_index)
+    {
+        if (filtered_index >= filtered.size())
             return;
-        const CashCommodity& item = model->catalog()[filtered[*highlighted]];
-        if (view::is_previewable_equip(item.item_id))
-            preview_look.add_equip(item.item_id, Texture::LoadMode::DEFERRED);
+        const int32_t item_id =
+            model->catalog()[filtered[filtered_index]].item_id;
+        if (!view::is_previewable_equip(item_id))
+            return;
+        const Equipslot::Id slot = EquipData::get(item_id).get_eqslot();
+        const auto same_slot = [&](int32_t existing)
+        {
+            return EquipData::get(existing).get_eqslot() == slot;
+        };
+        tryon_items.erase(
+            std::remove_if(tryon_items.begin(), tryon_items.end(), same_slot),
+            tryon_items.end());
+        tryon_items.push_back(item_id);
+    }
+
+    void UICashShop::clear_tryon()
+    {
+        if (tryon_items.empty())
+            return;
+        tryon_items.clear();
+        refresh();
     }
 
     void UICashShop::refresh()
@@ -169,7 +221,7 @@ namespace jrc
         tab_labels[1].change_color(
             locker_active ? Text::LIGHTGREY : Text::WHITE);
         transfer_hint.change_text(locker_active ?
-            "再次点击物品可快速取出" : "再次点击物品可快速存入");
+            "双击物品取出" : "双击物品存入");
         page_labels[0].change_text(std::to_string(left_page + 1) + "/" +
             std::to_string(view::page_count(
                 filtered.size(), view::CATALOG_PAGE_SIZE)));
@@ -246,6 +298,7 @@ namespace jrc
             *selected_left / view::CATALOG_PAGE_SIZE == left_page;
         buttons[BT_BUY]->set_active(!pending && buy_visible &&
             !(equip_menu_open && category == view::EQUIP_CATEGORY));
+        buttons[BT_RESET]->set_active(!tryon_items.empty());
         buttons[BT_FEATURED]->set_active(!pending && !filtered.empty());
         position_buy_button();
         const bool details_visible = selected_right &&
@@ -398,7 +451,7 @@ namespace jrc
 
     void UICashShop::request_transfer(size_t item_index)
     {
-        if (item_index >= right_count())
+        if (pending || item_index >= right_count())
             return;
         pending_cash_id = right_cash_id(item_index);
         set_pending(true);
@@ -470,6 +523,29 @@ namespace jrc
     {
         return category == view::EQUIP_CATEGORY ? equip_sub : 0;
     }
+    int32_t UICashShop::highlighted_item_id() const
+    {
+        const auto highlighted = highlighted_index();
+        if (!highlighted)
+            return 0;
+        return model->catalog()[filtered[*highlighted]].item_id;
+    }
+
+    int32_t UICashShop::selected_left_index() const
+    {
+        return selected_left ? static_cast<int32_t>(*selected_left) : -1;
+    }
+
+    int32_t UICashShop::tryon_count() const
+    {
+        return static_cast<int32_t>(tryon_items.size());
+    }
+
+    int32_t UICashShop::preview_cap_id() const
+    {
+        return preview_look.get_equips().get_equip(Equipslot::CAP);
+    }
+
 
     bool UICashShop::is_equip_menu_open() const
     {

@@ -1,9 +1,10 @@
 #include "UICashShop.h"
 
-#include "../UILayout.h"
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Graphics/GraphicsGL.h"
+
+#include <algorithm>
 
 namespace jrc
 {
@@ -13,20 +14,26 @@ namespace jrc
     namespace
     {
         // Mirrors the offset correction in UICashShop.cpp: layout constants
-        // use design-canvas coordinates; the scene is shifted by the shared
-        // content origin and VIEWYOFFSET.
+        // use design-canvas coordinates; the scene scales them onto the
+        // enlarged canvas, shifts by the content origin and VIEWYOFFSET.
         Point<int16_t> draw_position(Point<int16_t> position)
         {
-            return position + ui_layout::origin() -
+            return layout::origin() + layout::scale_point(position) -
                 Point<int16_t>{ 0, Constants::VIEWYOFFSET };
+        }
+
+        Point<int16_t> draw_size(Point<int16_t> size)
+        {
+            return layout::scale_point(size);
         }
 
         void fill_rect(Point<int16_t> position, Point<int16_t> size,
             float r, float g, float b, float a)
         {
             const Point<int16_t> drawn = draw_position(position);
+            const Point<int16_t> scaled = draw_size(size);
             GraphicsGL::get().drawrectangle(
-                drawn.x(), drawn.y(), size.x(), size.y(), r, g, b, a);
+                drawn.x(), drawn.y(), scaled.x(), scaled.y(), r, g, b, a);
         }
 
         void outline_rect(Point<int16_t> position, Point<int16_t> size,
@@ -71,7 +78,7 @@ namespace jrc
             const Texture* texture = badge_texture(skin, badge);
             if (!texture)
                 return;
-            texture->draw({ draw_position(position), size });
+            texture->draw({ draw_position(position), draw_size(size) });
         }
     }
 
@@ -142,7 +149,7 @@ namespace jrc
         const Point<int16_t> panel = layout::FEATURED_PANEL_POS;
         const Point<int16_t> panel_size = layout::FEATURED_PANEL_SIZE;
         skin.preview[left_page % 3].draw(
-            { draw_position(panel), panel_size });
+            { draw_position(panel), draw_size(panel_size) });
         fill_rect(panel, panel_size, 0.04f, 0.05f, 0.07f, 0.82f);
         outline_rect(panel, panel_size, 0.25f, 0.28f, 0.34f, 1.0f);
         fill_rect(panel, { 64, 2 }, 0.88f, 0.52f, 0.16f, 1.0f);
@@ -163,7 +170,8 @@ namespace jrc
             layout::FEATURED_BADGE_POS, layout::FEATURED_BADGE_SIZE);
 
         const bool avatar_ready =
-            view::is_previewable_equip(item.item_id) && avatar_preview_ready();
+            (view::is_previewable_equip(item.item_id) ||
+                !tryon_items.empty()) && avatar_preview_ready();
         if (avatar_ready)
         {
             fill_rect(layout::FEATURED_AVATAR_FRAME_POS,
@@ -206,6 +214,22 @@ namespace jrc
         fill_rect(hint_band, { hint_size.x(), 1 },
             0.88f, 0.52f, 0.16f, 0.65f);
         featured_hint.draw(draw_position(layout::FEATURED_HINT_POS));
+
+        const auto reset = buttons.find(BT_RESET);
+        if (reset != buttons.end() && reset->second->is_active())
+        {
+            const Button::State state = reset->second->get_state();
+            const float shade = state == Button::PRESSED ? 0.82f :
+                state == Button::MOUSEOVER ? 1.16f : 1.0f;
+            fill_rect(layout::RESET_POS, layout::RESET_SIZE,
+                std::min(1.0f, 0.86f * shade),
+                std::min(1.0f, 0.36f * shade),
+                std::min(1.0f, 0.30f * shade), 0.98f);
+            outline_rect(layout::RESET_POS, layout::RESET_SIZE,
+                0.98f, 0.52f, 0.44f, 1.0f);
+            reset_label.draw(draw_position(
+                layout::pill_label(layout::RESET_POS, layout::RESET_SIZE)));
+        }
     }
 
     void UICashShop::draw_sidebar_legend() const
@@ -238,7 +262,7 @@ namespace jrc
     void UICashShop::draw_catalog_hint() const
     {
         skin.line.draw({ draw_position(layout::CATALOG_LINE_POS),
-            layout::CATALOG_LINE_SIZE });
+            draw_size(layout::CATALOG_LINE_SIZE) });
         catalog_hint.draw(draw_position(layout::CATALOG_HINT_POS));
     }
 

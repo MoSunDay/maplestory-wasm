@@ -4,6 +4,7 @@
 #include "CashShopModel.h"
 #include "CashShopSkin.h"
 #include "CashShopView.h"
+#include "UICashShopButtons.h"
 #include "../Components/Textfield.h"
 #include "../UIElement.h"
 #include "../../Character/Look/CharLook.h"
@@ -16,12 +17,17 @@
 
 namespace jrc
 {
+    // The currency row length lives with the button geometry table.
+    using cash_shop_buttons::CURRENCY_CHOICES;
+
     // Full-screen cash shop window painted from the modern CashShop.img set.
     // The background bitmap is stretched from its native 1024x768 to fill the
     // current viewport, while the 800x600 design canvas (artwork, labels and
-    // hit areas on one 25/32 pixel grid) is centred via the shared ui_layout
-    // origin. The element is positioned at that origin so button hit tests
-    // keep using design-space coordinates.
+    // hit areas on one 25/32 pixel grid) is scaled uniformly to fill taller
+    // viewports (1.2x at 1280x720) and centred via the layout origin. The
+    // element is positioned at that origin, and the hit areas live on the
+    // scaled grid through cash_shop_buttons::apply_geometry, so button hit
+    // tests keep using design-space coordinates.
     class UICashShop : public UIElement
     {
     public:
@@ -37,6 +43,7 @@ namespace jrc
         CursorResult send_cursor(bool pressed, Point<int16_t> cursorpos) override;
         void send_scroll(double yoffset) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
+        void doubleclick(Point<int16_t> cursorpos) override;
 
         void set_balances(CashBalances balances);
         void replace_locker(std::vector<CashLockerItem> items);
@@ -53,6 +60,10 @@ namespace jrc
         int32_t selected_right_row() const;
         int32_t filtered_count() const;
         int8_t equip_sub_index() const;
+        int32_t highlighted_item_id() const;
+        int32_t selected_left_index() const;
+        int32_t preview_cap_id() const;
+        int32_t tryon_count() const;
         bool is_equip_menu_open() const;
         int64_t transfer_cash_id() const;
         bool is_pending() const;
@@ -61,40 +72,14 @@ namespace jrc
         Button::State button_pressed(uint16_t id) override;
 
     private:
-        static constexpr size_t CURRENCY_CHOICES = 3;
-
-        enum Buttons : uint16_t
-        {
-            BT_EXIT,
-            BT_CHARGE,
-            BT_BUY,
-            BT_EQSUB_CLOSE,
-            BT_EQSUB_FIRST,
-            BT_EQSUB_LAST = BT_EQSUB_FIRST + cash_shop_view::EQSUB_COUNT,
-            BT_CARD_FIRST,
-            BT_CARD_LAST = BT_CARD_FIRST + cash_shop_view::CATALOG_PAGE_SIZE,
-            BT_SLOT_FIRST,
-            BT_SLOT_LAST = BT_SLOT_FIRST + cash_shop_view::RIGHT_PAGE_SIZE,
-            BT_TAB_FIRST,
-            BT_TAB_LAST = BT_TAB_FIRST + cash_shop_view::CATEGORY_COUNT,
-            BT_CURRENCY_FIRST,
-            BT_CURRENCY_LAST = BT_CURRENCY_FIRST + CURRENCY_CHOICES,
-            BT_RIGHT_LOCKER_TAB,
-            BT_RIGHT_INVENTORY_TAB,
-            BT_TRANSFER,
-            BT_LEFT_PREV,
-            BT_LEFT_NEXT,
-            BT_RIGHT_PREV,
-            BT_RIGHT_NEXT,
-            BT_FEATURED
-        };
-
         void rebuild_catalog();
         void refresh();
         void refresh_rows();
         void press_equip_menu(uint16_t id);
         std::optional<size_t> highlighted_index() const;
         void refresh_preview();
+        void add_tryon(size_t filtered_index);
+        void clear_tryon();
         bool avatar_preview_ready() const;
         static CashCurrency currency_choice(size_t index);
         static const char* currency_short_name(CashCurrency value);
@@ -144,6 +129,7 @@ namespace jrc
 
         cash_shop_skin::CashShopSkin skin;
         CharLook preview_look;
+        std::vector<int32_t> tryon_items;
 
         Textfield search;
         Text title;
@@ -158,6 +144,7 @@ namespace jrc
         Text details_name;
         Text details_count;
         Text buy_label;
+        Text reset_label;
         Text transfer_label;
         Text charge_label;
         Text exit_label;

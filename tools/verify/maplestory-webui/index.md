@@ -63,7 +63,7 @@ node tools/verify/maplestory-webui/gm-shop-flow.mjs
 
 ## 现金商城装备分类菜单流程
 
-`cash-shop-equip-flow.mjs` 登录进图后点击状态栏商城按钮进入现金商城，专项目检「装备」分类二级菜单：点击分类栏「装备」展开浮层（`mscashshop_equip_menu_open`/`mscashshop_equip_sub`/`mscashshop_filtered_count` 只读探针驱动状态断言），依次选择「武器」「帽子」「全部装备」核对过滤数量（实测全部 1977 件中装备 1448、武器 233、帽子 336，切回全部装备数量复原），「×」收起后过滤保持、再次点击「装备」可重新展开/收起（toggle），切回「全部」分类时子分类复位且目录数量恢复初始值，最后 Escape 退出商城回游戏。视觉层用页面内 WebGL readPixels 断言选中行为暖橙高亮（R>G>B 且 R-B>40，实测 rgb≈184/111/37）而未选中行为深色（≈26/28/34），菜单收起后原「武器」行带不再出现暖色高亮（卡面 artwork 偏蓝 rgb≈178/186/196）。
+`cash-shop-equip-flow.mjs` 登录进图后点击状态栏商城按钮进入现金商城，专项目检「装备」分类二级菜单：点击分类栏「装备」展开浮层（`mscashshop_equip_menu_open`/`mscashshop_equip_sub`/`mscashshop_filtered_count` 只读探针驱动状态断言），依次选择「武器」「帽子」「全部装备」核对过滤数量（实测全部 1984 件中装备 1455、武器 233、帽子 338，切回全部装备数量复原），子分类选中后浮层自动收起（同一项再点也收起），「×」随时可收起且过滤保持、再次点击「装备」可重新展开/收起（toggle），切回「全部」分类时子分类复位且目录数量恢复初始值，最后 Escape 退出商城回游戏。视觉层用页面内 WebGL readPixels 断言选中行为暖橙高亮（R>G>B 且 R-B>40，实测 rgb≈184/111/37）而未选中行为深色（≈26/28/34），菜单收起后原「武器」行带不再出现暖色高亮（卡面 artwork 偏蓝 rgb≈178/186/196）。
 
 ```bash
 CASH_EQUIP_ACCOUNT=test1 CASH_EQUIP_PASSWORD=test1 CASH_EQUIP_CARD=1 \
@@ -72,6 +72,26 @@ node tools/verify/maplestory-webui/cash-shop-equip-flow.mjs
 ```
 
 环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`CASH_EQUIP_DEBUG_PORT`（默认 9249）、`CASH_EQUIP_ACCOUNT`/`CASH_EQUIP_PASSWORD`（默认 test1/test1）、`CASH_EQUIP_CARD`（角色卡索引 0..3，默认 1，选卡前先核对该账号名下角色）、`CASH_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。无需 GM 等级；登录偶发 reason=7（账号残留 loggedin 状态）时重跑即可。
+
+## 现金商城试穿流程
+
+`cash-shop-tryon-flow.mjs` 登录进图后进入现金商城，专项目检累计试穿（「试穿不生效」修复的验收）：选中「装备→帽子」子分类后点击目录卡入试穿集（`mscashshop_tryon_count`/`mscashshop_highlighted_item`/`mscashshop_preview_cap` 只读探针驱动断言），点击同槽第二顶帽子验证覆盖语义（计数仍为 1、预览帽切换为第二顶且不同于首顶和玩家基线帽），换「上衣」子分类再点一卡验证跨槽累计（计数 2、帽子预览保持），最后点击推荐面板「重置」按钮清空试穿集并还原玩家原始外观。视觉层用页面内 WebGL readPixels 采样人像带：换帽时均值亮度变化 ≥3、加上衣时降采样网格差异率 ≥2%（实测 5%）、重置后亮度回到基线 ±1.5。退出商城回游戏收尾。
+
+```bash
+TRYON_FLOW_ACCOUNT=test1 TRYON_FLOW_PASSWORD=test1 TRYON_FLOW_CARD=1 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-tryon-flow.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`TRYON_FLOW_DEBUG_PORT`（默认 9250）、`TRYON_FLOW_ACCOUNT`/`TRYON_FLOW_PASSWORD`（默认 test1/test1）、`TRYON_FLOW_CARD`（角色卡索引 0..3，默认 1）、`TRYON_FLOW_URL`（默认 http://127.0.0.1:8000/web/index.html）。测试动态读取当前角色穿戴帽作为重置基线（实测 1002000）；帽子子分类至少需要两件同槽在售帽，若换测试账号或商品表需同步调整。
+
+## 现金商城取出装备并穿戴流程
+
+`cash-shop-take-equip-flow.mjs` 覆盖「仓库双击取出后消失且未穿戴」修复：搜索并购买现金帽 SN `20000016`（物品 1002000，3700 NX），确认购买进入商城仓库；对选中仓库格双击后断言仓库数量减一、角色现金栏数量加一且请求已结算，证明双击只取出一次、没有被成功后的自动选中触发逆向存回。Escape 回图后通过状态栏 ITEMS 菜单打开物品栏（带重试以吸收资产加载抖动），用 `msiteminventory_slot_at` 校验 EQUIP 槽命中坐标后双击，断言 `msinventory_equipped(1)` 为 1002000、`msinventory_equipped_marker(1)`（装备现金 ID 标记）发生变化，且同 ID 换装时 EQUIP 数量不变也会被识别。测试会真实消耗 NX 并留下仓库/背包数据，运行前需角色离线且 EQUIP 栏至少有一个空位。
+
+```bash
+TAKE_EQUIP_ACCOUNT=test1 TAKE_EQUIP_PASSWORD=test1 TAKE_EQUIP_CARD=1 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-take-equip-flow.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`TAKE_EQUIP_DEBUG_PORT`（默认 9251）、`TAKE_EQUIP_ACCOUNT`/`TAKE_EQUIP_PASSWORD`（默认 test1/test1）、`TAKE_EQUIP_CARD`（角色卡索引 0..3，默认 1）、`TAKE_EQUIP_ITEM_ID`（默认 1002000）、`TAKE_EQUIP_SN`（默认 20000016）、`TAKE_EQUIP_PRICE`（默认 3700）、`TAKE_EQUIP_CAP_SLOT`（默认 1）、`TAKE_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。
 
 ## 自由市场 910000000 079 复刻流程
 
