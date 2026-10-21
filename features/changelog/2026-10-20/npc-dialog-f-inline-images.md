@@ -44,3 +44,31 @@
 - Escape 关闭后同带 chroma 回落 108→70（残留为世界底色）；
 - console 无 unresolved 告警、无浏览器错误；LazyFS 异步就绪由
   20s 色带重试覆盖（首帧 0/21，数秒后 21/21）。
+
+## 追加：全 NX 域解析与独立回归（同日）
+
+- `resolve_embed_node` 的域前缀从 UI/Effect 两域扩展为全部 16 个顶层
+  NX 文件（base/character/effect/etc/item/map/mob/morph/npc/quest/
+  reactor/skill/sound/string/tamingmob/ui），大小写不敏感；未知域返回
+  空 node（`domain_root()`）。服务端脚本里 `#fItem/...#`、`#fMap/...#`
+  等不再依赖手工加域。
+- 新增首帧回退：部分路径在新版 UI.nx 中是帧容器而非位图
+  （`UIWindow.img/QuestIcon/3` 的位图在子节点 `0`），解析到容器时
+  自动取 `0` 帧；实测 `UIWindow2.img/QuestIcon/3/0` 为 142×18。
+- `extract_embed_sprites` 签名改为
+  `(source, advance_per_space, out_text)`：空格步长由调用方
+  `UINpcTalk.cpp` 的 `npc_space_advance()`（A12M 空格 advance）注入，
+  模块不再依赖 `FontCache`/`Text`，可在无图形状态下链接测试。
+- 新增 `tools/verify/npc-embed-path-nx.cpp`（220 行）：token 识别
+  （中段 token、120 字节上限、`##` 转义、颜色标签近似串拒绝）、
+  `.img` 补全、UIWindow2 迁移回退、首帧回退、大小写不敏感域、
+  Item/Map 跨域真实位图尺寸（15×15 / 142×18 / 11×10 / 27×30 /
+  190×11）及未知域/缺节点空返回；以 `--gc-sections` 剥离
+  Texture/FontCache，位图只保留元数据桩。ALL CHECKS PASSED。
+- `src/client/Graphics/Color.h` 补 `<cstddef>`，显式提供 `size_t`
+  （独立编译该模块时不再报 `size_t does not name a type`）。
+
+重建 WASM 后复跑端到端回归：`npc-embed-icons.mjs`
+（prompt 无路径泄漏、105 空格占位、图标带 chroma 108.34 vs 灰阶 5.62、
+12/12 列染色、关闭回落）PASS；`fm-map-flow.mjs` 15/15 PASS（出生点、
+妮娜对话开关、四层平台/门传送、自由市场<1> 往返、返回落点）。

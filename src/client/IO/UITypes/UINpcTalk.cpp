@@ -22,6 +22,7 @@
 
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Graphics/FontCache.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
@@ -37,6 +38,14 @@ namespace jrc
 {
     namespace
     {
+        // Space advance of the dialogue font, used to size `#f` placeholders.
+        int16_t npc_space_advance()
+        {
+            const FontCache::Char& space =
+                FontCache::get().getglyph(Text::A12M, U' ');
+            return std::max<int16_t>(1, space.ax);
+        }
+
         constexpr int16_t MIN_DIALOGUE_TILES = 8;
         constexpr int16_t TEXT_WIDTH = 320;
         constexpr int16_t TEXT_VERTICAL_PADDING = 16;
@@ -361,7 +370,9 @@ namespace jrc
             prompttext.clear();
             // Extract #f<path># sprites last so their byte positions stay
             // valid for the final wrapped layout.
-            embeds = npctalk_images::extract_embed_sprites(parsed.rendered_text, prompttext);
+            const int16_t space_advance = npc_space_advance();
+            embeds = npctalk_images::extract_embed_sprites(
+                parsed.rendered_text, space_advance, prompttext);
             text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
             selection_labels.reserve(selection_texts.size());
             selection_embeds.reserve(selection_texts.size());
@@ -369,7 +380,8 @@ namespace jrc
             {
                 std::string display_text;
                 selection_embeds.push_back(
-                    npctalk_images::extract_embed_sprites(option_text, display_text));
+                    npctalk_images::extract_embed_sprites(
+                        option_text, space_advance, display_text));
                 selection_labels.emplace_back(
                     Text::A12M, Text::LEFT, Text::BLUE, display_text, TEXT_WIDTH, false);
             }
@@ -380,7 +392,8 @@ namespace jrc
             const std::string stripped = npctalk_text::strip_npc_tokens(
                 processed_tx, npctalk_text::EmbedImages::KEEP);
             prompttext.clear();
-            embeds = npctalk_images::extract_embed_sprites(stripped, prompttext);
+            embeds = npctalk_images::extract_embed_sprites(
+                stripped, npc_space_advance(), prompttext);
             text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
         }
 
