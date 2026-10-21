@@ -44,20 +44,23 @@ namespace jrc
             size_t& out_end
         );
 
-        // Map a `#f..#` path onto the nx data files. Only the UI and Effect
-        // domains are supported; the first path segment is retried with an
-        // appended ".img", and `UIWindow.img` falls back to `UIWindow2.img`
-        // where newer data files moved the node. Returns a null node when no
-        // bitmap resolves.
+        // Map a `#f..#` path onto the nx data files. The first segment names
+        // the domain (any of the 16 top-level nx files, case-insensitive,
+        // e.g. UI, Effect, Item, Map); the first path segment is retried
+        // with an appended ".img", and `UIWindow.img` falls back to
+        // `UIWindow2.img` where newer data files moved the node. Returns a
+        // null node when no bitmap resolves.
         nl::node resolve_embed_node(const std::string& path);
 
         // Remove every `#f..#` token from `source`, appending to `out_text`
         // a run of spaces as wide as the resolved sprite so line wrapping
-        // matches the rendered result. Tokens that fail to resolve are
+        // matches the rendered result (caller passes the advance width of a
+        // space for the dialogue font). Tokens that fail to resolve are
         // dropped without a placeholder (width 0). The returned sprites carry
         // the byte index of their placeholder run inside `out_text`.
         std::vector<NpcEmbedSprite> extract_embed_sprites(
             const std::string& source,
+            int16_t advance_per_space,
             std::string& out_text
         );
     }

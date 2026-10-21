@@ -4,8 +4,6 @@
 #include "UINpcTalkImages.h"
 
 #include "../../Console.h"
-#include "../../Graphics/FontCache.h"
-#include "../../Graphics/Text.h"
 
 #include "nlnx/nx.hpp"
 
@@ -59,6 +57,57 @@ namespace jrc
                 return "UIWindow2.img" + tail;
             }
 
+            // Every top-level nx file doubles as a `#f` domain: `Item/...`
+            // resolves in Item.nx, `Map/...` in Map.nx and so on. Matching
+            // is case-insensitive because server scripts are inconsistent.
+            nl::node domain_root(const std::string& domain)
+            {
+                struct DomainEntry
+                {
+                    const char* name;
+                    nl::node* root;
+                };
+
+                static const DomainEntry DOMAINS[] =
+                {
+                    { "base", &nl::nx::base },
+                    { "character", &nl::nx::character },
+                    { "effect", &nl::nx::effect },
+                    { "etc", &nl::nx::etc },
+                    { "item", &nl::nx::item },
+                    { "map", &nl::nx::map },
+                    { "mob", &nl::nx::mob },
+                    { "morph", &nl::nx::morph },
+                    { "npc", &nl::nx::npc },
+                    { "quest", &nl::nx::quest },
+                    { "reactor", &nl::nx::reactor },
+                    { "skill", &nl::nx::skill },
+                    { "sound", &nl::nx::sound },
+                    { "string", &nl::nx::string },
+                    { "tamingmob", &nl::nx::tamingmob },
+                    { "ui", &nl::nx::ui }
+                };
+
+                std::string lowered;
+                lowered.reserve(domain.size());
+                for (const char ch : domain)
+                {
+                    lowered.push_back(
+                        static_cast<char>(std::tolower(static_cast<unsigned char>(ch)))
+                    );
+                }
+
+                for (const DomainEntry& entry : DOMAINS)
+                {
+                    if (lowered == entry.name)
+                    {
+                        return *entry.root;
+                    }
+                }
+
+                return {};
+            }
+
             // Log each unresolved path once instead of once per dialogue.
             void warn_unresolved(const std::string& path)
             {
@@ -70,13 +119,6 @@ namespace jrc
                 }
 
                 Console::get().print("[npc] unresolved inline image: " + path);
-            }
-
-            int16_t space_advance()
-            {
-                const FontCache::Char& space =
-                    FontCache::get().getglyph(Text::A12M, U' ');
-                return std::max<int16_t>(1, space.ax);
             }
         }
 
@@ -138,16 +180,8 @@ namespace jrc
             const std::string domain = path.substr(0, slash);
             const std::string rest = path.substr(slash + 1);
 
-            nl::node root;
-            if (domain == "UI" || domain == "ui")
-            {
-                root = nl::nx::ui;
-            }
-            else if (domain == "Effect" || domain == "effect")
-            {
-                root = nl::nx::effect;
-            }
-            else
+            const nl::node root = domain_root(domain);
+            if (!root)
             {
                 return {};
             }
@@ -162,9 +196,23 @@ namespace jrc
             for (const std::string& candidate : candidates)
             {
                 const nl::node resolved = root.resolve(candidate);
-                if (resolved && resolved.data_type() == nl::node::type::bitmap)
+                if (!resolved)
+                {
+                    continue;
+                }
+
+                if (resolved.data_type() == nl::node::type::bitmap)
                 {
                     return resolved;
+                }
+
+                // Some images are containers whose frames are canvases
+                // (`UIWindow2.img/QuestIcon/3/0`); the dialogue macro always
+                // shows the first frame.
+                const nl::node frame = resolved["0"];
+                if (frame && frame.data_type() == nl::node::type::bitmap)
+                {
+                    return frame;
                 }
             }
 
@@ -173,13 +221,14 @@ namespace jrc
 
         std::vector<NpcEmbedSprite> extract_embed_sprites(
             const std::string& source,
+            int16_t advance_per_space,
             std::string& out_text)
         {
             out_text.clear();
             out_text.reserve(source.size());
 
             std::vector<NpcEmbedSprite> sprites;
-            const int16_t advance_per_space = space_advance();
+            advance_per_space = std::max<int16_t>(1, advance_per_space);
 
             size_t cursor = 0;
             while (cursor < source.size())
