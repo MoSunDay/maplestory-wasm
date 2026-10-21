@@ -122,7 +122,7 @@ cargo build --release -p web-server -p ws-proxy -p assets-server
 ./target/release/assets-server --port 8765 --directory .
 ```
 
-4. Open **http://localhost:8000**.
+4. Open **http://localhost:8000** (the repo-root `index.html` redirects to `/web/index.html`).
 
 The websocket proxy is intended to forward traffic to the linked server instance.
 
@@ -152,7 +152,7 @@ Stop all Docker services:
 ./scripts/stop_all.sh
 ```
 
-Open **http://localhost:8000** after the containers are up.
+Open **http://localhost:8000** after the containers are up. The root page redirects to `/web/index.html`; if you see a directory listing or a blank page, check that you are on port 8000 (the web-server), not on a reverse proxy in front of it.
 
 ---
 

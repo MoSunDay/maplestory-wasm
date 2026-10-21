@@ -1,0 +1,41 @@
+appId: org.maplestorywasm.journeyclient
+productName: JourneyClient
+directories:
+  output: dist
+files:
+  - main/**/*
+  - settings-ui/**/*
+  - preload.js
+asar: true
+compression: normal
+artifactName: "JourneyClient-${version}-${os}-${arch}.${ext}"
+extraResources:
+  - from: resources/msweb
+    to: msweb
+  - from: resources/bin
+    to: bin
+win:
+  target:
+    - nsis
+    - zip
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.games
+  identity: null # unsigned build
+  extendInfo:
+    LSMinimumSystemVersion: "11.0"
+linux:
+  target:
+    - AppImage
+    - zip
+  category: Game
+  maintainer: MapleStory WASM contributors
+  desktop:
+    Name: JourneyClient

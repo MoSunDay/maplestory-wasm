@@ -1,0 +1,141 @@
+name: desktop-release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  wasm:
+    name: wasm-client
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Emscripten 4.0.21
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.21
+
+      - name: Build WASM client
+        run: ./scripts/build_wasm.sh
+
+      - name: Upload WASM client
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-client
+          path:
+            - build/JourneyClient.js
+            - build/JourneyClient.wasm
+          if-no-files-found: error
+
+  package:
+    name: package-${{ matrix.tag }}
+    needs: wasm
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            tag: linux-x64
+            platform: linux
+          - os: macos-13
+            tag: darwin-x64
+            platform: mac
+          - os: macos-14
+            tag: darwin-arm64
+            platform: mac
+          - os: windows-latest
+            tag: windows-x64
+            platform: win
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download WASM client
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-client
+          path: build
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build local services (native)
+        run: cargo build --release -p web-server -p ws-proxy -p assets-server
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install desktop dependencies
+        run: npm ci
+        working-directory: desktop
+
+      - name: Assemble desktop resources
+        run: bash scripts/assemble.sh --target ${{ matrix.tag }}
+        working-directory: desktop
+        shell: bash
+
+      - name: Smoke-test local services
+        run: node scripts/smoke_services.mjs --bin-dir resources/bin/${{ matrix.tag }} --site resources/msweb
+        working-directory: desktop
+
+      - name: Package desktop app (electron-builder)
+        run: npx electron-builder --publish never
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.tag }}
+          path: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.exe
+            desktop/dist/*.blockmap
+          if-no-files-found: warn
+
+  release:
+    name: github-release
+    needs: [package]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/**
+          generate_release_notes: true

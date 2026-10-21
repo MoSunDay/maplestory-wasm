@@ -1,0 +1,21 @@
+{
+  "name": "journey-client-desktop",
+  "productName": "JourneyClient",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MapleStory WASM client desktop launcher (Electron shell bundling web-server, ws-proxy and assets-server)",
+  "author": "MapleStory WASM contributors",
+  "license": "SEE LICENSE IN ../LICENSE",
+  "main": "main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/",
+    "assemble": "bash scripts/assemble.sh",
+    "dist": "electron-builder",
+    "dist:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8"
+  }
+}

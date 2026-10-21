@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'">
+<title>JourneyClient 设置</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>JourneyClient 设置</h1>
+    <p>连接到游戏服务器</p>
+  </header>
+  <label class="field">
+    <span>服务器地址</span>
+    <input id="server-url" type="text" spellcheck="false"
+      placeholder="ms.example.com / ms.example.com:7575 / ws://proxy.example.com:8080">
+  </label>
+  <label class="field">
+    <span>资源服务器 URL（可选）</span>
+    <input id="assets-url" type="text" spellcheck="false"
+      placeholder="ws://assets.example.com:8765 — 未打包本地资源时必填">
+  </label>
+  <div class="hint">
+    服务器地址支持三种格式：<br>
+    <code>ms.example.com</code> 直连主机，登录端口默认 8484；<br>
+    <code>ms.example.com:7575</code> 指定登录端口；<br>
+    <code>ws://proxy.example.com:8080</code> 远程代理（端口默认 8080，支持 <code>wss://</code>）。<br>
+    资源服务器仅支持 <code>ws://</code>（默认 8765）或 <code>wss://</code>（默认 443）；留空时使用本地 .nx 资源。
+  </div>
+  <div id="status" class="status hidden"></div>
+  <div class="actions">
+    <button id="save" type="button" class="primary">保存并启动</button>
+    <button id="quit" type="button" class="secondary">退出</button>
+  </div>
+</main>
+<script src="./app.js"></script>
+</body>
+</html>
