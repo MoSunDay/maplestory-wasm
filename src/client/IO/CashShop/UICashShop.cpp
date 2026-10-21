@@ -1,9 +1,7 @@
 #include "UICashShop.h"
 
-#include "../Components/AreaButton.h"
 #include "../KeyAction.h"
 #include "../UI.h"
-#include "../UILayout.h"
 #include "../UITypes/UINotice.h"
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
@@ -22,18 +20,26 @@ namespace jrc
     {
         // The scene is rendered with Constants::VIEWYOFFSET applied, while
         // hitboxes and layout constants use the final canvas coordinates.
-        // Content is centred in the viewport before subtracting that offset.
+        // Design coordinates are scaled onto the enlarged canvas first, then
+        // centred in the viewport before subtracting that offset.
         Point<int16_t> draw_position(Point<int16_t> position)
         {
-            return position + ui_layout::origin() - Point<int16_t>{ 0, Constants::VIEWYOFFSET };
+            return layout::origin() + layout::scale_point(position) -
+                Point<int16_t>{ 0, Constants::VIEWYOFFSET };
+        }
+
+        Point<int16_t> draw_size(Point<int16_t> size)
+        {
+            return layout::scale_point(size);
         }
 
         void fill_rect(Point<int16_t> position, Point<int16_t> size,
             float r, float g, float b, float a)
         {
             const Point<int16_t> drawn = draw_position(position);
+            const Point<int16_t> scaled = draw_size(size);
             GraphicsGL::get().drawrectangle(
-                drawn.x(), drawn.y(), size.x(), size.y(), r, g, b, a);
+                drawn.x(), drawn.y(), scaled.x(), scaled.y(), r, g, b, a);
         }
 
         void outline_rect(Point<int16_t> position, Point<int16_t> size,
@@ -104,34 +110,17 @@ namespace jrc
           details_count(Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
               layout::DETAILS_TEXT_WIDTH),
           buy_label(Text::A11M, Text::CENTER, Text::BLACK, "购买"),
+          reset_label(Text::A11M, Text::CENTER, Text::BLACK, "重置"),
           transfer_label(Text::A11M, Text::CENTER, Text::WHITE, "存入"),
           charge_label(Text::A11M, Text::CENTER, Text::BLACK, "充值"),
           exit_label(Text::A11M, Text::CENTER, Text::WHITE, "关闭")
     {
-        buttons[BT_EXIT] = std::make_unique<AreaButton>(
-            layout::EXIT_POS, layout::EXIT_SIZE);
-        buttons[BT_CHARGE] = std::make_unique<AreaButton>(
-            layout::CHARGE_POS, layout::CHARGE_SIZE);
-        buttons[BT_BUY] = std::make_unique<AreaButton>(
-            layout::card_position(0) + layout::CARD_BUY_OFFSET,
-            layout::CARD_BUY_SIZE);
-        buttons[BT_TRANSFER] = std::make_unique<AreaButton>(
-            layout::TRANSFER_POS, layout::TRANSFER_SIZE);
-        buttons[BT_LEFT_PREV] = std::make_unique<AreaButton>(
-            layout::LEFT_PREV_POS, layout::PAGER_SIZE);
-        buttons[BT_LEFT_NEXT] = std::make_unique<AreaButton>(
-            layout::LEFT_NEXT_POS, layout::PAGER_SIZE);
-        buttons[BT_RIGHT_PREV] = std::make_unique<AreaButton>(
-            layout::RIGHT_PREV_POS, layout::PAGER_SIZE);
-        buttons[BT_RIGHT_NEXT] = std::make_unique<AreaButton>(
-            layout::RIGHT_NEXT_POS, layout::PAGER_SIZE);
-        buttons[BT_FEATURED] = std::make_unique<AreaButton>(
-            layout::FEATURED_PANEL_POS, layout::FEATURED_PANEL_SIZE);
+        // Hit areas are created (and later re-anchored on resize) from the
+        // shared scaled-geometry table.
+        cash_shop_buttons::apply_geometry(buttons);
 
         for (size_t card = 0; card < view::CATALOG_PAGE_SIZE; ++card)
         {
-            buttons[BT_CARD_FIRST + card] = std::make_unique<AreaButton>(
-                layout::card_position(card), layout::CARD_SIZE);
             card_names[card] = Text(
                 Text::A11M, Text::CENTER, Text::BLACK, "",
                 layout::CARD_NAME_WIDTH);
@@ -141,14 +130,10 @@ namespace jrc
         }
         for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
         {
-            buttons[BT_SLOT_FIRST + slot] = std::make_unique<AreaButton>(
-                layout::slot_position(slot), layout::SLOT_SIZE);
             slot_counts[slot] = Text(Text::A11M, Text::RIGHT, Text::BLACK);
         }
         for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
         {
-            buttons[BT_TAB_FIRST + entry] = std::make_unique<AreaButton>(
-                layout::category_position(entry), layout::CATEGORY_SIZE);
             category_labels[entry] = Text(
                 Text::A11M, Text::LEFT, Text::DARKGREY,
                 view::category_name(entry));
@@ -156,12 +141,8 @@ namespace jrc
                 Text::A11M, Text::RIGHT, Text::DARKGREY, "",
                 layout::CATEGORY_COUNT_WIDTH);
         }
-        buttons[BT_EQSUB_CLOSE] = std::make_unique<AreaButton>(
-            layout::EQSUB_CLOSE_POS, layout::EQSUB_CLOSE_SIZE);
         for (int8_t sub = 0; sub < view::EQSUB_COUNT; ++sub)
         {
-            buttons[BT_EQSUB_FIRST + sub] = std::make_unique<AreaButton>(
-                layout::equip_sub_position(sub), layout::EQSUB_ENTRY_SIZE);
             equip_sub_labels[sub] = Text(
                 Text::A11M, Text::LEFT, Text::DARKGREY,
                 view::equip_sub_name(sub));
@@ -171,8 +152,6 @@ namespace jrc
         }
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
         {
-            buttons[BT_CURRENCY_FIRST + choice] = std::make_unique<AreaButton>(
-                layout::currency_position(choice), layout::CURRENCY_SIZE);
             balance_labels[choice] = Text(
                 Text::A11M, Text::LEFT, Text::LIGHTGREY,
                 currency_short_name(currency_choice(choice)));
@@ -181,10 +160,6 @@ namespace jrc
                 currency_short_name(currency_choice(choice)),
                 layout::CURRENCY_SIZE.x());
         }
-        buttons[BT_RIGHT_LOCKER_TAB] = std::make_unique<AreaButton>(
-            layout::TAB_LOCKER_POS, layout::TAB_SIZE);
-        buttons[BT_RIGHT_INVENTORY_TAB] = std::make_unique<AreaButton>(
-            layout::TAB_INVENTORY_POS, layout::TAB_SIZE);
         tab_labels[0] = Text(
             Text::A11M, Text::CENTER, Text::WHITE, view::pane_name(
                 view::RightPane::LOCKER), layout::TAB_LABEL_WIDTH);
@@ -255,14 +230,18 @@ namespace jrc
             return found != buttons.end() ? found->second->get_state() :
                 Button::NORMAL;
         };
-        // Dark header band over the painted artwork.
-        fill_rect(layout::TOP_BAR_POS, layout::TOP_BAR_SIZE,
+        // Dark header band over the painted artwork. It spans the full
+        // viewport width so the gutters left of the scaled canvas are
+        // covered too.
+        const int16_t band_top = draw_position(layout::TOP_BAR_POS).y();
+        const int16_t band_height =
+            layout::scale_coord(layout::TOP_BAR_SIZE.y());
+        GraphicsGL::get().drawrectangle(0, band_top,
+            Constants::viewwidth(), band_height,
             0.04f, 0.05f, 0.07f, 0.92f);
-        fill_rect(
-            { layout::TOP_BAR_POS.x(),
-                static_cast<int16_t>(layout::TOP_BAR_POS.y() +
-                    layout::TOP_BAR_SIZE.y() - 1) },
-            { layout::TOP_BAR_SIZE.x(), 1 }, 0.88f, 0.52f, 0.16f, 0.35f);
+        GraphicsGL::get().drawrectangle(0,
+            static_cast<int16_t>(band_top + band_height - 1),
+            Constants::viewwidth(), 1, 0.88f, 0.52f, 0.16f, 0.35f);
 
         title.draw(draw_position(layout::TITLE_POS));
         category_title.draw(draw_position(layout::CATEGORY_TITLE_POS));
@@ -297,7 +276,7 @@ namespace jrc
             outline_rect(layout::SEARCH_BAR_POS, layout::SEARCH_BAR_SIZE,
                 1.0f, 0.62f, 0.22f, 1.0f);
         search_label.draw(draw_position(layout::SEARCH_LABEL_POS));
-        // Design-space Textfield bounds move with the shared content origin.
+        // Design-space-scaled Textfield bounds move with the content origin.
         search.draw(layout::origin());
 
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
@@ -353,7 +332,8 @@ namespace jrc
         if (left_range.first == left_range.second)
         {
             skin.no_item.draw({ draw_position(layout::EMPTY_CATALOG_CENTER -
-                layout::EMPTY_HINT_SIZE / 2), layout::EMPTY_HINT_SIZE });
+                layout::EMPTY_HINT_SIZE / 2),
+                draw_size(layout::EMPTY_HINT_SIZE) });
         }
         else
         {
@@ -361,7 +341,8 @@ namespace jrc
             {
                 const size_t index = left_range.first + card;
                 const Point<int16_t> base = layout::card_position(card);
-                skin.card.draw({ draw_position(base), layout::CARD_SIZE });
+                skin.card.draw(
+                    { draw_position(base), draw_size(layout::CARD_SIZE) });
                 const bool active = index < left_range.second;
                 bool selected = false;
                 bool hovered = false;
@@ -431,14 +412,16 @@ namespace jrc
         flat_tab(BT_RIGHT_INVENTORY_TAB, layout::TAB_INVENTORY_POS,
             !locker_active);
         skin.tab_bar.draw(
-            { draw_position(layout::TAB_BAR_POS), layout::TAB_BAR_SIZE });
+            { draw_position(layout::TAB_BAR_POS),
+                draw_size(layout::TAB_BAR_SIZE) });
         tab_labels[0].draw(
             draw_position(tab_label_position(layout::TAB_LOCKER_POS)));
         tab_labels[1].draw(
             draw_position(tab_label_position(layout::TAB_INVENTORY_POS)));
 
         skin.inventory_panel.draw(
-            { draw_position(layout::PANEL_POS), layout::PANEL_SIZE });
+            { draw_position(layout::PANEL_POS),
+                draw_size(layout::PANEL_SIZE) });
 
         // Replace the painted Korean panel header with a flat title band.
         const int16_t header_height = static_cast<int16_t>(
@@ -458,14 +441,15 @@ namespace jrc
         const Texture& cover =
             locker_active ? skin.locker_cover : skin.inventory_cover;
         cover.draw({ draw_position(layout::SLOT_GRID_POS),
-            layout::SLOT_COVER_SIZE });
+            draw_size(layout::SLOT_COVER_SIZE) });
 
         const auto right_range = view::page_range(
             right_page, right_count(), view::RIGHT_PAGE_SIZE);
         if (right_range.first == right_range.second)
         {
             skin.no_item.draw({ draw_position(layout::EMPTY_RIGHT_CENTER -
-                layout::EMPTY_HINT_SIZE / 2), layout::EMPTY_HINT_SIZE });
+                layout::EMPTY_HINT_SIZE / 2),
+                draw_size(layout::EMPTY_HINT_SIZE) });
         }
         else
         {
@@ -582,7 +566,8 @@ namespace jrc
         const size_t frame = found->second->is_active() ?
             button_frame(found->second->get_state()) : 3;
         const Texture& texture = source.frames[frame];
-        texture.draw({ draw_position(pos + texture.get_origin()), size });
+        texture.draw(
+            { draw_position(pos + texture.get_origin()), draw_size(size) });
     }
 
     void UICashShop::draw_icon(const Texture& icon, Point<int16_t> center,
@@ -593,15 +578,18 @@ namespace jrc
         const Point<int16_t> dimensions = icon.get_dimensions();
         if (dimensions.x() <= 0 || dimensions.y() <= 0)
             return;
-        Point<int16_t> size = dimensions;
-        const int16_t longest = std::max(dimensions.x(), dimensions.y());
-        if (max_side > 0 && longest > max_side)
+        // The native glyph scales with the canvas while the fit-to-max rule
+        // keeps it inside the scaled cell.
+        Point<int16_t> size = draw_size(dimensions);
+        const int16_t limit = layout::scale_coord(max_side);
+        const int16_t longest = std::max(size.x(), size.y());
+        if (limit > 0 && longest > limit)
         {
             size = {
                 static_cast<int16_t>(
-                    static_cast<int32_t>(dimensions.x()) * max_side / longest),
+                    static_cast<int32_t>(size.x()) * limit / longest),
                 static_cast<int16_t>(
-                    static_cast<int32_t>(dimensions.y()) * max_side / longest)
+                    static_cast<int32_t>(size.y()) * limit / longest)
             };
         }
         icon.draw(
@@ -627,8 +615,16 @@ namespace jrc
     void UICashShop::update_screen(int16_t, int16_t)
     {
         position = layout::origin();
-        dimension = { layout::VIEW_WIDTH, layout::VIEW_HEIGHT };
+        dimension = layout::scale_point(
+            { layout::VIEW_WIDTH, layout::VIEW_HEIGHT });
+        cash_shop_buttons::apply_geometry(buttons);
         position_buy_button();
+        // The field bounds stay in unshifted design-canvas space (scaled but
+        // without the origin) because search.draw/search.update receive
+        // layout::origin() as their parent position.
+        search.set_bounds({ layout::scale_point(
+            layout::SEARCH_FIELD_BOUNDS.getlt()), layout::scale_point(
+            layout::SEARCH_FIELD_BOUNDS.getrb()) });
     }
 
     void UICashShop::position_buy_button()
@@ -637,9 +633,10 @@ namespace jrc
             *selected_left / view::CATALOG_PAGE_SIZE != left_page)
             return;
         buttons[BT_BUY]->set_position(
-            layout::card_position(
-                *selected_left % view::CATALOG_PAGE_SIZE) +
-            layout::CARD_BUY_OFFSET);
+            layout::scale_point(
+                layout::card_position(
+                    *selected_left % view::CATALOG_PAGE_SIZE) +
+                layout::CARD_BUY_OFFSET));
     }
 
     UIElement::CursorResult UICashShop::send_cursor(
@@ -659,8 +656,8 @@ namespace jrc
 
     void UICashShop::send_scroll(double yoffset)
     {
-        const bool over_catalog = last_cursor_position.x() <
-            layout::SCROLL_SPLIT_X + layout::origin().x();
+        const bool over_catalog =
+            last_cursor_position.x() < layout::scroll_split_x();
         size_t& page = over_catalog ? left_page : right_page;
         const size_t count = over_catalog ? filtered.size() : right_count();
         const size_t page_size = over_catalog ? view::CATALOG_PAGE_SIZE :
@@ -714,6 +711,7 @@ namespace jrc
         {
             UI::get().emplace<UIOk>("当前版本暂不支持充值。", []() {});
         }
+        else if (id == BT_RESET) clear_tryon();
         else if (id == BT_BUY && selected_left)
             request_purchase(*selected_left);
         else if (id == BT_TRANSFER && selected_right)
@@ -778,7 +776,10 @@ namespace jrc
                 if (selected_left && *selected_left == index)
                     request_purchase(index);
                 else
+                {
                     selected_left = index;
+                    add_tryon(index);
+                }
             }
         }
         else if (id >= BT_SLOT_FIRST && id < BT_SLOT_LAST)
@@ -786,12 +787,7 @@ namespace jrc
             const size_t index = right_page * view::RIGHT_PAGE_SIZE +
                 (id - BT_SLOT_FIRST);
             if (index < right_count())
-            {
-                if (selected_right && *selected_right == index)
-                    request_transfer(index);
-                else
-                    selected_right = index;
-            }
+                selected_right = index;
         }
         refresh();
         return Button::NORMAL;

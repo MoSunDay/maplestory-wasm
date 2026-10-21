@@ -173,6 +173,9 @@ namespace jrc
     int32_t Inventory::add_slot(InventoryType::Id type, int16_t slot, int32_t item_id,
         int16_t count, bool cash, int64_t cash_id)
     {
+        // A packet may reuse an occupied slot; drop the old slot and its
+        // metadata before the new unique id is installed.
+        remove(type, slot);
         running_uid++;
         inventories[type][slot] = { running_uid, item_id, count, cash, cash_id };
         return running_uid;

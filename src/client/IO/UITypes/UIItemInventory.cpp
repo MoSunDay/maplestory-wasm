@@ -489,6 +489,11 @@ namespace jrc
         return slot < slotrange.first || slot > slotrange.second;
     }
 
+    int16_t UIItemInventory::hit_test(Point<int16_t> cursorpos) const
+    {
+        return slot_by_position(cursorpos - position);
+    }
+
     int16_t UIItemInventory::slot_by_position(Point<int16_t> cursorpos) const
     {
         // Socket hit test against the generation's grid geometry (see

@@ -2,19 +2,23 @@
 // Screen geometry for the modern full-screen cash shop renderer.
 //
 // The CashShop.img bitmaps are authored for a 1024x768 viewport while the
-// client canvas is a fixed 800x600 design surface. Native artwork sizes and
+// client canvas is an 800x600 design surface. Native artwork sizes and
 // cell pitches are mapped by 25/32 through px(), so bitmaps, the stretched
 // background and the overlays placed on top of them share one pixel grid.
 // Values that are pure screen-space choices are already in 800x600 canvas
-// coordinates; origin() centres that canvas inside larger viewports.
+// coordinates. The design canvas scales uniformly to fill taller viewports
+// (1.2x at 1280x720), and origin() centres the scaled canvas; at exactly
+// 800x600 nothing is scaled or shifted.
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "../../Constants.h"
 #include "../../Template/Point.h"
 #include "../../Template/Rectangle.h"
-#include "../UILayout.h"
 #include "CashShopView.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
@@ -23,11 +27,38 @@ namespace jrc::cash_shop_layout
     constexpr int16_t VIEW_WIDTH = 800;
     constexpr int16_t VIEW_HEIGHT = 600;
 
-    // Top-left corner of the 800x600 design canvas inside the current
+    // Uniform factor applied to the 800x600 design canvas so it fills taller
+    // viewports; it is 1.0f when the viewport is 800x600 or smaller.
+    inline float content_scale()
+    {
+        const float width = static_cast<float>(Constants::viewwidth());
+        const float height = static_cast<float>(Constants::viewheight());
+        return std::max(1.0f,
+            std::min(width / VIEW_WIDTH, height / VIEW_HEIGHT));
+    }
+
+    // Design-canvas coordinate rounded onto the scaled grid.
+    inline int16_t scale_coord(int16_t value)
+    {
+        return static_cast<int16_t>(
+            std::lround(value * content_scale()));
+    }
+
+    // Design-canvas point scaled on both axes.
+    inline Point<int16_t> scale_point(Point<int16_t> value)
+    {
+        return { scale_coord(value.x()), scale_coord(value.y()) };
+    }
+
+    // Top-left corner of the scaled design canvas inside the current
     // viewport. It is zero when the viewport is exactly 800x600.
     inline Point<int16_t> origin()
     {
-        return jrc::ui_layout::origin();
+        const int16_t x = static_cast<int16_t>(std::max(0,
+            (Constants::viewwidth() - scale_coord(VIEW_WIDTH)) / 2));
+        const int16_t y = static_cast<int16_t>(std::max(0,
+            (Constants::viewheight() - scale_coord(VIEW_HEIGHT)) / 2));
+        return Point<int16_t>(x, y);
     }
 
     // Native 1024x768 pixels -> 800x600 screen pixels.
@@ -112,13 +143,13 @@ namespace jrc::cash_shop_layout
     constexpr Rectangle<int16_t> SEARCH_HITBOX{
         { 109, 34 }, { 493, 59 } };
 
-    // Viewport-space search hitbox: the design rect moved by origin().
+    // Viewport-space search hitbox: the scaled design rect moved by origin().
     inline Rectangle<int16_t> search_hitbox()
     {
         const Point<int16_t> offset = origin();
         return {
-            SEARCH_HITBOX.getlt() + offset,
-            SEARCH_HITBOX.getrb() + offset
+            scale_point(SEARCH_HITBOX.getlt()) + offset,
+            scale_point(SEARCH_HITBOX.getrb()) + offset
         };
     }
 
@@ -235,12 +266,22 @@ namespace jrc::cash_shop_layout
     constexpr Point<int16_t> FEATURED_META_POS{ 630, 508 };
     constexpr int16_t FEATURED_TEXT_WIDTH = 156;
     constexpr Point<int16_t> FEATURED_HINT_POS{ 644, 568 };
+
+    // Reset button for the accumulated try-on set, left of the hint band.
+    constexpr Point<int16_t> RESET_POS{ 508, 556 };
+    constexpr Point<int16_t> RESET_SIZE{ 40, 16 };
     constexpr int16_t FEATURED_HINT_WIDTH = 270;
     constexpr Point<int16_t> FEATURED_TEXT_BLOCK_POS{ 622, 448 };
     constexpr Point<int16_t> FEATURED_TEXT_BLOCK_SIZE{ 164, 74 };
 
     // Cursor x that separates the catalog from the right pane when scrolling.
     constexpr int16_t SCROLL_SPLIT_X = 495;
+
+    // Viewport-space x of the catalog/right-pane scroll split.
+    inline int16_t scroll_split_x()
+    {
+        return static_cast<int16_t>(origin().x() + scale_coord(SCROLL_SPLIT_X));
+    }
 
     // Top-left corner of the n-th category entry.
     inline Point<int16_t> category_position(int8_t index)
