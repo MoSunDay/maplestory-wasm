@@ -158,7 +158,7 @@ node scripts/smoke_services.mjs \
   跳过 macOS 签名）→ 上传 `desktop/dist/` 下的 AppImage/dmg/zip/exe/blockmap。
   Windows 的 assemble 步骤显式 `shell: bash`（git-bash）。
 - **`release` job**：仅标签触发，汇总 `desktop-*` artifacts 后用
-  `softprops/action-gh-release@v2` 附到 GitHub Release（自动生成变更说明）。
+  `softprops/action-gh-release@v3` 附到 GitHub Release（自动生成变更说明）。
 
 ## 8. 风险与对策
 
