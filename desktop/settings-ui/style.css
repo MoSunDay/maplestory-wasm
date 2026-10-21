@@ -1,0 +1,75 @@
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1e1f24;
+    color: #e8e8ec;
+    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    font-size: 14px;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+  main { width: 100%; padding: 28px 32px; display: flex; flex-direction: column; gap: 18px; }
+  header h1 { font-size: 20px; color: #fff; }
+  header h1::before { content: "🍁 "; font-size: 18px; }
+  header p { margin-top: 6px; color: #9a9aa5; font-size: 13px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field span { color: #c7c7d1; }
+  input {
+    background: #17181c;
+    border: 1px solid #3a3b44;
+    border-radius: 6px;
+    color: #f0f0f4;
+    padding: 9px 11px;
+    font-size: 13px;
+    outline: none;
+    width: 100%;
+  }
+  input:focus { border-color: #f60; }
+  .hint {
+    background: #232429;
+    border-left: 3px solid #f60;
+    border-radius: 4px;
+    color: #9a9aa5;
+    font-size: 12px;
+    line-height: 1.7;
+    padding: 10px 12px;
+  }
+  .hint code { color: #d9d9e2; }
+  .status {
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status.warn { background: #3a2a10; color: #ffb84d; border: 1px solid #6b4a15; }
+  .status.error { background: #3a1518; color: #ff8080; border: 1px solid #6b2429; }
+  .status.info { background: #1c2634; color: #7fb0ff; border: 1px solid #274363; }
+  .status.info::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border: 2px solid #7fb0ff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none; }
+  .actions { display: flex; gap: 12px; margin-top: auto; }
+  button {
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 10px 18px;
+    flex: 1;
+  }
+  button.primary { background: #f60; color: #1e1f24; font-weight: bold; }
+  button.primary:hover:not(:disabled) { background: #ff751a; }
+  button.secondary { background: #2a2b32; color: #c7c7d1; border-color: #3a3b44; }
+  button.secondary:hover:not(:disabled) { background: #33343d; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
