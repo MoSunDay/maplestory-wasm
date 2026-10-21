@@ -20,6 +20,7 @@
 
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Texture.h"
+#include "UINpcTalkImages.h"
 #include <string>
 #include <vector>
 
@@ -102,8 +103,10 @@ namespace jrc
         int8_t type;
         bool end_confirms_dialogue;
         std::string prompttext;
+        std::vector<npctalk_images::NpcEmbedSprite> embeds;
         std::vector<std::string> selection_texts;
         std::vector<Text> selection_labels;
+        std::vector<std::vector<npctalk_images::NpcEmbedSprite>> selection_embeds;
         std::vector<int32_t> selections;
         int32_t selected;
         int32_t hovered_selection;

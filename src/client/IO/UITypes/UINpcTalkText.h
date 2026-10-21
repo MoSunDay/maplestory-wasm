@@ -17,6 +17,13 @@ namespace jrc
 {
     namespace npctalk_text
     {
+        // How the scanners treat `#f<path>#` inline-image tokens.
+        enum class EmbedImages
+        {
+            STRIP,  // drop the whole token so no path text leaks
+            KEEP    // copy it through so the caller can extract sprites
+        };
+
         struct SelectionList
         {
             std::string rendered_text;
@@ -28,12 +35,23 @@ namespace jrc
         bool is_selection_dialogue_type(int8_t msgtype);
 
         // Remove every #..# placeholder token, keeping the readable text.
-        std::string strip_npc_tokens(const std::string& source);
+        // Inline-image tokens are always removed from the output; KEEP
+        // additionally preserves them for a later sprite extraction pass.
+        std::string strip_npc_tokens(
+            const std::string& source,
+            EmbedImages embed_images = EmbedImages::STRIP
+        );
 
         // Expand #h/#p/#t/#m/#o references into names, drop formatting tokens.
-        std::string replace_macros(const std::string& source);
+        std::string replace_macros(
+            const std::string& source,
+            EmbedImages embed_images = EmbedImages::STRIP
+        );
 
         // Split a dialogue string into its prompt text and #L id#option#l list.
-        SelectionList parse_selections(const std::string& source);
+        SelectionList parse_selections(
+            const std::string& source,
+            EmbedImages embed_images = EmbedImages::STRIP
+        );
     }
 }

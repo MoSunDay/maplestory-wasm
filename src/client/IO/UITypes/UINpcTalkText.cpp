@@ -19,6 +19,7 @@
 
 #include "../../Gameplay/Stage.h"
 
+#include "UINpcTalkImages.h"
 #include "UINpcTalkRefs.h"
 
 #include <cctype>
@@ -147,7 +148,7 @@ namespace jrc
             return msgtype == SELECTION_DIALOGUE_TYPE || msgtype == LEGACY_SELECTION_DIALOGUE_TYPE;
         }
 
-        std::string strip_npc_tokens(const std::string& source)
+        std::string strip_npc_tokens(const std::string& source, EmbedImages embed_images)
         {
             std::string stripped;
             stripped.reserve(source.size());
@@ -163,6 +164,21 @@ namespace jrc
                 }
 
                 char token = source[cursor + 1];
+
+                // Inline-image tokens must be consumed as a whole: their path
+                // must never leak into the readable text, and in KEEP mode
+                // they survive verbatim for the sprite extraction pass.
+                std::string embed_path;
+                size_t embed_end = 0;
+                if (npctalk_images::try_parse_embed_token(source, cursor, embed_path, embed_end))
+                {
+                    if (embed_images == EmbedImages::KEEP)
+                    {
+                        stripped.append(source, cursor, embed_end - cursor);
+                    }
+                    cursor = embed_end;
+                    continue;
+                }
 
                 if (token == '#')
                 {
@@ -219,7 +235,7 @@ namespace jrc
             return stripped;
         }
 
-        std::string replace_macros(const std::string& source)
+        std::string replace_macros(const std::string& source, EmbedImages embed_images)
         {
             std::string result;
             result.reserve(source.size());
@@ -235,6 +251,21 @@ namespace jrc
                 }
 
                 char token = source[cursor + 1];
+
+                // Inline-image tokens pass through untouched in KEEP mode (or
+                // vanish in STRIP mode); their body is not scanned for macros
+                // or formatting letters like the legacy 'f' colour token.
+                std::string embed_path;
+                size_t embed_end = 0;
+                if (npctalk_images::try_parse_embed_token(source, cursor, embed_path, embed_end))
+                {
+                    if (embed_images == EmbedImages::KEEP)
+                    {
+                        result.append(source, cursor, embed_end - cursor);
+                    }
+                    cursor = embed_end;
+                    continue;
+                }
 
                 // Skip zero-parameter formatting tokens (#b, #e, #k, #n, #r, etc.)
                 if (is_formatting_token(token))
@@ -311,7 +342,7 @@ namespace jrc
             return result;
         }
 
-        SelectionList parse_selections(const std::string& source)
+        SelectionList parse_selections(const std::string& source, EmbedImages embed_images)
         {
             SelectionList result;
 
@@ -368,13 +399,16 @@ namespace jrc
                 result.option_ids.push_back(selection_id);
                 result.option_texts.push_back(
                     trim_selection_text(
-                        strip_npc_tokens(source.substr(option_start, option_end - option_start))
+                        strip_npc_tokens(
+                            source.substr(option_start, option_end - option_start),
+                            embed_images
+                        )
                     )
                 );
                 cursor = has_explicit_end ? option_end + 2 : option_end;
             }
 
-            result.rendered_text = strip_npc_tokens(result.rendered_text);
+            result.rendered_text = strip_npc_tokens(result.rendered_text, embed_images);
             return result;
         }
     }
