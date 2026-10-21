@@ -109,6 +109,11 @@ namespace jrc
         return layout.get_endoffset();
     }
 
+    const Text::Layout& Text::get_layout() const
+    {
+        return layout;
+    }
+
     const std::string& Text::get_text() const
     {
         return text;

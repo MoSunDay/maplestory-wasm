@@ -46,6 +46,66 @@ namespace jrc
         constexpr int16_t DIALOG_TEXT_Y_OFFSET = 16;
         constexpr int16_t OPTION_VERTICAL_GAP = 2;
         constexpr int16_t HOVER_UNDERLINE_THICKNESS = 1;
+
+        // Baseline y (relative to the text block) of the line containing the
+        // given byte index; falls back to the latest line that starts at or
+        // before the index when the byte sits between recorded words.
+        int16_t embed_line_baseline(const Text::Layout& layout, size_t byte_pos)
+        {
+            int16_t fallback = 0;
+            for (const Text::Layout::Line& line : layout)
+            {
+                if (line.words.empty())
+                {
+                    continue;
+                }
+
+                for (const Text::Layout::Word& word : line.words)
+                {
+                    if (byte_pos >= word.first && byte_pos < word.last)
+                    {
+                        return line.position.y();
+                    }
+                }
+
+                if (byte_pos >= line.words.front().first)
+                {
+                    fallback = line.position.y();
+                }
+            }
+
+            return fallback;
+        }
+
+        // Draw inline-image sprites for one text block. Sprites sit with
+        // their bottom edge on the line baseline, horizontally at the space
+        // placeholder that `extract_embed_sprites` left in the text.
+        void draw_embed_sprites(
+            const std::vector<npctalk_images::NpcEmbedSprite>& sprites,
+            const Text& label,
+            Point<int16_t> dialog_position,
+            int16_t text_y
+        )
+        {
+            if (sprites.empty() || label.empty())
+            {
+                return;
+            }
+
+            const Text::Layout& layout = label.get_layout();
+            for (const npctalk_images::NpcEmbedSprite& sprite : sprites)
+            {
+                const int16_t x = static_cast<int16_t>(
+                    DIALOG_TEXT_X + label.advance(sprite.byte_pos) + sprite.x_offset
+                );
+                const int16_t y = static_cast<int16_t>(
+                    text_y +
+                    embed_line_baseline(layout, sprite.byte_pos) -
+                    sprite.texture.height()
+                );
+                sprite.texture.draw(dialog_position + Point<int16_t>(x, y));
+            }
+        }
     }
 
     UINpcTalk::UINpcTalk()
@@ -125,6 +185,7 @@ namespace jrc
         if (text_y + text.height() > content_top && text_y < content_bottom)
         {
             text.draw(position + Point<int16_t>(DIALOG_TEXT_X, text_y));
+            draw_embed_sprites(embeds, text, position, text_y);
         }
 
         if (!selection_labels.empty())
@@ -138,6 +199,13 @@ namespace jrc
                 if (option_y + option_label.height() > content_top && option_y < content_bottom)
                 {
                     option_label.draw(position + Point<int16_t>(DIALOG_TEXT_X, option_y));
+
+                    if (i < selection_embeds.size())
+                    {
+                        draw_embed_sprites(
+                            selection_embeds[i], option_label, position, option_y
+                        );
+                    }
 
                     if (static_cast<int32_t>(i) == hovered_selection)
                     {
@@ -271,33 +339,48 @@ namespace jrc
         const std::string& tx
     )
     {
-        std::string processed_tx = npctalk_text::replace_macros(tx);
+        std::string processed_tx = npctalk_text::replace_macros(
+            tx, npctalk_text::EmbedImages::KEEP);
         dialogue_mode = resolve_dialogue_mode(msgtype, has_navigation_flags);
 
         selections.clear();
         selection_texts.clear();
         selection_labels.clear();
+        selection_embeds.clear();
+        embeds.clear();
         selected = 0;
         hovered_selection = -1;
         end_confirms_dialogue = false;
 
         if (dialogue_mode == DialogueMode::SELECTION)
         {
-            const npctalk_text::SelectionList parsed = npctalk_text::parse_selections(processed_tx);
-            prompttext = parsed.rendered_text;
+            const npctalk_text::SelectionList parsed = npctalk_text::parse_selections(
+                processed_tx, npctalk_text::EmbedImages::KEEP);
             selections = parsed.option_ids;
             selection_texts = parsed.option_texts;
+            prompttext.clear();
+            // Extract #f<path># sprites last so their byte positions stay
+            // valid for the final wrapped layout.
+            embeds = npctalk_images::extract_embed_sprites(parsed.rendered_text, prompttext);
             text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
             selection_labels.reserve(selection_texts.size());
+            selection_embeds.reserve(selection_texts.size());
             for (const std::string& option_text : selection_texts)
             {
-                selection_labels.emplace_back(Text::A12M, Text::LEFT, Text::BLUE, option_text, TEXT_WIDTH, false);
+                std::string display_text;
+                selection_embeds.push_back(
+                    npctalk_images::extract_embed_sprites(option_text, display_text));
+                selection_labels.emplace_back(
+                    Text::A12M, Text::LEFT, Text::BLUE, display_text, TEXT_WIDTH, false);
             }
             refresh_selection_styles();
         }
         else
         {
-            prompttext = npctalk_text::strip_npc_tokens(processed_tx);
+            const std::string stripped = npctalk_text::strip_npc_tokens(
+                processed_tx, npctalk_text::EmbedImages::KEEP);
+            prompttext.clear();
+            embeds = npctalk_images::extract_embed_sprites(stripped, prompttext);
             text = { Text::A12M, Text::LEFT, Text::DARKGREY, prompttext, TEXT_WIDTH, false };
         }
 

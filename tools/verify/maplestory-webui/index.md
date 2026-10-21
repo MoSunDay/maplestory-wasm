@@ -110,3 +110,24 @@ update characters set map=910000000, spawnpoint=0 where accountid=42;
 （角色卡索引 0..3，默认 1）、`FM_FLOW_URL`（默认 http://127.0.0.1:8000/web/index.html）。
 产物在 `/tmp/maplestory-webui-*/`（`fm00-entry..fm05-room1.png` 六张截图 +
 browser-console/errors.log）。
+
+## NPC 对话内嵌图片（#f 路径宏）流程
+
+`npc-embed-icons.mjs` 验证妮娜（9270052，自由市场 910000000，出生点向右走到
+x≈34）对话里 `#fUI/GuildMark/Mark/...#` 内嵌图片宏的端到端渲染：
+
+- 文本层：`msnpc_prompt` 不得泄漏 `UI/`、`GuildMark` 等资源路径子串，
+  且出现 `#f` 精灵按宽度换算出的空格占位长跑（实测 105 空格）；
+- 像素层：页面内 readPixels 在对话文本列（game x300..620 y215..290）按
+  5px 横带扫描，自动锁定最彩带为图标行（实测 y255-269、pitch 15 的
+  17 连排 15×15 四方印 + 行尾 3 枚），要求其 chroma 显著高于灰阶文本
+  参照（实测 108 vs 5.6），且 x300..560 分 12 列全部染色；
+- 差分层：Escape 关闭对话后同带 chroma 须回落（世界底色残留约 70，
+  开对话时 108，差 ≥10 断言通过）；
+- 卫生层：console 无 `unresolved inline image` 告警、无浏览器错误。
+
+图标纹理经 LazyFS 异步入图集，脚本对色带扫描带 20s 重试（首帧
+ready=0/21，数秒后 21/21）。每次运行前需
+`update accounts set loggedin=0 where name='fmflow1';`。
+环境变量：`NPC_EMBED_ACCOUNT/PASSWORD/CARD/X/URL`、`CHROME_BIN`，
+产物在 `/tmp/maplestory-webui-*/`（open/closed 截图 + npc-embed-icons.json）。

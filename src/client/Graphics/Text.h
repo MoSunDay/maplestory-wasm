@@ -127,6 +127,7 @@ namespace jrc
         uint16_t advance(size_t pos) const;
         Point<int16_t> dimensions() const;
         Point<int16_t> endoffset() const;
+        const Layout& get_layout() const;
         const std::string& get_text() const;
 
     private:
