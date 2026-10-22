@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../UIDragElement.h"
+#include "TradeLayout.h"
 #include "TradeState.h"
 
 #include "../../Character/Inventory/Inventory.h"

@@ -55,6 +55,7 @@ namespace jrc
             BT_CLOSE,
             BT_PET,
             BT_TRADE,
+            BT_PARTY,
             BT_FAME_UP,
             BT_FAME_DOWN,
             BT_PET_TAB_0,

@@ -81,10 +81,12 @@ int main(int argc, char** argv)
         "character/married placement");
     check(button_is_complete(character["BtPet"]), "character/BtPet");
     check(button_is_complete(character["BtTrad"]), "character/BtTrad");
+    check(button_is_complete(character["BtParty"]), "character/BtParty");
     check(button_is_complete(character["BtPopUp"]), "character/BtPopUp");
     check(button_is_complete(character["BtPopDown"]), "character/BtPopDown");
     check(button_fits(character["BtPet"], 271, 190), "character/BtPet bounds");
     check(button_fits(character["BtTrad"], 271, 190), "character/BtTrad bounds");
+    check(button_fits(character["BtParty"], 271, 190), "character/BtParty bounds");
     check(button_fits(character["BtPopUp"], 271, 190), "character/BtPopUp bounds");
     check(button_fits(character["BtPopDown"], 271, 190), "character/BtPopDown bounds");
     check(bitmap_is(pet["backgrnd"], 271, 196), "pet/backgrnd");
@@ -103,7 +105,7 @@ int main(int argc, char** argv)
             "pet/ActionPet/" + key);
     }
     std::cout << (ok ? "PASS" : "FAIL")
-              << " UserInfo character, fame, trade, and three-pet assets";
+              << " UserInfo character, fame, party, trade, and three-pet assets";
     if (ok)
     {
         const nl::node pet_button = character["BtPet"]["normal"]["0"];

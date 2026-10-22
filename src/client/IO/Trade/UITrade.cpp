@@ -15,11 +15,12 @@
 namespace jrc
 {
     UITrade::UITrade(const Inventory& inv, uint8_t slot)
-        : UIDragElement<PosTRADE>({ 654, 24 }),
+        : UIDragElement<PosTRADE>({ trade_layout::WIDTH, 24 }),
           inventory(inv), local_slot(slot), page(0),
           chatfield(Text::A11M, Text::LEFT, Text::DARKGREY,
-              Rectangle<int16_t>(28, 570, 346, 369), 70),
-          page_label(Text::A11M, Text::CENTER, Text::DARKGREY, "1-5 / 9")
+              trade_layout::CHATFIELD, 70),
+          page_label(Text::A11M, Text::RIGHT, Text::DARKGREY, "1-5 / 9",
+              trade_layout::PAGE_WIDTH)
     {
         nl::node source = nl::nx::ui["UIWindow2.img"]["CashTradingRoom"];
         sprites.emplace_back(source["backgrnd"]);
@@ -33,49 +34,61 @@ namespace jrc
         buttons[BT_RESET]->set_active(false);
         buttons[BT_TRADE]->set_state(Button::DISABLED);
 
-        names[0] = { Text::A12B, Text::CENTER, Text::DARKGREY, "等待中", 260 };
-        names[1] = { Text::A12B, Text::CENTER, Text::DARKGREY, "等待对方", 260 };
+        names[0] = { Text::A12B, Text::CENTER, Text::DARKGREY, "等待中",
+            trade_layout::NAME_WIDTH };
+        names[1] = { Text::A12B, Text::CENTER, Text::DARKGREY, "等待对方",
+            trade_layout::NAME_WIDTH };
         chatfield.set_enter_callback([this](const std::string&) { send_chat(); });
-        dimension = { 654, 566 };
+        dimension = { trade_layout::WIDTH, trade_layout::HEIGHT };
         active = true;
     }
 
     void UITrade::draw(float alpha) const
     {
         draw_sprites(alpha);
-        names[0].draw(position + Point<int16_t>(163, 40));
-        names[1].draw(position + Point<int16_t>(489, 40));
+        names[0].draw(position + Point<int16_t>(trade_layout::LOCAL_NAME_X,
+            trade_layout::NAME_Y));
+        names[1].draw(position + Point<int16_t>(trade_layout::PARTNER_NAME_X,
+            trade_layout::NAME_Y));
         if (looks[0])
-            looks[0]->draw(position + Point<int16_t>(162, 108), false,
-                Stance::STAND1, Expression::DEFAULT);
+            looks[0]->draw(position + Point<int16_t>(trade_layout::LOCAL_LOOK_X,
+                trade_layout::LOOK_Y), false, Stance::STAND1, Expression::DEFAULT);
         if (looks[1])
-            looks[1]->draw(position + Point<int16_t>(489, 108), true,
-                Stance::STAND1, Expression::DEFAULT);
+            looks[1]->draw(position + Point<int16_t>(trade_layout::PARTNER_LOOK_X,
+                trade_layout::LOOK_Y), true, Stance::STAND1, Expression::DEFAULT);
 
         draw_offers(false);
         draw_offers(true);
-        page_label.draw(position + Point<int16_t>(327, 318));
+        page_label.draw(position + Point<int16_t>(trade_layout::PAGE_X,
+            trade_layout::PAGE_Y));
 
         const std::string local_meso = "金币: " + std::to_string(state.meso(false));
         const std::string partner_meso = "金币: " + std::to_string(state.meso(true));
         Text(Text::A11B, Text::LEFT, Text::DARKGREY, local_meso)
-            .draw(position + Point<int16_t>(31, 319));
+            .draw(position + Point<int16_t>(trade_layout::LOCAL_MESO_X,
+                trade_layout::MESO_Y));
         Text(Text::A11B, Text::LEFT, Text::DARKGREY, partner_meso)
-            .draw(position + Point<int16_t>(356, 319));
+            .draw(position + Point<int16_t>(trade_layout::PARTNER_MESO_X,
+                trade_layout::MESO_Y));
 
         if (state.confirmed(false))
-            Text(Text::A11B, Text::CENTER, Text::RED, "已确认", 120)
-                .draw(position + Point<int16_t>(163, 73));
+            Text(Text::A11B, Text::CENTER, Text::RED, "已确认",
+                trade_layout::CONFIRM_WIDTH)
+                .draw(position + Point<int16_t>(trade_layout::LOCAL_CONFIRM_X,
+                    trade_layout::CONFIRM_Y));
         if (state.confirmed(true))
-            Text(Text::A11B, Text::CENTER, Text::RED, "对方已确认", 120)
-                .draw(position + Point<int16_t>(489, 73));
+            Text(Text::A11B, Text::CENTER, Text::RED, "对方已确认",
+                trade_layout::CONFIRM_WIDTH)
+                .draw(position + Point<int16_t>(trade_layout::PARTNER_CONFIRM_X,
+                    trade_layout::CONFIRM_Y));
 
-        int16_t chat_y = 392;
+        int16_t chat_y = trade_layout::CHAT_Y;
         for (const std::string& message : state.chat())
         {
-            Text(Text::A11M, Text::LEFT, Text::DARKGREY, message, 590)
-                .draw(position + Point<int16_t>(30, chat_y));
-            chat_y += 17;
+            Text(Text::A11M, Text::LEFT, Text::DARKGREY, message,
+                trade_layout::CHAT_WIDTH)
+                .draw(position + Point<int16_t>(trade_layout::CHAT_X, chat_y));
+            chat_y += trade_layout::CHAT_STEP;
         }
         chatfield.draw(position);
         draw_buttons(alpha);
@@ -83,7 +96,8 @@ namespace jrc
 
     void UITrade::draw_offers(bool partner) const
     {
-        const int16_t x = partner ? 355 : 30;
+        const int16_t x = partner ? trade_layout::PARTNER_ITEM_X :
+            trade_layout::LOCAL_ITEM_X;
         const uint8_t first = page == 0 ? 1 : 5;
         for (uint8_t row = 0; row < 5; ++row)
         {
@@ -92,13 +106,16 @@ namespace jrc
             if (offer.item_id == 0)
                 continue;
 
-            Point<int16_t> item_position = position + Point<int16_t>(x, 116 + row * 39);
+            Point<int16_t> item_position = position + Point<int16_t>(x,
+                trade_layout::ITEM_TOP + row * trade_layout::ITEM_STEP);
             ItemData::get(offer.item_id).get_icon(false).draw(item_position);
             std::string label = ItemData::get(offer.item_id).get_name();
             if (offer.quantity > 1)
                 label += " x" + std::to_string(offer.quantity);
-            Text(Text::A11M, Text::LEFT, Text::DARKGREY, label, 240)
-                .draw(item_position + Point<int16_t>(39, -25));
+            Text(Text::A11M, Text::LEFT, Text::DARKGREY, label,
+                trade_layout::ITEM_LABEL_WIDTH)
+                .draw(item_position + Point<int16_t>(trade_layout::ITEM_LABEL_DX,
+                    trade_layout::ITEM_LABEL_DY));
         }
     }
 
