@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../UIElement.h"
+#include "PlayerContextLayout.h"
 
 #include "../../Gameplay/Targeting/PlayerTargeting.h"
 #include "../../Graphics/Geometry.h"
@@ -29,5 +30,6 @@ namespace jrc
         ColorLine divider;
         Text title;
         Text trade;
+        Text party;
     };
 }

@@ -14,6 +14,8 @@ const secondary = {
   password: process.env.SOCIAL_PASSWORD,
   name: process.env.SOCIAL_CHARACTER
 };
+const primaryCard = Number(process.env.PRIMARY_CARD || 0);
+const secondaryCard = Number(process.env.SOCIAL_CARD || 0);
 const uiState = Object.freeze({ login: 1, world: 2, characters: 3, game: 5 });
 
 function requireCredentials(credentials, label) {
@@ -51,7 +53,19 @@ async function waitAssets(driver, label) {
   }, 60);
 }
 
-async function boot(credentials, port) {
+async function enterCharacter(driver, cardIndex) {
+  const x = 105 + 120 * cardIndex + 25;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await driver.doubleClick(x, 210);
+    for (let poll = 0; poll < 10; poll += 1) {
+      if (await probe(driver, 'msui_state') === uiState.game) return;
+      await sleep(500);
+    }
+  }
+  throw new Error(`game UI timed out for character card ${cardIndex}`);
+}
+
+async function boot(credentials, port, cardIndex) {
   const driver = new BrowserDriver({ binary: chrome, debugPort: port });
   await driver.start();
   await driver.navigate(url);
@@ -59,19 +73,24 @@ async function boot(credentials, port) {
     "typeof Module !== 'undefined' && Module.calledRun === true && typeof Module.ccall === 'function'"), 90);
   await waitUi(driver, 'login UI', uiState.login);
   await waitAssets(driver, 'login assets');
-  await driver.click(340, 260);
+  await driver.clickField(340, 260);
   await driver.compose(credentials.account);
-  await driver.click(340, 285);
+  await driver.clickField(340, 285);
   await driver.typeAscii(credentials.password);
   await driver.key('Enter', 'Enter', 13);
   await waitUi(driver, 'world UI', uiState.world);
   await waitAssets(driver, 'world assets');
-  await driver.click(510, 216);
+  await sleep(2500);
+  await driver.retryClick(510, 216, () =>
+    probe(driver, 'msui_state').then(value => value === uiState.characters));
   await waitUi(driver, 'character UI', uiState.characters);
   await waitAssets(driver, 'character assets');
-  await driver.click(130, 220);
-  await driver.click(650, 400);
-  await waitUi(driver, 'game UI', uiState.game, 60);
+  await waitFor('character list ready', async () =>
+    await probe(driver, 'mscharlist_phase') === 8 &&
+    await probe(driver, 'mscharlist_character_index') >= 0);
+  await enterCharacter(driver, cardIndex);
+  await waitFor('game UI', () => probe(driver, 'msui_state').then(
+    value => value === uiState.game), 60);
   await waitAssets(driver, 'game assets');
   return driver;
 }
@@ -140,7 +159,7 @@ async function addBuddy(driver, name, openWindow = true) {
   await driver.screenshot('social-buddy-field-entry');
   await waitFor('buddy add field focused', () => driver.evaluate(
     `MapleWasmIME.active && document.getElementById('ime-input').value === ${JSON.stringify(name)}`));
-  await driver.key('Enter', 'Enter', 13);
+  await driver.click(origin.x + 260, origin.y + 180);
 }
 
 async function deleteFirstBuddy(driver, openWindow = true) {
@@ -192,8 +211,8 @@ async function fullSocialFlow() {
   requireCredentials(primary, 'primary');
   requireCredentials(secondary, 'secondary');
   const basePort = Number(process.env.E2E_DEBUG_PORT || 9261);
-  const primaryDriver = await boot(primary, basePort);
-  let secondaryDriver = await boot(secondary, basePort + 1);
+  const primaryDriver = await boot(primary, basePort, primaryCard);
+  let secondaryDriver = await boot(secondary, basePort + 1, secondaryCard);
   try {
     const primaryId = await probe(primaryDriver, 'msplayer_id');
     const secondaryId = await probe(secondaryDriver, 'msplayer_id');
@@ -203,6 +222,12 @@ async function fullSocialFlow() {
     if ((primaryLevel < 10) !== (secondaryLevel < 10)) {
       throw new Error('party participants must both be starters or both be level 10 or higher');
     }
+    for (const driver of [primaryDriver, secondaryDriver]) {
+      await chat(driver, '/party leave');
+    }
+    await waitFor('party invite state cleaned', async () =>
+      await probe(primaryDriver, 'msparty_id') === -1 &&
+      await probe(secondaryDriver, 'msparty_id') === -1);
 
     await waitFor('remote character visible for profile card', () =>
       probe(primaryDriver, 'mschar_visible', [secondaryId], ['number']).then(value => value === 1));
@@ -216,13 +241,37 @@ async function fullSocialFlow() {
       await probe(primaryDriver, 'msuserinfo_target_id') === secondaryId &&
       await probe(primaryDriver, 'msuserinfo_loaded') === 1);
     await primaryDriver.screenshot('social-remote-user-info');
+    const userInfoOrigin = {
+      x: await probe(primaryDriver, 'msuserinfo_x'),
+      y: await probe(primaryDriver, 'msuserinfo_y')
+    };
+    await primaryDriver.click(userInfoOrigin.x + 177, userInfoOrigin.y + 35);
+    await waitFor('party invite sent from character card', () =>
+      probe(secondaryDriver, 'msparty_pending_id').then(value => value > 0));
+    await primaryDriver.screenshot('social-card-party-invite');
+    await chat(secondaryDriver, '/party deny');
+    await waitFor('card party invite denied', () =>
+      probe(secondaryDriver, 'msparty_pending_id').then(value => value === -1));
     await primaryDriver.key('Escape', 'Escape', 27);
     await waitFor('remote character info card closed', () =>
       probe(primaryDriver, 'msuserinfo_active').then(value => value === 0));
+    await chat(primaryDriver, '/party leave');
+    await waitFor('card invite party cleaned up', () =>
+      probe(primaryDriver, 'msparty_id').then(value => value === -1));
+
     await primaryDriver.rightClick(remotePoint.x, remotePoint.y);
-    await waitFor('remote right-click trade context retained', () =>
+    await waitFor('remote right-click context retained', () =>
       probe(primaryDriver, 'msplayer_context_active').then(value => value === 1));
-    await primaryDriver.key('Escape', 'Escape', 27);
+    await primaryDriver.click(remotePoint.x + 20, remotePoint.y + 60);
+    await waitFor('party invite sent from right-click menu', () =>
+      probe(secondaryDriver, 'msparty_pending_id').then(value => value > 0));
+    await primaryDriver.screenshot('social-context-party-invite');
+    await chat(secondaryDriver, '/party deny');
+    await waitFor('context party invite denied', () =>
+      probe(secondaryDriver, 'msparty_pending_id').then(value => value === -1));
+    await chat(primaryDriver, '/party leave');
+    await waitFor('context invite party cleaned up', () =>
+      probe(primaryDriver, 'msparty_id').then(value => value === -1));
 
     await clearExistingBuddies(primaryDriver);
     await clearExistingBuddies(secondaryDriver);
@@ -249,7 +298,7 @@ async function fullSocialFlow() {
     await secondaryDriver.stop();
     await waitFor('buddy offline update received', () =>
       probe(primaryDriver, 'msbuddy_online_count').then(value => value === 0));
-    secondaryDriver = await boot(secondary, basePort + 2);
+    secondaryDriver = await boot(secondary, basePort + 2, secondaryCard);
     await waitFor('buddy online update received', () =>
       probe(primaryDriver, 'msbuddy_online_count').then(value => value === 1));
 

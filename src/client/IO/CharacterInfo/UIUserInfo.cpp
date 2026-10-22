@@ -6,6 +6,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Net/CharacterInfo/CharacterInfoPackets.h"
 #include "../../Net/CharacterInfo/CharacterInfoProtocol.h"
+#include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/TradePackets.h"
 #include "../../Gameplay/Stage.h"
 #include "../Components/AreaButton.h"
@@ -69,6 +70,7 @@ namespace jrc
             basic["BtClose"], Point<int16_t>(248, 7));
         buttons[BT_PET] = std::make_unique<MapleButton>(character["BtPet"]);
         buttons[BT_TRADE] = std::make_unique<MapleButton>(character["BtTrad"]);
+        buttons[BT_PARTY] = std::make_unique<MapleButton>(character["BtParty"]);
         buttons[BT_FAME_UP] = std::make_unique<MapleButton>(character["BtPopUp"]);
         buttons[BT_FAME_DOWN] = std::make_unique<MapleButton>(character["BtPopDown"]);
         for (uint16_t index = 0; index < 3; ++index)
@@ -298,6 +300,9 @@ namespace jrc
             CreateTradePacket().dispatch();
             InviteTradePacket(character_id).dispatch();
             break;
+        case BT_PARTY:
+            InviteToPartyPacket(character_name).dispatch();
+            break;
         case BT_FAME_UP:
             request_fame(true);
             break;
@@ -352,6 +357,7 @@ namespace jrc
         const Button::State social_state = ready && can_fame && !waiting_for_fame ?
             Button::NORMAL : Button::DISABLED;
         buttons[BT_TRADE]->set_state(ready && !self ? Button::NORMAL : Button::DISABLED);
+        buttons[BT_PARTY]->set_state(ready && !self ? Button::NORMAL : Button::DISABLED);
         buttons[BT_FAME_UP]->set_state(social_state);
         buttons[BT_FAME_DOWN]->set_state(social_state);
         for (uint16_t index = 0; index < 3; ++index)

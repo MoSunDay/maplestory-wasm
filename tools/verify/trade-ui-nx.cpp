@@ -34,6 +34,12 @@ namespace
                 return false;
         return true;
     }
+
+    bool origin_is(nl::node node, int16_t x, int16_t y)
+    {
+        const auto origin = node["origin"].get_vector();
+        return origin.first == x && origin.second == y;
+    }
 }
 
 int main(int argc, char** argv)
@@ -42,14 +48,22 @@ int main(int argc, char** argv)
     nl::file ui(path);
     nl::node room = ui.root()["UIWindow2.img"]["CashTradingRoom"];
     bool ok = bitmap_is(room["backgrnd"], 654, 566)
-        && bitmap_is(room["backgrnd2"])
-        && bitmap_is(room["backgrnd3"])
+        && bitmap_is(room["backgrnd2"], 641, 553)
+        && bitmap_is(room["backgrnd3"], 632, 437)
+        && origin_is(room["backgrnd"], 0, 1)
+        && origin_is(room["backgrnd2"], -7, -6)
+        && origin_is(room["backgrnd3"], -11, -118)
         && button_is_complete(room["BtClame"])
         && button_is_complete(room["BtCoin"])
         && button_is_complete(room["BtEnter"])
         && button_is_complete(room["BtReset"])
-        && button_is_complete(room["BtTrade"]);
+        && button_is_complete(room["BtTrade"])
+        && origin_is(room["BtClame"]["normal"]["0"], -626, -363)
+        && origin_is(room["BtCoin"]["normal"]["0"], -203, -348)
+        && origin_is(room["BtEnter"]["normal"]["0"], -583, -364)
+        && origin_is(room["BtReset"]["normal"]["0"], -168, -87)
+        && origin_is(room["BtTrade"]["normal"]["0"], -168, -65);
     std::cout << (ok ? "PASS" : "FAIL")
-              << " CashTradingRoom 654x566 and required buttons\n";
+              << " CashTradingRoom NX origins and required buttons\n";
     return ok ? 0 : 1;
 }
