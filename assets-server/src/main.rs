@@ -151,7 +151,7 @@ async fn handle_connection(
             Ok(Message::Binary(bytes)) => match String::from_utf8(bytes) {
                 Ok(text) => text,
                 Err(_) => {
-                    let _ = send_error(&mut tx, "Messages must be UTF-8 JSON").await;
+                    send_error(&mut tx, "Messages must be UTF-8 JSON").await;
                     continue;
                 }
             },
@@ -185,11 +185,15 @@ async fn send_error(
         Message,
     >,
     message: &str,
-) -> Result<(), tokio_tungstenite::tungstenite::Error> {
-    tx.send(Message::Text(
-        serde_json::json!({ "type": "error", "message": message }).to_string(),
-    ))
-    .await
+) {
+    if let Err(err) = tx
+        .send(Message::Text(
+            serde_json::json!({ "type": "error", "message": message }).to_string(),
+        ))
+        .await
+    {
+        warn!("[AssetServer] Failed to send error message: {err}");
+    }
 }
 
 #[cfg(test)]
