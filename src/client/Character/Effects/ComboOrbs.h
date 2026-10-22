@@ -25,8 +25,8 @@ namespace jrc
     namespace combo_orbs
     {
         // Draw the combo ground aura behind the character look.
-        void draw_aura(const Char& chr, Point<int16_t> absp);
+        void draw_aura(const Char& chr, Point<int16_t> absp, float alpha);
         // Draw the orbiting combo orbs in front of the character look.
-        void draw_orbs(const Char& chr, Point<int16_t> absp);
+        void draw_orbs(const Char& chr, Point<int16_t> absp, float alpha);
     }
 }

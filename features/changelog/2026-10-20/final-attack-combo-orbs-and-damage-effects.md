@@ -16,9 +16,10 @@
 - **斗气不显示的根因**：封包→状态链路（GIVE_BUFF/GIVE_FOREIGN_BUFF/CANCEL_*、
   `Player::give_buff`、`OtherChar::visual_buffs`、虚接口 `get_visual_buff_value/
   source`）全部就绪，唯独**没有任何绘制代码**。数据：`111.img/skill/1111002/state`
-  与 `1120003/state` 各 6 帧——帧 "0" 111x112 静态光环、帧 "1".."5" 42x42 相同橙珠
-  （origin 21,21 居中，delay=300，a0=64→a1=255 脉动）。COMBO 值 N 含未激活中心珠，
-  环绕珠数 = N-1（基础最多 5，进阶最多 10，进阶仅 5 帧可循环复用）。
+  与 `1120003/state` 各 6 帧——帧 "0" 111x112 静态光环、帧 "1".."5" 是 5 种**不同**的
+  42x42 珠图案（个别帧宽 43；origin 21,21 居中，delay=300，
+  a0=64→a1=255 脉动）。COMBO 值 N 含未激活中心珠，环绕珠数 = N-1（基础最多 5，
+  进阶最多 10，进阶复用这 5 种图案循环）。
 - **毒/受击特效缺口**：DAMAGE_PLAYER(0xC0=192) 未在 PacketSwitch 注册
   （他人受击/自己 DoT 掉血无数字）；怪物 POISON/FREEZE 状态掩码已存于
   `Mob::status_first_mask` 但无变色；玩家 POISON buff 已存无变色；
@@ -47,14 +48,19 @@
 ### 斗气球渲染
 
 - 新增 `Character/Effects/ComboOrbs.h/.cpp`（namespace `combo_orbs`，自由函数+
-  纯数据 struct）：按 `get_visual_buff_source(COMBO)` 选 1111002/1120003 的
-  state 节点惰性加载；`draw_aura` 在 look 之前画静态光环（absp+(0,-14)），
-  `draw_orbs` 在残影之后画 N-1 颗珠（椭圆中心 absp+(0,-42)，rx=34 ry=11）。
-- 珠子必须**真的绕人转**：早期版本把角度固定成槽位，看起来只是贴在原地的
-  橙色光斑。现在用 `steady_clock` 毫秒数取相位 `now%2400 / 2400 * 2π`，
-  2.4s 一圈顺时针均布；前后半圈按 `sin` 分 0.65/1.0 两档深度分别画在角色
-  身后/身前；脉动仍由帧游走 + a0→a1 插值驱动，绘制期零状态修改。
-  进阶外观判定改为 `skilllevel(1120003) > 0 || value > 6`——服务端
+  纯数据 struct）：按进阶外观判定选 1111002/1120003 的
+  state 节点惰性加载；`draw_aura` 在 look 之前画静态光环，`draw_orbs` 在残影之后
+  画 N-1 颗珠。光环与环绕共用同一个中心 `absp + (0,-14)`，环绕是半径 34 的圆周，
+  正好压在光环那一圈上。
+- 珠子必须**真的绕人转**：角度相位取 `steady_clock` 毫秒数，
+  `phase = now % 2400 / 2400 * 2π`，2.4s 顺时针转完一圈、均布在圆周上；
+  前后半圈按 `sin(angle)` 判定，远半圈明暗系数 0.65，先画远半圈再画近半圈，
+  于是珠子分别落在角色身后/身前。
+- 每颗珠的帧时钟再按环绕序号错开：`local_time = now + duration * i / n`，
+  按 delay 序列取帧（时间回绕）并插值 a0→a1 得到脉动透明度。因此同一时刻
+  基础 5 珠展示的是 5 种不同图案，而非共用一帧；进阶 10 珠则循环复用这 5 种图案。
+- 绘制保持无状态：整段 draw 只读时间戳与帧数据，不修改任何状态。
+- 进阶外观判定改为 `skilllevel(1120003) > 0 || value > 6`——服务端
   `GIVE_BUFF` 的 source 恒为 1111002，单看 source 永远进不了进阶分支。
 - `Character/Char.cpp`：存活分支挂 `draw_aura`/`draw_orbs`；颜色链在 is_hidden 后
   增加 POISON 分支 `{0.62, 1.0, 0.55, 1}`（自己与他人共用该虚接口路径）。

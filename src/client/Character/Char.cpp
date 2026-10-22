@@ -68,14 +68,14 @@ namespace jrc
         }
         else
         {
-            combo_orbs::draw_aura(*this, absp);
+            combo_orbs::draw_aura(*this, absp, alpha);
 
             look.draw({ absp, color }, alpha);
             chair.draw({ absp, flip }, alpha, false);
 
             afterimage.draw(look.get_frame(), { absp, flip }, alpha);
 
-            combo_orbs::draw_orbs(*this, absp);
+            combo_orbs::draw_orbs(*this, absp, alpha);
 
             if (ironbody)
             {

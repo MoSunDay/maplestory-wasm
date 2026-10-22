@@ -56,6 +56,8 @@ namespace jrc
         {
             Texture aura;
             std::vector<OrbFrame> orbs;
+            // Sum of all orb frame delays, computed once at load time.
+            int64_t duration = 0;
             bool valid = false;
         };
 
@@ -104,9 +106,51 @@ namespace jrc
                 frame.a0 = read_int(frame_node, "a0", 255);
                 frame.a1 = read_int(frame_node, "a1", 255);
                 visuals.orbs.push_back(frame);
+                visuals.duration += frame.delay;
             }
             visuals.valid = visuals.aura.is_valid() && !visuals.orbs.empty();
             return visuals;
+        }
+
+        // An orb frame picked for a given moment, with its opacity.
+        struct OrbSample
+        {
+            const OrbFrame* frame = nullptr;
+            float opacity = 0.0f;
+        };
+
+        // Pick the pattern playing at 'time' and its interpolated opacity.
+        // The frame delay list loops with 'duration', so this stays a pure
+        // function of the timestamp.
+        OrbSample sample_orb(const std::vector<OrbFrame>& frames,
+            int64_t duration, int64_t time)
+        {
+            OrbSample sample;
+            if (frames.empty() || duration <= 0)
+                return sample;
+
+            const int64_t t = ((time % duration) + duration) % duration;
+            std::size_t index = 0;
+            int64_t elapsed = 0;
+            for (; index < frames.size(); ++index)
+            {
+                elapsed += frames[index].delay;
+                if (t < elapsed)
+                    break;
+            }
+            if (index >= frames.size())
+                index = frames.size() - 1;
+
+            const OrbFrame& frame = frames[index];
+            const int64_t frame_start = elapsed - frame.delay;
+            const float progress = frame.delay > 0
+                ? static_cast<float>(t - frame_start) / frame.delay
+                : 0.0f;
+            const float pulse = frame.a0 + (frame.a1 - frame.a0) * progress;
+
+            sample.frame = &frame;
+            sample.opacity = std::clamp(pulse, 0.0f, 255.0f) / 255.0f;
+            return sample;
         }
 
         // Return the visuals of the normal or the advanced combo skill.
@@ -120,7 +164,7 @@ namespace jrc
         }
     }
 
-    void combo_orbs::draw_aura(const Char& chr, Point<int16_t> absp)
+    void combo_orbs::draw_aura(const Char& chr, Point<int16_t> absp, float alpha)
     {
         const int16_t value = chr.get_visual_buff_value(Buffstat::COMBO);
         if (value <= 0)
@@ -134,10 +178,11 @@ namespace jrc
         if (!visuals.aura.is_valid())
             return;
 
-        visuals.aura.draw(DrawArgument(absp + Point<int16_t>(0, -14)));
+        // The aura center is also the orbit center of the orbs.
+        visuals.aura.draw(DrawArgument(absp + Point<int16_t>(0, -14), alpha));
     }
 
-    void combo_orbs::draw_orbs(const Char& chr, Point<int16_t> absp)
+    void combo_orbs::draw_orbs(const Char& chr, Point<int16_t> absp, float alpha)
     {
         int16_t value = chr.get_visual_buff_value(Buffstat::COMBO);
         if (value <= 0)
@@ -149,7 +194,7 @@ namespace jrc
         // for the appearance and the number of drawn orbs.
         const ComboVisuals& visuals = load(
             combo_attack::advanced_orbs(chr, value));
-        if (visuals.orbs.empty())
+        if (visuals.orbs.empty() || visuals.duration <= 0)
             return;
 
         // The first combo is the unactivated orb in the character's hands.
@@ -161,45 +206,19 @@ namespace jrc
         if (n == 0)
             return;
 
-        // Walk the frames to find the current one and its progress.
-        int64_t total = 0;
-        for (const OrbFrame& frame : visuals.orbs)
-            total += frame.delay;
-        if (total <= 0)
-            return;
+        const int64_t now = now_ms();
 
-        const int64_t t = now_ms() % total;
-        std::size_t index = 0;
-        int64_t elapsed = 0;
-        for (; index < visuals.orbs.size(); ++index)
-        {
-            elapsed += visuals.orbs[index].delay;
-            if (t < elapsed)
-                break;
-        }
-        if (index >= visuals.orbs.size())
-            index = visuals.orbs.size() - 1;
-
-        const OrbFrame& frame = visuals.orbs[index];
-        const int64_t frame_start = elapsed - frame.delay;
-        const float progress = frame.delay > 0
-            ? static_cast<float>(t - frame_start) / frame.delay
-            : 0.0f;
-        const float pulse = frame.a0 + (frame.a1 - frame.a0) * progress;
-        const float opacity = std::clamp(pulse, 0.0f, 255.0f) / 255.0f;
-
-        // The orbs travel clockwise on an ellipse around the torso. The
-        // angle offset comes from the steady clock, so the ring really orbits
-        // instead of sitting on fixed slots (fixed angles made it look like a
-        // static halo).
-        const Point<int16_t> center = absp + Point<int16_t>(0, -42);
-        constexpr float RX = 34.0f;
-        constexpr float RY = 11.0f;
+        // The orbs travel clockwise on the bright ring of the aura, so they
+        // share its center and its 34 px radius. The angle offset comes from
+        // the steady clock, so the ring really orbits instead of sitting on
+        // fixed slots (fixed angles made it look like a static halo).
+        const Point<int16_t> center = absp + Point<int16_t>(0, -14);
+        constexpr float ORBIT_RADIUS = 34.0f;
         constexpr float TAU = 6.28318531f;
         // One full revolution every 2.4 seconds.
         constexpr int64_t ORBIT_PERIOD_MS = 2400;
         const float phase = TAU
-            * static_cast<float>(now_ms() % ORBIT_PERIOD_MS)
+            * static_cast<float>(now % ORBIT_PERIOD_MS)
             / static_cast<float>(ORBIT_PERIOD_MS);
 
         // Draw the far half of the orbit first and dim it, so that the near
@@ -213,14 +232,24 @@ namespace jrc
                 if (near_side != (pass == 1))
                     continue;
 
+                // Shift the frame clock by the orbital index, so every orb
+                // shows a different pattern at the same moment instead of all
+                // sharing one frame. 10 orbs pair up over the 5 patterns.
+                const int64_t local_time = now + visuals.duration * i / n;
+                const OrbSample sample =
+                    sample_orb(visuals.orbs, visuals.duration, local_time);
+                if (!sample.frame)
+                    continue;
+
                 const Point<int16_t> pos{
                     static_cast<int16_t>(std::lround(
-                        center.x() + RX * std::cos(angle))),
+                        center.x() + ORBIT_RADIUS * std::cos(angle))),
                     static_cast<int16_t>(std::lround(
-                        center.y() + RY * std::sin(angle)))
+                        center.y() + ORBIT_RADIUS * std::sin(angle)))
                 };
                 const float shade = near_side ? 1.0f : 0.65f;
-                frame.texture.draw(DrawArgument(pos, opacity * shade));
+                sample.frame->texture.draw(
+                    DrawArgument(pos, alpha * sample.opacity * shade));
             }
         }
     }
