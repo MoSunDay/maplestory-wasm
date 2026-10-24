@@ -35,6 +35,7 @@ namespace jrc
             virtual void drop_on_equips(Equipslot::Id eqslot) const = 0;
             virtual void drop_on_items(InventoryType::Id tab, Equipslot::Id eqslot, int16_t slot, bool equip) const = 0;
             virtual void drop_on_bindings(Point<int16_t>, bool) const {}
+            virtual int32_t get_skill_id() const { return 0; }
             virtual bool drop_on_pet_potion(bool) const { return false; }
             virtual void drop_on_trade() const {}
         };
@@ -56,6 +57,7 @@ namespace jrc
         void drop_on_equips(Equipslot::Id eqslot) const;
         void drop_on_items(InventoryType::Id tab, Equipslot::Id eqslot, int16_t slot, bool equip) const;
         void drop_on_bindings(Point<int16_t> cursorpos, bool remove) const;
+        int32_t get_skill_id() const;
         bool drop_on_pet_potion(bool hp) const;
         void drop_on_trade() const;
         void start_drag(Point<int16_t> offset);

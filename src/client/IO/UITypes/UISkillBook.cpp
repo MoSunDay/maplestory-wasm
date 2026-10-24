@@ -46,6 +46,11 @@ namespace jrc
             void drop_on_stage() const override {}
             void drop_on_equips(Equipslot::Id) const override {}
             void drop_on_items(InventoryType::Id, Equipslot::Id, int16_t, bool) const override {}
+            int32_t get_skill_id() const override
+            {
+                return skill_id;
+            }
+
             void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override
             {
                 if (auto keyconfig = UI::get().get_element<UIKeyConfig>())
@@ -361,53 +366,55 @@ namespace jrc
         }
 
         Point<int16_t> skill_position = position + SKILL_OFFSET;
-        if (!grabbing)
+        if (grabbing)
         {
-            for (auto iter = begin; iter != end; ++iter)
-            {
-                Point<int16_t> icon_position = skill_position + ICON_OFFSET;
-                Point<int16_t> icon_hit_position = icon_position + SKILL_ICON_HIT_ADJUST;
-                if (Cursor::State state = iter->send_cursor(cursorpos - icon_hit_position, clicked))
-                {
-                    switch (state)
-                    {
-                    case Cursor::GRABBING:
-                    {
-                        clear_tooltip();
-                        grabbing = true;
-
-                        int32_t skill_id = iter->get_id();
-                        int32_t skill_level = skillbook.get_level(skill_id);
-                        if (skill_level > 0 && !SkillData::get(skill_id).is_passive())
-                        {
-                            if (Icon* icon = iter->get_drag_icon())
-                            {
-                                icon->start_drag(cursorpos - icon_hit_position);
-                                UI::get().drag_icon(icon);
-                            }
-
-                            return { Cursor::GRABBING, true };
-                        }
-
-                        return { Cursor::IDLE, true };
-                    }
-                    case Cursor::CANGRAB:
-                        show_skill(iter->get_id());
-                        return { Cursor::IDLE, true };
-                    default:
-                        break;
-                    }
-                }
-
-                skill_position.shift_y(ROW_HEIGHT);
-            }
-
-            clear_tooltip();
-        }
-        else
-        {
+            // The global drag icon consumes the mouse-up, so the next click
+            // has to clear this stale flag and still reach the icons.
             grabbing = false;
         }
+
+        for (auto iter = begin; iter != end; ++iter)
+        {
+            Point<int16_t> icon_position = skill_position + ICON_OFFSET;
+            Point<int16_t> icon_hit_position = icon_position + SKILL_ICON_HIT_ADJUST;
+            if (Cursor::State state = iter->send_cursor(cursorpos - icon_hit_position, clicked))
+            {
+                switch (state)
+                {
+                case Cursor::GRABBING:
+                {
+                    clear_tooltip();
+                    grabbing = true;
+
+                    int32_t skill_id = iter->get_id();
+                    int32_t skill_level = skillbook.get_level(skill_id);
+                    if (skill_level > 0 && !SkillData::get(skill_id).is_passive())
+                    {
+                        selected_skill = skill_id;
+
+                        if (Icon* icon = iter->get_drag_icon())
+                        {
+                            icon->start_drag(cursorpos - icon_hit_position);
+                            UI::get().drag_icon(icon);
+                        }
+
+                        return { Cursor::GRABBING, true };
+                    }
+
+                    return { Cursor::IDLE, true };
+                }
+                case Cursor::CANGRAB:
+                    show_skill(iter->get_id());
+                    return { Cursor::IDLE, true };
+                default:
+                    break;
+                }
+            }
+
+            skill_position.shift_y(ROW_HEIGHT);
+        }
+
+        clear_tooltip();
 
         return UIDragElement::send_cursor(clicked, cursorpos);
     }
@@ -417,8 +424,19 @@ namespace jrc
         if (pressed && escape)
         {
             clear_tooltip();
+            clear_selected_skill();
             deactivate();
         }
+    }
+
+    int32_t UISkillbook::get_selected_skill() const
+    {
+        return selected_skill;
+    }
+
+    void UISkillbook::clear_selected_skill()
+    {
+        selected_skill = 0;
     }
 
     void UISkillbook::update_stat(Maplestat::Id stat, int16_t value)

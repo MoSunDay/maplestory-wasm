@@ -81,6 +81,9 @@ namespace jrc
         void update_stat(Maplestat::Id stat, int16_t value);
         void update_skills(int32_t skill_id);
 
+        int32_t get_selected_skill() const;
+        void clear_selected_skill();
+
     protected:
         Button::State button_pressed(uint16_t id) override;
 
@@ -144,5 +147,7 @@ namespace jrc
 
         std::vector<SkillIcon> icons;
         bool grabbing;
+
+        int32_t selected_skill = 0;
     };
 }

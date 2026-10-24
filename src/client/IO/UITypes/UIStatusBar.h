@@ -23,6 +23,7 @@
 #include "../Messages.h"
 
 #include "StatusBar/StatusBarPreChaos.h"
+#include "StatusBar/QuickSlotBar.h"
 
 #include "../Components/Charset.h"
 #include "../Components/Gauge.h"
@@ -35,6 +36,7 @@
 #include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
 
+#include <array>
 #include <string>
 #include <vector>
 #include <optional>
@@ -57,6 +59,8 @@ namespace jrc
         bool is_in_range(Point<int16_t> cursorpos) const override;
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override;
         CursorResult send_cursor(bool pressed, Point<int16_t> cursorpos) override;
+        void send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
+        void rightclick(Point<int16_t> cursorpos) override;
 
         void send_chatline(const std::string& line, UIChatbar::LineType type);
         void focus_chatfield();
@@ -85,6 +89,18 @@ namespace jrc
         const social::BuddyState& get_buddy_state() const;
         void record_multi_chat(uint8_t type);
         uint32_t get_party_message_count() const;
+        int32_t get_quickslot_skill(int16_t index) const;
+        int16_t get_quickslot_cooldown_length(int16_t index) const;
+        int16_t get_quickslot_hovered() const;
+        bool is_quickslot_in_range(Point<int16_t> cursorpos) const;
+        int16_t button_at(Point<int16_t> cursorpos) const;
+        int32_t debug_press_count() const { return press_debug_count; }
+        int16_t debug_last_button() const { return press_debug_button; }
+        int16_t debug_cursor_x() const { return cursor_debug_x; }
+        int16_t debug_cursor_y() const { return cursor_debug_y; }
+        int16_t debug_rightclick_index() const { return rightclick_debug_index; }
+        int16_t debug_rightclick_x() const { return rightclick_debug_x; }
+        int16_t debug_rightclick_y() const { return rightclick_debug_y; }
         void toggle_menu_popup();
         void open_system_popup();
         bool activate_popup_selection();
@@ -100,6 +116,8 @@ namespace jrc
         void initialize_postchaos();
         void initialize_prechaos(nl::node statusbar);
         void draw_prechaos() const;
+        void update_quickslot_tooltip(int16_t index);
+        void update_quickslot_cooldowns();
         void ensure_stat_labels(bool prechaos) const;
         void dispatch_popup_action(StatusBarPopup::Action action);
         float getexppercent() const;
@@ -128,6 +146,14 @@ namespace jrc
 
         const CharStats& stats;
 
+        int32_t press_debug_count = 0;
+        int16_t press_debug_button = -1;
+        int16_t cursor_debug_x = -1;
+        int16_t cursor_debug_y = -1;
+        int16_t rightclick_debug_index = -2;
+        int16_t rightclick_debug_x = -1;
+        int16_t rightclick_debug_y = -1;
+
         EnumMap<Messages::Type, time_t> message_cooldowns;
 
         UIChatbar chatbar;
@@ -149,6 +175,8 @@ namespace jrc
         Texture gauge_fill;
         Texture quickslot_panel;
         Texture quickslot_keys[8];
+        quickslot::State quickslots;
+        std::array<Text, quickslot::COUNT> quickslot_cooldowns;
         mutable ColorBox gauge_covers[3];
 
         // Stat label cache, rebuilt only when the displayed values or the

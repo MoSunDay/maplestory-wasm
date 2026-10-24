@@ -66,7 +66,7 @@ UI 状态接口。三个具体实现:
 ### 游戏内 UI (`UITypes/`)
 | 文件 | 职责 |
 |------|------|
-| `UIStatusBar` | 底部状态栏；持有好友与队伍状态并向窗口、聊天及验收探针提供统一读写入口；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用；游戏内无其他窗口时 Escape 打开 System 并默认选中退出，Enter 发送标准登出、重连登录服并回到账号登录页 |
+| `UIStatusBar` | 底部状态栏；持有好友与队伍状态并向窗口、聊天及验收探针提供统一读写入口；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用；游戏内无其他窗口时 Escape 打开 System 并默认选中退出，Enter 发送标准登出、重连登录服并回到账号登录页；v83 `StatusBar.img/base/quickSlot` 快捷栏可从技能簿点击或拖拽绑定已学习的非被动技能，点击已绑定槽位经 `Combat::use_move` 释放，服务端下发冷却后按槽位在技能图标上覆盖黑色遮罩并显示剩余秒数，悬停显示技能 tooltip，右键清空；绑定仅存客户端内存，重登清空；v83 HP/MP/EXP gauge 按 `gauge/bar` 实测内框（HP `{3,106,16,29}`、MP `{111,214,16,29}`、EXP `{224,337,16,29}`）以满条加黑色 cover 遮盖表达进度（cover 同时刷新宽高），数值用根节点 `StatusBar.img/number` charset 按节点名组串（`L<cur>s<max>R`、`<exp>L<pct>pR`）动态绘制 |
 | `UIStatsInfo` | 角色属性窗口；加点按钮直接采用 NX 内置 origin 定位，使可见加号与鼠标命中区域落在对应属性行 |
 | `UISkillBook` | 技能书窗口；使用与四行技能布局匹配的 175×289 紧凑 NX 面板，并按 Explorer/Cygnus/Aran 的实际转职阶段开放可切换页签 |
 | `UIEquipInventory` | 装备栏窗口；宠物页显示已选择的 HP/MP 药水，并从 `Stage` 当前已召唤宠物与已装备能力解析启用项；现金栏仅持有未召唤宠物不会误显示为已启用，窗口接受 USE 药水拖放 |

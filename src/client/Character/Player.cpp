@@ -219,6 +219,8 @@ namespace jrc
 
     int8_t Player::update(const Physics& physics)
     {
+        update_cooldowns();
+
         if (state == DIED)
         {
             Char::update(physics, 1.0f);
@@ -598,22 +600,6 @@ namespace jrc
         {
             recalc_stats(false);
         }
-    }
-
-    void Player::add_cooldown(int32_t skill_id, int32_t cooltime)
-    {
-        cooldowns[skill_id] = cooltime;
-    }
-
-    bool Player::has_cooldown(int32_t skill_id) const
-    {
-        auto iter = cooldowns.find(skill_id);
-        if (iter == cooldowns.end())
-        {
-            return false;
-        }
-
-        return iter->second > 0;
     }
 
     void Player::change_level(uint16_t level)

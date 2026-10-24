@@ -21,6 +21,7 @@
 #include "../Components/MapleButton.h"
 #include "Pet/UIPetOptions.h"
 #include "Settings/UIGameOptions.h"
+#include "UISkillBook.h"
 
 #include "../../Character/ExpTable.h"
 #include "../../Console.h"
@@ -111,15 +112,18 @@ namespace jrc
     {
         nl::node base = statusbar["base"];
 
-        // v83 ships one 1280x71 strip anchored bottom-left.
+        // Use the shipped v83 strip as-is; the quickslot dock is drawn
+        // separately at the right edge.
         sprites.emplace_back(base["backgrnd"]);
 
         nl::node gauge = statusbar["gauge"];
         gauge_graduation = gauge["graduation"];
         gauge_fill = gauge["bar"];
 
-        statset  = { gauge["number"], Charset::RIGHT };
-        levelset = { gauge["number"], Charset::LEFT  };
+        // v83 keeps the number/brackets/slash/percent charset at the root
+        // node; StatusBar.img/gauge/number does not exist.
+        statset  = { statusbar["number"], Charset::RIGHT };
+        levelset = { statusbar["number"], Charset::LEFT  };
 
         joblabel  = { Text::A11M, Text::LEFT, Text::BLACK };
         namelabel = { Text::A11M, Text::LEFT, Text::BLACK };
@@ -133,6 +137,9 @@ namespace jrc
         for (int16_t i = 0; i < 8; ++i)
         {
             quickslot_keys[i] = keyset[std::to_string(i)];
+            quickslot_cooldowns[i] = Text(
+                Text::A11B, Text::CENTER, Text::WHITE, "", 32
+            );
         }
 
         // Menu bar buttons, right-anchored to the view.
@@ -240,76 +247,48 @@ namespace jrc
         popup.draw(alpha);
     }
 
-    void UIStatusbar::draw_prechaos() const
+    void UIStatusbar::update_quickslot_tooltip(int16_t index)
     {
-        const Point<int16_t> gauge_pos = position + statusbar::gauge_anchor();
-
-        // gauge/bar carries the labels plus the 100% gradient fills. The
-        // unfilled rest of each slot is dimmed to the empty-slot look of
-        // gauge/graduation, which is drawn on top (frame, ticks, base).
-        gauge_fill.draw(gauge_pos);
-
-        auto draw_cover = [this, gauge_pos](statusbar::Gauge kind, float percent) {
-            const Rectangle<int16_t> fill = statusbar::gauge_fill(kind);
-            const int16_t width = fill.width();
-            const int16_t filled = static_cast<int16_t>(percent * width + 0.5f);
-            const int16_t empty = static_cast<int16_t>(width - filled);
-            if (empty <= 0)
-            {
-                return;
-            }
-
-            const int16_t index = static_cast<int16_t>(kind);
-            gauge_covers[index].setwidth(empty);
-            gauge_covers[index].draw(gauge_pos + Point<int16_t>(
-                static_cast<int16_t>(fill.l() + filled), fill.t()
-            ));
-        };
-
-        draw_cover(statusbar::Gauge::HP, gethppercent());
-        draw_cover(statusbar::Gauge::MP, getmppercent());
-        draw_cover(statusbar::Gauge::EXP, getexppercent());
-
-        gauge_graduation.draw(gauge_pos);
-
-        ensure_stat_labels(true);
-
-        statset.draw(
-            hp_label,
-            gauge_pos + Point<int16_t>(
-                statusbar::gauge_number_right(statusbar::Gauge::HP),
-                statusbar::gauge_number_y()
-            )
-        );
-        statset.draw(
-            mp_label,
-            gauge_pos + Point<int16_t>(
-                statusbar::gauge_number_right(statusbar::Gauge::MP),
-                statusbar::gauge_number_y()
-            )
-        );
-        statset.draw(
-            exp_label,
-            gauge_pos + Point<int16_t>(
-                statusbar::gauge_number_right(statusbar::Gauge::EXP),
-                statusbar::gauge_number_y()
-            )
-        );
-
-        levelset.draw(level_label, position + statusbar::level_pos());
-        namelabel.draw(position + statusbar::name_pos());
-        joblabel.draw(position + statusbar::job_pos());
-
-        // Quickslot display (base/quickSlot + key caps).
-        const Point<int16_t> quickslot_pos = position + statusbar::quickslot_pos();
-        quickslot_panel.draw(quickslot_pos);
-        for (int16_t i = 0; i < 8; ++i)
+        if (index == quickslots.hovered)
         {
-            const Point<int16_t> center = statusbar::quickslot_key_center(i);
-            const Point<int16_t> size = quickslot_keys[i].get_dimensions();
-            quickslot_keys[i].draw(quickslot_pos + center - Point<int16_t>(
-                size.x() / 2, size.y() / 2
-            ));
+            return;
+        }
+        quickslots.hovered = index;
+
+        const int32_t skill_id = quickslot::skill_at(quickslots, index);
+        if (skill_id <= 0)
+        {
+            UI::get().clear_tooltip(Tooltip::NONE);
+            return;
+        }
+
+        const Skillbook& skills = Stage::get().get_player().get_skills();
+        UI::get().show_skill(
+            Tooltip::NONE,
+            skill_id,
+            skills.get_level(skill_id),
+            skills.get_masterlevel(skill_id),
+            skills.get_expiration(skill_id)
+        );
+    }
+
+    void UIStatusbar::update_quickslot_cooldowns()
+    {
+        if (!statusbar::prechaos())
+        {
+            return;
+        }
+
+        const Player& player = Stage::get().get_player();
+        for (int16_t i = 0; i < quickslot::COUNT; ++i)
+        {
+            const int32_t skill_id = quickslot::skill_at(quickslots, i);
+            const int32_t seconds = skill_id > 0
+                ? player.get_cooldown_seconds(skill_id)
+                : 0;
+            quickslot_cooldowns[i].change_text(
+                seconds > 0 ? std::to_string(seconds) : std::string()
+            );
         }
     }
 
@@ -318,6 +297,7 @@ namespace jrc
         update_layout_position();
         UIElement::update();
 
+        update_quickslot_cooldowns();
         chatbar.update();
 
         if (!statusbar::prechaos())
@@ -420,6 +400,8 @@ namespace jrc
 
     Button::State UIStatusbar::button_pressed(uint16_t id)
     {
+        ++press_debug_count;
+        press_debug_button = static_cast<int16_t>(id);
         switch (id)
         {
         case BT_MENU:
@@ -457,6 +439,7 @@ namespace jrc
         if (statusbar::prechaos())
         {
             return statusbar::statusbar_range(position).contains(cursorpos)
+                || statusbar::quickslot_range(position).contains(cursorpos)
                 || chatbar.is_in_range(cursorpos)
                 || popup.contains(cursorpos);
         }
@@ -470,8 +453,32 @@ namespace jrc
             popup.contains(cursorpos);
     }
 
+    bool UIStatusbar::is_quickslot_in_range(Point<int16_t> cursorpos) const
+    {
+        return statusbar::prechaos()
+            && statusbar::quickslot_range(position).contains(cursorpos);
+    }
+
+    int16_t UIStatusbar::button_at(Point<int16_t> cursorpos) const
+    {
+        for (const auto& entry : buttons)
+        {
+            if (entry.second && entry.second->bounds(position).contains(cursorpos))
+            {
+                return static_cast<int16_t>(entry.first);
+            }
+        }
+        return -1;
+    }
+
     bool UIStatusbar::remove_cursor(bool clicked, Point<int16_t> cursorpos)
     {
+        if (statusbar::prechaos())
+        {
+            // Leaving the HUD drops the quickslot tooltip with it.
+            update_quickslot_tooltip(-1);
+        }
+
         popup.remove_cursor();
         if (clicked && !popup.contains(cursorpos))
         {
@@ -488,6 +495,8 @@ namespace jrc
 
     UIElement::CursorResult UIStatusbar::send_cursor(bool pressed, Point<int16_t> cursorpos)
     {
+        cursor_debug_x = cursorpos.x();
+        cursor_debug_y = cursorpos.y();
         if (popup.contains(cursorpos))
         {
             StatusBarPopup::CursorResult result = popup.send_cursor(pressed, cursorpos);
@@ -496,6 +505,43 @@ namespace jrc
                 dispatch_popup_action(result.action);
             }
             return { result.state, true };
+        }
+
+        if (statusbar::prechaos())
+        {
+            const Point<int16_t> local =
+                cursorpos - (position + statusbar::quickslot_pos());
+            const int16_t index = quickslot::index_at(local);
+            update_quickslot_tooltip(index);
+
+            if (index >= 0)
+            {
+                if (pressed && quickslots.press_id != UI::get().get_cursor_press_id())
+                {
+                    quickslots.press_id = UI::get().get_cursor_press_id();
+
+                    auto skillbook = UI::get().get_element<UISkillbook>();
+                    const int32_t selected = skillbook && skillbook->is_active()
+                        ? skillbook->get_selected_skill()
+                        : 0;
+
+                    if (selected > 0)
+                    {
+                        if (quickslot::assign(quickslots, index, selected))
+                        {
+                            skillbook->clear_selected_skill();
+                            quickslots.hovered = -1;
+                            update_quickslot_tooltip(index);
+                        }
+                    }
+                    else if (const int32_t skill_id = quickslot::skill_at(quickslots, index))
+                    {
+                        Stage::get().get_combat().use_move(skill_id);
+                    }
+                }
+
+                return { pressed ? Cursor::CLICKING : Cursor::CANCLICK, pressed };
+            }
         }
 
         bool toggles_popup =
@@ -522,6 +568,58 @@ namespace jrc
 
         chatbar.send_cursor(pressed, cursorpos);
         return UIElement::send_cursor(pressed, cursorpos);
+    }
+
+    void UIStatusbar::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+    {
+        if (!statusbar::prechaos())
+        {
+            return;
+        }
+
+        const int32_t skill_id = icon.get_skill_id();
+        if (skill_id <= 0)
+        {
+            return;
+        }
+
+        const Point<int16_t> local =
+            cursorpos - (position + statusbar::quickslot_pos());
+        const int16_t index = quickslot::index_at(local);
+        if (!quickslot::assign(quickslots, index, skill_id))
+        {
+            return;
+        }
+
+        quickslots.hovered = -1;
+        update_quickslot_tooltip(index);
+        if (auto skillbook = UI::get().get_element<UISkillbook>())
+        {
+            skillbook->clear_selected_skill();
+        }
+    }
+
+    void UIStatusbar::rightclick(Point<int16_t> cursorpos)
+    {
+        rightclick_debug_x = cursorpos.x();
+        rightclick_debug_y = cursorpos.y();
+        if (!statusbar::prechaos())
+        {
+            return;
+        }
+
+        const Point<int16_t> local =
+            cursorpos - (position + statusbar::quickslot_pos());
+        const int16_t index = quickslot::index_at(local);
+        rightclick_debug_index = index;
+        if (quickslot::skill_at(quickslots, index) == 0)
+        {
+            return;
+        }
+
+        quickslot::clear(quickslots, index);
+        quickslots.hovered = -1;
+        update_quickslot_tooltip(index);
     }
 
     void UIStatusbar::toggle_menu_popup()
@@ -611,136 +709,6 @@ namespace jrc
         }
     }
 
-    void UIStatusbar::send_chatline(const std::string& line, UIChatbar::LineType type)
-    {
-        chatbar.send_line(line, type);
-    }
-
-    void UIStatusbar::focus_chatfield()
-    {
-        chatbar.focus_chatfield();
-    }
-
-    void UIStatusbar::set_chat_target(UIChatbar::ChatTarget target)
-    {
-        chatbar.set_chat_target(target);
-    }
-
-    void UIStatusbar::cycle_chat_target()
-    {
-        chatbar.cycle_chat_target();
-    }
-
-    void UIStatusbar::set_pending_party_invite(int32_t party_id, const std::string& inviter)
-    {
-        chatbar.set_pending_party_invite(party_id, inviter);
-    }
-
-    void UIStatusbar::clear_pending_party_invite()
-    {
-        chatbar.clear_pending_party_invite();
-    }
-
-    void UIStatusbar::set_party_state(int32_t party_id, int32_t leader_id, const std::vector<UIChatbar::PartyMember>& members)
-    {
-        chatbar.set_party_state(party_id, leader_id, members);
-    }
-
-    void UIStatusbar::confirm_party_created(int32_t party_id)
-    {
-        chatbar.confirm_party_created(party_id);
-    }
-
-    void UIStatusbar::clear_party_state()
-    {
-        chatbar.clear_party_state();
-    }
-
-    void UIStatusbar::set_party_leader(int32_t leader_id)
-    {
-        chatbar.set_party_leader(leader_id);
-    }
-
-    void UIStatusbar::update_party_member_hp(int32_t cid, int32_t hp, int32_t max_hp)
-    {
-        chatbar.update_party_member_hp(cid, hp, max_hp);
-    }
-
-    int32_t UIStatusbar::get_party_id() const
-    {
-        return chatbar.get_party_id();
-    }
-
-    int32_t UIStatusbar::get_party_leader_id() const
-    {
-        return chatbar.get_party_leader_id();
-    }
-
-    int32_t UIStatusbar::get_pending_party_invite_id() const
-    {
-        return chatbar.get_pending_party_invite_id();
-    }
-
-    const std::string& UIStatusbar::get_pending_party_inviter() const
-    {
-        return chatbar.get_pending_party_inviter();
-    }
-
-    const std::vector<UIChatbar::PartyMember>& UIStatusbar::get_party_members() const
-    {
-        return chatbar.get_party_members();
-    }
-
-    void UIStatusbar::set_buddy_list(const std::vector<social::BuddyEntry>& entries)
-    {
-        chatbar.set_buddy_list(entries);
-    }
-
-    void UIStatusbar::set_pending_buddy_request(int32_t id, const std::string& name)
-    {
-        chatbar.set_pending_buddy_request(id, name);
-    }
-
-    void UIStatusbar::clear_pending_buddy_request()
-    {
-        chatbar.clear_pending_buddy_request();
-    }
-
-    void UIStatusbar::remove_buddy(int32_t id)
-    {
-        chatbar.remove_buddy(id);
-    }
-
-    void UIStatusbar::begin_buddy_add(const std::string& name)
-    {
-        chatbar.begin_buddy_add(name);
-    }
-
-    void UIStatusbar::update_buddy_channel(int32_t id, int32_t channel)
-    {
-        chatbar.update_buddy_channel(id, channel);
-    }
-
-    void UIStatusbar::set_buddy_capacity(uint8_t capacity)
-    {
-        chatbar.set_buddy_capacity(capacity);
-    }
-
-    const social::BuddyState& UIStatusbar::get_buddy_state() const
-    {
-        return chatbar.get_buddy_state();
-    }
-
-    void UIStatusbar::record_multi_chat(uint8_t type)
-    {
-        chatbar.record_multi_chat(type);
-    }
-
-    uint32_t UIStatusbar::get_party_message_count() const
-    {
-        return chatbar.get_party_message_count();
-    }
-
     void UIStatusbar::display_message(Messages::Type line, UIChatbar::LineType type)
     {
         if (message_cooldowns[line] > 0)
@@ -752,6 +720,26 @@ namespace jrc
         chatbar.send_line(message, type);
 
         message_cooldowns[line] = MESSAGE_COOLDOWN;
+    }
+
+    int32_t UIStatusbar::get_quickslot_skill(int16_t index) const
+    {
+        return quickslot::skill_at(quickslots, index);
+    }
+
+    int16_t UIStatusbar::get_quickslot_cooldown_length(int16_t index) const
+    {
+        if (index < 0 || index >= quickslot::COUNT)
+        {
+            return -1;
+        }
+        return static_cast<int16_t>(
+            quickslot_cooldowns[static_cast<size_t>(index)].length());
+    }
+
+    int16_t UIStatusbar::get_quickslot_hovered() const
+    {
+        return quickslots.hovered;
     }
 
     float UIStatusbar::getexppercent() const

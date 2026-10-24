@@ -9,14 +9,15 @@
 //////////////////////////////////////////////////////////////////////////////
 // Free-function coordinate vocabulary for the pre-Chaos (v83) status bar.
 //
-// v83 ships `StatusBar.img` instead of `StatusBar2.img`: the bar is a
-// 1280x71 strip anchored to the BOTTOM-LEFT of the view (the post-Chaos
-// bar is centered and 1366 wide). Every HUD element of the status bar,
-// the chat bar and the menu popup derives its position from here so no
-// magic numbers are scattered through the element code.
+// v83 ships `StatusBar.img` instead of `StatusBar2.img`: the bar is an
+// 800x71 strip anchored to the BOTTOM-LEFT of the view (the post-Chaos bar
+// is centered and 1366 wide). Every
+// HUD element of the status bar, the chat bar and the menu popup derives
+// its position from here so no magic numbers are scattered through the
+// element code.
 //
 // Layout metrics below were measured from the actual UI.nx textures:
-//   base/backgrnd      1280x71   light grey full-width strip
+//   base/backgrnd       800x71   light grey strip
 //   base/quickSlot      151x80   4x2 key display (9px taller than the bar)
 //   gauge/bar           340x31   "HP"/"MP"/"EXP" labels above the fills
 //   gauge/graduation    340x31   frame + ticks + translucent dark base
@@ -28,8 +29,6 @@
 #include "../../UiAssetVersion.h"
 #include "../../../Template/Point.h"
 #include "../../../Template/Rectangle.h"
-
-#include <algorithm>
 
 namespace jrc
 {
@@ -47,13 +46,15 @@ namespace jrc
         // Generation detection (same marker convention as UiAssetVersion.h)
         // ------------------------------------------------------------------
 
-        /// True when the loaded UI.nx is the pre-Chaos (v83) asset set, i.e.
-        /// when StatusBar2.img (and its whole node family) is absent.
+        /// True when the loaded UI.nx carries the v83 status bar chrome.
+        /// Some combined asset packs ship both generations; in that case the
+        /// legacy bar is preferred because it is the one with the quickslot
+        /// panel that this HUD exposes.
         inline bool prechaos()
         {
-            const bool post_chaos = static_cast<bool>(
-                nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"]);
-            return !post_chaos;
+            static const bool legacy_bar = static_cast<bool>(
+                nl::nx::ui["StatusBar.img"]["base"]["quickSlot"]);
+            return legacy_bar;
         }
 
         // ------------------------------------------------------------------
@@ -62,8 +63,8 @@ namespace jrc
 
         /// Height of the v83 bottom strip (base/backgrnd).
         constexpr int16_t BAR_HEIGHT = 71;
-        /// Width of the v83 bottom strip.
-        constexpr int16_t BAR_WIDTH = 1280;
+        /// Width of the shipped v83 bottom strip.
+        constexpr int16_t BAR_WIDTH = 800;
         /// Size of the quickslot display (base/quickSlot).
         constexpr int16_t QUICKSLOT_WIDTH = 151;
         constexpr int16_t QUICKSLOT_HEIGHT = 80;
@@ -89,10 +90,7 @@ namespace jrc
         /// Hit-test bounds of the whole HUD strip for the current view.
         inline Rectangle<int16_t> statusbar_range(Point<int16_t> position)
         {
-            const int16_t width = static_cast<int16_t>(
-                std::min<int32_t>(Constants::viewwidth(), BAR_WIDTH)
-            );
-            return { position, position + Point<int16_t>(width, BAR_HEIGHT) };
+            return { position, position + bar_dimension() };
         }
 
         // ------------------------------------------------------------------
@@ -106,18 +104,19 @@ namespace jrc
         }
 
         /// Inner fill rectangle of one gauge slot, relative to the block.
-        /// Derived from the frame borders in gauge/graduation.
+        /// Measured from the NX bitmap pixels of gauge/bar to cover the
+        /// actually fillable inner area.
         inline Rectangle<int16_t> gauge_fill(Gauge kind)
         {
             switch (kind)
             {
             case Gauge::HP:
-                return { 3, 103, 15, 29 };
+                return { 3, 106, 16, 29 };
             case Gauge::MP:
-                return { 110, 208, 15, 29 };
+                return { 111, 214, 16, 29 };
             case Gauge::EXP:
             default:
-                return { 214, 338, 15, 29 };
+                return { 224, 337, 16, 29 };
             }
         }
 
@@ -229,6 +228,17 @@ namespace jrc
             return {
                 static_cast<int16_t>(Constants::viewwidth() - QUICKSLOT_WIDTH),
                 static_cast<int16_t>(BAR_HEIGHT - QUICKSLOT_HEIGHT)
+            };
+        }
+
+        /// Hit-test bounds of base/quickSlot. The panel starts 9px above the
+        /// bar, so the bar range alone clips its top edge.
+        inline Rectangle<int16_t> quickslot_range(Point<int16_t> position)
+        {
+            return {
+                position + quickslot_pos(),
+                position + quickslot_pos()
+                    + Point<int16_t>(QUICKSLOT_WIDTH, QUICKSLOT_HEIGHT)
             };
         }
 

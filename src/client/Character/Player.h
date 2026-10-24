@@ -110,10 +110,12 @@ namespace jrc
 
         /// Change a skill.
         void change_skill(int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration);
-        /// Put a skill on cooldown.
-        void add_cooldown(int32_t skill_id, int32_t time);
+        /// Put a skill on cooldown for the given number of seconds.
+        void add_cooldown(int32_t skill_id, int32_t seconds);
         /// Check if a skill is on cooldown.
         bool has_cooldown(int32_t skill_id) const;
+        /// Remaining cooldown in whole seconds, rounded up (0 when ready).
+        int32_t get_cooldown_seconds(int32_t skill_id) const;
 
         /// Change the player's level, display the levelup effect.
         void change_level(uint16_t level);
@@ -174,6 +176,8 @@ namespace jrc
         Monsterbook& get_monsterbook();
 
     private:
+        void update_cooldowns();
+
         CharStats stats;
         Inventory inventory;
         Skillbook skillbook;
@@ -185,6 +189,7 @@ namespace jrc
         ActiveBuffs active_buffs;
         PassiveBuffs passive_buffs;
 
+        // Skill id -> remaining cooldown in milliseconds.
         std::unordered_map<int32_t, int32_t> cooldowns;
 
         std::map<KeyAction::Id, bool> keysdown;

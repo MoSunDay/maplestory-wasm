@@ -11,6 +11,7 @@
 #include "../../IO/UITypes/Settings/UIGameOptions.h"
 #include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIItemInventory.h"
+#include "../../IO/UITypes/UISkillBook.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 
 #include <cstdint>
@@ -617,5 +618,133 @@ extern "C"
             return 0;
         }
         return static_cast<int>(jrc::Stage::get().count_active_named_objects(name));
+    }
+
+    int msquickslot_skill(int index)
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar
+            ? static_cast<int>(statusbar->get_quickslot_skill(
+                static_cast<int16_t>(index)))
+            : -1;
+    }
+
+    int msquickslot_cooldown(int index)
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        if (!statusbar)
+        {
+            return -1;
+        }
+
+        const int32_t skill_id = statusbar->get_quickslot_skill(
+            static_cast<int16_t>(index));
+        return skill_id > 0
+            ? jrc::Stage::get().get_player().get_cooldown_seconds(skill_id)
+            : 0;
+    }
+
+    int msquickslot_cooldown_label(int index)
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar
+            ? static_cast<int>(statusbar->get_quickslot_cooldown_length(
+                static_cast<int16_t>(index)))
+            : -1;
+    }
+
+    int msquickslot_hovered()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar
+            ? static_cast<int>(statusbar->get_quickslot_hovered())
+            : -2;
+    }
+
+    int msstatusbar_hit(int x, int y)
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        if (!statusbar)
+        {
+            return -1;
+        }
+        const jrc::Point<int16_t> point(
+            static_cast<int16_t>(x), static_cast<int16_t>(y));
+        return (statusbar->is_active() ? 1 : 0)
+            | (statusbar->is_in_range(point) ? 2 : 0)
+            | (statusbar->is_quickslot_in_range(point) ? 4 : 0);
+    }
+
+    int msstatusbar_button_at(int x, int y)
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar
+            ? static_cast<int>(statusbar->button_at(jrc::Point<int16_t>(
+                static_cast<int16_t>(x), static_cast<int16_t>(y))))
+            : -1;
+    }
+
+    int msstatusbar_press_count()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar ? static_cast<int>(statusbar->debug_press_count()) : -1;
+    }
+
+    int msstatusbar_last_button()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar ? static_cast<int>(statusbar->debug_last_button()) : -1;
+    }
+
+    int msstatusbar_cursor_x()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar ? static_cast<int>(statusbar->debug_cursor_x()) : -1;
+    }
+
+    int msstatusbar_cursor_y()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar ? static_cast<int>(statusbar->debug_cursor_y()) : -1;
+    }
+
+    int msstatusbar_rightclick_index()
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar ? static_cast<int>(statusbar->debug_rightclick_index()) : -2;
+    }
+
+    int msui_front_at(int x, int y)
+    {
+        return static_cast<int>(jrc::UI::get().front_type_at(jrc::Point<int16_t>(
+            static_cast<int16_t>(x), static_cast<int16_t>(y))));
+    }
+
+    int msui_cursor_x()
+    {
+        return static_cast<int>(jrc::UI::get().cursor_position().x());
+    }
+
+    int msui_cursor_y()
+    {
+        return static_cast<int>(jrc::UI::get().cursor_position().y());
+    }
+
+    int msskillbook_exists()
+    {
+        return jrc::UI::get().has_element(jrc::UIElement::SKILLBOOK) ? 1 : 0;
+    }
+
+    int msskillbook_selected()
+    {
+        auto skillbook = jrc::UI::get().get_element<jrc::UISkillbook>();
+        return skillbook && skillbook->is_active()
+            ? skillbook->get_selected_skill()
+            : 0;
+    }
+
+    int msskillbook_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::SKILLBOOK) ? 1 : 0;
     }
 }

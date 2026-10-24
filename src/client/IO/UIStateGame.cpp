@@ -158,6 +158,20 @@ namespace jrc
 
     void UIStateGame::drop_icon(const Icon& icon, Point<int16_t> pos)
     {
+        // The quickslot dock stays reachable while another window (such as
+        // the skillbook) is focused, so route skill drops there first.
+        auto& statusbar_element = elements[UIElement::STATUSBAR];
+        if (statusbar_element && statusbar_element->is_active())
+        {
+            auto* statusbar = static_cast<UIStatusbar*>(statusbar_element.get());
+            if (icon.get_skill_id() > 0 &&
+                statusbar->is_quickslot_in_range(pos))
+            {
+                statusbar->send_icon(icon, pos);
+                return;
+            }
+        }
+
         if (UIElement* front = get_front(pos))
         {
             front->send_icon(icon, pos);
@@ -188,6 +202,19 @@ namespace jrc
 
     void UIStateGame::rightclick(Point<int16_t> pos)
     {
+        // The quickslot dock is a persistent HUD control: keep right-click
+        // clear reachable even when a focused window covers the quickslot.
+        auto& statusbar_element = elements[UIElement::STATUSBAR];
+        if (statusbar_element && statusbar_element->is_active())
+        {
+            auto* statusbar = static_cast<UIStatusbar*>(statusbar_element.get());
+            if (statusbar->is_quickslot_in_range(pos))
+            {
+                statusbar->rightclick(pos);
+                return;
+            }
+        }
+
         if (UIElement* front = get_front(pos))
         {
             front->rightclick(pos);
@@ -354,6 +381,26 @@ namespace jrc
         else
         {
             bool clicked = mst == Cursor::CLICKING;
+
+            // The quickslot dock is a persistent HUD control: keep it usable
+            // while a focused window (for example the skillbook) is open.
+            auto& statusbar_element = elements[UIElement::STATUSBAR];
+            if (statusbar_element && statusbar_element->is_active())
+            {
+                auto* statusbar = static_cast<UIStatusbar*>(statusbar_element.get());
+                if (statusbar->is_quickslot_in_range(pos))
+                {
+                    clear_cursors(clicked, pos, UIElement::STATUSBAR);
+                    UIElement::CursorResult result =
+                        statusbar->send_cursor(clicked, pos);
+                    if (clicked && result.handled)
+                    {
+                        cursor_captured = UIElement::STATUSBAR;
+                    }
+                    return result.state;
+                }
+            }
+
             if (UIElement* capturedelement = get(cursor_captured))
             {
                 if (capturedelement->is_active())
