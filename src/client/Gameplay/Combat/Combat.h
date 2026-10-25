@@ -109,6 +109,7 @@ namespace jrc
 
         // Skill id of a proc'd final attack waiting to fire, or 0.
         int32_t final_attack_pending = 0;
+        std::vector<int32_t> final_attack_targets;
 
         TimedQueue<AttackResult> attackresults;
         TimedQueue<BulletEffect> bulleteffects;

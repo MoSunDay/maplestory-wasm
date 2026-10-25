@@ -63,6 +63,11 @@ namespace jrc
 
         // Calculate the results of an attack.
         AttackResult send_attack(const Attack& attack);
+        // Calculate the results of an attack against the given mobs.
+        // Used by follow-up attacks that must stay attached to the targets
+        // selected by the primary attack.
+        AttackResult send_attack(const Attack& attack,
+            const std::vector<int32_t>& targets);
         // Applies damage to a mob.
         void apply_damage(int32_t oid, int32_t damage, bool toleft,
             const AttackUser& user, const SpecialMove& move);

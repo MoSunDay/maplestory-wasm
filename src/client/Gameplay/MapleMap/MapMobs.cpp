@@ -197,10 +197,31 @@ namespace jrc
                 {
                     result.first_oid = target;
                 }
-                if (result.mobcount == mobcount)
+                result.last_oid = target;
+            }
+        }
+        return result;
+    }
+
+    AttackResult MapMobs::send_attack(const Attack& attack,
+        const std::vector<int32_t>& targets)
+    {
+        AttackResult result = attack;
+        for (const auto& target : targets)
+        {
+            if (result.mobcount >= attack.mobcount)
+                break;
+
+            if (Optional<Mob> mob = mobs.get(target))
+            {
+                result.damagelines[target] = mob->calculate_damage(attack);
+                result.mobcount++;
+
+                if (result.mobcount == 1)
                 {
-                    result.last_oid = target;
+                    result.first_oid = target;
                 }
+                result.last_oid = target;
             }
         }
         return result;

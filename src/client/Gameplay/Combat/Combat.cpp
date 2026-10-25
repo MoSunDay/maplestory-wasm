@@ -168,6 +168,7 @@ namespace jrc
     {
         teleport_cooldown = 0;
         final_attack_pending = 0;
+        final_attack_targets.clear();
     }
 
     bool Combat::use_move(int32_t move_id)
@@ -264,6 +265,7 @@ namespace jrc
         const Attack& attack, const AttackResult& result)
     {
         final_attack_pending = 0;
+        final_attack_targets.clear();
 
         if (!move.is_skill() || attack.type != Attack::CLOSE)
             return;
@@ -278,7 +280,11 @@ namespace jrc
 
         bool proc = final_attack::roll(fa_skill, player.get_skills());
         if (proc)
+        {
             final_attack_pending = fa_skill;
+            for (const auto& line : result.damagelines)
+                final_attack_targets.push_back(line.first);
+        }
     }
 
     void Combat::perform_final_attack()
@@ -299,7 +305,8 @@ namespace jrc
         combo_attack::apply_damage(player, attack);
         attack.stance = player.get_look().get_stance();
 
-        AttackResult result = mobs.send_attack(attack);
+        AttackResult result = mobs.send_attack(attack, final_attack_targets);
+        final_attack_targets.clear();
         result.attacker = player.get_oid();
         apply_shadow_partner(player, result);
         extract_effects(player, move, result);

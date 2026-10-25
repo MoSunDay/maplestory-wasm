@@ -98,11 +98,21 @@
   `wz/Skill.wz/111.img.xml`（69KB→154KB），保证客户端/服端数值同源；
   `docker restart ms-game-server` 后加载 0.372s 正常，Panic/Coma 可用。
 
-### 终极命中判定框修复
+### 终极追伤目标接力（第二轮修复）
 
 - 首版 `perform_final_attack` 把技能自带的 ±300 判定框覆盖成武器残影的
   15px 窄条，`MapMobs::send_attack` 一只怪都接不上（attached=0）→ 出伤 0。
-  删除覆盖后沿用 `Skill::apply_stats` 的判定框，实测 `attached=1 lines=1`。
+  删除覆盖后沿用 `Skill::apply_stats` 的判定框。
+- 仍会偶发"触发但零伤害"：主挥砍结束后终极才执行，若主攻击已把目标打死
+  或服务端已下发移除，终极再次 `send_attack` 重新搜索活怪会得到空结果，
+  于是不发伤害数字也不发有效攻击包。
+- 现在主攻击掷中 prop 时，把 `result.damagelines` 里的 oid 快照到
+  `Combat::final_attack_targets`；终极执行时改调
+  `MapMobs::send_attack(attack, targets)`，只对这批主攻击目标计算伤害，
+  不再二次搜索。`Combat::clear()` 同步清空快照。
+- 服务端临时探针确认终极包真实落地并走伤害公式：
+  `skill=1100002 lvl=30 mobs=1 hits=2 dmg={...=[17804, 19450]}`，
+  随后目标死亡掉落；探针已在收尾移除，游戏服恢复原类并重启。
 
 ### 网络（受击数字 / 升级转职特效 / 疾病解析）
 
@@ -133,7 +143,9 @@
   `finisher blocked value=1`、Panic(1111003) 3.12×、终极 `attached=1 lines=1`；
   38 张截图、0 浏览器错误。
 - 调试探针（Combat/Player/ComboAttack 的 printf）在收尾时全部移除并重建，
-  重跑同一 e2e：38 张截图、0 错误、全相位通过。
+  重跑同一 e2e：38 张截图、0 错误、全相位通过。终极目标接力修复后再次
+  全量构建并跑 e2e，同样 38 张截图、0 浏览器错误；服务端侧确认收到
+  1100002 的两击伤害（mobs=1/2）。
 - 运行时手测路径：剑客带 1100002 学习等级，用 1001005 砍怪 → 按等级 prop 概率
   在挥砍结束后自动追加一次终极挥砍（服务端 mobCount=15 特判通道）；三转 1111002
   每次命中 giveBuff(COMBO,n) → 脚下光环 + N-1 颗脉动橙珠；怪物中毒/冰冻变绿/蓝，
