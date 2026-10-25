@@ -144,7 +144,8 @@ async function snapshot(driver) {
     return {
       mobCount: n('msmob_count'), mobX: n('msnearest_mob_x'), mobY: n('msnearest_mob_y'),
       playerX: n('msplayer_x'), playerY: n('msplayer_y'),
-      meso: n('msplayer_meso'), drops: n('msdrop_count')
+      meso: n('msplayer_meso'), drops: n('msdrop_count'),
+      dropNX: n('msdrop_nearest_x'), dropNY: n('msdrop_nearest_y')
     };
   })()`);
 }
