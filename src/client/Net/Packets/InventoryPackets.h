@@ -70,8 +70,10 @@ namespace jrc
     class EquipItemPacket : public MoveItemPacket
     {
     public:
-        EquipItemPacket(int16_t src, Equipslot::Id dest)
-            : MoveItemPacket(InventoryType::EQUIP, src, -dest, 1) {}
+        // Cash equips are worn in hidden slots (100+): looks only, no stats.
+        EquipItemPacket(int16_t src, Equipslot::Id dest, bool cash = false)
+            : MoveItemPacket(cash ? InventoryType::CASH : InventoryType::EQUIP,
+                src, cash ? -(100 + dest) : -dest, 1) {}
     };
 
 
@@ -80,8 +82,9 @@ namespace jrc
     class UnequipItemPacket : public MoveItemPacket
     {
     public:
-        UnequipItemPacket(int16_t src, int16_t dest)
-            : MoveItemPacket(InventoryType::EQUIPPED, -src, dest, 1) {}
+        UnequipItemPacket(int16_t src, int16_t dest, bool cash = false)
+            : MoveItemPacket(cash ? InventoryType::CASH : InventoryType::EQUIPPED,
+                cash ? -(100 + src) : -src, dest, 1) {}
     };
 
 

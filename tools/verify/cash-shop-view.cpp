@@ -132,11 +132,12 @@ int main()
         is_previewable_equip(1002000) && is_previewable_equip(1012180) &&
         is_previewable_equip(1022104) && is_previewable_equip(1042018) &&
         is_previewable_equip(1050050) && is_previewable_equip(1102000) &&
-        is_previewable_equip(1302000) && is_previewable_equip(1492000),
+        is_previewable_equip(1302000) && is_previewable_equip(1492000) &&
+        is_previewable_equip(1702000),
         "visible equipment preview ranges");
     ok &= expect(
         !is_previewable_equip(1112000) && !is_previewable_equip(1122000) &&
-        !is_previewable_equip(1702000) && !is_previewable_equip(5150000) &&
+        !is_previewable_equip(1802000) && !is_previewable_equip(5150000) &&
         !is_previewable_equip(4031192) && !is_previewable_equip(1202000),
         "non-previewable item ranges");
     // CATALOG_PAGE_SIZE is 12, so page 1 starts at filtered index 12.

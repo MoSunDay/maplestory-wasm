@@ -36,6 +36,8 @@ namespace jrc
 
         // Returns wether this equip has equipslot WEAPON.
         bool is_weapon() const;
+        // Returns whether this is a cash (NX) equip.
+        bool is_cash() const;
         // Returns a required base stat.
         int16_t get_reqstat(Maplestat::Id stat) const;
         // Returns a default stat.

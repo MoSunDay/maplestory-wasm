@@ -48,6 +48,19 @@ namespace jrc
             }
             add_equip(equip.second, load_mode);
         }
+
+        // Cash equips are worn for the look only and mask ordinary equips.
+        for (auto& masked : entry.maskedequips)
+        {
+            if (masked.second <= 0)
+                continue;
+
+            if (equip_observer)
+            {
+                equip_observer(masked.second);
+            }
+            add_equip(masked.second, load_mode);
+        }
     }
 
     CharLook::CharLook()

@@ -92,6 +92,12 @@ namespace jrc
             type = types[weaponindex];
             eqslot = Equipslot::WEAPON;
         }
+        else if (index == 70)
+        {
+            // Cash weapons (1702xxx) render in the weapon slot for previews.
+            type = "CASH WEAPON";
+            eqslot = Equipslot::WEAPON;
+        }
         else
         {
             type = "CASH";
@@ -112,6 +118,11 @@ namespace jrc
     bool EquipData::is_weapon() const
     {
         return eqslot == Equipslot::WEAPON;
+    }
+
+    bool EquipData::is_cash() const
+    {
+        return cash;
     }
 
     int16_t EquipData::get_reqstat(Maplestat::Id stat) const

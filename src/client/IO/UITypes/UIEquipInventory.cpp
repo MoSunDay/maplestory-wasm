@@ -148,7 +148,13 @@ namespace jrc
 
     void UIEquipInventory::update_slot(Equipslot::Id slot)
     {
-        if (int32_t item_id = inventory.get_item_id(InventoryType::EQUIPPED, slot))
+        // Cash equips mask the ordinary equip in the same slot.
+        int32_t item_id =
+            inventory.get_item_id(InventoryType::EQUIP, 100 + slot);
+        if (!item_id)
+            item_id = inventory.get_item_id(InventoryType::EQUIPPED, slot);
+
+        if (item_id)
         {
             const Texture& texture = ItemData::get(item_id).get_icon(false);
             icons[slot] = std::make_unique<Icon>(
@@ -210,9 +216,13 @@ namespace jrc
         Equipslot::Id slot = slot_by_position(cursorpos);
         if (icons[slot])
         {
-            if (int16_t freeslot = inventory.find_free_slot(InventoryType::EQUIP))
+            const bool cash =
+                inventory.get_item_id(InventoryType::EQUIP, 100 + slot) != 0;
+            const InventoryType::Id tab =
+                cash ? InventoryType::CASH : InventoryType::EQUIP;
+            if (int16_t freeslot = inventory.find_free_slot(tab))
             {
-                UnequipItemPacket(slot, freeslot).dispatch();
+                UnequipItemPacket(slot, freeslot, cash).dispatch();
             }
         }
     }

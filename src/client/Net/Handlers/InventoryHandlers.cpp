@@ -161,31 +161,37 @@ namespace jrc
             case Inventory::MOVE_UNEQUIP:
                 if (mod.pos < 0)
                 {
+                    const int16_t eqslot = -mod.pos;
                     if (eqinvent)
                     {
-                        eqinvent->modify(-mod.pos, 3, 0);
+                        // Cash equips hide in slots at 100+; show them over the
+                        // ordinary slot they mask.
+                        eqinvent->modify(eqslot >= 100 ? eqslot - 100 : eqslot, 3, 0);
                     }
-
                     if (itinvent)
                     {
-                        itinvent->modify(InventoryType::EQUIP, mod.arg, 0, 0);
+                        itinvent->modify(
+                            eqslot >= 100 ? InventoryType::CASH : InventoryType::EQUIP,
+                            mod.arg, 0, 0);
                     }
 
-                    Stage::get().get_player().change_equip(-mod.pos);
+                    Stage::get().get_player().change_equip(eqslot);
                 }
                 else if (mod.arg < 0)
                 {
+                    const int16_t eqslot = -mod.arg;
                     if (eqinvent)
                     {
-                        eqinvent->modify(-mod.arg, 0, 0);
+                        eqinvent->modify(eqslot >= 100 ? eqslot - 100 : eqslot, 0, 0);
                     }
-
                     if (itinvent)
                     {
-                        itinvent->modify(InventoryType::EQUIP, mod.pos, 3, 0);
+                        itinvent->modify(
+                            eqslot >= 100 ? InventoryType::CASH : InventoryType::EQUIP,
+                            mod.pos, 3, 0);
                     }
 
-                    Stage::get().get_player().change_equip(-mod.arg);
+                    Stage::get().get_player().change_equip(eqslot);
                 }
                 break;
             case Inventory::MOVE_NONE:

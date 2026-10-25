@@ -1,5 +1,8 @@
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
+#include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -66,6 +69,106 @@ namespace
             audit_node(child, item, zmap, observed, failures, parts);
         }
     }
+
+    // Mirrors the frame-name parsing of Clothing/BodyDrawInfo: frame children
+    // are imgdirs whose names must be pure integers in [0, 255].
+    std::optional<uint8_t> parse_frame_name(const std::string& name)
+    {
+        if (name.empty() || name.front() < '0' || name.front() > '9')
+            return std::nullopt;
+
+        char* end = nullptr;
+        long value = std::strtol(name.c_str(), &end, 10);
+        if (*end != '\0' || value < 0 || value > 255)
+            return std::nullopt;
+
+        return static_cast<uint8_t>(value);
+    }
+
+    // v83 glove data convention: the attack follow-ups swingO1/swingT2, the
+    // transition stances (swingTF/stabTF/swingP2), swingO3, heal and the
+    // climb stances legitimately begin past frame 0 (observed up to 2);
+    // ladder/rope may omit sprites entirely. Everything else starts at 0.
+    bool may_start_late(const std::string& stance)
+    {
+        return stance == "swingO1" || stance == "swingT2" ||
+            stance == "swingTF" || stance == "stabTF" ||
+            stance == "swingO3" || stance == "swingP2" ||
+            stance == "heal" || stance == "ladder" || stance == "rope";
+    }
+
+    void audit_stance_frames(
+        nl::node item,
+        const std::string& itemname,
+        std::map<std::string, uint8_t>& item_first,
+        std::vector<std::string>& failures,
+        size_t& frames
+    ) {
+        for (nl::node stance : item)
+        {
+            const std::string stancename = stance.name();
+            if (stancename == "info")
+                continue;
+
+            long first = -1;
+            for (nl::node framenode : stance)
+            {
+                if (framenode.data_type() != nl::node::type::none)
+                    continue;
+
+                std::optional<uint8_t> frame = parse_frame_name(framenode.name());
+                if (!frame)
+                {
+                    failures.push_back(
+                        itemname + "/" + stancename +
+                        ": non-numeric frame name '" + framenode.name() + "'"
+                    );
+                    continue;
+                }
+                ++frames;
+                if (first < 0 || *frame < first)
+                    first = *frame;
+            }
+
+            if (first < 0)
+            {
+                if (stancename != "ladder" && stancename != "rope")
+                {
+                    failures.push_back(
+                        itemname + "/" + stancename + ": no frame directories"
+                    );
+                }
+                continue;
+            }
+
+            auto known = item_first.find(stancename);
+            if (known == item_first.end() || first < known->second)
+                item_first[stancename] = static_cast<uint8_t>(first);
+
+            if (first != 0 && !may_start_late(stancename))
+            {
+                failures.push_back(
+                    itemname + "/" + stancename + ": first frame is " +
+                    std::to_string(first) + ", expected 0"
+                );
+            }
+            else if (first > 2)
+            {
+                failures.push_back(
+                    itemname + "/" + stancename + ": first frame is " +
+                    std::to_string(first) + ", beyond known v83 range"
+                );
+            }
+            else if ((stancename == "swingO1" || stancename == "swingT2") &&
+                     first > 1)
+            {
+                failures.push_back(
+                    itemname + "/" + stancename + ": first frame is " +
+                    std::to_string(first) + ", expected 0 or 1"
+                );
+            }
+        }
+    }
 }
 
 int main(int argc, char** argv)
@@ -80,10 +183,13 @@ int main(int argc, char** argv)
 
     std::set<std::string> observed;
     std::set<std::string> declared;
+    std::map<std::string, uint8_t> first_frames;
     std::vector<std::string> failures;
     size_t items = 0;
     size_t parts = 0;
+    size_t frames = 0;
     size_t target_parts = 0;
+    long target_swing_o1 = -1;
     bool target_found = false;
     std::set<std::string> target_layers;
 
@@ -121,11 +227,23 @@ int main(int argc, char** argv)
         audit_node(item, item.name(), zmap, item_layers, failures, item_parts);
         observed.insert(item_layers.begin(), item_layers.end());
         parts += item_parts;
+
+        std::map<std::string, uint8_t> item_first;
+        audit_stance_frames(item, item.name(), item_first, failures, frames);
+        for (const auto& entry : item_first)
+        {
+            auto known = first_frames.find(entry.first);
+            if (known == first_frames.end() || entry.second < known->second)
+                first_frames[entry.first] = entry.second;
+        }
         if (item.name() == TARGET_ITEM)
         {
             target_found = true;
             target_parts = item_parts;
             target_layers = item_layers;
+            auto swing = item_first.find("swingO1");
+            if (swing != item_first.end())
+                target_swing_o1 = swing->second;
         }
     }
 
@@ -159,6 +277,27 @@ int main(int argc, char** argv)
             std::string(TARGET_ITEM) + " does not exercise backGlove"
         );
     }
+    if (first_frames.empty() || frames == 0)
+    {
+        failures.push_back("no stance frame metadata was audited");
+    }
+    else
+    {
+        auto swing_o1 = first_frames.find("swingO1");
+        auto swing_t2 = first_frames.find("swingT2");
+        if (swing_o1 == first_frames.end() || swing_t2 == first_frames.end())
+        {
+            failures.push_back(
+                "swingO1 and swingT2 stances were not exercised"
+            );
+        }
+    }
+    if (target_swing_o1 != 1)
+    {
+        failures.push_back(
+            std::string(TARGET_ITEM) + " swingO1 must start at frame 1"
+        );
+    }
 
     if (!failures.empty())
     {
@@ -167,6 +306,8 @@ int main(int argc, char** argv)
     }
     std::cout << "glove layering audit passed: " << items << " items, "
               << parts << " parts, " << declared.size() << " z labels; "
-              << TARGET_ITEM << "=" << target_parts << " parts\n";
+              << TARGET_ITEM << "=" << target_parts << " parts; "
+              << first_frames.size() << " stances, " << frames
+              << " frames, swingO1 starts at " << target_swing_o1 << '\n';
     return 0;
 }

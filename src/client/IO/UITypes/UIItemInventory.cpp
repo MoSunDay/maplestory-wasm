@@ -26,6 +26,7 @@
 #include "../Trade/UITrade.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Data/EquipData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/PetPackets.h"
@@ -300,6 +301,15 @@ namespace jrc
                     if (inventory.is_pet_item(tab, slot))
                     {
                         SpawnPetPacket(static_cast<int8_t>(slot)).dispatch();
+                    }
+                    else if (EquipData::get(item_id).is_cash())
+                    {
+                        // Cash equips are worn for the look only.
+                        EquipItemPacket(
+                            slot,
+                            inventory.find_equipslot(item_id),
+                            true
+                        ).dispatch();
                     }
                     break;
                 default:

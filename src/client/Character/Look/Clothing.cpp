@@ -47,6 +47,24 @@ namespace jrc
 
             return static_cast<uint8_t>(value);
         }
+
+        // Regular equip images place stances directly under the image root
+        // (01302000.img/stand1/...); cash weapons nest each stance under a
+        // numeric body group (01702000.img/33/stand1/...). Probe the direct
+        // child first, then scan the numeric groups.
+        nl::node stance_node(nl::node src, const std::string& stancename)
+        {
+            if (nl::node direct = src[stancename])
+                return direct;
+            for (nl::node group : src)
+            {
+                if (!frame_by_name(group.name()))
+                    continue;
+                if (nl::node nested = group[stancename])
+                    return nested;
+            }
+            return {};
+        }
     }
 
     Clothing::Clothing(int32_t id, const BodyDrawinfo& drawinfo,
@@ -98,7 +116,8 @@ namespace jrc
         {
             chlayer = layers[index];
         }
-        else if (index >= WEAPON_OFFSET && index < WEAPON_OFFSET + WEAPON_TYPES)
+        else if (index >= WEAPON_OFFSET && index < WEAPON_OFFSET + WEAPON_TYPES
+            || index == 70)
         {
             chlayer = Layer::WEAPON;
         }
@@ -145,7 +164,7 @@ namespace jrc
             Stance::Id stance = iter.first;
             const std::string& stancename = iter.second;
 
-            nl::node stancenode = src[stancename];
+            nl::node stancenode = stance_node(src, stancename);
             if (!stancenode)
             {
                 continue;

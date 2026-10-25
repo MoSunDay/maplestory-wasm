@@ -172,13 +172,17 @@ namespace jrc
             Inventory& inventory = player.get_inventory();
             const InventoryType::Id type = ItemParser::parse_item_auto(
                 recv, slot, inventory, cash_id);
-            slot = static_cast<int16_t>(slot < 0 ? -slot : slot);
 
-            if (type == InventoryType::EQUIPPED)
+            if (slot < 0)
             {
-                if (auto equips = UI::get().get_element<UIEquipInventory>())
-                    equips->modify(slot, Inventory::ADD, 0);
-                player.change_equip(slot);
+                // The locker transfer equipped the item on arrival.
+                const int16_t eqslot = static_cast<int16_t>(-slot);
+                if (eqslot < 100)
+                {
+                    if (auto equips = UI::get().get_element<UIEquipInventory>())
+                        equips->modify(eqslot, Inventory::ADD, 0);
+                }
+                player.change_equip(eqslot);
                 player.recalc_stats(true);
             }
             else if (type != InventoryType::NONE &&

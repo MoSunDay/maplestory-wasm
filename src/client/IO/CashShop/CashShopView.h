@@ -27,12 +27,14 @@ namespace jrc::cash_shop_view
 
     // Equipment slots that the CharLook render stack actually draws. Rings,
     // pendants, belts and medals have no visible layer, so they stay out.
+    // Cash weapons (1702xxx, index 70) are included, while PetEquip
+    // (1802xxx) and 1202000 stay out.
     constexpr bool is_previewable_equip(int32_t item_id)
     {
         if (item_id / 1000000 != 1)
             return false;
         const int32_t index = item_id / 10000 - 100;
-        return index >= 0 && (index < 11 || (index >= 30 && index < 50));
+        return index >= 0 && (index < 11 || (index >= 30 && index < 50) || index == 70);
     }
 
     enum class RightPane : uint8_t

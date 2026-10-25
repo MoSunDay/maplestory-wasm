@@ -18,6 +18,7 @@
 #include "InventoryType.h"
 
 #include "../../Console.h"
+#include "../../Data/EquipData.h"
 
 namespace jrc
 {
@@ -29,7 +30,18 @@ namespace jrc
         };
 
         int32_t prefix = item_id / 1000000;
-        return (prefix > NONE && prefix <= CASH) ? values_by_id[prefix] : NONE;
+        if (prefix <= NONE || prefix > CASH)
+            return NONE;
+
+        if (values_by_id[prefix] == EQUIP)
+        {
+            // Cash (NX) equips share the equip id space but are flagged in the
+            // game data; they live in the CASH tab, not the EQUIP tab.
+            const EquipData& equip = EquipData::get(item_id);
+            return equip && equip.is_cash() ? CASH : EQUIP;
+        }
+
+        return values_by_id[prefix];
     }
 
     InventoryType::Id InventoryType::by_value(int8_t value)

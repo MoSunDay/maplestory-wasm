@@ -227,7 +227,9 @@ namespace jrc
         if (slot < 0)
         {
             slot = -slot;
-            type = InventoryType::EQUIPPED;
+            // Slots at 100+ are worn cash equips (hidden EQUIP slots);
+            // ordinary worn equips live in EQUIPPED.
+            type = slot >= 100 ? InventoryType::EQUIP : InventoryType::EQUIPPED;
         }
         arg = (arg < 0) ? -arg : arg;
 
@@ -243,10 +245,18 @@ namespace jrc
                 swap(type, slot, type, arg);
                 break;
             case MOVE_UNEQUIP:
-                swap(InventoryType::EQUIPPED, slot, InventoryType::EQUIP, arg);
+                if (slot >= 100)
+                    // Cash equip taken off: it returns to the CASH tab.
+                    swap(InventoryType::EQUIP, slot, InventoryType::CASH, arg);
+                else
+                    swap(InventoryType::EQUIPPED, slot, InventoryType::EQUIP, arg);
                 break;
             case MOVE_EQUIP:
-                swap(InventoryType::EQUIP, slot, InventoryType::EQUIPPED, arg);
+                if (arg >= 100)
+                    // Cash equip worn: hidden EQUIP slot (looks only, never EQUIPPED).
+                    swap(type, slot, InventoryType::EQUIP, arg);
+                else
+                    swap(InventoryType::EQUIP, slot, InventoryType::EQUIPPED, arg);
                 break;
             case MOVE_NONE:
             default:

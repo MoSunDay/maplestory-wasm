@@ -171,14 +171,24 @@ namespace jrc
 
     void Player::change_equip(int16_t slot)
     {
-        if (int32_t itemid = inventory.get_item_id(InventoryType::EQUIPPED, slot))
-        {
-            look.add_equip(itemid);
-        }
+        // Slots at 100+ are worn cash (NX) equips. They only change the look
+        // and mask the ordinary equip in the same slot.
+        const Equipslot::Id eqslot =
+            Equipslot::by_id(slot >= 100 ? slot - 100 : slot);
+        if (eqslot == Equipslot::NONE)
+            return;
+
+        const int32_t cashid =
+            inventory.get_item_id(InventoryType::EQUIP, 100 + eqslot);
+        const int32_t equipid =
+            inventory.get_item_id(InventoryType::EQUIPPED, eqslot);
+
+        if (cashid)
+            look.add_equip(cashid);
+        else if (equipid)
+            look.add_equip(equipid);
         else
-        {
-            look.remove_equip(Equipslot::by_id(slot));
-        }
+            look.remove_equip(eqslot);
     }
 
     void Player::use_item(int32_t itemid)
