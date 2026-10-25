@@ -109,3 +109,11 @@ String 名称双语端同步：
 
 - 用户追认两个 NPC 的落点（如需微调 x/fh）。
 - 评估是否回填 SQL `wz_customlife` 的新 fh，避免后续再导出时复用陈旧值。
+
+## 入口、房间小地图标记与剩余差异（2026-10-19 补）
+
+- **入口可见性**：`web-server` 的根目录是仓库根，原先访问 `/` 只得到目录列表。新增根 `index.html`（meta refresh 到 `./web/index.html`），现在 `http://<host>:8000/` 直接进入登录界面；headless Chromium 实测跳转后 `msui_state=1`。
+- **房间小地图标记**：079 的 `910000001..022` 并非全部 `FreeMarket`，而是按区域取 `Henesys`(001/002/003/005/006)、`ElNath`(004/018..022)、`Ludibrium`(007..012)、`Perion`(013..017)。客户端 `assets/Map.nx` 用新增的 `tools/nx/patch_nx_string.py` 原地重指向字符串表（不改变文件大小）；服务端 22 个 `9100000xx.img.xml` 同步。小地图图标随房间变化。
+- **NPC 落点（“吸附”）**：079 `wz_customlife` 的旧坐标在当前地图上引用了不在同一 x 的 foothold（9030000: fh=144/x=1590；9270052: fh=81/x=34），服务端 spawn 包只带 `cy`，客户端 `NpcSpawn::instantiate` 会用 `get_y_below(x, cy)` 找承载台面。若照抄旧 `cy`，NPC 会掉到 `borders.second` 浮空。因此保留 079 的 x，把 y 吸附到实际台面：9030000 → fh232(y=-1，店门台阶)，9270052 → fh123(y=23，入口地面)。
+- **910000023/024**：只有 2023 服务端 `Map.wz` XML 里有这两张图（客户端 `data/Map/Map/Map9` 只有 `910000000.img`），客户端 `String/Map.img` 也没有它们的名称；没有任何地图 portal 或 NPC 脚本指向它们（023 内部的 023→024 门也只在 023 里）。属于不可达残留，未注入客户端。
+- **弗兰德里交互**：079 的 `9030000.js` 是 `cm.openMerchantItemStore()`，2023 服务端发送 `MERCH_ITEM_STORE` 打开精灵商人领取窗口。本客户端没有该窗口，也没有 v83 `FREDRICK` 包的处理器；当前脚本仍保留“没有可领取物品”的聊天提示。要 100% 还原该交互，需要新增客户端窗口与包处理（不能只改脚本）。
