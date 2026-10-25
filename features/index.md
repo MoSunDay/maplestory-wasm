@@ -23,6 +23,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 ### 输入与本地化
 
 - **[中文/Unicode 输入与渲染](input-localization/)**: CJK 回退字体与 UTF-8 排版；WASM 下由浏览器原生输入法处理候选，拼音 preedit 不进入游戏文本框，只同步选中后的最终文本，密码字段除外
+- **[回车打开输入框不再带入多余空格](changelog/2026-10-25/enter-key-stray-space-in-textfield.md)**: 修复按 Enter 聚焦聊天输入框时浏览器默认动作向 IME 镜像 textarea 插入换行、渲染成多余空格的问题，单行字段一律拦截换行插入
 
 ### 游戏世界
 
@@ -31,11 +32,19 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **[角色自然恢复](character-recovery/)**: 按 v83 站立、攀爬、技能、地图倍率和椅子规则恢复 HP/MP，并与 linked server 的恢复校验及椅子状态同步
 - **传送门**: 地图间瞬移
 - **NPC 交互**: 对话、商店、仓库等
+- **[自由市场玩法向导 NPC](changelog/2026-10-25/fm-gameplay-guide-npcs.md)**: 910000000 内的 PQ 招募/BOSS 入口向导（9010000/9010005），一键传送到 13 个组队任务招募点与 12 个 BOSS 入口，危险地图先二次确认
+- **[自由市场科皮药水价格](changelog/2026-10-25/fm-kopee-potion-prices.md)**: 超级药水 5 万、特殊药水 2 万（shopid 1339 shopitems，重启生效）
+- **[场景机关/进度横幅/BGM 切换](changelog/2026-10-25/field-obstacles-progress-banner.md)**: 服务端可开/关/批量/重置具名地图机关对象（OrbisPQ 陷阱、CWKPQ 石阵等），下发 PQ 进度横幅并运行时切换 BGM
 - **反应器**: 可交互物体（如采集物）
 - **掉落物**: 物品/meso 的拾取
 - **小地图/世界地图**: 地图导航
 
 相关模块: [游戏世界](../agents/client/Gameplay/index.md), [图形渲染](../agents/client/Graphics/index.md)
+
+### 任务系统
+
+- **[任务日志窗口](changelog/2026-10-25/quest-log-window.md)**: Q 键或状态栏菜单打开的 In Progress/Completed 双页任务列表（双代 UI.nx 素材自动适配），实时反映服务端任务状态：放弃、进度数据更新、完成与过期；任务相关的道具特效与状态提示同步接入
+- **新版本地图数据源 gate**: 252/262/271-273/300-305 等新版本地图区段在现有 079 wz 数据源中不存在，注入整体暂缓（[结论记录](changelog/2026-10-25/new-era-maps-gate.md)），不阻塞任务 UI 与玩法枢纽
 
 ### 战斗系统
 
@@ -56,7 +65,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **[玩家面对面交易](player-trade/)**: 点击同地图玩家发起双人交易，交换最多 9 格物品和金币，支持交易内聊天与双方确认
 - **仓库存储**: 物品存储
 - **[现金商城](cash-shop/)**: 查询真实 NX 余额和在售目录，购买单品/礼包，并在商城仓库与角色物品栏之间转移现金物品
-- **[永久新手宠物与自动化](pet-automation/)**: 每个角色获得永久 Brown Puppy 和基础宠物能力；召唤后可自动拾取，并按本地可配置阈值使用角色选择的 HP/MP 药水
+- **[永久新手宠物与自动化](pet-automation/)**: 每个角色获得永久 Brown Puppy，宠物也可在现金商城购买；任意召唤的宠物内建磁铁/物品袋/自动 HP/MP 药水袋能力，可自动拾取并按本地可配置阈值使用角色选择的 HP/MP 药水
 
 相关模块: [角色系统](../agents/client/Character/index.md), [UI 系统](../agents/client/IO/index.md)
 
@@ -87,7 +96,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 ### 音频
 
-- **BGM 播放**: 背景音乐
+- **BGM 播放**: 背景音乐；进图设定之外还支持服务端 FIELD_EFFECT 运行时切换
 - **音效**: 攻击、技能等音效
 
 ## 变更记录

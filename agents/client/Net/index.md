@@ -60,7 +60,11 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 
 掉落移除包由无 UI 状态依赖的 `DropRemovalPayload` 解析器完整消费：mode 0/1 只含 oid，mode 2/4 追加角色 cid，mode 5 再追加宠物槽位。已知模式的截断或尾随字节会抛出 `PacketError`；未知模式记录警告并按服务端权威结论立即擦除对应 oid，不能让单个表现分支中断地图封包处理。mode 5 会解析拾取宠物的固定位置供动画使用；角色或宠物已离开可见范围时仍执行原地淡出和删除。
 
-场地包 `CLOCK` / `STOP_CLOCK` 驱动游戏内场地计时器；`FIELD_EFFECT` 的 2、3、4 模式分别处理具名地图对象关闭、一次性视觉效果和场地音效。服务端 `Party1/Clear`、`Party1/Failed` 会按 `Sound.nx/Field.img` 兼容路径解析，组队任务开门则按地图对象的 `name` 精确停用。
+场地包 `CLOCK` / `STOP_CLOCK` 驱动游戏内场地计时器；`FIELD_EFFECT` 的 2、3、4 模式分别处理具名地图对象关闭、一次性视觉效果和场地音效，mode 6 携带 BGM 路径、经 `Audio/FieldMusicPath` 的 `normalize_bgm_path`（如 `Bgm03/FormatX` → `Bgm03.img/FormatX`）规范化后运行时切换背景音乐。服务端 `Party1/Clear`、`Party1/Failed` 会按 `Sound.nx/Field.img` 兼容路径解析，组队任务开门则按地图对象的 `name` 精确停用。
+
+机关与进度由 `Handlers/FieldObstacleHandlers` 接入服务端 MaplePacketCreator 的封包：`FIELD_OBSTACLE_ONOFF(139)`（string name + int state）、`FIELD_OBSTACLE_ONOFF_LIST(140)`（int count × (string, int)）逐条下推 `Stage::set_named_object_active`；`FIELD_OBSTACLE_ALL_RESET(141)` 无负载，经 `Stage::reset_named_objects` 沿 MapTilesObjs/TilesObjs/Obj 层层下推，把具名对象重置回地图默认全激活，解决 OrbisPQ 陷阱、CWKPQ 石阵等机关卡关。`SCRIPT_PROGRESS_MESSAGE(122)`（string）弹出顶部进度横幅 `UIProgressBanner`。
+
+任务状态回包由 `Handlers/QuestHandlers` 消费：`QUEST_CLEAR(49)`（int16）立即完成任务；`SET_QUEST_CLEAR(150)` 是本服务端从不发送的旧版通知，按宽松 int16 解析并镜像 QUEST_CLEAR；`UPDATE_QUEST_INFO(211)` 按 mode 6/7/8/0x0A/0x0B/0x0D/0x0E/0x0F 分发任务计时器、NPC 标记与通知，0x0F 过期触发 forfeit，mode 8 只读 quest+npc（服务端两种变体尾部不一致）；`SHOW_ITEM_EFFECT(194)`（int cid + int itemid）为本地/远处角色播放 `Effect.nx ItemEff.img/<itemid>` 动画。`SHOW_STATUS_INFO(39)` mode 1 承接 quest + status（0 放弃 / 1 数据字符串更新 / 2 filetime 完成），mode 2 提示道具过期。每次状态迁移递增 `Questlog` revision，驱动任务日志窗口自动刷新。
 
 怪物出生包 `SPAWN_MONSTER` / `SPAWN_MONSTER_CONTROL` 共用无应用状态依赖的 `SpawnMobPayload` 解析器。linked server 在坐标前固定写入 22 字节出生状态块；假怪显形包额外写入 6 字节。解析器按已存在的怪物 oid 区分显形布局，并完整消费坐标、姿态、foothold、出生特效、父怪物、队伍和物品特效尾段；未知布局或截断封包直接抛出 `PacketError`，不会以默认坐标生成怪物。
 
@@ -134,7 +138,7 @@ linked MapleStory Server → Socket::read() → Session::read()
 
 | 目录 | 职责 |
 |------|------|
-| `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, Social, Trade, NpcInteraction, CashShop 等) |
+| `Handlers/` | 按功能分类的封包处理器 (Login, Common, Setfield, Player, Inventory, Attack, Messaging, Social, Trade, NpcInteraction, Quest, FieldObstacle, CashShop 等) |
 | `Handlers/Helpers/` | 封包解析辅助 (CharacterDataParser, ItemParser, LoginParser, MovementParser) |
 | `Packets/` | 发送封包构建器 (LoginPackets, GameplayPackets, InventoryPackets, SocialPackets, TradePackets, CashShopPackets 等)；`CharacterCreation/` 保存可独立验证的建角 payload 编码 |
 | `Protocol/` | 可独立验证的协议解析与编码，包括好友事件、远端玩家/怪物出生负载和掉落移除负载 |

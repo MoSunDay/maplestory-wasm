@@ -67,7 +67,7 @@ node tools/verify/maplestory-webui/gm-shop-flow.mjs
 
 ## 现金商城装备分类菜单流程
 
-`cash-shop-equip-flow.mjs` 登录进图后点击状态栏商城按钮进入现金商城，专项目检「装备」分类二级菜单：点击分类栏「装备」展开浮层（`mscashshop_equip_menu_open`/`mscashshop_equip_sub`/`mscashshop_filtered_count` 只读探针驱动状态断言），依次选择「武器」「帽子」「全部装备」核对过滤数量（实测全部 1984 件中装备 1455、武器 233、帽子 338，切回全部装备数量复原），子分类选中后浮层自动收起（同一项再点也收起），「×」随时可收起且过滤保持、再次点击「装备」可重新展开/收起（toggle），切回「全部」分类时子分类复位且目录数量恢复初始值，最后 Escape 退出商城回游戏。视觉层用页面内 WebGL readPixels 断言选中行为暖橙高亮（R>G>B 且 R-B>40，实测 rgb≈184/111/37）而未选中行为深色（≈26/28/34），菜单收起后原「武器」行带不再出现暖色高亮（卡面 artwork 偏蓝 rgb≈178/186/196）。
+`cash-shop-equip-flow.mjs` 登录进图后点击状态栏商城按钮进入现金商城，专项目检「装备」分类二级菜单：点击分类栏「装备」后左栏原位切换为子菜单（`mscashshop_equip_menu_open`/`mscashshop_equip_sub`/`mscashshop_filtered_count` 只读探针驱动状态断言），依次选择「武器」「帽子」「全部装备」核对过滤数量（实测全部 1984 件中装备 1402、武器 180、帽子 338，切回全部装备数量复原）。展开期间分类按钮 inactive，子分类选中后原位菜单自动收起；「← 返回」收起且过滤保持，再点「装备」重新展开；切回「全部」分类时子分类复位且目录数量恢复初始值，最后 Escape 退出商城回游戏。视觉层用页面内 WebGL readPixels 断言选中行为暖橙高亮（R>G>B 且 R-B>40，实测 rgb≈193/117/42）而未选中行为浅色（≈229/229/231），菜单收起后原「武器」行带不再出现暖色高亮（卡面 artwork 偏蓝 rgb≈234/230/234）。
 
 ```bash
 CASH_EQUIP_ACCOUNT=test1 CASH_EQUIP_PASSWORD=test1 CASH_EQUIP_CARD=1 \
@@ -77,9 +77,18 @@ node tools/verify/maplestory-webui/cash-shop-equip-flow.mjs
 
 环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`CASH_EQUIP_DEBUG_PORT`（默认 9249）、`CASH_EQUIP_ACCOUNT`/`CASH_EQUIP_PASSWORD`（默认 test1/test1）、`CASH_EQUIP_CARD`（角色卡索引 0..3，默认 1，选卡前先核对该账号名下角色）、`CASH_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。无需 GM 等级；登录偶发 reason=7（账号残留 loggedin 状态）时重跑即可。
 
+## 现金商城分辨率取证
+
+`cash-shop-resolution-shot.mjs` 分别以 `SHOP_RES=1`（1280×720）和 `SHOP_RES=none`（800×600，清除持久化设置）登录进图、打开商城并截图，输出画布 `getBoundingClientRect` JSON 与 `mscashshop_filtered_count`/`mscashshop_selected_left`/`mscashshop_locker_count`/`mscashshop_inventory_count` 探针。两种分辨率均应得到 `filtered=1984`，用于确认 800×600 设计画布在宽屏下等比缩放且左右栏不重叠。
+
+```bash
+SHOP_RES=1 node tools/verify/maplestory-webui/cash-shop-resolution-shot.mjs
+SHOP_RES=none node tools/verify/maplestory-webui/cash-shop-resolution-shot.mjs
+```
+
 ## 现金商城试穿流程
 
-`cash-shop-tryon-flow.mjs` 登录进图后进入现金商城，专项目检累计试穿（「试穿不生效」修复的验收）：选中「装备→帽子」子分类后点击目录卡入试穿集（`mscashshop_tryon_count`/`mscashshop_highlighted_item`/`mscashshop_preview_cap` 只读探针驱动断言），点击同槽第二顶帽子验证覆盖语义（计数仍为 1、预览帽切换为第二顶且不同于首顶和玩家基线帽），换「上衣」子分类再点一卡验证跨槽累计（计数 2、帽子预览保持），最后点击推荐面板「重置」按钮清空试穿集并还原玩家原始外观。视觉层用页面内 WebGL readPixels 采样人像带：换帽时均值亮度变化 ≥3、加上衣时降采样网格差异率 ≥2%（实测 5%）、重置后亮度回到基线 ±1.5。退出商城回游戏收尾。
+`cash-shop-tryon-flow.mjs` 登录进图后进入现金商城，专项目检累计试穿（「试穿不生效」修复的验收）：选中「装备→帽子」子分类后点击目录卡入试穿集（`mscashshop_tryon_count`/`mscashshop_highlighted_item`/`mscashshop_preview_cap` 只读探针驱动断言），点击同槽第二顶帽子验证覆盖语义（计数仍为 1、预览帽切换为第二顶且不同于首顶和玩家基线帽），换「上衣」子分类再点一卡验证跨槽累计（计数 2、帽子预览保持），最后点击推荐面板「重置」按钮清空试穿集并还原玩家原始外观。视觉层用页面内 WebGL readPixels 采样人像带：换帽时均值亮度变化 ≥3、加上衣时降采样网格差异率 ≥2%（实测 4%）、重置后亮度回到基线 ±1.5。退出商城回游戏收尾。
 
 ```bash
 TRYON_FLOW_ACCOUNT=test1 TRYON_FLOW_PASSWORD=test1 TRYON_FLOW_CARD=1 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-tryon-flow.mjs
@@ -96,6 +105,36 @@ TAKE_EQUIP_ACCOUNT=test1 TAKE_EQUIP_PASSWORD=test1 TAKE_EQUIP_CARD=1 CHROME_BIN=
 ```
 
 环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`TAKE_EQUIP_DEBUG_PORT`（默认 9251）、`TAKE_EQUIP_ACCOUNT`/`TAKE_EQUIP_PASSWORD`（默认 test1/test1）、`TAKE_EQUIP_CARD`（角色卡索引 0..3，默认 1）、`TAKE_EQUIP_ITEM_ID`（默认 1002000）、`TAKE_EQUIP_SN`（默认 20000016）、`TAKE_EQUIP_PRICE`（默认 3700）、`TAKE_EQUIP_CAP_SLOT`（默认 1）、`TAKE_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。
+
+## 现金商城宠物购买与自动化全链路流程
+
+`cash-shop-pet-flow.mjs` 验收「商城宠物」功能闭环：登录（角色需在地图 40001、USE 栏备 `2000005` 超级药水）进图后进商城，断言第 8 分类「宠物」过滤生效（在售宠物 5000000–5000999 与宠物能力装备 1812000/1802 段，当前目录 87 件），SN `60000001` 搜索唯一高亮 5000001 并购买（NX 扣 4900、入库商城仓库）；双击仓库槽取出到现金栏后通过 `ensurePetSummoned` 序列召唤，断言已召唤宠物能力掩码为 31（磁铁+物品袋+飞行靴+自动 HP/MP 药水袋内建）。回图打蜗牛掉落金币/物品，验证宠物自动捡取（meso 到账且服务端 confirmed OID 从地图对象表移除）；随后 SQL 绑定 keymap 91/92 → 2000005，把 HP/MP 压到 30% 以下断线重登，断言登录同步后 HP/MP 均恢复 ≥99% 且药水消耗 1 瓶。产物（截图 + 状态 JSON）写 `/tmp/cash-shop-pet-flow`。测试会真实消耗 NX 并修改 keymap/HP/MP，运行前需角色离线。
+
+```bash
+PET_FLOW_ACCOUNT=test1 PET_FLOW_PASSWORD=test1 PET_FLOW_CARD=0 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-pet-flow.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`PET_FLOW_DEBUG_PORT`（默认 9262）、`PET_FLOW_ACCOUNT`/`PET_FLOW_PASSWORD`（默认 test1/test1）、`PET_FLOW_CARD`（角色卡索引 0..3，默认 0）、`PET_FLOW_ARTIFACT_DIR`（默认 /tmp/cash-shop-pet-flow）、`MS_SERVER_CONFIG`（DB 凭证，默认 link_repos/MapleStory-Server/configuration.ini）、`PET_FLOW_URL`（默认 http://127.0.0.1:8000/web/index.html）。所需账号/角色卡由脚本按账号名核对，登录偶发 reason=7（账号残留 loggedin 状态）时重跑即可。
+
+## 现金商城宠物 UI 交互缺陷猎手流程
+
+`cash-shop-pet-ui-interactions.mjs` 专项目检宠物功能的 UI 交互边界（不做购买正向流，购买/取出/召唤/自动化由 `cash-shop-pet-flow.mjs` 覆盖）：宠物分类过滤计数**从内嵌 `cash-shop-v83.csv` 按客户端同口径动态推算**（在售 ∧ 性别 ∧ 宠物 5000xxx+能力装备 1812000-07+宠物穿戴 1802xxx，目录数据被并行任务扩充时自动跟随，实测 87 件）；翻页连点越界只钳制不崩溃（filtered/pending/notice 不漂移）；「装备」子菜单(武器)选中后切「宠物」子菜单状态复位不泄漏；「全部」分类含宠物商品；点宠物卡不进试穿集、预览面板回退图标；SN 搜索 → 二次点击弹购买确认 → **Escape 取消**路径不扣款不动仓库；搜索框「×」按钮清空恢复列表；宠物自动补给面板 CANCEL 丢弃滑条编辑、OK 保存 30/40 阈值（±2 容差）、`location.reload()` 重登后 localStorage 持久化、药水槽左右箭头切换候选（含 OFF）并落盘、收尾复位 50/50；召唤态断言能力掩码 31（未召唤则跳过）。注意：翻页/切分类后必须等 assetsIdle（图标按需流式加载会吞点击）。产物写 `/tmp/cash-shop-pet-ui`。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-pet-ui-interactions.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`PET_UI_DEBUG_PORT`（默认 9263）、`PET_UI_ARTIFACT_DIR`（默认 /tmp/cash-shop-pet-ui）、`PET_UI_URL`（默认 http://127.0.0.1:8000/web/index.html）、`MS_SERVER_CONFIG`（DB 凭证路径）。固定 test1/test1 卡 0；会重置账号 loggedin 并改写本地阈值/药水配置（收尾已复位 50/50 与 2000005）。
+
+## 现金商城确认弹窗输入隔离
+
+`cash-shop-modal-guards.mjs` 专项目检购买确认弹窗（`UIYesNo`）的模态输入隔离与失效选中守卫：A 打开确认框后双击右栏储物格，断言 `msui_notice_active` 仍为 1 且 `mscashshop_pending` 与仓库/物品栏/NX 余额快照不变；B 弹窗外左栏滚轮同样不改变快照，关闭确认后左栏页基与操作前一致（滚轮符号先用无弹窗状态标定）；C 在第 2 页选中一张卡后翻页使高亮项离开当前页，按 Enter 不弹确认、快照不变，再用可见选中做正对照——Enter 仍弹确认，Escape 取消后快照不变。A/B 都用 `msui_front_at` 断言层级：储物格与滚轮点返回 `CASHSHOP`、弹窗中心 (400,240) 返回 `NOTICE`，这是 `get_front` 前台层判定修复的回归点（修复前该点为 `CASHSHOP`，鼠标事件会穿透到底层商城）。守卫用例本身不结算交易；商城仓库为空时脚本先用 SN `80000002`（1 NX）买入一件备货，开跑前通过 DB 重置账号 loggedin，要求账号离线且 NX Credit ≥ 1。产物写 `MODAL_GUARDS_ARTIFACT_DIR`（默认 `/tmp/cash-shop-modal-guards`）：截图 `01-slot-doubleclick-guard` 至 `05-visible-enter-cancelled`、`browser-console.log`、`browser-errors.log`，失败时另有 `zz-failure.png`。固定 test1/card0。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-modal-guards.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`MODAL_GUARDS_DEBUG_PORT`（默认 9269）、`MODAL_GUARDS_ACCOUNT`/`MODAL_GUARDS_PASSWORD`（默认 test1/test1）、`MODAL_GUARDS_CARD`（角色卡索引 0..3，默认 0）、`MODAL_GUARDS_ARTIFACT_DIR`（默认 /tmp/cash-shop-modal-guards）、`MODAL_GUARDS_URL`（默认 http://127.0.0.1:8000/web/index.html）、`MS_SERVER_CONFIG`（DB 凭证，默认 link_repos/MapleStory-Server/configuration.ini）、`MS_UI_ELEMENT_HEADER`（默认 src/client/IO/UIElement.h，用于解析 NOTICE/CASHSHOP 元素序号）。
 
 ## 自由市场 910000000 079 复刻流程
 
@@ -137,21 +176,131 @@ browser-console/errors.log）。
 
 ## NPC 对话内嵌图片（#f 路径宏）流程
 
-`npc-embed-icons.mjs` 验证妮娜（9270052，自由市场 910000000，出生点向右走到
-x≈34）对话里 `#fUI/GuildMark/Mark/...#` 内嵌图片宏的端到端渲染：
+`npc-embed-icons.mjs` 验证妮娜（9270052，自由市场 910000000，出生点向左走到
+x≈34）对话里菜单爱心 `#fEffect/CharacterEff/1062114/1/0#` 的端到端渲染。
+妮娜 case 0 原有的 21 个 GuildMark 四方印分隔行已删除，因此测试不再要求
+整行 17 连排色带：
 
-- 文本层：`msnpc_prompt` 不得泄漏 `UI/`、`GuildMark` 等资源路径子串，
-  且出现 `#f` 精灵按宽度换算出的空格占位长跑（实测 105 空格）；
-- 像素层：页面内 readPixels 在对话文本列（game x300..620 y215..290）按
-  5px 横带扫描，自动锁定最彩带为图标行（实测 y255-269、pitch 15 的
-  17 连排 15×15 四方印 + 行尾 3 枚），要求其 chroma 显著高于灰阶文本
-  参照（实测 108 vs 5.6），且 x300..560 分 12 列全部染色；
-- 差分层：Escape 关闭对话后同带 chroma 须回落（世界底色残留约 70，
-  开对话时 108，差 ≥10 断言通过）；
+- 文本层：`msnpc_prompt` 不得泄漏 `UI/`、`Effect/` 等资源路径子串；
+  旧的 105 空格分隔行不得再现（实测最长空格跑为 3）；
+- 像素层：页面内 readPixels 在菜单爱心图标列（game x296..308、
+  y258..350）按 5px 横带扫描，自动锁定最彩带为爱心行，要求其 chroma
+  显著高于灰阶文本参照，且 3 个窄列中至少 1 列染色（实测 3/3）；
+- 差分层：Escape 关闭对话后同带亮度须大幅回落（白色面板消失；实测
+  186 → 39.59~53.49），色度差作为备选判据；
 - 卫生层：console 无 `unresolved inline image` 告警、无浏览器错误。
 
-图标纹理经 LazyFS 异步入图集，脚本对色带扫描带 20s 重试（首帧
-ready=0/21，数秒后 21/21）。每次运行前需
+图标纹理经 LazyFS 异步入图集，脚本对色带扫描带 20s 重试。每次运行前需
 `update accounts set loggedin=0 where name='fmflow1';`。
 环境变量：`NPC_EMBED_ACCOUNT/PASSWORD/CARD/X/URL`、`CHROME_BIN`，
 产物在 `/tmp/maplestory-webui-*/`（open/closed 截图 + npc-embed-icons.json）。
+
+## /gohome 快捷回自由市场
+
+`gohome-flow.mjs` 从自由市场房间 910000001（fieldLimit 含
+`CANNOTMIGRATE`，旧 `@goto`/`@warp` 会拒绝）登录，发送 `/gohome`，
+断言地图切回 910000000 且落点为 `in01` 传送门附近（x≈1332）。
+这是 slash 命令的唯一放行项，客户端无需改动；`@gohome`/`!gohome`
+也可用。运行前需把测试角色放到 910000001：
+
+```sql
+update characters c join accounts a on a.id=c.accountid
+  set c.map=910000001, c.spawnpoint=0
+  where a.name='fmflow1' and c.name='fmflow1Hero';
+update accounts set loggedin=0 where name='fmflow1';
+```
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/gohome-flow.mjs
+```
+
+环境变量：`GOHOME_ACCOUNT/PASSWORD/CARD/START_MAP/URL/DEBUG_PORT`、
+`CHROME_BIN`；产物在 `/tmp/maplestory-webui-*/`。
+
+## 自由市场服务 NPC（佩里传送 / 科皮商店）
+
+`fm-service-npcs.mjs` 验证 910000000 新增的两个服务 NPC（服务端 life
+index 4/5）：从 sp 出生后走到 x≈300 打开佩里 9110000 的主菜单，
+点击首分类进入维多利亚子菜单，确认文本含「维多利亚」；Escape 关闭后
+走到 x≈600 打开科皮 9201116 的商店（shopid 1339），断言可见行含
+飞镖/子弹/药水等本店物品，并真实点击购买 2030004 或 2030000，
+库存 +1；最后再次打开佩里，选维多利亚→射手村，断言 warp 到
+100000000。
+
+对话选项由脚本从 y=140 起逐行物理点击，命中首项（默认 selected=0）
+即确认。运行前需重置测试角色：
+
+```sql
+update accounts set loggedin=0 where name='test2';
+update characters set map=910000000, spawnpoint=0 where id=219;
+```
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/fm-service-npcs.mjs
+```
+
+环境变量：`FM_SERVICE_ACCOUNT/PASSWORD/CARD/URL/DEBUG_PORT`（默认
+test2/test2、卡 0、本地 8000、9255）；产物在
+`/tmp/maplestory-webui-*/`（perry-main、victoria、kopee-shop、
+henesys 截图 + browser-console.log）。
+
+## 自由市场玩法向导（PQ 招募 / BOSS 入口传送）
+
+`fm-gameplay-guides.mjs` 验证 910000000 新增的两个向导 NPC（服务端 life
+index 6/7）：从 sp 出生后走到 x≈850 打开 9010000「玩法向导」的组队任务
+招募菜单，断言提示含「玩法向导」与「组队任务」；Escape 关闭后走到
+x≈1150 打开 9010005「BOSS 向导」的入口菜单，断言提示含「BOSS 向导」与
+「入口」；随后点击首选项「扎昆入口(50级+)」——211042300 不在脚本的
+DANGEROUS_MAPS 危险名单内，单击直接 cm.warp，断言落图 211042300。
+
+NPC 脚本为 `scripts/npc/9010000.js` / `9010005.js`（支持热更新），对话
+选项由脚本从 y=140 起逐行物理点击，命中首项（默认 selected=0）即确认。
+运行前需重置测试角色（结束后角色停在扎昆入口一带，会话落点为
+211041900）：
+
+```sql
+update accounts set loggedin=0 where name='test2';
+update characters set map=910000000, spawnpoint=0 where id=219;
+```
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/fm-gameplay-guides.mjs
+```
+
+环境变量：`FM_GUIDES_ACCOUNT/PASSWORD/CARD/URL/DEBUG_PORT`（默认
+test2/test2、卡 0、本地 8000、9256）；产物在
+`/tmp/maplestory-webui-*/`（pq-menu、boss-menu、zakum-door 截图 +
+browser-console.log）。
+
+## 任务日志窗口（Q 键开合）
+
+`questlog-flow.mjs` 验证 KeyAction::QUESTLOG 全链路：登录进图后按 Q
+（GLFW 81）打开任务日志窗口（UIElement::QUESTLOG，`emplace<UIQuestLog>`），
+断言 `msui_questlog_active=1` 并截图；`msui_questlog_rows` 返回非负整数
+行数；再按 Q 经 TOGGLED 翻转关闭；第三次按 Q 重开后按 Escape 走
+`send_key(escape)` 分支 deactivate。窗口实现位于
+`IO/UITypes/Quest/UIQuestLog.{h,cpp}`，数据源 Character/QuestLog +
+Quest.nx QuestInfo.img。
+
+两个易错点：keymap 的 `key` 列是客户端 Keytable 的 MS 扫描码下标，
+Q 是 16（GLFW 键码 81 对应 PAGE_DOWN 槽位）；KeyType 枚举 MENU=4/
+ACTION=5，Q 必须绑 16→4/8，写成 ACTION/8 不会开窗。运行前需重置
+测试角色：
+
+```sql
+update accounts set loggedin=0 where name='test2';
+update characters set map=910000000, spawnpoint=0 where id=219;
+update keymap set type=4, action=8 where characterid=219 and `key`=16;
+```
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/questlog-flow.mjs
+```
+
+环境变量：`QUESTLOG_ACCOUNT/PASSWORD/CARD/URL/DEBUG_PORT`（默认
+test2/test2、卡 0、本地 8000、9257）；产物在
+`/tmp/maplestory-webui-*/`（questlog-open、questlog-closed 截图 +
+browser-console.log）。
