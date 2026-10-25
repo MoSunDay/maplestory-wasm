@@ -79,6 +79,11 @@ namespace jrc
     Cursor::State UIStateCashShop::send_cursor(Cursor::State state, Point<int16_t> pos)
     {
         bool clicked = state == Cursor::CLICKING;
+        // A focused modal (yes/no, notice) owns input; drop a stale capture so
+        // the shop cannot keep consuming the click sequence behind it.
+        if (focused != UIElement::NONE && focused != UIElement::CASHSHOP &&
+            cursor_captured == UIElement::CASHSHOP)
+            cursor_captured = UIElement::NONE;
         UIElement* target = nullptr;
         UIElement::Type target_type = UIElement::NONE;
         if (UIElement* captured = get(cursor_captured); captured && captured->is_active())
@@ -100,8 +105,11 @@ namespace jrc
         clear_cursors(clicked, pos, target_type);
         if (!target)
             return Cursor::IDLE;
+        // Dispatch can move the focus (BT_BUY opens UIYesNo), so only hold the
+        // capture when the shop still owns the focus afterwards.
+        const UIElement::Type target_focus = focused;
         UIElement::CursorResult result = target->send_cursor(clicked, pos);
-        if (clicked && result.handled)
+        if (clicked && result.handled && focused == target_focus)
             cursor_captured = target_type;
         else if (!clicked)
             cursor_captured = UIElement::NONE;

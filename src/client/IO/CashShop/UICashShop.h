@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace jrc
@@ -69,6 +70,18 @@ namespace jrc
         int64_t transfer_cash_id() const;
         bool is_pending() const;
 
+        Point<int16_t> button_center(uint16_t id) const
+        {
+            const auto found = buttons.find(id);
+            if (found == buttons.end())
+                return { -32768, -32768 };
+            const Rectangle<int16_t> rect = found->second->bounds(position);
+            return {
+                static_cast<int16_t>((rect.l() + rect.r()) / 2),
+                static_cast<int16_t>((rect.t() + rect.b()) / 2)
+            };
+        }
+
     protected:
         Button::State button_pressed(uint16_t id) override;
 
@@ -88,6 +101,9 @@ namespace jrc
         static const char* currency_short_name(CashCurrency value);
         void change_right_pane(cash_shop_view::RightPane pane);
         void set_pending(bool value);
+        // True once every expected balance push has arrived. Purchases stay
+        // disabled before that so no reply can race the cached balances.
+        bool balances_ready() const;
         void select_new_locker_item(int64_t cash_id);
         void select_inventory_item(int64_t cash_id);
         void request_purchase(size_t filtered_index);
@@ -111,6 +127,7 @@ namespace jrc
         void draw_details_text() const;
         void draw_feature_panel() const;
         void draw_sidebar_legend() const;
+        void draw_right_pane() const;
         void draw_catalog_hint() const;
         void position_buy_button();
 
@@ -125,12 +142,24 @@ namespace jrc
         size_t right_page;
         bool pending;
         bool balance_requested;
+        // Armed by set_pending(true); pending_frames counts update() ticks so
+        // a lost reply cannot lock the shop forever.
+        bool pending_watch;
+        int pending_frames;
+        // The entry showCash is the first expected push; the CheckCash reply
+        // is counted as a second one when it is requested.
+        size_t balance_expected;
+        size_t balance_received;
         bool preview_dirty;
         int64_t pending_cash_id;
         std::optional<size_t> selected_left;
         std::optional<size_t> selected_right;
         std::vector<size_t> filtered;
         std::string applied_query;
+        // Error raised from a modal callback (UIYesNo) is queued here and
+        // emplaced from update(), because emplace<UIOk> resets the shared
+        // NOTICE slot and would destroy the still-executing UIYesNo.
+        std::string deferred_error;
         int32_t category_icon_ids[cash_shop_view::CATEGORY_COUNT] = {};
         Point<int16_t> last_cursor_position;
 

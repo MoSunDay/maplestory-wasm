@@ -22,7 +22,13 @@ namespace jrc
     using cash_shop_draw::fill_rect;
     using cash_shop_draw::outline_rect;
     using cash_shop_draw::currency_label_position;
-    using cash_shop_draw::tab_label_position;
+
+    namespace
+    {
+        // ~30 s at 60 fps. Long enough for a slow purchase/transfer reply,
+        // short enough that a dropped reply cannot lock the shop forever.
+        constexpr int PENDING_TIMEOUT_FRAMES = 1800;
+    }
 
     UICashShop::UICashShop(std::shared_ptr<CashShopModel> value, bool is_female)
         : model(std::move(value)), female(is_female),
@@ -30,7 +36,8 @@ namespace jrc
           currency(CashCurrency::NX_CREDIT), category(0),
           equip_sub(0), equip_menu_open(false), left_page(0),
           right_page(0), pending(false), balance_requested(false),
-          preview_dirty(true), pending_cash_id(0),
+          pending_watch(false), pending_frames(0), balance_expected(1),
+          balance_received(0), preview_dirty(true), pending_cash_id(0),
           last_cursor_position(),
           skin(cash_shop_skin::load_cash_shop_skin()),
           search(Text::A11M, Text::LEFT, Text::WHITE,
@@ -419,102 +426,7 @@ namespace jrc
         page_labels[0].draw(draw_position(layout::LEFT_PAGE_POS));
         draw_catalog_hint();
 
-        const auto flat_tab = [&](uint16_t id, Point<int16_t> tab_position,
-            bool selected)
-        {
-            const bool hovered = !selected &&
-                state_of(id) == Button::MOUSEOVER;
-            if (selected)
-                fill_rect(tab_position, layout::TAB_SIZE,
-                    0.20f, 0.17f, 0.11f, 1.0f);
-            else if (hovered)
-                fill_rect(tab_position, layout::TAB_SIZE,
-                    0.14f, 0.15f, 0.18f, 1.0f);
-            else
-                fill_rect(tab_position, layout::TAB_SIZE,
-                    0.10f, 0.11f, 0.135f, 1.0f);
-            outline_rect(tab_position, layout::TAB_SIZE,
-                0.25f, 0.28f, 0.34f, 1.0f);
-            if (selected)
-                fill_rect(
-                    { tab_position.x(), static_cast<int16_t>(tab_position.y() +
-                        layout::TAB_SIZE.y() - 2) },
-                    { layout::TAB_SIZE.x(), 2 },
-                    0.88f, 0.52f, 0.16f, 1.0f);
-        };
-
-        const bool locker_active = right_pane == view::RightPane::LOCKER;
-        flat_tab(BT_RIGHT_LOCKER_TAB, layout::TAB_LOCKER_POS, locker_active);
-        flat_tab(BT_RIGHT_INVENTORY_TAB, layout::TAB_INVENTORY_POS,
-            !locker_active);
-        skin.tab_bar.draw(
-            { draw_position(layout::TAB_BAR_POS),
-                draw_size(layout::TAB_BAR_SIZE) });
-        tab_labels[0].draw(
-            draw_position(tab_label_position(layout::TAB_LOCKER_POS)));
-        tab_labels[1].draw(
-            draw_position(tab_label_position(layout::TAB_INVENTORY_POS)));
-
-        skin.inventory_panel.draw(
-            { draw_position(layout::PANEL_POS),
-                draw_size(layout::PANEL_SIZE) });
-
-        // Replace the painted Korean panel header with a flat title band.
-        const int16_t header_height = static_cast<int16_t>(
-            layout::SLOT_GRID_POS.y() - layout::PANEL_POS.y());
-        fill_rect(layout::PANEL_POS,
-            { layout::PANEL_SIZE.x(), header_height },
-            0.06f, 0.07f, 0.09f, 1.0f);
-        fill_rect(layout::PANEL_POS, { layout::PANEL_SIZE.x(), 1 },
-            0.25f, 0.28f, 0.34f, 1.0f);
-        fill_rect(
-            { layout::PANEL_POS.x(),
-                static_cast<int16_t>(layout::SLOT_GRID_POS.y() - 1) },
-            { layout::PANEL_SIZE.x(), 1 }, 0.25f, 0.28f, 0.34f, 1.0f);
-        pane_title.draw(draw_position(layout::PANE_TITLE_POS));
-        pane_info.draw(draw_position(layout::PANE_INFO_RIGHT));
-
-        const Texture& cover =
-            locker_active ? skin.locker_cover : skin.inventory_cover;
-        cover.draw({ draw_position(layout::SLOT_GRID_POS),
-            draw_size(layout::SLOT_COVER_SIZE) });
-
-        const auto right_range = view::page_range(
-            right_page, right_count(), view::RIGHT_PAGE_SIZE);
-        if (right_range.first == right_range.second)
-        {
-            skin.no_item.draw({ draw_position(layout::EMPTY_RIGHT_CENTER -
-                layout::EMPTY_HINT_SIZE / 2),
-                draw_size(layout::EMPTY_HINT_SIZE) });
-        }
-        else
-        {
-            for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
-            {
-                const size_t index = right_range.first + slot;
-                if (index >= right_range.second)
-                    continue;
-                const Point<int16_t> base = layout::slot_position(slot);
-                if (const ItemData& data = ItemData::get(right_item_id(index)))
-                    draw_icon(data.get_icon(false),
-                        base + layout::SLOT_SIZE / 2, layout::SLOT_ICON_MAX);
-                slot_counts[slot].draw(
-                    draw_position(base + layout::SLOT_COUNT_OFFSET));
-                const bool selected = selected_right &&
-                    *selected_right == index;
-                if (selected)
-                    draw_icon(skin.selected_marker,
-                        base + layout::SLOT_MARKER_CENTER, layout::px(12));
-                if (selected)
-                    outline_rect(base, layout::SLOT_SIZE,
-                        0.88f, 0.52f, 0.16f, 1.0f, 2);
-                else if (state_of(BT_SLOT_FIRST + slot) == Button::MOUSEOVER)
-                    outline_rect(base, layout::SLOT_SIZE,
-                        0.78f, 0.81f, 0.85f, 0.85f, 2);
-            }
-        }
-        transfer_hint.draw(draw_position(layout::TRANSFER_HINT_POS));
-        page_labels[1].draw(draw_position(layout::RIGHT_PAGE_POS));
+        draw_right_pane();
 
         // Selected item details.
         fill_rect(layout::DETAILS_PANEL_POS, layout::DETAILS_PANEL_SIZE,
@@ -600,15 +512,29 @@ namespace jrc
     void UICashShop::update()
     {
         UIElement::update();
+        // Queued errors are shown here, never from the callback that raised
+        // them: emplace<UIOk> resets the NOTICE slot, which would destroy a
+        // UIYesNo that is still executing its yes-handler.
+        if (!deferred_error.empty())
+        {
+            const std::string message = std::move(deferred_error);
+            deferred_error.clear();
+            UI::get().emplace<UIOk>(message, []() {});
+        }
         search.update(layout::origin());
         if (preview_dirty)
         {
             preview_dirty = false;
             refresh_preview();
         }
-        if (!balance_requested)
+        if (pending_watch && ++pending_frames >= PENDING_TIMEOUT_FRAMES)
+            show_error("商城操作超时，请重试。");
+        // One query at most, and not when the entry showCash already made us
+        // ready. The reply is a second expected push.
+        if (!balance_requested && !balances_ready())
         {
             balance_requested = true;
+            ++balance_expected;
             CheckCashPacket().dispatch();
         }
     }
@@ -705,6 +631,10 @@ namespace jrc
         if (id == BT_EXIT)
         {
             pending = true;
+            // Leaving is not a purchase/transfer: it is never timed out, and
+            // the showCash the server pushes with the exit is not an error.
+            pending_watch = false;
+            pending_frames = 0;
             UI::get().disable();
             LeaveCashShopPacket().dispatch();
         }

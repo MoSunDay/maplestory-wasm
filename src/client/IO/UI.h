@@ -63,6 +63,7 @@ namespace jrc
         void send_cursor(Point<int16_t> pos);
         void send_cursor(bool pressed);
         void set_cursor_position(Point<int16_t> pos);
+        void set_cursor_idle();
         void send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate);
         void send_focus(int focused);
         void send_scroll(double yoffset);

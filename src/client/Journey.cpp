@@ -187,6 +187,10 @@ namespace jrc
         if (asset_blocking)
         {
             Stage::get().release_actions();
+            // The loading overlay can eat the mouseup that would end a cash
+            // shop click, so drop the stuck CLICKING cursor here.
+            if (UI::get().get_state() == UI::CASHSHOP)
+                UI::get().set_cursor_idle();
         }
         if (Stage::get().is_loading() || !asset_blocking)
         {

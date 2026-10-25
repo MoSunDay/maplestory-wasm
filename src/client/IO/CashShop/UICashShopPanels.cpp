@@ -15,6 +15,7 @@ namespace jrc
     using cash_shop_draw::draw_size;
     using cash_shop_draw::fill_rect;
     using cash_shop_draw::outline_rect;
+    using cash_shop_draw::tab_label_position;
 
     namespace
     {
@@ -122,6 +123,109 @@ namespace jrc
             { layout::DETAILS_TEXT_CENTER.x(), layout::DETAILS_META_Y }));
         details_extra.draw(draw_position(
             { layout::DETAILS_TEXT_CENTER.x(), layout::DETAILS_EXTRA_Y }));
+    }
+
+    void UICashShop::draw_right_pane() const
+    {
+        const auto state_of = [this](uint16_t id) -> Button::State
+        {
+            const auto found = buttons.find(id);
+            return found != buttons.end() ? found->second->get_state() :
+                Button::NORMAL;
+        };
+        const auto flat_tab = [&](uint16_t id, Point<int16_t> tab_position,
+            bool selected)
+        {
+            const bool hovered = !selected &&
+                state_of(id) == Button::MOUSEOVER;
+            if (selected)
+                fill_rect(tab_position, layout::TAB_SIZE,
+                    0.20f, 0.17f, 0.11f, 1.0f);
+            else if (hovered)
+                fill_rect(tab_position, layout::TAB_SIZE,
+                    0.14f, 0.15f, 0.18f, 1.0f);
+            else
+                fill_rect(tab_position, layout::TAB_SIZE,
+                    0.10f, 0.11f, 0.135f, 1.0f);
+            outline_rect(tab_position, layout::TAB_SIZE,
+                0.25f, 0.28f, 0.34f, 1.0f);
+            if (selected)
+                fill_rect(
+                    { tab_position.x(), static_cast<int16_t>(tab_position.y() +
+                        layout::TAB_SIZE.y() - 2) },
+                    { layout::TAB_SIZE.x(), 2 },
+                    0.88f, 0.52f, 0.16f, 1.0f);
+        };
+
+        const bool locker_active = right_pane == view::RightPane::LOCKER;
+        flat_tab(BT_RIGHT_LOCKER_TAB, layout::TAB_LOCKER_POS, locker_active);
+        flat_tab(BT_RIGHT_INVENTORY_TAB, layout::TAB_INVENTORY_POS,
+            !locker_active);
+        skin.tab_bar.draw(
+            { draw_position(layout::TAB_BAR_POS),
+                draw_size(layout::TAB_BAR_SIZE) });
+        tab_labels[0].draw(
+            draw_position(tab_label_position(layout::TAB_LOCKER_POS)));
+        tab_labels[1].draw(
+            draw_position(tab_label_position(layout::TAB_INVENTORY_POS)));
+
+        // Single flat layer: the outline doubles as the panel frame, so no
+        // painted artwork or extra header band is drawn underneath.
+        fill_rect(layout::PANEL_POS, layout::PANEL_SIZE,
+            0.06f, 0.07f, 0.09f, 1.0f);
+        outline_rect(layout::PANEL_POS, layout::PANEL_SIZE,
+            0.25f, 0.28f, 0.34f, 1.0f);
+        fill_rect(
+            { layout::PANEL_POS.x(),
+                static_cast<int16_t>(layout::SLOT_GRID_POS.y() - 1) },
+            { layout::PANEL_SIZE.x(), 1 }, 0.25f, 0.28f, 0.34f, 1.0f);
+        pane_title.draw(draw_position(layout::PANE_TITLE_POS));
+        pane_info.draw(draw_position(layout::PANE_INFO_RIGHT));
+
+        const auto right_range = view::page_range(
+            right_page, right_count(), view::RIGHT_PAGE_SIZE);
+        const bool right_empty = right_range.first == right_range.second;
+        if (!right_empty)
+        {
+            const Texture& cover =
+                locker_active ? skin.locker_cover : skin.inventory_cover;
+            cover.draw({ draw_position(layout::SLOT_GRID_POS),
+                draw_size(layout::SLOT_COVER_SIZE) });
+
+            for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
+            {
+                const size_t index = right_range.first + slot;
+                if (index >= right_range.second)
+                    continue;
+                const Point<int16_t> base = layout::slot_position(slot);
+                if (const ItemData& data = ItemData::get(right_item_id(index)))
+                    draw_icon(data.get_icon(false),
+                        base + layout::SLOT_SIZE / 2, layout::SLOT_ICON_MAX);
+                slot_counts[slot].draw(
+                    draw_position(base + layout::SLOT_COUNT_OFFSET));
+                const bool selected = selected_right &&
+                    *selected_right == index;
+                if (selected)
+                    draw_icon(skin.selected_marker,
+                        base + layout::SLOT_MARKER_CENTER, layout::px(12));
+                if (selected)
+                    outline_rect(base, layout::SLOT_SIZE,
+                        0.88f, 0.52f, 0.16f, 1.0f, 2);
+                else if (state_of(BT_SLOT_FIRST + slot) == Button::MOUSEOVER)
+                    outline_rect(base, layout::SLOT_SIZE,
+                        0.78f, 0.81f, 0.85f, 0.85f, 2);
+            }
+        }
+        else
+        {
+            // Empty page: show the hint on the bare panel instead of layering
+            // it on top of the empty cover artwork.
+            skin.no_item.draw({ draw_position(layout::EMPTY_RIGHT_CENTER -
+                layout::EMPTY_HINT_SIZE / 2),
+                draw_size(layout::EMPTY_HINT_SIZE) });
+        }
+        transfer_hint.draw(draw_position(layout::TRANSFER_HINT_POS));
+        page_labels[1].draw(draw_position(layout::RIGHT_PAGE_POS));
     }
 
     void UICashShop::draw_feature_panel() const
@@ -372,7 +476,9 @@ namespace jrc
                     static_cast<int32_t>(size.y()) * limit / longest)
             };
         }
-        icon.draw(
+        // Commodity icons stream in on demand and must never freeze input, so
+        // they draw as TRANSIENT_EFFECT rather than BLOCKING_VISIBLE.
+        icon.draw_effect(
             { draw_position(center) - size / 2 + icon.get_origin(), size });
     }
 

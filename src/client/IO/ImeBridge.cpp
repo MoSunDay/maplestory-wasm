@@ -340,6 +340,18 @@ extern "C"
         return shop ? shop->preview_weapon_id() : -1;
     }
 
+    EMSCRIPTEN_KEEPALIVE int mscashshop_buy_x()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->button_center(jrc::BT_BUY).x() : -32768;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_buy_y()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->button_center(jrc::BT_BUY).y() : -32768;
+    }
+
     EMSCRIPTEN_KEEPALIVE int msplayer_frame()
     {
         return jrc::Stage::get().get_player().get_look().get_frame();

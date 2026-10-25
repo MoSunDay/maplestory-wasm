@@ -51,7 +51,26 @@ namespace jrc
     void UICashShop::set_balances(CashBalances balances)
     {
         model->set_balances(balances);
+        // Every push counts towards the expected total, but never past it: a
+        // late duplicate must not make later queries wait for more replies.
+        if (balance_received < balance_expected)
+            ++balance_received;
+        // Only a purchase/transfer is watchable here. An exit pending flag is
+        // not an operation reply, so its showCash is not an error.
+        if (pending_watch)
+        {
+            // The server rejects a purchase/transfer by only resending showCash
+            // (enableCSActions) without a 0x57/0x68 reply, so the pending flag
+            // has to be released here or the shop would stay locked.
+            show_error("商城操作未完成，请重试。");
+            return;
+        }
         refresh();
+    }
+
+    bool UICashShop::balances_ready() const
+    {
+        return balance_received >= balance_expected;
     }
 
     void UICashShop::replace_locker(std::vector<CashLockerItem> items)
@@ -120,7 +139,10 @@ namespace jrc
     void UICashShop::show_error(const std::string& message)
     {
         set_pending(false);
-        UI::get().emplace<UIOk>(message, []() {});
+        // Deferred: callers include the UIYesNo yes-handler, and an immediate
+        // emplace<UIOk> would free that still-running element (both live in
+        // the shared NOTICE slot). update() shows the text on the next tick.
+        deferred_error = message;
     }
 
     void UICashShop::reconnect_failed(const std::string& address)
@@ -356,9 +378,12 @@ namespace jrc
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
             buttons[BT_CURRENCY_FIRST + choice]->set_active(!pending);
         const bool buy_visible = left_selection_visible();
+        // A price-0 item must also wait for the balances to load, otherwise
+        // the confirmation could pass the (not yet received) balance check.
+        const bool buy_ready = buy_visible && balances_ready();
         buttons[BT_SEARCH_CLEAR]->set_active(!pending &&
             !applied_query.empty());
-        buttons[BT_BUY]->set_active(!pending && buy_visible &&
+        buttons[BT_BUY]->set_active(!pending && buy_ready &&
             !(equip_menu_open && category == view::EQUIP_CATEGORY));
         buttons[BT_RESET]->set_active(!tryon_items.empty());
         buttons[BT_FEATURED]->set_active(!pending && !filtered.empty());
@@ -369,7 +394,7 @@ namespace jrc
         transfer_label.change_text(
             right_pane == view::RightPane::LOCKER ? "取出" : "存入");
         buy_label.change_color(
-            buy_visible && !pending ? Text::BLACK : Text::LIGHTGREY);
+            buy_ready && !pending ? Text::BLACK : Text::LIGHTGREY);
         transfer_label.change_color(
             details_visible && !pending ? Text::WHITE : Text::LIGHTGREY);
         charge_label.change_color(pending ? Text::LIGHTGREY : Text::BLACK);
@@ -460,6 +485,8 @@ namespace jrc
     void UICashShop::set_pending(bool value)
     {
         pending = value;
+        pending_watch = value;
+        pending_frames = 0;
         refresh();
     }
 
@@ -493,7 +520,7 @@ namespace jrc
 
     void UICashShop::request_purchase(size_t filtered_index)
     {
-        if (filtered_index >= filtered.size() ||
+        if (pending || !balances_ready() || filtered_index >= filtered.size() ||
             filtered_index / view::CATALOG_PAGE_SIZE != left_page)
             return;
         const CashCommodity item = model->catalog()[filtered[filtered_index]];

@@ -1,6 +1,7 @@
 // 商城宠物全链路浏览器端到端验收：购买宠物 → 仓库取出 → 召唤 → 自动捡取 →
-// 自动回血回蓝。覆盖：第 8 分类「宠物」过滤、SN 60000001 搜索高亮 5000001、NX
-// 扣款购买、双击仓库槽取出、CASH 页召唤(能力掩码 31)、地图 40001 打怪自动捡取、
+// 自动回血回蓝。覆盖：第 8 分类「宠物」过滤、SN 60000001 搜索高亮 5000001、
+// 左栏卡片选中 → 右栏 BT_BUY 购买按钮 → 确认框弹窗确认、双击仓库槽取出、
+// CASH 页召唤(能力掩码 31)、地图 40001 用 S(Slash Blast) 打怪自动捡取、
 // keymap 91/92 绑 2000005 后压低 hp/mp 到 30% 重登自动嗑药恢复 99%+。
 // 前置：WASM 构建含宠物分类；产物写 /tmp/cash-shop-pet-flow。
 // Run: CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-pet-flow.mjs
@@ -176,13 +177,25 @@ async function buyPet(driver, probes, cash, initial) {
   await driver.click(first.x, first.y);
   await requireState('pet catalog card selected', async () =>
     await cash('mscashshop_selected_left') >= 0, 10);
-  const selected = cardCenter(await cash('mscashshop_selected_left') % 12);
-  await driver.click(selected.x, selected.y);
+  // 真实购买路径：左栏卡片选中 → 右栏 BT_BUY 按钮 → 确认框确认。
+  const buyX = await cash('mscashshop_buy_x');
+  const buyY = await cash('mscashshop_buy_y');
+  if (buyX === MISSING || buyY === MISSING)
+    throw new Error(`BT_BUY purchase button missing (buy_x=${buyX}, buy_y=${buyY}); ` +
+      'WASM 可能仍是旧构建，等 /tmp/wasm-build.log 出现 Build finished successfully 后重试');
+  report(true, `BT_BUY purchase button at (${buyX},${buyY})`);
+  await driver.click(buyX, buyY);
   await requireState('pet purchase confirmation visible', async () =>
     await cash('msui_notice_active') === 1, 10);
+  // 确认框底图按需流式加载：等资源退下再截图并点击确认。
+  await requireState('purchase confirmation assets ready', assetsIdle(driver, probes), 45);
   await sleep(500);
   await driver.screenshot('03-pet-purchase-confirm');
-  await driver.click(380, 285);
+  const width = await cash('msui_resolution_width');
+  const height = await cash('msui_resolution_height');
+  const uiX = Math.max(0, Math.floor((width - 800) / 2));
+  const uiY = Math.max(0, Math.floor((height - 600) / 2));
+  await driver.click(380 + uiX, 285 + uiY);
   await requireState('pet purchase settles into locker', async () =>
     await cash('mscashshop_pending') === 0 &&
     await cash('mscashshop_nx_credit') === initial.nx - PET_PRICE &&
@@ -214,23 +227,41 @@ async function summonPet(driver, probes) {
     const cashSlot = await probes.inventorySlot(PET_ITEM);
     if (cashSlot < 1 || cashSlot > 24)
       throw new Error(`pet unavailable in visible cash inventory: slot=${cashSlot}`);
-    await driver.click(711, 574);
-    await sleep(400);
-    const menuX = await probes.itemsMenuX();
-    const menuY = await probes.itemsMenuY();
-    if (menuX < 0 || menuY < 0) throw new Error(`items menu point unavailable: ${menuX},${menuY}`);
-    await driver.click(menuX, menuY);
-    await sleep(500);
+    if (await probes.itemInventoryActive() !== 1) {
+      await driver.click(711, 574);
+      await sleep(400);
+      const menuX = await probes.itemsMenuX();
+      const menuY = await probes.itemsMenuY();
+      if (menuX < 0 || menuY < 0) throw new Error(`items menu point unavailable: ${menuX},${menuY}`);
+      await driver.click(menuX, menuY);
+    }
+    await requireState('item inventory active', async () =>
+      await probes.itemInventoryActive() === 1, 30);
     await requireState('item inventory assets ready', assetsIdle(driver, probes), 45);
-    await driver.click(438, 178);  // CASH 页
-    await sleep(500);
+    const windowX = await probes.itemInventoryX();
+    const windowY = await probes.itemInventoryY();
+    // CASH is tab index 4; each v83 tab sprite is 32px apart from x+9.
+    await driver.retryClick(windowX + 9 + 32 * 4 + 13, windowY + 24 + 8,
+      async () => await probes.itemInventoryTab() === 5, 3, 2000);
+    await requireState('cash inventory tab active', async () =>
+      await probes.itemInventoryTab() === 5, 10);
     await requireState('cash inventory assets ready', assetsIdle(driver, probes), 45);
     await sleep(500);
     const column = (cashSlot - 1) % 4;
     const row = Math.floor((cashSlot - 1) / 4);
-    await driver.doubleClick(329 + column * 36, 218 + row * 35);
+    // Socket art begins at window-relative (8,50); click its centre.
+    const slotX = windowX + 8 + column * 36 + 21;
+    const slotY = windowY + 50 + row * 34 + 18;
+    const hitSlot = await probes.itemInventorySlotAt(slotX, slotY);
+    report(hitSlot === cashSlot,
+      `cash inventory slot ${cashSlot} hit test (got ${hitSlot} at ${slotX},${slotY}, window ${windowX},${windowY})`);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await driver.doubleClick(slotX, slotY);
+      if (await waitFor(async () => await probes.petActive() === 1 &&
+        await probes.petItemId() === PET_ITEM, 10)) break;
+    }
     await requireState('purchased pet summoned', async () =>
-      await probes.petActive() === 1 && await probes.petItemId() === PET_ITEM, 30);
+      await probes.petActive() === 1 && await probes.petItemId() === PET_ITEM, 10);
     await driver.key('i', 'KeyI', 73, 'i');
     await sleep(300);
   }
@@ -282,7 +313,7 @@ async function verifyPickup(driver, probes) {
     const code = right ? 'ArrowRight' : 'ArrowLeft';
     await driver.keyHold(code, code, right ? 39 : 37,
       Math.abs(delta) > 65 ? Math.min(350, Math.max(80, Math.abs(delta) * 2)) : 35);
-    await driver.keyHold('Control', 'ControlLeft', 17, 60);
+    await driver.keyHold('S', 'KeyS', 83, 60);
     await sleep(400);
   }
   // take-equip 同款：多等 15s 兜底，让宠物磁铁完成一次服务端确认捡取。

@@ -185,6 +185,11 @@ namespace jrc
         cursor.set_position(pos);
     }
 
+    void UI::set_cursor_idle()
+    {
+        cursor.set_state(Cursor::IDLE);
+    }
+
     void UI::send_cursor(bool pressed)
     {
         if (!enabled || asset_loading_blocks_input())

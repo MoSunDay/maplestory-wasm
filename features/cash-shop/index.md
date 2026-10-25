@@ -6,7 +6,7 @@ Commit: d484de5f30c73b3b55c1c5f1ed9816ffe133fabd
 
 角色可从游戏状态栏或商城快捷键进入 linked server 现金商城。商城读取由 linked server v83 `Commodity.img.xml` 与 `CashPackage.img.xml` 生成并随 WASM 内嵌的商品清单，结合客户端字符串资源形成目录，并以服务端下发的特殊商品状态、三类余额和商城仓库为准。目录文件缺失或验收商品契约不符时直接报错，不回退到与服务端 SN 不一致的客户端 `Etc.nx` 商品表。
 
-商城界面按 2023 高版本 `CashShop.img` 素材做全屏现代渲染：`Base/backgrnd` 1024×768 背景拉伸铺满视口，商品以 `CSList` 卡片 4×3=12 网格陈列（选中卡片出现 `BtBuy` 购买按钮），搜索栏复用 `CSSortBar`，右栏以 `CSInventory` 面板 7×3=21 槽位在商城仓库和角色现金栏之间切换，余额用 `Base/Number` 位图数字显示，翻页与转移分别使用 `CSBargainSale`、`CSLockerNew` 按钮。`CSEffect` 徽章与左侧图例、分类件数与筛选摘要、余额图标、卡片期限、右栏多字段详情和 `Base/Preview` 推荐面板补充了可见信息，推荐面板以「玩家当前外观 + 试穿集」叠加渲染人像（高亮可试穿或试穿集非空时展示，否则回退商品图标），CharLook 无可见层的槽位仍回退商品图标；槽位使用 `backgrndCover` 半透明格底。全部坐标基于 800×600 设计空间，桌面窗口其它尺寸时整体等比缩放居中。所需现代素材缺失或尺寸错误会直接终止并报告，不降级到老版商城素材。
+商城界面按 2023 高版本 `CashShop.img` 素材做全屏现代渲染：`Base/backgrnd` 1024×768 背景拉伸铺满视口，商品以 `CSList` 卡片 4×3=12 网格陈列（选中卡片出现 `BtBuy` 购买按钮），搜索栏复用 `CSSortBar`，右栏使用扁平单层面板，仅以 `CSInventory|CSLocker/backgrndCover` 绘制 7×3=21 槽位网格；空仓库/空现金栏直接显示 `noItem`，不再叠加 `CSInventory/backgrnd` 的烘焙网格，余额用 `Base/Number` 位图数字显示，翻页与转移分别使用 `CSBargainSale`、`CSLockerNew` 按钮。`CSEffect` 徽章与左侧图例、分类件数与筛选摘要、余额图标、卡片期限、右栏多字段详情和 `Base/Preview` 推荐面板补充了可见信息，推荐面板以「玩家当前外观 + 试穿集」叠加渲染人像（高亮可试穿或试穿集非空时展示，否则回退商品图标），CharLook 无可见层的槽位仍回退商品图标；槽位使用 `backgrndCover` 半透明格底。全部坐标基于 800×600 设计空间，桌面窗口其它尺寸时整体等比缩放居中。所需现代素材缺失或尺寸错误会直接终止并报告，不降级到老版商城素材。
 
 ## 规则与流程
 

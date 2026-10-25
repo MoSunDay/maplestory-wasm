@@ -1,9 +1,12 @@
 // 商城「确认弹窗输入隔离」验收：A 弹窗开启时双击弹窗外储物格不转移；B 弹窗外滚轮不翻页；
-// C 选中项翻页离开后 Enter 不弹确认，可见选中 Enter 仍弹确认、Escape 取消不落账。
-// 前置：WASM 含 UIStateCashShop 模态守卫，web-server/ws-proxy/assets-server 在跑；截图 01-05 存
+// C 选中项翻页离开后 Enter 不弹确认，可见选中 Enter 仍弹确认、Escape 取消不落账；
+// D Maple Points 余额 0 时确认购买弹客户端余额不足提示，pending 保持 0、不落账。
+// 前置：WASM 含 UIStateCashShop 模态守卫，web-server/ws-proxy/assets-server 在跑；截图 01-06 存
 //   MODAL_GUARDS_ARTIFACT_DIR（默认 /tmp/cash-shop-modal-guards）。
 // Run: CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-modal-guards.mjs
-// Env: MODAL_GUARDS_ACCOUNT / MODAL_GUARDS_PASSWORD / MODAL_GUARDS_CARD / MODAL_GUARDS_ARTIFACT_DIR / CHROME_BIN / MODAL_GUARDS_DEBUG_PORT / MODAL_GUARDS_URL / MS_SERVER_CONFIG / MS_UI_ELEMENT_HEADER
+// Run(快跑 D): MODAL_GUARDS_BALANCE_ONLY=1 node tools/verify/maplestory-webui/cash-shop-modal-guards.mjs
+//   —— 只跑 D 余额不足分支，跳过储物格初始化 / 滚轮校准 / A、B、C 守卫，不改动余额数据。
+// Env: MODAL_GUARDS_BALANCE_ONLY(=1 仅跑 D) / MODAL_GUARDS_ACCOUNT / MODAL_GUARDS_PASSWORD / MODAL_GUARDS_CARD / MODAL_GUARDS_ARTIFACT_DIR / CHROME_BIN / MODAL_GUARDS_DEBUG_PORT / MODAL_GUARDS_URL / MS_SERVER_CONFIG / MS_UI_ELEMENT_HEADER
 
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -17,9 +20,14 @@ const pageUrl = process.env.MODAL_GUARDS_URL || 'http://127.0.0.1:8000/web/index
 const configPath = process.env.MS_SERVER_CONFIG || '/data/maplestory-wasm/link_repos/MapleStory-Server/configuration.ini';
 const uiElementHeader = process.env.MS_UI_ELEMENT_HEADER || '/data/maplestory-wasm/src/client/IO/UIElement.h';
 const account = process.env.MODAL_GUARDS_ACCOUNT || 'test1', password = process.env.MODAL_GUARDS_PASSWORD || 'test1', cardIndex = Number(process.env.MODAL_GUARDS_CARD ?? 0), CHEAP_SN = '80000002';
+const balanceOnly = process.env.MODAL_GUARDS_BALANCE_ONLY === '1';
 const CATALOG_PAGE = 12, PAGE1_BASE = 0, PAGE2_BASE = CATALOG_PAGE;
 const SEARCH_BOX = [300, 50], SEARCH_CLEAR = [480, 46];
 const LOCKER_TAB = [579, 43], SLOT0_POINT = [550, 106], NOTICE_POINT = [400, 240];
+// D 用：左栏「全部」分类行 (CATEGORY_POS{4,58} + CATEGORY_SIZE{90,22})、
+// 币种第 1 格 Maple Points (CURRENCY_POS{100,64} + 1 * 52, CURRENCY_SIZE{48,16})、
+// 装备子菜单关闭行 (EQSUB_CLOSE_POS{4,36} + 90x22)，避免子菜单盖住分类栏。
+const ALL_CATEGORY = [49, 69], MAPLE_POINT_CHIP = [176, 72], EQSUB_CLOSE = [49, 47];
 const pager = Object.freeze({ next: [488, 557], prev: [115, 557] });
 const cardCenter = v => ({ x: 100 + (v % 4) * 101 + 42, y: 88 + Math.floor(v / 4) * 148 + 40 });
 const WHEEL_POINT = Object.freeze(cardCenter(0));
@@ -354,6 +362,66 @@ async function verifyStaleSelectionEnterGuard(driver, probes, cash) {
     `C: cancelled visible confirmation keeps locker/inventory/NX (${stateText(controlBefore)} -> ${stateText(controlAfter)})`);
   await driver.screenshot('05-visible-enter-cancelled');
 }
+
+// 搜索 1 NX 商品：先按一次空查询复位，再敲 SN，保证 applied_query 一定变化
+// （残留查询与输入相同时会吞掉 Enter），同时让左栏重建回第 0 页、清掉旧选中。
+async function searchCheapCommodity(driver, probes, cash) {
+  await driver.clickField(...SEARCH_BOX);
+  await requireState('D: search focused', () => driver.evaluate('MapleWasmIME.active === true'), 10);
+  for (const query of ['', CHEAP_SN]) {
+    await driver.clickField(...SEARCH_BOX);
+    await driver.compose(query);
+    await sleep(200);
+    await driver.key('Enter', 'Enter', 13);
+    await sleep(300);
+  }
+  await requireState('D: cheap SN search narrows to one card',
+    stateIs(() => cash('mscashshop_filtered_count'), 1), 10);
+  await requireState('D: search result assets ready', assetsIdle(driver, probes), 45);
+}
+
+// D：Maple Points 余额 0 时确认购买，走 request_purchase 的客户端余额不足分支：
+// 延迟 UIOk 提示、pending 保持 0、储物格与 NX 均不落账，Escape 关闭提示。
+async function verifyInsufficientBalanceNotice(driver, probes, cash) {
+  await requireState('D: no modal before the balance guard', stateIs(() => cash('msui_notice_active'), 0), 10);
+  await requireState('D: no pending transfer before the balance guard', stateIs(() => cash('mscashshop_pending'), 0), 10);
+  if (await cash('mscashshop_equip_menu_open') === 1) {
+    await driver.click(...EQSUB_CLOSE);  // 装备子菜单会盖住分类栏，先关掉
+    await sleep(300);
+  }
+  await expectFront(driver, 'D currency chip', MAPLE_POINT_CHIP[0], MAPLE_POINT_CHIP[1], 'CASHSHOP', FRONT.cashShop);
+  await driver.click(...MAPLE_POINT_CHIP);  // 支付币种切到 Maple Points（余额 0）
+  await sleep(400);
+  await driver.click(...ALL_CATEGORY);  // 「全部」分类，保证搜索能命中 1 NX 商品
+  await sleep(400);
+  await searchCheapCommodity(driver, probes, cash);
+  const card = cardCenter(0);
+  await driver.click(card.x, card.y);
+  await sleep(450);
+  if (await cash('msui_notice_active') !== 1) {  // 首击只选中时，再点一次才弹确认
+    await requireState('D: cheap card selected', stateIs(() => cash('mscashshop_selected_left'), 0), 10);
+    await sleep(450);
+    await driver.click(card.x, card.y);
+  }
+  await requireState('D: purchase confirmation opens', stateIs(() => cash('msui_notice_active'), 1), 10);
+  const before = await snapshot(cash);
+  requireNoPending(before, 'D');
+  await driver.key('Enter', 'Enter', 13);  // 确认购买：余额不足走客户端分支并延迟弹 UIOk
+  await requireState('D: insufficient balance keeps the modal and pending 0', async () =>
+    await cash('msui_notice_active') === 1 && await cash('mscashshop_pending') === 0, 15);
+  await sleep(600);  // 延迟 UIOk 在下一次 update 才 emplace，等提示落定
+  await requireState('D: deferred error notice stays up', async () =>
+    await cash('msui_notice_active') === 1 && await cash('mscashshop_pending') === 0, 10);
+  const after = await snapshot(cash);
+  report(after.pending === 0 && after.locker === before.locker && after.nx === before.nx,
+    `D: Maple Points 0 blocks the purchase without landing anything (${stateText(before)} -> ${stateText(after)})`);
+  await driver.screenshot('06-insufficient-balance');
+  await driver.key('Escape', 'Escape', 27);
+  await requireState('D: Escape dismisses the insufficient-balance notice',
+    stateIs(() => cash('msui_notice_active'), 0), 10);
+  await requireState('D: no pending transfer after the balance guard', stateIs(() => cash('mscashshop_pending'), 0), 10);
+}
+
 async function cleanupCashShop(driver, probes, cash) {
   if (await probes.currentUiState() !== uiState.cashShop) return;
   for (let attempt = 0; attempt < 3 && await cash('msui_notice_active') === 1; attempt += 1) {
@@ -375,11 +443,16 @@ async function main() {
     await driver.navigate(pageUrl);
     await loginAndEnterGame(driver, probes);
     await enterCashShop(driver, probes);
-    await setupLockerPane(driver, probes, cash);
-    const wheelDelta = await calibrateWheel(driver, probes, cash);
-    await verifySlotDoubleClickGuard(driver, probes, cash);
-    await verifyWheelPageGuard(driver, probes, cash, wheelDelta);
-    await verifyStaleSelectionEnterGuard(driver, probes, cash);
+    if (balanceOnly) {
+      await verifyInsufficientBalanceNotice(driver, probes, cash);
+    } else {
+      await setupLockerPane(driver, probes, cash);
+      const wheelDelta = await calibrateWheel(driver, probes, cash);
+      await verifySlotDoubleClickGuard(driver, probes, cash);
+      await verifyWheelPageGuard(driver, probes, cash, wheelDelta);
+      await verifyStaleSelectionEnterGuard(driver, probes, cash);
+      await verifyInsufficientBalanceNotice(driver, probes, cash);
+    }
     console.log(`${failed ? 'FAIL' : 'PASS'} cash shop modal guards: ${passed} checks`);
   } catch (error) {
     report(false, `cash shop modal guards aborted: ${error.message}`);

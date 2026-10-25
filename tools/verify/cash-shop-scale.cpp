@@ -66,6 +66,29 @@ int main()
         "800x600 scroll split stays 504");
     check(same(layout::scale_point({800, 600}), {800, 600}),
         "800x600 scale_point is identity");
+    // Single-layer right pane: the slot grid is covered by one bitmap whose
+    // size is the 7x3 cells plus their 3px gaps.
+    const Rectangle<int16_t> cover_rect{
+        layout::SLOT_GRID_POS,
+        layout::SLOT_GRID_POS + layout::SLOT_COVER_SIZE};
+    check(same(layout::SLOT_COVER_SIZE, {270, 114}) &&
+          same(layout::SLOT_COVER_SIZE, {7 * 36 + 6 * 3, 3 * 36 + 2 * 3}),
+        "right slot cover is 7x3 cells of 36px with 3px gaps");
+    check(same(layout::slot_position(20) + layout::SLOT_SIZE, {787, 202}),
+        "last slot ends at the cover bottom-right");
+    const Rectangle<int16_t> empty_rect{
+        layout::EMPTY_RIGHT_CENTER - layout::EMPTY_HINT_SIZE / 2,
+        layout::EMPTY_RIGHT_CENTER + layout::EMPTY_HINT_SIZE / 2};
+    check(empty_rect.contains(cover_rect.getlt()) &&
+          empty_rect.contains(cover_rect.getrb()),
+        "empty right hint covers the slot-grid cover");
+    const Rectangle<int16_t> panel_rect{
+        layout::PANEL_POS, layout::PANEL_POS + layout::PANEL_SIZE};
+    check(cover_rect.l() - panel_rect.l() == 9 &&
+          panel_rect.r() - cover_rect.r() == 9 &&
+          panel_rect.contains(cover_rect.getlt()) &&
+          panel_rect.contains(cover_rect.getrb()),
+        "flat right panel frames the cover with 9px side margins");
 
     // 1280x720 preset: the canvas scales uniformly by 1.2 and is centred.
     set_viewsize(1280, 720);
