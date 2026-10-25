@@ -119,26 +119,31 @@ namespace jrc
                 : Point<int16_t>(175, 0);
         }
 
-        // Auto potion sockets on the pet panel.
+        // Auto potion sockets on the pet panel.  post-Chaos lands on the
+        // first row of the 3x3 cell grid painted by UIWindow2 Equip/pet
+        // backgrnd3 (see pet_ability_positions).
         inline Point<int16_t> pet_hp_pos()
         {
-            return post_chaos() ? Point<int16_t>(194, 43) : Point<int16_t>(188, 44);
+            return post_chaos() ? Point<int16_t>(195, 27) : Point<int16_t>(188, 44);
         }
 
         inline Point<int16_t> pet_mp_pos()
         {
-            return post_chaos() ? Point<int16_t>(234, 43) : Point<int16_t>(221, 44);
+            return post_chaos() ? Point<int16_t>(228, 27) : Point<int16_t>(221, 44);
         }
 
-        // Sockets of the five pet ability items.
+        // Sockets of the five pet ability items.  post-Chaos follows the
+        // 3x3 cell grid of UIWindow2.img/Equip/pet/backgrnd3 (98x108 at
+        // origin (-11,-27), cells 32px wide with 1px slits): columns
+        // x = 195, 228, 261 and rows y = 27, 70, 103 in window coordinates.
         inline std::array<Point<int16_t>, 5> pet_ability_positions()
         {
             if (post_chaos())
             {
                 return {
-                    Point<int16_t>(194, 88), Point<int16_t>(230, 88),
-                    Point<int16_t>(266, 88), Point<int16_t>(212, 124),
-                    Point<int16_t>(248, 124)
+                    Point<int16_t>(195, 70), Point<int16_t>(228, 70),
+                    Point<int16_t>(261, 70), Point<int16_t>(195, 103),
+                    Point<int16_t>(228, 103)
                 };
             }
             return {
@@ -165,8 +170,8 @@ namespace jrc
         {
             return post_chaos()
                 ? Rectangle<int16_t>(
-                    position + Point<int16_t>(194, 43),
-                    position + Point<int16_t>(226, 75))
+                    position + Point<int16_t>(195, 27),
+                    position + Point<int16_t>(227, 59))
                 : Rectangle<int16_t>(
                     position + Point<int16_t>(188, 44),
                     position + Point<int16_t>(220, 76));
@@ -176,8 +181,8 @@ namespace jrc
         {
             return post_chaos()
                 ? Rectangle<int16_t>(
-                    position + Point<int16_t>(234, 43),
-                    position + Point<int16_t>(266, 75))
+                    position + Point<int16_t>(228, 27),
+                    position + Point<int16_t>(260, 59))
                 : Rectangle<int16_t>(
                     position + Point<int16_t>(221, 44),
                     position + Point<int16_t>(253, 76));
