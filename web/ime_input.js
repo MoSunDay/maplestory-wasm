@@ -242,6 +242,19 @@
             syncToGame();
         });
 
+        // Focusing this textarea while an Enter keydown is still being
+        // dispatched (Return opens the chat field from C++) lets the browser
+        // run that keydown's default action against the newly focused
+        // textarea and insert a line break, which would then sync into the
+        // single-line game field as a stray space. Mirrored fields are
+        // single-line, so line breaks never belong in the textarea value.
+        textarea.addEventListener('beforeinput', function (event) {
+            if (event.inputType === 'insertLineBreak'
+                || event.inputType === 'insertParagraph') {
+                event.preventDefault();
+            }
+        });
+
         document.addEventListener('selectionchange', function () {
             syncToGame();
         });
