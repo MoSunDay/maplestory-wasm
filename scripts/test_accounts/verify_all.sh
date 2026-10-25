@@ -1,7 +1,7 @@
 #!/bin/bash
 # End-to-end regression: create accounts -> manifest -> keymap prep -> protocol
 # skill verification -> (optional) client animation verification -> report.
-# Usage: verify_all.sh {setup|proto|visual <suffix...>|report|restore|all} [--skip-visual]
+# Usage: verify_all.sh {setup|proto [<suffix...>]|visual <suffix...>|report|restore|all} [--skip-visual]
 #   ./verify_all.sh visual DK   # re-run a single character (no manual result copying)
 set -u
 cd "$(dirname "$0")"
@@ -22,7 +22,8 @@ phase_setup() {
 }
 
 phase_proto() {
-  for sfx in "${SUFFIXES[@]}"; do
+  local list=("$@"); [ $# -eq 0 ] && list=("${SUFFIXES[@]}")
+  for sfx in "${list[@]}"; do
     acct=${ACC[$sfx]}
     reset_login
     WIRE_USER=$acct WIRE_WORLD=$WORLD CHAR_SUFFIX=$sfx \
@@ -34,7 +35,9 @@ phase_proto() {
   reset_login
   WIRE_USER=test1 WIRE_WORLD=$WORLD CHAR_SUFFIX=Hero \
     timeout 120 node iron_body_buff_proto.mjs > /tmp/iron_body_proto.log 2>&1
-  echo "proto iron-body rc=$? : $(grep -oE 'PASS.*' /tmp/iron_body_proto.log | tail -1)"
+  ib_rc=$?
+  echo "$ib_rc" > /tmp/iron_body_proto.rc   # report 阶段折入总 verdict
+  echo "proto iron-body rc=$ib_rc : $(grep -oE 'PASS.*' /tmp/iron_body_proto.log | tail -1)"
   reset_login
   echo "PROTO DONE"
 }
@@ -82,6 +85,19 @@ for suffix in "Hero Pala DK FPA ILA Bish BM MM NL Shad Bucc CS".split():
             else: print("VISUAL-FAIL", acc+suffix, x.get("skill"), x.get("name"), x.get("animation"), x.get("damageVisual"), file=sys.stderr)
         vl = len(r["results"]) - vskip; vs = f"{ok}/{vl}"; vis_ok += ok; vis_bad += vl - ok; vis_skip += vskip
     rows.append((acc+suffix, ps, vs))
+# iron-body 探针无 JSON 产物，以 rc 文件折入（缺失则不计入，与其它缺文件行同口径）
+ib = f"/tmp/iron_body_proto.rc"
+ib_ps = "-"
+if os.path.exists(ib):
+    try:
+        ib_rc = int(open(ib).read().strip() or 1)
+    except ValueError:
+        ib_rc = 1
+    ib_ps = "1/1" if ib_rc == 0 else "0/1"
+    proto_ok, proto_bad = (proto_ok + 1, proto_bad) if ib_rc == 0 else (proto_ok, proto_bad + 1)
+    if ib_rc != 0:
+        print("PROTO-FAIL", "iron-body 1001003", f"rc={ib_rc}", file=sys.stderr)
+rows.append(("iron-body", ib_ps, "-"))
 lines = [f"{'char':12} {'proto settled/fired':22} visual ok/total"]
 for n, a, b in rows: lines.append(f"{n:12} {a:22} {b}")
 verdict = "PASS" if proto_bad == 0 and vis_bad == 0 else "FAIL"
@@ -104,7 +120,7 @@ phase_restore() {
 
 case "${1:-all}" in
   setup)  shift; phase_setup ;;
-  proto)  shift; phase_proto ;;
+  proto)  shift; phase_proto "$@" ;;
   visual) shift; phase_visual "$@" ;;
   report) shift; phase_report ;;
   all)
@@ -115,5 +131,5 @@ case "${1:-all}" in
     fi
     phase_report ;;
   restore) shift; phase_restore ;;
-  *) echo "usage: $0 {setup|proto|visual <suffix...>|report|restore|all} [--skip-visual]"; exit 64 ;;
+  *) echo "usage: $0 {setup|proto [<suffix...>]|visual <suffix...>|report|restore|all} [--skip-visual]"; exit 64 ;;
 esac

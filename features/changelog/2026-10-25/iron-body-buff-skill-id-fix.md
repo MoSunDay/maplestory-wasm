@@ -95,3 +95,9 @@ WIRE_USER=test1 PASS=test1 WIRE_WORLD=4 CHAR_SUFFIX=Hero \
   「圣甲术客户端生效流程」。
 - 测试残留：test1Hero 位于 910000000、keymap I→1001003（`skill-keymap-prep.py`
   重跑会重建 keymap，届时按 index.md 前置 SQL 重绑）。
+
+## 追记（2026-10-25 22:25）：report 总判定折入
+
+- `verify_all.sh` proto 阶段将 iron-body 探针 rc 持久化至 `/tmp/iron_body_proto.rc`，report 阶段读取并折入总 verdict：rc=0 计 1 settled、非 0 计 1 failed（stderr 出 `PROTO-FAIL` 行），rc 文件缺失时显示 `-` 不计入（与其余缺文件行同口径）。
+- `phase_proto` 支持可选 suffix 过滤（`./verify_all.sh proto Hero`），与 visual 阶段对齐，便于压缩共享账号独占窗口。
+- 管线实测（`proto Hero` + `report`）：`proto iron-body rc=0 : PASS: Iron Body settled — WDEF +40 for 300s`，汇总表出现 `iron-body 1/1`，TOTAL 112 settled。当时 verdict=FAIL 的 4 项均为历史遗留（Hero `Panic : Axe`/`Coma : Axe` 需配斧、Pala 10/24 旧 visual 数据），非本次回归。
