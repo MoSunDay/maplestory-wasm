@@ -16,13 +16,16 @@ namespace jrc::pet_capability
     Capabilities resolve(int32_t active_pet_item_id,
         const EquippedAbilities& equipped)
     {
-        const bool starter_puppy = active_pet_item_id == STARTER_PUPPY;
+        // Any summoned pet intrinsically grants magnet/pouch/boots/auto-potion
+        // conveniences; equipped items only add on top. Magic scales stays
+        // equipment-only. STARTER_PUPPY is retained for compatibility.
+        const bool pet = is_pet_item(active_pet_item_id);
         return {
-            equipped.meso_magnet || starter_puppy,
-            equipped.item_pouch || starter_puppy,
-            equipped.auto_hp_pouch,
-            equipped.auto_mp_pouch,
-            equipped.wing_boots || starter_puppy,
+            equipped.meso_magnet || pet,
+            equipped.item_pouch || pet,
+            equipped.auto_hp_pouch || pet,
+            equipped.auto_mp_pouch || pet,
+            equipped.wing_boots || pet,
             equipped.magic_scales
         };
     }

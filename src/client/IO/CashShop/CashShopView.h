@@ -17,9 +17,11 @@ namespace jrc::cash_shop_view
     constexpr size_t RIGHT_COLS = 7;
     constexpr size_t RIGHT_ROWS = 3;
     constexpr size_t RIGHT_PAGE_SIZE = RIGHT_COLS * RIGHT_ROWS;
-    constexpr int8_t CATEGORY_COUNT = 7;
+    constexpr int8_t CATEGORY_COUNT = 8;
     // Index of the 装备 entry in the category rail.
     constexpr int8_t EQUIP_CATEGORY = 1;
+    // Index of the 宠物 entry in the category rail.
+    constexpr int8_t PET_CATEGORY = 7;
     // Equipment sub-categories opened from the rail's 装备 entry.
     constexpr int8_t EQSUB_COUNT = 17;
 
@@ -70,6 +72,7 @@ namespace jrc::cash_shop_view
         const std::vector<size_t>& filtered, std::optional<size_t> selected);
 
     int8_t next_category(int8_t category);
+    int8_t category_for_item(int32_t item_id);
     int8_t equip_sub_of(int32_t item_id);
     const char* equip_sub_name(int8_t sub);
     CashCurrency next_currency(CashCurrency currency);

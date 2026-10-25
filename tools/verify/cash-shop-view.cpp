@@ -78,7 +78,23 @@ int main()
         page_range(0, 50, RIGHT_PAGE_SIZE) ==
             std::pair<size_t, size_t>({0, 21}),
         "right pane paging");
-    ok &= expect(next_category(6) == 0, "category cycling");
+    ok &= expect(next_category(6) == PET_CATEGORY && next_category(7) == 0,
+        "category cycling");
+    ok &= expect(
+        category_for_item(5000001) == PET_CATEGORY &&
+        category_for_item(5000099) == PET_CATEGORY &&
+        category_for_item(1812000) == PET_CATEGORY &&
+        category_for_item(1812007) == PET_CATEGORY &&
+        category_for_item(1002000) == EQUIP_CATEGORY &&
+        category_for_item(2000000) == 2 &&
+        category_for_item(4031192) == 4 &&
+        category_for_item(5010000) == 5 &&
+        category_for_item(9000000) == 6,
+        "catalog item categories");
+    ok &= expect(
+        std::string(category_name(PET_CATEGORY)) == "宠物" &&
+        std::string(category_name(CATEGORY_COUNT)) == "全部",
+        "category labels");
     ok &= expect(next_currency(CashCurrency::NX_PREPAID) == CashCurrency::NX_CREDIT,
         "currency cycling");
     ok &= expect(toggle_pane(RightPane::LOCKER) == RightPane::INVENTORY,

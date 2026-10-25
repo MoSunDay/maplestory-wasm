@@ -62,20 +62,49 @@ int main()
 
     using jrc::pet_capability::Capabilities;
     using jrc::pet_capability::EquippedAbilities;
+    ok &= expect(jrc::pet_capability::is_pet_item(
+        jrc::pet_capability::STARTER_PUPPY), "starter puppy is a pet item");
+    ok &= expect(jrc::pet_capability::is_pet_item(5000000) &&
+        jrc::pet_capability::is_pet_item(5000999),
+        "pet item id range covers 5000000-5000999");
+    ok &= expect(!jrc::pet_capability::is_pet_item(4999999) &&
+        !jrc::pet_capability::is_pet_item(5001000),
+        "ids outside the pet range are rejected");
     Capabilities starter = jrc::pet_capability::resolve(
         jrc::pet_capability::STARTER_PUPPY, EquippedAbilities{});
     ok &= expect(starter.meso_magnet && starter.item_pouch && starter.wing_boots,
         "starter puppy has intrinsic pickup and movement abilities");
-    ok &= expect(!starter.auto_hp_pouch && !starter.auto_mp_pouch &&
-        !starter.magic_scales, "starter puppy does not gain unrelated abilities");
+    ok &= expect(starter.auto_hp_pouch && starter.auto_mp_pouch,
+        "starter puppy has intrinsic auto potion pouches");
+    ok &= expect(!starter.magic_scales,
+        "starter puppy does not gain magic scales");
     ok &= expect(starter.mask() == (jrc::pet_capability::MESO_MAGNET |
-        jrc::pet_capability::ITEM_POUCH | jrc::pet_capability::WING_BOOTS),
+        jrc::pet_capability::ITEM_POUCH | jrc::pet_capability::AUTO_HP_POUCH |
+        jrc::pet_capability::AUTO_MP_POUCH | jrc::pet_capability::WING_BOOTS),
         "starter capability mask is deterministic");
     Capabilities ordinary = jrc::pet_capability::resolve(5000002,
-        EquippedAbilities{false, true, true, false, false, true});
-    ok &= expect(!ordinary.meso_magnet && ordinary.item_pouch &&
-        ordinary.auto_hp_pouch && ordinary.magic_scales && !ordinary.wing_boots,
-        "ordinary pets retain equipment-only abilities");
+        EquippedAbilities{});
+    ok &= expect(ordinary.meso_magnet && ordinary.item_pouch &&
+        ordinary.auto_hp_pouch && ordinary.auto_mp_pouch &&
+        ordinary.wing_boots && !ordinary.magic_scales,
+        "ordinary pets have every intrinsic automation ability");
+    Capabilities equipped = jrc::pet_capability::resolve(5000002,
+        EquippedAbilities{true, true, true, true, true, true});
+    ok &= expect(equipped.meso_magnet && equipped.item_pouch &&
+        equipped.auto_hp_pouch && equipped.auto_mp_pouch &&
+        equipped.wing_boots && equipped.magic_scales,
+        "equipped abilities still stack on an ordinary pet");
+    Capabilities nonpet_none = jrc::pet_capability::resolve(0,
+        EquippedAbilities{});
+    Capabilities nonpet_item = jrc::pet_capability::resolve(1812000,
+        EquippedAbilities{});
+    ok &= expect(!nonpet_none.meso_magnet && !nonpet_none.item_pouch &&
+        !nonpet_none.auto_hp_pouch && !nonpet_none.auto_mp_pouch &&
+        !nonpet_none.wing_boots && !nonpet_none.magic_scales &&
+        !nonpet_item.meso_magnet && !nonpet_item.item_pouch &&
+        !nonpet_item.auto_hp_pouch && !nonpet_item.auto_mp_pouch &&
+        !nonpet_item.wing_boots && !nonpet_item.magic_scales,
+        "non-pet ids without equipment gain no abilities");
 
     using jrc::pet_follow::Action;
     using jrc::pet_follow::Inputs;

@@ -1,5 +1,7 @@
 #include "CashShopModel.h"
 
+#include "CashShopView.h"
+
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
 
@@ -14,12 +16,6 @@ namespace jrc
 {
     namespace
     {
-        int8_t category_for_item(int32_t item_id)
-        {
-            int32_t prefix = item_id / 1'000'000;
-            return (prefix >= 1 && prefix <= 5) ? static_cast<int8_t>(prefix) : 6;
-        }
-
         nl::node item_string_node(int32_t item_id)
         {
             switch (item_id / 1'000'000)
@@ -37,6 +33,8 @@ namespace jrc
                     category = categories[index];
                 else if (index >= 30 && index <= 70)
                     category = "Weapon";
+                else if (index == 81)
+                    category = "PetEquip";
                 return nl::nx::string["Eqp.img"]["Eqp"][category][std::to_string(item_id)];
             }
             case 2:
@@ -46,6 +44,8 @@ namespace jrc
             case 4:
                 return nl::nx::string["Etc.img"]["Etc"][std::to_string(item_id)];
             case 5:
+                if (item_id / 1'000 == 5'000)
+                    return nl::nx::string["Pet.img"][std::to_string(item_id)];
                 return nl::nx::string["Cash.img"][std::to_string(item_id)];
             default:
                 return {};
@@ -177,7 +177,7 @@ namespace jrc
                 item.gender = static_cast<int8_t>(number(fields, 6));
                 item.priority = number(fields, 7);
                 item.on_sale = number(fields, 8) == 1;
-                item.category = category_for_item(item.item_id);
+                item.category = cash_shop_view::category_for_item(item.item_id);
                 item.name = item_name(item.item_id);
                 commodities.push_back(std::move(item));
             }

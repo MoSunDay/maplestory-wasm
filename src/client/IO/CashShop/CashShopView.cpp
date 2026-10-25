@@ -76,6 +76,22 @@ namespace jrc::cash_shop_view
         return static_cast<int8_t>((category + 1) % CATEGORY_COUNT);
     }
 
+    // Catalog item id to rail category. Pets and pet ability equipment get
+    // their own 宠物 entry; everything else follows the leading digit.
+    int8_t category_for_item(int32_t item_id)
+    {
+        if (item_id / 1'000 == 5'000)
+            return PET_CATEGORY;
+        if (item_id >= 1'812'000 && item_id <= 1'812'007)
+            return PET_CATEGORY;
+        // Pet equipment (1802xxx) is worn by pets, not by the player, so it
+        // belongs with the pet entries instead of the equipment weapon slot.
+        if (item_id >= 1'802'000 && item_id < 1'803'000)
+            return PET_CATEGORY;
+        const int32_t prefix = item_id / 1'000'000;
+        return (prefix >= 1 && prefix <= 5) ? static_cast<int8_t>(prefix) : 6;
+    }
+
     CashCurrency next_currency(CashCurrency currency)
     {
         switch (currency)
@@ -124,7 +140,7 @@ namespace jrc::cash_shop_view
     const char* category_name(int8_t category)
     {
         constexpr const char* names[CATEGORY_COUNT] = {
-            "全部", "装备", "消耗", "设置", "其他", "现金", "礼包"
+            "全部", "装备", "消耗", "设置", "其他", "现金", "礼包", "宠物"
         };
         return category >= 0 && category < CATEGORY_COUNT ? names[category] : names[0];
     }

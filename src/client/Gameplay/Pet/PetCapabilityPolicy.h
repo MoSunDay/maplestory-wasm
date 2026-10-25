@@ -2,9 +2,25 @@
 
 #include <cstdint>
 
+// Pet capability policy.
+//
+// Any summoned pet (is_pet_item, item ids 5000000-5000999) intrinsically
+// provides: meso magnet, item pouch, wing boots, and auto HP/MP potion
+// pouches. Equipped pet-ability items still grant their ability
+// independently, and magic scales remains equipment-only (it must actually
+// be equipped).
+
 namespace jrc::pet_capability
 {
     constexpr int32_t STARTER_PUPPY = 5000001;
+
+    // Returns true when item_id is a summonable pet item (5000000-5000999).
+    // Any purchased pet summoned from the cash shop counts: the client treats
+    // every pet id as carrying the intrinsic conveniences below.
+    constexpr bool is_pet_item(int32_t item_id)
+    {
+        return item_id / 1000 == 5000;
+    }
 
     enum Mask : uint8_t
     {
