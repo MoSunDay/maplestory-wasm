@@ -19,6 +19,7 @@
 | 补丁 | 内容 | 状态 |
 |------|------|------|
 | [0001-fix-iron-body-skill-id-constants.patch](0001-fix-iron-body-skill-id-constants.patch) | 圣甲术 `Swordsman.IRON_BODY` 1000003→1001003；`Rogue.NIMBLE_BODY` 4001000→4000000（未引用常量对齐） | 已应用于当前 checkout 并重编入 dist（2026-10-25） |
+| [0002-storage-slots-byte-width-mismatch.patch](0002-storage-slots-byte-width-mismatch.patch) | STORAGE 系列封包（0x16/0x13/0x0D/0x09/0x0F）`writeShort(slots)`→`write(slots)`，修复与客户端 byte 解析的 1 字节错位 | 已应用于当前 checkout 并重编入 dist（2026-10-26） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。

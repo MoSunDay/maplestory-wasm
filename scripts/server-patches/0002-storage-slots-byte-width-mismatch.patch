@@ -1,0 +1,67 @@
+# 服务端源码补丁：修复 STORAGE 封包 slots 字段字节宽度错位
+# 背景：v83 客户端 StorageHandler 对全部 storage 下行 mode（0x16 getStorage/
+# 0x13 mesoStorage/0x0D storeStorage/0x09 takeOutStorage/0x0F arrangeStorage）
+# 均以 read_byte() 读 slots，而服务端 writeShort(slots) 写 2 字节，恒错位
+# 1 字节 → 客户端 count 恒读 0，仓库物品列表被静默丢弃（左列恒空、取出动作
+# 无法经 UI 触发）。MaplePacketLittleEndianWriter.write(int) 写单字节，与
+# 客户端一致；slots 上限 48 < 128，无截断风险。
+# 详情：features/changelog/2026-10-26/storage-slots-byte-width-mismatch.md
+#
+# 应用（在 link_repos/MapleStory-Server 目录内）：
+#   patch -p1 < ../../../scripts/server-patches/0002-storage-slots-byte-width-mismatch.patch
+# 验证：
+#   grep -n "write(slots)" src/tools/MaplePacketCreator.java   # 期望 3935/3972/3985/4001/4017 五处
+#   bash posix-compile.sh && docker restart ms-game-server     # 登录口 8484 就绪
+#   node tools/verify/maplestory-webui/storage-deposit-flow.mjs
+#
+# 注：8480/8489/8498 三处 writeShort(slots) 属 CASHSHOP_OPERATION
+# （showBoughtInventorySlots 0x60 / showBoughtStorageSlots 0x62 /
+# showBoughtCharacterSlot 0x64），非 STORAGE 封包且客户端无对应解析
+# （落入 default 提示），有意不改。
+--- a/src/tools/MaplePacketCreator.java
++++ b/src/tools/MaplePacketCreator.java
+@@ -3932,7 +3932,7 @@
+         mplew.writeShort(SendOpcode.STORAGE.getValue());
+         mplew.write(0x16);
+         mplew.writeInt(npcId);
+-        mplew.writeShort(slots);
++        mplew.write(slots);
+         mplew.writeShort(0x7E);
+         mplew.writeShort(0);
+         mplew.writeInt(0);
+@@ -3969,7 +3969,7 @@
+         final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter();
+         mplew.writeShort(SendOpcode.STORAGE.getValue());
+         mplew.write(0x13);
+-        mplew.writeShort(slots);
++        mplew.write(slots);
+         mplew.writeShort(2);
+         mplew.writeShort(0);
+         mplew.writeInt(0);
+@@ -3982,7 +3982,7 @@
+         final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter();
+         mplew.writeShort(SendOpcode.STORAGE.getValue());
+         mplew.write(0xD);
+-        mplew.writeShort(slots);
++        mplew.write(slots);
+         mplew.writeShort(type.getBitfieldEncoding());
+         mplew.writeShort(0);
+         mplew.writeInt(0);
+@@ -3998,7 +3998,7 @@
+         final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter();
+         mplew.writeShort(SendOpcode.STORAGE.getValue());
+         mplew.write(0x9);
+-        mplew.writeShort(slots);
++        mplew.write(slots);
+         mplew.writeShort(type.getBitfieldEncoding());
+         mplew.writeShort(0);
+         mplew.writeInt(0);
+@@ -4014,7 +4014,7 @@
+         MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter();
+         mplew.writeShort(SendOpcode.STORAGE.getValue());
+         mplew.write(0xF);
+-        mplew.writeShort(slots);
++        mplew.write(slots);
+         mplew.write(124);
+ 
+         for (byte i = 0; i < 10; i++)
