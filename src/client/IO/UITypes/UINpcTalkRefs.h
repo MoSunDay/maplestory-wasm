@@ -20,9 +20,10 @@ namespace jrc
 {
     namespace npctalk_text
     {
-        // Resolves an npc-dialogue token prefix (#m/#p/#o/#t/#z ...) plus a
-        // numeric id into a display name. Returns an empty string when no
-        // matching entry exists.
+        // Resolves an npc-dialogue token prefix (#m/#p/#o/#t/#z names,
+        // #q skill names, #c carried item counts) plus a numeric id into its
+        // display text. Returns an empty string when no matching entry exists;
+        // #c always resolves (item counts report "0").
         std::string resolve_prefixed_reference(char prefix, int32_t id);
 
         // Resolves a bare delimited id token (#123456#) into a display name,

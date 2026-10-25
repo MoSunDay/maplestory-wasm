@@ -13,8 +13,11 @@
 // GNU Affero General Public License for more details.                      //
 #include "UINpcTalkRefs.h"
 
+#include "../../Character/Inventory/InventoryType.h"
 #include "../../Console.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/SkillData.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
@@ -61,6 +64,42 @@ namespace jrc
                 return {};
             }
 
+            std::string try_get_skill_name(int32_t skillid)
+            {
+                const std::string& name = SkillData::get(skillid).get_name();
+                if (!name.empty())
+                {
+                    return name;
+                }
+
+                return {};
+            }
+
+            // `#c<itemid>#` shows how many of the item the player carries.
+            // "0" is a meaningful answer, so missing inventory entries (and
+            // ids outside every inventory tab) report zero instead of failing.
+            std::string try_get_item_count(int32_t itemid)
+            {
+                const InventoryType::Id type = InventoryType::by_item_id(itemid);
+                if (type == InventoryType::NONE)
+                {
+                    return "0";
+                }
+
+                const auto& inventory = Stage::get().get_player().get_inventory();
+                const int16_t slot_max = inventory.get_slotmax(type);
+                int32_t count = 0;
+                for (int16_t slot = 1; slot <= slot_max; ++slot)
+                {
+                    if (inventory.get_item_id(type, slot) == itemid)
+                    {
+                        count += inventory.get_item_count(type, slot);
+                    }
+                }
+
+                return std::to_string(count);
+            }
+
             std::string try_get_map_name(int32_t mapid)
             {
                 const NxHelper::Map::MapInfo map_info = NxHelper::Map::get_map_info_by_id(mapid);
@@ -91,6 +130,12 @@ namespace jrc
             case 'o':
             case 'O':
                 return try_get_mob_name(id);
+            case 'q':
+            case 'Q':
+                return try_get_skill_name(id);
+            case 'c':
+            case 'C':
+                return try_get_item_count(id);
             default:
                 return {};
             }

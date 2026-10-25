@@ -21,6 +21,7 @@
 
 #include "UINpcTalkImages.h"
 #include "UINpcTalkRefs.h"
+#include "UINpcTalkWhitespace.h"
 
 #include <cctype>
 
@@ -139,6 +140,31 @@ namespace jrc
                 return true;
             }
 
+            // Consume an item/skill icon token (#i/#v/#s). In KEEP mode the
+            // token survives verbatim for the later sprite extraction pass; in
+            // STRIP mode it disappears without leaking the numeric id.
+            bool copy_icon_token(
+                const std::string& source,
+                size_t cursor,
+                EmbedImages embed_images,
+                std::string& out,
+                size_t& out_end
+            )
+            {
+                npctalk_images::NpcIconKind icon_kind = npctalk_images::NpcIconKind::ITEM;
+                int32_t icon_id = 0;
+                if (!npctalk_images::try_parse_icon_token(source, cursor, icon_kind, icon_id, out_end))
+                {
+                    return false;
+                }
+
+                if (embed_images == EmbedImages::KEEP)
+                {
+                    out.append(source, cursor, out_end - cursor);
+                }
+
+                return true;
+            }
         }
 
         bool is_selection_dialogue_type(int8_t msgtype)
@@ -176,6 +202,12 @@ namespace jrc
                     {
                         stripped.append(source, cursor, embed_end - cursor);
                     }
+                    cursor = embed_end;
+                    continue;
+                }
+
+                if (copy_icon_token(source, cursor, embed_images, stripped, embed_end))
+                {
                     cursor = embed_end;
                     continue;
                 }
@@ -232,7 +264,7 @@ namespace jrc
                 cursor++;
             }
 
-            return stripped;
+            return normalize_dialogue_whitespace(stripped);
         }
 
         std::string replace_macros(const std::string& source, EmbedImages embed_images)
@@ -267,6 +299,27 @@ namespace jrc
                     continue;
                 }
 
+                if (copy_icon_token(source, cursor, embed_images, result, embed_end))
+                {
+                    cursor = embed_end;
+                    continue;
+                }
+
+                // `#c<itemid>#` is the item-count macro (never an orange
+                // colour token): show how many the player carries, so a valid
+                // id with nothing in the inventory still renders "0".
+                if (token == 'c' || token == 'C')
+                {
+                    int32_t item_id = 0;
+                    size_t count_end = 0;
+                    if (try_parse_delimited_number(source, cursor + 2, count_end, item_id))
+                    {
+                        result += resolve_prefixed_reference(token, item_id);
+                        cursor = count_end + 1;
+                        continue;
+                    }
+                }
+
                 // Skip zero-parameter formatting tokens (#b, #e, #k, #n, #r, etc.)
                 if (is_formatting_token(token))
                 {
@@ -285,11 +338,13 @@ namespace jrc
                     }
                 }
 
+                // Named references: map, item, npc, mob and (for #q) skill.
                 if (token == 'm' || token == 'M' ||
                     token == 't' || token == 'T' ||
                     token == 'z' || token == 'Z' ||
                     token == 'p' || token == 'P' ||
-                    token == 'o' || token == 'O')
+                    token == 'o' || token == 'O' ||
+                    token == 'q' || token == 'Q')
                 {
                     int32_t id = 0;
                     size_t token_end = 0;
@@ -339,7 +394,7 @@ namespace jrc
                 cursor++;
             }
 
-            return result;
+            return normalize_dialogue_whitespace(result);
         }
 
         SelectionList parse_selections(const std::string& source, EmbedImages embed_images)
