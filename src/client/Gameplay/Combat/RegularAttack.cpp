@@ -62,7 +62,7 @@ namespace jrc
     }
 
     SpecialMove::ForbidReason RegularAttack::can_use(int32_t, Weapon::Type weapon,
-        const Job&, uint16_t, uint16_t, uint16_t bullets) const {
+        const Job&, int32_t, int32_t, uint16_t bullets) const {
 
         switch (weapon)
         {

@@ -133,9 +133,16 @@ namespace jrc
             player.get_inventory().set_meso(recv.read_int());
             break;
         default:
-            player.get_stats().set_stat(stat, recv.read_short());
+        {
+            // HP/MAXHP/MP/MAXMP are sent as 4-byte ints; other stats as shorts.
+            int32_t value = (stat == Maplestat::HP || stat == Maplestat::MAXHP
+                || stat == Maplestat::MP || stat == Maplestat::MAXMP)
+                ? recv.read_int()
+                : recv.read_short();
+            player.get_stats().set_stat(stat, value);
             recalculate = true;
             break;
+        }
         }
 
         if (stat == Maplestat::HP)
@@ -163,7 +170,7 @@ namespace jrc
 
     void ChangeStatsHandler::handle_hp_state(Player& player) const
     {
-        uint16_t hp = player.get_stats().get_stat(Maplestat::HP);
+        int32_t hp = player.get_stats().get_stat(Maplestat::HP);
         if (hp == 0)
         {
             if (!player.is_dead())

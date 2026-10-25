@@ -97,7 +97,7 @@ namespace jrc
         if (partymaxhp > 0 && partyhp >= 0)
         {
             int32_t clamped_hp = std::clamp(partyhp, 0, partymaxhp);
-            int16_t hp_percent = static_cast<int16_t>((100 * clamped_hp) / partymaxhp);
+            int16_t hp_percent = static_cast<int16_t>((100LL * clamped_hp) / partymaxhp);
             partyhpbar.draw(absp + Point<int16_t>(0, -55), hp_percent);
         }
 

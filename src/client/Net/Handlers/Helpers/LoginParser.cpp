@@ -151,10 +151,10 @@ namespace jrc
         statsentry.stats[Maplestat::DEX]   = recv.read_short();
         statsentry.stats[Maplestat::INT]   = recv.read_short();
         statsentry.stats[Maplestat::LUK]   = recv.read_short();
-        statsentry.stats[Maplestat::HP]    = recv.read_short();
-        statsentry.stats[Maplestat::MAXHP] = recv.read_short();
-        statsentry.stats[Maplestat::MP]    = recv.read_short();
-        statsentry.stats[Maplestat::MAXMP] = recv.read_short();
+        statsentry.stats[Maplestat::HP]    = recv.read_int();
+        statsentry.stats[Maplestat::MAXHP] = recv.read_int();
+        statsentry.stats[Maplestat::MP]    = recv.read_int();
+        statsentry.stats[Maplestat::MAXMP] = recv.read_int();
         statsentry.stats[Maplestat::AP]    = recv.read_short();
         statsentry.stats[Maplestat::SP]    = read_remaining_sp(recv, job);
         statsentry.exp                     = recv.read_int();

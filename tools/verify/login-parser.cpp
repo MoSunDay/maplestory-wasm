@@ -51,10 +51,10 @@ namespace
         append_number<uint16_t>(bytes, 13);
         append_number<uint16_t>(bytes, 14);
         append_number<uint16_t>(bytes, 15);
-        append_number<uint16_t>(bytes, 1200);
-        append_number<uint16_t>(bytes, 1300);
-        append_number<uint16_t>(bytes, 800);
-        append_number<uint16_t>(bytes, 900);
+        append_number<int32_t>(bytes, 2100000000);
+        append_number<int32_t>(bytes, 2147483000);
+        append_number<int32_t>(bytes, 2050000000);
+        append_number<int32_t>(bytes, 2000000000);
         append_number<uint16_t>(bytes, 7);
         if (sp_table)
         {
@@ -129,6 +129,10 @@ int main()
     assert(character.stats.stats[jrc::Maplestat::JOB] == 112);
     assert(character.stats.stats[jrc::Maplestat::STR] == 12);
     assert(character.stats.stats[jrc::Maplestat::SP] == 7);
+    assert(character.stats.stats[jrc::Maplestat::HP] == 2100000000);
+    assert(character.stats.stats[jrc::Maplestat::MAXHP] == 2147483000);
+    assert(character.stats.stats[jrc::Maplestat::MP] == 2050000000);
+    assert(character.stats.stats[jrc::Maplestat::MAXMP] == 2000000000);
     assert(character.stats.mapid == 100000000);
     assert(character.stats.portal == 2);
     assert(character.look.equips.at(5) == 1040002);

@@ -622,7 +622,7 @@ namespace jrc
             return { 0, false };
         }
 
-        constexpr double DAMAGECAP = 999999.0;
+        constexpr double DAMAGECAP = 2100000000.0;
 
         double damage = randomizer.next_real(mindamage, maxdamage);
         bool iscritical = randomizer.below(critical);

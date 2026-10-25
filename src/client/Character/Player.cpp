@@ -406,8 +406,8 @@ namespace jrc
         int32_t level       = skillbook.get_level(move.get_id());
         Weapon::Type weapon = get_weapontype();
         const Job& job      = stats.get_job();
-        uint16_t hp         = stats.get_stat(Maplestat::HP);
-        uint16_t mp         = stats.get_stat(Maplestat::MP);
+        int32_t hp         = stats.get_stat(Maplestat::HP);
+        int32_t mp         = stats.get_stat(Maplestat::MP);
         uint16_t bullets    = inventory.get_bulletcount();
 
         return move.can_use(level, weapon, job, hp, mp, bullets);

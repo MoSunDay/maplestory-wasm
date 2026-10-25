@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "CharStats.h"
 
+#include "AttackStat.h"
 #include "StatCaps.h"
 
 #include <algorithm>
@@ -81,10 +82,14 @@ namespace jrc
 
         int32_t primary = get_primary_stat();
         int32_t secondary = get_secondary_stat();
-        int32_t attack = get_total(Equipstat::WATK);
+        int32_t attack = get_total(attack_stat::of(weapontype));
         float multiplier = damagepercent + static_cast<float>(attack) / 100;
-        maxdamage = static_cast<int32_t>((primary + secondary) * multiplier);
-        mindamage = static_cast<int32_t>(((primary * 0.9f * mastery) + secondary) * multiplier);
+        // Clamp before the cast: values beyond INT32_MAX would be undefined.
+        constexpr double DAMAGESTATCAP = 2147483647.0;
+        maxdamage = static_cast<int32_t>(std::clamp(
+            static_cast<double>(primary + secondary) * multiplier, 0.0, DAMAGESTATCAP));
+        mindamage = static_cast<int32_t>(std::clamp(
+            (static_cast<double>(primary) * 0.9 * mastery + secondary) * multiplier, 0.0, DAMAGESTATCAP));
     }
 
     int32_t CharStats::calculateaccuracy() const
@@ -144,7 +149,7 @@ namespace jrc
         }
     }
 
-    void CharStats::set_stat(Maplestat::Id stat, uint16_t value)
+    void CharStats::set_stat(Maplestat::Id stat, int32_t value)
     {
         basestats[stat] = value;
     }
@@ -237,7 +242,7 @@ namespace jrc
             || get_buffdelta(Equipstat::MAGIC) > 0;
     }
 
-    uint16_t CharStats::get_stat(Maplestat::Id stat) const
+    int32_t CharStats::get_stat(Maplestat::Id stat) const
     {
         return basestats[stat];
     }

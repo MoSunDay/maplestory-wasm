@@ -33,7 +33,7 @@ namespace jrc
         CharStats();
 
         void init_totalstats();
-        void set_stat(Maplestat::Id stat, uint16_t value);
+        void set_stat(Maplestat::Id stat, int32_t value);
         void set_total(Equipstat::Id stat, int32_t value);
         void add_buff(Equipstat::Id stat, int32_t value);
         void add_value(Equipstat::Id stat, int32_t value);
@@ -53,7 +53,7 @@ namespace jrc
         int32_t calculate_damage(int32_t mobatk, bool magic = false) const;
 
         bool is_damage_buffed() const;
-        uint16_t get_stat(Maplestat::Id stat) const;
+        int32_t get_stat(Maplestat::Id stat) const;
         int32_t get_total(Equipstat::Id stat) const;
         int32_t get_buffdelta(Equipstat::Id stat) const;
         Rectangle<int16_t> get_range() const;
@@ -95,7 +95,7 @@ namespace jrc
         uint8_t portal;
         std::pair<int32_t, int8_t> rank;
         std::pair<int32_t, int8_t> jobrank;
-        EnumMap<Maplestat::Id, uint16_t> basestats;
+        EnumMap<Maplestat::Id, int32_t> basestats;
         EnumMap<Equipstat::Id, int32_t> totalstats;
         EnumMap<Equipstat::Id, int32_t> buffdeltas;
         EnumMap<Equipstat::Id, float> percentages;

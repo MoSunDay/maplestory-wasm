@@ -2492,15 +2492,17 @@ updateMask   int    Bitmask of which stats changed (see §12)
 | 0x0200     | DEX   | short  |
 | 0x0400     | INT   | short  |
 | 0x0800     | LUK   | short  |
-| 0x1000     | HP    | short  |
-| 0x2000     | MaxHP | short  |
-| 0x4000     | MP    | short  |
-| 0x8000     | MaxMP | short  |
+| 0x1000     | HP    | int    |
+| 0x2000     | MaxHP | int    |
+| 0x4000     | MP    | int    |
+| 0x8000     | MaxMP | int    |
 | 0x10000    | AP    | short  |
 | 0x20000    | SP    | short (or SP table — see §11.5) |
 | 0x40000    | EXP   | int    |
 | 0x80000    | Fame  | short  |
 | 0x100000   | Mesos | int    |
+
+> HP/MaxHP/MP/MaxMP are serialized as 4-byte `int` (widened from `short`). Fame/GachaExp single-stat updates still have a known server/client width mismatch; see §12.
 
 ---
 
@@ -2812,7 +2814,7 @@ channel      int     Channel index (0-based)
 [byte]       byte    0
 mapId        int     Target map ID
 spawnPoint   byte    Spawn portal index
-hp           short   Player's current HP
+hp           int     Player's current HP
 chasing      bool    If true, spawn at specific coords
 [If chasing:]
   posX       int
@@ -3896,10 +3898,10 @@ str          short
 dex          short
 int_         short
 luk          short
-hp           short
-maxHp        short
-mp           short
-maxMp        short
+hp           int
+maxHp        int
+mp           int
+maxMp        int
 ap           short        Remaining ability points
 [SP info]    —            See §11.5
 exp          int
@@ -4248,15 +4250,17 @@ projectile       int    Ammo item ID (0 for melee/magic)
 | 0x200      | Dex    | short                             |
 | 0x400      | Int    | short                             |
 | 0x800      | Luk    | short                             |
-| 0x1000     | HP     | short                             |
-| 0x2000     | MaxHP  | short                             |
-| 0x4000     | MP     | short                             |
-| 0x8000     | MaxMP  | short                             |
+| 0x1000     | HP     | int                               |
+| 0x2000     | MaxHP  | int                               |
+| 0x4000     | MP     | int                               |
+| 0x8000     | MaxMP  | int                               |
 | 0x10000    | AP     | short                             |
 | 0x20000    | SP     | short or SP table (§11.5)         |
 | 0x40000    | Exp    | int                               |
 | 0x80000    | Fame   | short                             |
 | 0x100000   | Mesos  | int                               |
+
+> **Known issue (registered, fix pending):** single-stat updates for **Fame** and **GachaExp** have a width mismatch: the server serializes them through the final `writeInt` branch of `updatePlayerStats` (4 bytes each), while the WASM client default `STAT_CHANGED` branch reads them via `read_short` (2 bytes). Any update touching only Fame/GachaExp desynchronizes the stream by 2 bytes per stat (reachable via `gainFame`, the `!fame` GM command, and gacha EXP). This is a pre-existing defect deliberately excluded from the HP/MP `int` widening; a dedicated fix must align both sides.
 
 ### Key Buff Stats (BuffStat — used in GIVE_BUFF / CANCEL_BUFF)
 

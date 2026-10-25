@@ -51,7 +51,7 @@ namespace jrc
         std::string name;
         bool female = false;
         std::vector<int64_t> petids;
-        EnumMap<Maplestat::Id, uint16_t> stats;
+        EnumMap<Maplestat::Id, int32_t> stats;
         int64_t exp;
         int32_t mapid;
         uint8_t portal;
