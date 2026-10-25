@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 namespace jrc
 {
     namespace SkillId
@@ -38,7 +40,7 @@ namespace jrc
             IMPROVED_MAX_HP = 1000001,
             IMPROVED_LADDER_RECOVERY = 1000002,
             IRON_BODY = 1001003,
-            POWER_STRIKE = 1001004,
+            POWER_STRIKE = 1001004, // legacy v83 id, absent from 079MAX4 Skill.nx
             SLASH_BLAST = 1001005,
 
             // Fighter
@@ -67,6 +69,7 @@ namespace jrc
             GUARDIAN_HERO = 1120005,
             RUSH_HERO = 1121006,
             BRANDISH = 1121008,
+            WIDE_HERO = 1121012,
 
             // Page
             SWORD_MASTERY_PAGE = 1200000,
@@ -94,9 +97,10 @@ namespace jrc
             ADVANCED_CHARGE = 1220010,
             RUSH_PALADIN = 1221007,
             BLAST = 1221009,
-            HEAVENS_HAMMER = 1221011,
+            HEAVENS_HAMMER = 1221011, // legacy v83 id, absent from 079MAX4 Skill.nx
             SWORD_HOLY_CHARGE = 1221003,
             BW_HOLY_CHARGE = 1221004,
+            WIDE_PALADIN = 1221013,
 
             // Spearman
             SPEAR_MASTERY = 1300000,
@@ -110,11 +114,11 @@ namespace jrc
 
             // Dragon Knight
             DRAGON_BUSTER = 1311001,
-            DRAGON_FURY = 1311002,
+            DRAGON_FURY = 1311002, // legacy v83 id, absent from 079MAX4 Skill.nx
             PA_BUSTER = 1311003,
             PA_FURY = 1311004,
-            SACRIFICE = 1311005,
-            DRAGONS_ROAR = 1311006,
+            SACRIFICE = 1311005, // legacy v83 id, absent from 079MAX4 Skill.nx
+            DRAGONS_ROAR = 1311006, // legacy v83 id, absent from 079MAX4 Skill.nx
             POWER_CRASH = 1311007,
 
             // Dark Knight
@@ -124,20 +128,21 @@ namespace jrc
             BEHOLDER_BUFF = 1320009,
             RUSH_DK = 1321003,
             BEHOLDER = 1321007,
+            WIDE_DARK_KNIGHT = 1321011,
 
             // Magician
             IMPROVE_HP_RECOVERY = 2000000,
             IMPROVE_MAX_HP = 2000001,
             MAGIC_GUARD = 2001002,
             MAGIC_ARMOR = 2001003,
-            ENERGY_BOLT = 2001004,
+            ENERGY_BOLT = 2001004, // legacy v83 id, absent from 079MAX4 Skill.nx
             MAGIC_CLAW = 2001005,
 
             // F/P Mage
             MP_EATER_FP = 2100000,
             MEDITATION_FP = 2101001,
             TELEPORT_FP = 2101002,
-            SLOW_FP = 2101003,
+            SLOW_FP = 2101003, // legacy v83 id, absent from 079MAX4 Skill.nx
             FIRE_ARROW = 2101004,
             POISON_BREATH = 2101005,
 
@@ -146,15 +151,16 @@ namespace jrc
             ELEMENT_AMPLIFICATION_FP = 2110001,
             EXPLOSION = 2111002,
             POISON_MIST = 2111003,
-            SEAL_FP = 2111004,
+            SEAL_FP = 2111004, // legacy v83 id, absent from 079MAX4 Skill.nx
             SPELL_BOOSTER_FP = 2111005,
             ELEMENT_COMPOSITION_FP = 2111006,
 
-            //
+            // F/P ArchMage
             FIRE_DEMON = 2121003,
             ELQUINES = 2121005,
             PARALYZE = 2121006,
             METEOR_SHOWER = 2121007,
+            WIDE_FP_ARCHMAGE = 2121009,
 
             // I/L Mage
             IL_TELEPORT = 2201002,
@@ -168,6 +174,7 @@ namespace jrc
             ICE_DEMON = 2221003,
             CHAIN_LIGHTNING = 2221006,
             BLIZZARD = 2221007,
+            WIDE_IL_ARCHMAGE = 2221009,
 
             // Priest
             PRIEST_TELEPORT = 2301001,
@@ -178,6 +185,7 @@ namespace jrc
             BIG_BANG = 2321001,
             ANGEL_RAY = 2321007,
             GENESIS = 2321008,
+            WIDE_BISHOP = 2321010,
 
             // Archer
             ARROW_BLOW = 3001004,
@@ -190,6 +198,7 @@ namespace jrc
             STRAFE_HUNTER = 3111006,
             DRAGONS_BREATH_HUNTER = 3121003,
             HURRICANE = 3121004,
+            WIDE_BOWMASTER = 3121011,
 
             // Crossbowman
             CROSSBOW_MASTERY = 3200000,
@@ -200,6 +209,7 @@ namespace jrc
             PIERCING_ARROW = 3221001,
             DRAGONS_BREATH_SNIPER = 3221003,
             SNIPE = 3221007,
+            WIDE_MARKSMAN = 3221009,
 
             // Hermit
             DRAIN = 4101005,
@@ -209,9 +219,10 @@ namespace jrc
             // Night Lord
             TRIPLE_THROW = 4121007,
             NINJA_STORM = 4121008,
+            WIDE_NIGHT_LORD = 4121010,
 
             // Rogue
-            DISORDER = 4001002,
+            DISORDER = 4001002, // legacy v83 id, absent from 079MAX4 Skill.nx
             LUCKY_SEVEN = 4001344,
             DOUBLE_STAB = 4001334,
 
@@ -225,6 +236,7 @@ namespace jrc
             // Shadower
             ASSASSINATE = 4221001,
             BOOMERANG_STEP = 4221007,
+            WIDE_SHADOWER = 4221009,
 
             // Bandit
             DAGGER_MASTERY = 4200000,
@@ -253,6 +265,7 @@ namespace jrc
             ENERGY_ORB = 5121002,
             DEMOLITION = 5121004,
             SNATCH = 5121005,
+            WIDE_BUCCANEER = 5121011,
 
             // Gunslinger
             GUN_MASTERY = 5200000,
@@ -271,10 +284,28 @@ namespace jrc
             RAPID_FIRE = 5221004,
             BATTLESHIP_CANNON = 5221007,
             BATTLESHIP_TORPEDO = 5221008,
+            WIDE_CORSAIR = 5221011,
 
             // Aran
             POLEARM_MASTERY_ARAN = 21100000,
             HIGH_MASTERY_ARAN = 21120001
         };
+
+        // 第四转末格大招的"更大范围伤害版本"（12 个 WIDE_*）：15s 冷却 + 紫色图标 + 施放金光特效；普通版本（原版技能）无冷却。
+        constexpr bool is_wide_attack(int32_t id)
+        {
+            return id == WIDE_HERO ||
+                id == WIDE_PALADIN ||
+                id == WIDE_DARK_KNIGHT ||
+                id == WIDE_FP_ARCHMAGE ||
+                id == WIDE_IL_ARCHMAGE ||
+                id == WIDE_BISHOP ||
+                id == WIDE_BOWMASTER ||
+                id == WIDE_MARKSMAN ||
+                id == WIDE_NIGHT_LORD ||
+                id == WIDE_SHADOWER ||
+                id == WIDE_BUCCANEER ||
+                id == WIDE_CORSAIR;
+        }
     }
 }

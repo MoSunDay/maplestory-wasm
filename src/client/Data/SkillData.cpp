@@ -109,12 +109,14 @@ namespace jrc
 
     int32_t SkillData::flags_of(int32_t id) const
     {
+        // Whitelisted ids must exist in Skill.nx: a missing node keeps the
+        // skill out of the book, so it can never be learned.
+        // tools/verify/second-job-attack-nx.cpp audits this table.
         static const std::unordered_map<int32_t, int32_t> skill_flags =
         {
             // Beginner
             { SkillId::THREE_SNAILS, ATTACK },
             // Warrior
-            { SkillId::POWER_STRIKE, ATTACK },
             { SkillId::SLASH_BLAST, ATTACK },
             // Fighter
             // Page
@@ -128,6 +130,7 @@ namespace jrc
             // Hero
             { SkillId::RUSH_HERO, ATTACK },
             { SkillId::BRANDISH, ATTACK },
+            { SkillId::WIDE_HERO, ATTACK },
             // Page
             // White Knight
             { SkillId::CHARGE, ATTACK },
@@ -135,35 +138,30 @@ namespace jrc
             // Paladin
             { SkillId::RUSH_PALADIN, ATTACK },
             { SkillId::BLAST, ATTACK },
-            { SkillId::HEAVENS_HAMMER, ATTACK },
+            { SkillId::WIDE_PALADIN, ATTACK },
             // Spearman
             // Dragon Knight
             { SkillId::DRAGON_BUSTER, ATTACK },
-            { SkillId::DRAGON_FURY, ATTACK },
             { SkillId::PA_BUSTER, ATTACK },
             { SkillId::PA_FURY, ATTACK },
-            { SkillId::SACRIFICE, ATTACK },
-            { SkillId::DRAGONS_ROAR, ATTACK },
             { SkillId::POWER_CRASH, ATTACK },
             // Dark Knight
             { SkillId::RUSH_DK, ATTACK },
+            { SkillId::WIDE_DARK_KNIGHT, ATTACK },
             // Mage
-            { SkillId::ENERGY_BOLT, ATTACK | RANGED },
             { SkillId::MAGIC_CLAW, ATTACK | RANGED },
             // F/P Mage
-            { SkillId::SLOW_FP, ATTACK },
             { SkillId::FIRE_ARROW, ATTACK | RANGED },
             { SkillId::POISON_BREATH, ATTACK | RANGED },
             // F/P ArchMage
             { SkillId::EXPLOSION, ATTACK },
             { SkillId::POISON_MIST, ATTACK },
-            { SkillId::POISON_BREATH, ATTACK },
-            { SkillId::SEAL_FP, ATTACK },
             { SkillId::ELEMENT_COMPOSITION_FP, ATTACK | RANGED },
             //
             { SkillId::FIRE_DEMON, ATTACK },
             { SkillId::PARALYZE, ATTACK | RANGED },
             { SkillId::METEOR_SHOWER, ATTACK },
+            { SkillId::WIDE_FP_ARCHMAGE, ATTACK },
             // I/L Mage
             { SkillId::COLD_BEAM, ATTACK | RANGED },
             { SkillId::THUNDERBOLT, ATTACK | RANGED },
@@ -174,6 +172,7 @@ namespace jrc
             { SkillId::ICE_DEMON, ATTACK },
             { SkillId::CHAIN_LIGHTNING, ATTACK | RANGED },
             { SkillId::BLIZZARD, ATTACK },
+            { SkillId::WIDE_IL_ARCHMAGE, ATTACK },
             // Priest
             { SkillId::HOLY_ARROW, ATTACK | RANGED },
             { SkillId::SHINING_RAY, ATTACK },
@@ -181,6 +180,7 @@ namespace jrc
             { SkillId::BIG_BANG, ATTACK },
             { SkillId::ANGEL_RAY, ATTACK | RANGED },
             { SkillId::GENESIS, ATTACK },
+            { SkillId::WIDE_BISHOP, ATTACK },
             // Hunter
             { SkillId::ARROW_BOMB, ATTACK | RANGED },
             { SkillId::ARROW_BLOW, ATTACK | RANGED },
@@ -189,6 +189,7 @@ namespace jrc
             { SkillId::STRAFE_HUNTER, ATTACK | RANGED },
             { SkillId::DRAGONS_BREATH_HUNTER, ATTACK | RANGED },
             { SkillId::HURRICANE, ATTACK | RANGED },
+            { SkillId::WIDE_BOWMASTER, ATTACK | RANGED },
             // Crossbowman
             { SkillId::IRON_ARROW, ATTACK | RANGED },
             { SkillId::POWER_KNOCKBACK_XBOW, ATTACK },
@@ -197,8 +198,8 @@ namespace jrc
             { SkillId::PIERCING_ARROW, ATTACK | RANGED },
             { SkillId::DRAGONS_BREATH_SNIPER, ATTACK | RANGED },
             { SkillId::SNIPE, ATTACK | RANGED },
+            { SkillId::WIDE_MARKSMAN, ATTACK | RANGED },
             // Rogue
-            { SkillId::DISORDER, ATTACK },
             { SkillId::LUCKY_SEVEN, ATTACK | RANGED },
             { SkillId::DOUBLE_STAB, ATTACK },
             // Hermit / Night Lord
@@ -206,6 +207,7 @@ namespace jrc
             { SkillId::AVENGER, ATTACK | RANGED },
             { SkillId::TRIPLE_THROW, ATTACK | RANGED },
             { SkillId::NINJA_STORM, ATTACK },
+            { SkillId::WIDE_NIGHT_LORD, ATTACK },
             // Bandit
             { SkillId::STEAL, ATTACK },
             { SkillId::SAVAGE_BLOW, ATTACK },
@@ -214,6 +216,7 @@ namespace jrc
             { SkillId::BAND_OF_THIEVES, ATTACK },
             { SkillId::ASSASSINATE, ATTACK },
             { SkillId::BOOMERANG_STEP, ATTACK },
+            { SkillId::WIDE_SHADOWER, ATTACK },
             { SkillId::MESO_EXPLOSION, ATTACK },
             // Pirate
             { SkillId::FLASH_FIST, ATTACK },
@@ -232,6 +235,7 @@ namespace jrc
             { SkillId::ENERGY_ORB, ATTACK },
             { SkillId::DEMOLITION, ATTACK },
             { SkillId::SNATCH, ATTACK },
+            { SkillId::WIDE_BUCCANEER, ATTACK },
             // Gunslinger
             { SkillId::INVISIBLE_SHOT, ATTACK | RANGED },
             { SkillId::GRENADE, ATTACK | RANGED },
@@ -245,7 +249,8 @@ namespace jrc
             { SkillId::AERIAL_STRIKE, ATTACK },
             { SkillId::RAPID_FIRE, ATTACK | RANGED },
             { SkillId::BATTLESHIP_CANNON, ATTACK | RANGED },
-            { SkillId::BATTLESHIP_TORPEDO, ATTACK | RANGED }
+            { SkillId::BATTLESHIP_TORPEDO, ATTACK | RANGED },
+            { SkillId::WIDE_CORSAIR, ATTACK | RANGED }
         };
 
         auto iter = skill_flags.find(id);
@@ -319,5 +324,13 @@ namespace jrc
     const Texture& SkillData::get_icon(Icon icon) const
     {
         return icons[icon];
+    }
+
+    Color wide_attack_icon_tint(int32_t skill_id)
+    {
+        if (SkillId::is_wide_attack(skill_id))
+            return { 0.78f, 0.55f, 1.0f, 1.0f };
+
+        return { 1.0f, 1.0f, 1.0f, 1.0f };
     }
 }

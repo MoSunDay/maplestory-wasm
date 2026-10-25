@@ -106,16 +106,18 @@ namespace jrc
 
     void SkillIcon::draw(const DrawArgument& args) const
     {
+        const Color tint = wide_attack_icon_tint(id);
+
         switch (state)
         {
             case NORMAL:
-                normal.draw(args);
+                normal.draw({ args.getpos(), tint });
                 break;
             case DISABLED:
-                disabled.draw(args);
+                disabled.draw({ args.getpos(), tint });
                 break;
             case MOUSEOVER:
-                mouseover.draw(args);
+                mouseover.draw({ args.getpos(), tint });
                 break;
         }
 
@@ -277,6 +279,7 @@ namespace jrc
         {
             skille.draw(skill_position);
             iter->draw(skill_position + ICON_OFFSET);
+
             if (iter != end - 1)
             {
                 line.draw(skill_position + LINE_OFFSET);

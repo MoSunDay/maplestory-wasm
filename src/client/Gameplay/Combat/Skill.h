@@ -24,7 +24,10 @@
 #include "SkillHitEffect.h"
 #include "SkillUseEffect.h"
 
+#include "../../Graphics/Animation.h"
+
 #include <memory>
+#include <vector>
 
 namespace jrc
 {
@@ -48,6 +51,9 @@ namespace jrc
             const Job& job, int32_t hp, int32_t mp, uint16_t bullets) const override;
 
     private:
+        struct Flourish { Animation animation; int8_t z; };  // 额外施放特效层
+        std::vector<Flourish> flourish;
+        bool ironbody_flash = false;
 
         std::unique_ptr<SkillAction> action;
         std::unique_ptr<SkillBullet> bullet;

@@ -151,7 +151,8 @@ namespace jrc
         pos.shift_y(icon_offset);
 
         base.draw({ pos + Point<int16_t>(12, 16) });
-        icon.draw({ pos + Point<int16_t>(22, 90), 2.0f, 2.0f });
+        icon.draw({ pos + Point<int16_t>(22, 90), pos + Point<int16_t>(22, 90),
+            {}, 2.0f, 2.0f, wide_attack_icon_tint(skill_id), 0.0f });
         cover.draw({ pos + Point<int16_t>(12, 16) });
 
         desc.draw(pos + Point<int16_t>(102, 12));

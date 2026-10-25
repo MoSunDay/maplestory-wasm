@@ -136,4 +136,7 @@ namespace jrc
 
         std::array<Texture, NUM_ICONS> icons;
     };
+
+    // 宽范围攻击技能的图标识别色（紫色系），其余返回白色。
+    Color wide_attack_icon_tint(int32_t skill_id);
 }

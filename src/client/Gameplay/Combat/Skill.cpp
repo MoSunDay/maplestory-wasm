@@ -95,6 +95,27 @@ namespace jrc
             }
         }
 
+        // 宽范围攻击技能的额外施放特效：祝福(2301004)金色圣光 + 圣甲术(1001003)剪影闪光。
+        // 特效来源常量：换成 神圣祈祷(2311003)/圣灵之盾(2321005) 只需改这一行。
+        static constexpr const char* FLOURISH_EFFECTS[][2] = { { "230.img", "2301004" } };
+        if (SkillId::is_wide_attack(skillid))
+        {
+            for (const auto& source : FLOURISH_EFFECTS)
+            {
+                nl::node bless = nl::nx::skill[source[0]]["skill"][source[1]];
+                int8_t no = -1;
+                nl::node sub = bless["effect"];
+                while (sub)
+                {
+                    flourish.push_back({ sub, sub["z"] });
+
+                    no++;
+                    sub = bless["effect" + std::to_string(no)];
+                }
+            }
+            ironbody_flash = true;
+        }
+
         size_t hitvariants = 0;
         for (auto hit : src["hit"])
         {
@@ -217,6 +238,11 @@ namespace jrc
     void Skill::apply_useeffects(Char& user) const
     {
         useeffect->apply(user);
+
+        for (const auto& fx : flourish)
+            user.show_attack_effect(fx.animation, fx.z);  // 祝福金色圣光
+        if (ironbody_flash)
+            user.show_iron_body();  // 圣甲术剪影闪光
 
         sound->play_use();
     }

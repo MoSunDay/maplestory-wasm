@@ -57,6 +57,15 @@ FREE_MARKET_MAP = 910000000
 KEY_TYPE_SKILL = 1       # KeyType::SKILL in the client KeyType.h
 MAX_BOUND_KEYS = 26      # one letter per attack skill, capped at 26
 
+# Wide attack skills granted to the test characters by grant_wide_attacks.py
+# (one per explorer 4th-job line: Hero, Pala, DK, FPA, ILA, Bish, BM, MM, NL,
+# Shad, Bucc, CS). They are claimed before any other skill so the 26-letter
+# cap can never squeeze them out of the keymap.
+WIDE_ATTACK_IDS = frozenset({
+    1121012, 1221013, 1321011, 2121009, 2221009, 2321010,
+    3121011, 3221009, 4121010, 4221009, 5121011, 5221011,
+})
+
 # Maple key indexes into the client Keytable (Keyboard.cpp): home row first,
 # then the top and bottom rows. Distinct keys keep one skill per letter.
 LETTER_KEYS = (
@@ -161,16 +170,21 @@ def claim_rosters(roster, skills_by_job):
     A skill id is claimed by the first character whose weapon passes the
     manifest weapon requirement; later characters - and characters whose
     own weapon mismatches (Double Stab style cross-weapon duplicates) -
-    do not rebind it. Returns ({character name -> kept skill tuples},
-    coveredElsewhere rows naming the claiming suffix per dropped skill).
+    do not rebind it. Wide attack skills (WIDE_ATTACK_IDS) are ordered
+    first so they are always bound before the 26-letter cap; the rest
+    follow in skill-id order. Returns ({character name -> kept skill
+    tuples}, coveredElsewhere rows naming the claiming suffix per dropped
+    skill).
     """
     claimed = {}
     per_char = {}
     for character in roster:
         name, suffix = character["name"], character["suffix"]
         skills = skills_by_job.get(character["job"], {"skills": []})["skills"]
+        ordered = sorted(
+            skills, key=lambda skill: (skill[0] not in WIDE_ATTACK_IDS, skill[0]))
         kept = []
-        for skill in skills:
+        for skill in ordered:
             if skill[0] in claimed or not weapon_compatible(skill[5], suffix):
                 continue
             claimed[skill[0]] = suffix

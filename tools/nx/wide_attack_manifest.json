@@ -1,0 +1,321 @@
+[
+  {
+    "job": 112,
+    "img": "112.img",
+    "id": 1121012,
+    "source_id": 1121008,
+    "source_img": "112.img",
+    "name": "Blade Wave",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "melee",
+    "stats": {
+      "attackCount": 8,
+      "damage": 500,
+      "mobCount": 10,
+      "mpCon": 200,
+      "cooltime": 15,
+      "lt": [
+        -390,
+        -600
+      ],
+      "rb": [
+        70,
+        20
+      ],
+      "range": 600
+    }
+  },
+  {
+    "job": 122,
+    "img": "122.img",
+    "id": 1221013,
+    "source_id": 1221007,
+    "source_img": "122.img",
+    "name": "Divine Judgment",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "melee",
+    "stats": {
+      "attackCount": 6,
+      "damage": 500,
+      "mobCount": 15,
+      "mpCon": 400,
+      "cooltime": 15,
+      "lt": [
+        -500,
+        -300
+      ],
+      "rb": [
+        500,
+        300
+      ],
+      "range": 600
+    }
+  },
+  {
+    "job": 132,
+    "img": "132.img",
+    "id": 1321011,
+    "source_id": 1311003,
+    "source_img": "131.img",
+    "name": "Gungnir's Descent",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "melee",
+    "stats": {
+      "attackCount": 10,
+      "damage": 330,
+      "mobCount": 10,
+      "mpCon": 200,
+      "cooltime": 15,
+      "lt": [
+        -330,
+        -440
+      ],
+      "rb": [
+        330,
+        60
+      ],
+      "range": 600
+    }
+  },
+  {
+    "job": 212,
+    "img": "212.img",
+    "id": 2121009,
+    "source_id": 2121007,
+    "source_img": "212.img",
+    "name": "Inferno Sphere",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "magic",
+    "stats": {
+      "attackCount": 9,
+      "mobCount": 10,
+      "mpCon": 500,
+      "cooltime": 15,
+      "lt": [
+        -400,
+        -300
+      ],
+      "rb": [
+        50,
+        50
+      ],
+      "mad": 330,
+      "range": 600
+    }
+  },
+  {
+    "job": 222,
+    "img": "222.img",
+    "id": 2221009,
+    "source_id": 2221007,
+    "source_img": "222.img",
+    "name": "Frozen Orb",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "magic",
+    "stats": {
+      "attackCount": 7,
+      "mobCount": 15,
+      "mpCon": 30,
+      "cooltime": 15,
+      "lt": [
+        -450,
+        -350
+      ],
+      "rb": [
+        50,
+        50
+      ],
+      "mad": 300,
+      "range": 600
+    }
+  },
+  {
+    "job": 232,
+    "img": "232.img",
+    "id": 2321010,
+    "source_id": 2321008,
+    "source_img": "232.img",
+    "name": "Genesis Nova",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "magic",
+    "stats": {
+      "attackCount": 8,
+      "mobCount": 15,
+      "mpCon": 500,
+      "cooltime": 15,
+      "lt": [
+        -550,
+        -550
+      ],
+      "rb": [
+        550,
+        130
+      ],
+      "mad": 370,
+      "range": 600
+    }
+  },
+  {
+    "job": 312,
+    "img": "312.img",
+    "id": 3121011,
+    "source_id": 3121003,
+    "source_img": "312.img",
+    "name": "Arrow Barrage",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "ranged",
+    "stats": {
+      "attackCount": 8,
+      "damage": 500,
+      "mobCount": 12,
+      "mpCon": 200,
+      "cooltime": 15,
+      "lt": [
+        -400,
+        -435
+      ],
+      "rb": [
+        400,
+        20
+      ],
+      "range": 600,
+      "bulletCount": 8,
+      "bulletConsume": 1
+    }
+  },
+  {
+    "job": 322,
+    "img": "322.img",
+    "id": 3221009,
+    "source_id": 3221001,
+    "source_img": "322.img",
+    "name": "Piercing Barrage",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "ranged",
+    "stats": {
+      "attackCount": 5,
+      "damage": 750,
+      "mobCount": 12,
+      "mpCon": 300,
+      "cooltime": 15,
+      "lt": [
+        -700,
+        -210
+      ],
+      "rb": [
+        -60,
+        150
+      ],
+      "range": 600,
+      "bulletCount": 5,
+      "bulletConsume": 1
+    }
+  },
+  {
+    "job": 412,
+    "img": "412.img",
+    "id": 4121010,
+    "source_id": 4121008,
+    "source_img": "412.img",
+    "name": "Shadow Storm",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "melee",
+    "stats": {
+      "attackCount": 7,
+      "damage": 358,
+      "mobCount": 8,
+      "mpCon": 300,
+      "cooltime": 15,
+      "lt": [
+        -300,
+        -330
+      ],
+      "rb": [
+        300,
+        50
+      ],
+      "range": 600
+    },
+    "action": "ninjastorm"
+  },
+  {
+    "job": 422,
+    "img": "422.img",
+    "id": 4221009,
+    "source_id": 4221007,
+    "source_img": "422.img",
+    "name": "Shadow Vortex",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "melee",
+    "stats": {
+      "attackCount": 1,
+      "damage": 800,
+      "mobCount": 15,
+      "mpCon": 300,
+      "cooltime": 15,
+      "lt": [
+        -420,
+        -620
+      ],
+      "rb": [
+        420,
+        20
+      ],
+      "range": 600
+    }
+  },
+  {
+    "job": 512,
+    "img": "512.img",
+    "id": 5121011,
+    "source_id": 5121001,
+    "source_img": "512.img",
+    "name": "Dragon Fury",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "melee",
+    "stats": {
+      "attackCount": 5,
+      "damage": 650,
+      "mobCount": 8,
+      "mpCon": 20,
+      "cooltime": 15,
+      "lt": [
+        -450,
+        -450
+      ],
+      "rb": [
+        100,
+        100
+      ],
+      "range": 600
+    }
+  },
+  {
+    "job": 522,
+    "img": "522.img",
+    "id": 5221011,
+    "source_id": 5201002,
+    "source_img": "520.img",
+    "name": "Broadside",
+    "desc": "A wide-range 4th job attack.",
+    "kind": "ranged",
+    "stats": {
+      "attackCount": 12,
+      "damage": 400,
+      "mobCount": 15,
+      "mpCon": 500,
+      "cooltime": 15,
+      "lt": [
+        -450,
+        -480
+      ],
+      "rb": [
+        50,
+        20
+      ],
+      "range": 600,
+      "bulletCount": 12,
+      "bulletConsume": 1
+    }
+  }
+]
