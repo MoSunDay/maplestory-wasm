@@ -47,7 +47,7 @@ namespace jrc
             const std::array<Text, COUNT>& cooldown_labels,
             Point<int16_t> origin)
         {
-            panel.draw(origin);
+            panel.draw(quickslot::texture_draw_position(origin, panel.get_origin()));
 
             for (int16_t i = 0; i < COUNT; ++i)
             {

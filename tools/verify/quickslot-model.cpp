@@ -71,6 +71,29 @@ namespace
         assert(at(CHAOS_LAYOUT, 3, 7) == -1);
     }
 
+    void verify_texture_draw_position()
+    {
+        // Post-Chaos panel: 145x93 with NX origin (-143,143). Texture::draw
+        // subtracts that origin, so the draw position has to pre-add it to
+        // make the bitmap land on the intended top-left.
+        const Point<int16_t> origin(-143, 143);
+        const Point<int16_t> top_left(1135, 557);
+        const Point<int16_t> draw_pos =
+            jrc::quickslot::texture_draw_position(top_left, origin);
+
+        assert(draw_pos.x() - origin.x() == top_left.x());
+        assert(draw_pos.y() - origin.y() == top_left.y());
+        assert(draw_pos == Point<int16_t>(1135 - 143, 557 + 143));
+
+        // The old `panel.draw(top_left)` skipped the shift: the bitmap ended
+        // up one whole origin away from the hit-test/icons/keycaps.
+        assert(draw_pos != top_left);
+
+        // Zero origin textures are drawn at their top-left unchanged.
+        assert(jrc::quickslot::texture_draw_position(
+            top_left, Point<int16_t>()) == top_left);
+    }
+
     void verify_invalid_indices()
     {
         State state;
@@ -151,11 +174,12 @@ int main()
     verify_centers(jrc::quickslot::CHAOS_LAYOUT);
     verify_boundaries(jrc::quickslot::V83_LAYOUT);
     verify_boundaries(jrc::quickslot::CHAOS_LAYOUT);
+    verify_texture_draw_position();
     verify_invalid_indices();
     verify_assign_and_clear();
     verify_item_bindings();
 
     std::cout << "PASS quickslot model (both layouts: hit bands, centers,"
-        " key labels, skill/item assign, clear)\n";
+        " key labels, texture draw position, skill/item assign, clear)\n";
     return 0;
 }

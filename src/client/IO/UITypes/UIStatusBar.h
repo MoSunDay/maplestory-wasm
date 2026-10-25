@@ -102,6 +102,10 @@ namespace jrc
         int16_t get_quickslot_hovered() const;
         bool is_quickslot_in_range(Point<int16_t> cursorpos) const;
         int16_t button_at(Point<int16_t> cursorpos) const;
+        /// Screen bounds of the button with `id`, zero-sized when absent.
+        /// Probes use this to assert real layout instead of re-deriving
+        /// button rectangles from NX origins.
+        Rectangle<int16_t> get_control_bounds(uint16_t id) const;
         int32_t debug_press_count() const { return press_debug_count; }
         int16_t debug_last_button() const { return press_debug_button; }
         int16_t debug_cursor_x() const { return cursor_debug_x; }

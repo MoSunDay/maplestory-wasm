@@ -704,6 +704,32 @@ extern "C"
         return statusbar ? static_cast<int>(statusbar->debug_rightclick_index()) : -2;
     }
 
+    int msstatusbar_control_bounds(int id, int edge)
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        if (!statusbar || edge < 0 || edge > 3)
+        {
+            return MISSING_COORDINATE;
+        }
+        const jrc::Rectangle<int16_t> bounds =
+            statusbar->get_control_bounds(static_cast<uint16_t>(id));
+        if (bounds.width() <= 0 || bounds.height() <= 0)
+        {
+            return MISSING_COORDINATE;
+        }
+        switch (edge)
+        {
+        case 0:
+            return static_cast<int>(bounds.l());
+        case 1:
+            return static_cast<int>(bounds.t());
+        case 2:
+            return static_cast<int>(bounds.r());
+        default:
+            return static_cast<int>(bounds.b());
+        }
+    }
+
     int msui_front_at(int x, int y)
     {
         return static_cast<int>(jrc::UI::get().front_type_at(jrc::Point<int16_t>(

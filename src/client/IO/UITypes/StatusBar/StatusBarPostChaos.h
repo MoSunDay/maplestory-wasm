@@ -64,13 +64,13 @@ namespace jrc
         }
 
         /// Top edge of the shortcut icon row relative to the element anchor
-        /// (MapleButton uses the NORMAL origin, y = 57).
-        constexpr int16_t CHAOS_SHORTCUT_ICON_TOP = -57;
+        /// (MapleButton uses the NORMAL origin, y = 58).
+        constexpr int16_t CHAOS_SHORTCUT_ICON_TOP = -58;
 
         /// Top-left of mainBar/quickSlot/quickSlot relative to the element
-        /// anchor. The nx origin (-143,143) docks the panel above the bar;
-        /// it is lifted two pixels further so the panel's 93px body clears
-        /// the 21px shortcut icon row (panel bottom below icon top).
+        /// anchor. Placement leaves a 2px gap above the shortcut row: the
+        /// panel top is viewH-163, its bottom viewH-70, and the icon row
+        /// starts at viewH-68.
         constexpr int16_t CHAOS_QUICKSLOT_OFFSET_Y =
             CHAOS_SHORTCUT_ICON_TOP - quickslot::CHAOS_LAYOUT.dimension.y() - 2;
         constexpr Point<int16_t> CHAOS_QUICKSLOT_OFFSET = {

@@ -30,6 +30,8 @@ export function createRuntimeProbes(driver) {
     driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', [], [])`);
   const numberArgument = (name, value) =>
     driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', ['number'], [${Number(value)}])`);
+  const numberArgument2 = (name, first, second) =>
+    driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', ['number','number'], [${Number(first)},${Number(second)}])`);
   const pointArgument = (name, x, y) =>
     driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', ['number','number'], [${Number(x)},${Number(y)}])`);
   return {
@@ -118,6 +120,12 @@ export function createRuntimeProbes(driver) {
     quickslotCooldown: index => numberArgument('msquickslot_cooldown', index),
     quickslotCooldownLabel: index => numberArgument('msquickslot_cooldown_label', index),
     quickslotHovered: () => number('msquickslot_hovered'),
+    statusbarControlBounds: async id => ({
+      left: await numberArgument2('msstatusbar_control_bounds', id, 0),
+      top: await numberArgument2('msstatusbar_control_bounds', id, 1),
+      right: await numberArgument2('msstatusbar_control_bounds', id, 2),
+      bottom: await numberArgument2('msstatusbar_control_bounds', id, 3)
+    }),
     skillbookSelected: () => number('msskillbook_selected'),
     skillbookActive: () => number('msskillbook_active'),
     cashShopProbe: name => number(name)

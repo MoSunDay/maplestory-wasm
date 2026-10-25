@@ -148,6 +148,19 @@ namespace jrc::quickslot
         };
     }
 
+    /// Draw position that makes a texture with `texture_origin` render at
+    /// `top_left` (Texture::draw subtracts its NX origin). Same as
+    /// `top_left + texture_origin`; the coordinates are summed explicitly
+    /// because Point::operator+ narrows int back to int16_t inside a braced
+    /// return, which `-Werror` rejects with GCC.
+    inline Point<int16_t> texture_draw_position(Point<int16_t> top_left, Point<int16_t> texture_origin)
+    {
+        return {
+            static_cast<int16_t>(top_left.x() + texture_origin.x()),
+            static_cast<int16_t>(top_left.y() + texture_origin.y())
+        };
+    }
+
     /// Assigned skill id of a slot, 0 when empty or out of range.
     inline int32_t skill_at(const State& state, int16_t index)
     {

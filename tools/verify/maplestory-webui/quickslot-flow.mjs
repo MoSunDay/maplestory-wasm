@@ -27,6 +27,7 @@
 //   QS_SKIP_SKILLS=1     跳过前面的技能绑定段（用于独立跑冷却/物品段，避免
 //                        SwiftShader 在多次技能书开关后偶发挂起）
 //   QS_SKIP_COOLDOWN=1   跳过冷却段（用于独立验证物品绑定）
+//   QS_SKIP_ITEMS=1      跳过物品绑定段（用于只验证 HUD 布局）
 //   CHROME_BIN           Chromium 路径（默认 /usr/bin/chromium-browser）
 
 import fs from 'fs';
@@ -49,6 +50,7 @@ const expectedPlayerLevel = Number(process.env.QS_PLAYER_LEVEL || 200);
 const bindItemId = Number(process.env.QS_ITEM_ID || 2000005);
 const skipSkills = process.env.QS_SKIP_SKILLS === '1';
 const skipCooldown = process.env.QS_SKIP_COOLDOWN === '1';
+const skipItems = process.env.QS_SKIP_ITEMS === '1';
 const artifactDir = process.env.QS_ARTIFACT_DIR || `/tmp/qs-flow-${preset}`;
 
 const driver = new BrowserDriver({
@@ -110,14 +112,17 @@ async function hover(x, y) {
 
 // post-Chaos 底部 HUD 布局（StatusBarPostChaos.h / QuickSlotModel.h）：
 // StatusBar2.img mainBar，145x93 快捷栏面板右锚视口右下。NX origin
-// (-143,143) 会让面板底边压住 21px 快捷图标行（图标顶边在
-// viewH - 67），因此 CHAOS_QUICKSLOT_OFFSET_Y 再上提 9px，令面板
-// 顶边在 viewH - 162、底边在 viewH - 69，与图标行留 2px 间隙。
+// (-143,143) 会让 panel.draw(origin) 再叠加一次原点，因此面板贴图必须
+// 用 quickslot::texture_draw_position(origin, panel.get_origin()) 绘制，
+// 才能让贴图落在命中框/图标/键帽同一个 top-left 上。
+// CHAOS_SHORTCUT_ICON_TOP = -58（BtSkill 等 NORMAL 原点 y=58），
+// CHAOS_QUICKSLOT_OFFSET_Y = -58 - 93 - 2 = -153：
+// 面板顶边 viewH-163、底边 viewH-70，图标行顶边 viewH-68，间隙 2px。
 // 技能书窗口是视口内固定坐标，与分辨率无关；状态栏技能按钮
-//（mainBar/BtSkill，origin (-254,57)）随 HUD 右锚。
+//（mainBar/BtSkill，origin (-254,58)）随 HUD 右锚。
 const panelX = viewW - 145;
-const panelY = viewH - 162;
-const shortcutRowTop = viewH - 67;
+const panelY = viewH - 163;
+const shortcutRowTop = viewH - 68;
 const slotCenter = index => ({
   x: panelX + [23, 56, 89, 122][index % 4],
   y: panelY + (index < 4 ? 31 : 64)
@@ -128,9 +133,10 @@ const skillIconCenter = row => ({
   x: skillbookOrigin.x + 29,
   y: skillbookOrigin.y + 110 + row * 40
 });
-// 状态栏技能按钮（mainBar/BtSkill 30x18，中心 x = viewW - 19）：
+// 状态栏技能按钮（mainBar/BtSkill 30x18，原点 (-254,58)，矩形
+// x=viewW-34..viewW-4 / y=viewH-68..viewH-50）：
 // 取按钮中心略偏左的稳定点，避免 canvas 缩放截断点击点。
-const skillbookButton = { x: viewW - 24, y: viewH - 58 };
+const skillbookButton = { x: viewW - 24, y: viewH - 59 };
 
 // Open the item inventory through the status bar Menu popup. The menu
 // button is part of the right-anchored control cluster, so its viewport
@@ -205,6 +211,40 @@ async function verifyItemBinding() {
   await driver.screenshot('slot1-item-cleared');
 }
 
+// UIStatusbar::Buttons 枚举值：Menu/System 弹层按钮与快捷图标行共用同一
+// 张 post-Chaos mainBar 贴图，右边距固定，因此真实矩形随视宽右锚。
+const statusbarControls = Object.freeze({
+  menu: 4,        // BT_MENU
+  system: 5,      // BT_OPTIONS（mainBar/BtSystem）
+  character: 6,   // BT_CHARACTER
+  stats: 7,       // BT_STATS
+  quest: 8,       // BT_QUEST
+  inventory: 9,   // BT_INVENTORY
+  equips: 10,     // BT_EQUIPS
+  skill: 11       // BT_SKILL
+});
+const shortcutControlNames = [
+  'character', 'stats', 'quest', 'inventory', 'equips', 'skill'
+];
+const MISSING_COORDINATE = -32768;
+
+// 严格矩形重叠：仅共边（a.right === b.left / a.bottom === b.top）不算重叠。
+const overlaps = (a, b) =>
+  a.left < b.right && b.left < a.right
+  && a.top < b.bottom && b.top < a.bottom;
+const showBounds = bounds =>
+  `{${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}}`;
+
+// 读取真实按钮矩形；探针缺失时给出可诊断的错误而不是 -32768 参与比较。
+async function controlBounds(name) {
+  const id = statusbarControls[name];
+  const bounds = await probes.statusbarControlBounds(id);
+  if (Object.values(bounds).includes(MISSING_COORDINATE)) {
+    throw new Error(`statusbar control ${name} (id=${id}) unavailable: ${showBounds(bounds)}`);
+  }
+  return bounds;
+}
+
 async function verifyQuickslotLayout() {
   const panel = await probes.quickslotPanel();
   equal('quickslot panel bounds', panel, {
@@ -213,10 +253,54 @@ async function verifyQuickslotLayout() {
     right: panelX + 145,
     bottom: panelY + 93
   });
-  if (panel.bottom >= shortcutRowTop) {
-    throw new Error(`quickslot panel overlaps shortcut row:`
-      + ` panel bottom=${panel.bottom}, shortcut top=${shortcutRowTop}`);
+
+  // 1) 快捷栏面板不得与任何真实状态栏控件矩形重叠（不使用硬编码矩形）。
+  const controls = {};
+  for (const name of Object.keys(statusbarControls)) {
+    controls[name] = await controlBounds(name);
+    if (overlaps(panel, controls[name])) {
+      throw new Error(`quickslot panel ${showBounds(panel)} overlaps`
+        + ` ${name} ${showBounds(controls[name])}`);
+    }
   }
+
+  // 2) 快捷图标行与 SYSTEM/MENU 两行控件互不重叠。
+  const shortcuts = shortcutControlNames.map(name => ({
+    name,
+    bounds: controls[name]
+  }));
+  for (const { name, bounds } of shortcuts) {
+    if (overlaps(bounds, controls.system) || overlaps(bounds, controls.menu)) {
+      throw new Error(`shortcut ${name} ${showBounds(bounds)} overlaps`
+        + ` system ${showBounds(controls.system)}`
+        + ` or menu ${showBounds(controls.menu)}`);
+    }
+  }
+
+  // 3) 面板底边到图标行顶边的实测间隙：2px。
+  const earliestShortcutTop = Math.min(...shortcuts.map(entry => entry.bounds.top));
+  const latestShortcutBottom = Math.max(...shortcuts.map(entry => entry.bounds.bottom));
+  const gap = earliestShortcutTop - panel.bottom;
+  if (gap < 2) {
+    throw new Error(`quickslot panel ${showBounds(panel)} clears shortcut row by`
+      + ` ${gap}px (<2): shortcut top=${earliestShortcutTop}`);
+  }
+  if (earliestShortcutTop !== shortcutRowTop) {
+    console.log(`INFO  shortcut row top measured ${earliestShortcutTop},`
+      + ` constant ${shortcutRowTop}`);
+  }
+  if (gap !== 2) {
+    console.log(`INFO  quickslot panel gap measured ${gap}px, expected 2px`);
+  }
+
+  // 4) SYSTEM/MENU 必须在快捷图标行下方（图标 bottom < 按钮 top）。
+  for (const name of ['system', 'menu']) {
+    if (controls[name].top < latestShortcutBottom) {
+      throw new Error(`${name} ${showBounds(controls[name])} is not below the`
+        + ` shortcut row (latest bottom=${latestShortcutBottom})`);
+    }
+  }
+
   for (let index = 0; index < 8; index += 1) {
     const expected = slotCenter(index);
     const actual = {
@@ -227,7 +311,9 @@ async function verifyQuickslotLayout() {
       throw new Error(`quickslot ${index} center: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
     }
   }
-  console.log(`PASS  quickslot panel clears shortcut row by ${shortcutRowTop - panel.bottom}px`);
+  console.log(`PASS  quickslot panel ${showBounds(panel)} clears shortcut row by ${gap}px`
+    + ` (shortcut top=${earliestShortcutTop}, system top=${controls.system.top},`
+    + ` menu top=${controls.menu.top})`);
 }
 
 async function login() {
@@ -508,7 +594,11 @@ try {
     equal('right click clears cooldown slot', await quickslots(), EMPTY_SLOTS);
   }
 
-  await verifyItemBinding();
+  if (skipItems) {
+    console.log('SKIP  item binding section (QS_SKIP_ITEMS=1)');
+  } else {
+    await verifyItemBinding();
+  }
 
   equal('state final', await state(), uiState.game);
   if (driver.errors.length) throw new Error(`browser errors: ${driver.errors.join('\n')}`);

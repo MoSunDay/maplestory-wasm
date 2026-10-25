@@ -30,6 +30,16 @@
 
 namespace jrc
 {
+    Rectangle<int16_t> UIStatusbar::get_control_bounds(uint16_t id) const
+    {
+        const auto button = buttons.find(id);
+        if (button == buttons.end() || !button->second)
+        {
+            return Rectangle<int16_t>();
+        }
+        return button->second->bounds(position);
+    }
+
     void UIStatusbar::dispatch_popup_action(StatusBarPopup::Action action)
     {
         popup.close();

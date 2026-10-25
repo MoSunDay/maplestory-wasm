@@ -4,7 +4,7 @@
 
 post-Chaos 状态栏的快捷栏面板使用 `StatusBar2.img/mainBar/quickSlot/quickSlot`
 （145×93，NX origin `(-143,143)`）。按原偏移 `{143,-143}` 绘制时，面板底边
-落在 `viewH-69`，而状态栏 21px 快捷图标行顶边在 `viewH-67`，两者实际重叠。
+落在 `viewH-60`，而状态栏 21px 快捷图标行顶边在 `viewH-68`，两者实际重叠。
 同时快捷栏只支持技能：技能图标会盖住槽位内的键帽，物品栏图标拖入无响应，
 用户无法确认每个槽位对应的按键、绑定的物品或冷却状态。
 
@@ -12,13 +12,29 @@ post-Chaos 状态栏的快捷栏面板使用 `StatusBar2.img/mainBar/quickSlot/q
 
 ### 面板几何
 
-- `StatusBar/StatusBarPostChaos.h` 新增 `CHAOS_SHORTCUT_ICON_TOP = -57`
-  （相对状态栏锚点的图标行顶边）和
+- `StatusBar/StatusBarPostChaos.h` 新增 `CHAOS_SHORTCUT_ICON_TOP = -58`
+  （相对状态栏锚点的图标行顶边，取按钮 NORMAL 原点 y=58）和
   `CHAOS_QUICKSLOT_OFFSET_Y = CHAOS_SHORTCUT_ICON_TOP - CHAOS_LAYOUT.dimension.y() - 2`
-  （`-57 - 93 - 2 = -152`），`CHAOS_QUICKSLOT_OFFSET` 由 `{143,-143}`
-  改为 `{143,-152}`。
-- 面板顶边 = `viewH-162`、底边 = `viewH-69`，与图标行留 2px 间隙；
-  `static_assert` 保证面板底边不越过图标行顶。v83 的 `{143,-143}` 不变。
+  （`-58 - 93 - 2 = -153`），`CHAOS_QUICKSLOT_OFFSET` 由 `{143,-143}`
+  改为 `{143,-153}`。
+- 面板顶边 = `viewH-163`、底边 = `viewH-70`，图标行顶边 = `viewH-68`，
+  两者留 2px 间隙；`static_assert` 保证面板底边不越过图标行顶。
+  v83 的 `{143,-143}` 不变。
+
+### 面板贴图原点回归
+
+- `QuickSlotBar.cpp::quickslot::draw` 之前直接 `panel.draw(origin)`，而
+  `Texture::draw(DrawArgument(pos))` 以 `pos` 为中心、`Texture::get_rectangle`
+  再减去 NX origin，于是 145×93 面板实际落在 `origin - (-143,143)`，
+  即向右下偏移 `(143,-143)`、几乎整块移出屏幕：背景消失，而图标/键帽
+  走 `draw_slot`（显式加上 `texture.get_origin()`）仍停在预期坐标，
+  视觉上快捷栏格子就与快捷图标行 / SYSTEM+MENU 按钮叠在一起。
+- `QuickSlotModel.h` 新增纯函数
+  `texture_draw_position(top_left, texture_origin) = top_left + texture_origin`，
+  `QuickSlotBar.cpp` 改为
+  `panel.draw(quickslot::texture_draw_position(origin, panel.get_origin()))`，
+  使面板贴图、命中框、图标与键帽共用同一个 top-left；键位/图标坐标与
+  命中测试不变。
 
 ### 技能与物品共用槽位
 
@@ -57,24 +73,40 @@ post-Chaos 状态栏的快捷栏面板使用 `StatusBar2.img/mainBar/quickSlot/q
 - `Gameplay/Probes/QuickslotProbes.cpp`（从 `GameplayProbes.cpp` 拆出）
   新增 `msquickslot_item`、`msquickslot_center_x/y`、
   `msquickslot_panel_left/top/right/bottom`；冷却与悬停探针一并迁入。
+- `UIStatusbar::get_control_bounds(uint16_t id)` 暴露按钮真实矩形
+  （找不到时返回零尺寸 `Rectangle<int16_t>()`）；
+  `GameplayProbes.cpp` 新增 `msstatusbar_control_bounds(id, edge)`
+  （edge：0=left、1=top、2=right、3=bottom，缺失返回 `MISSING_COORDINATE`）。
 - `CMakeLists.txt` 的 `-sEXPORTED_FUNCTIONS` 同步导出全部新探针；
   `tools/verify/maplestory-webui/runtime-flow.mjs` 增
-  `quickslotItem`、`quickslotCenterX/Y`、`quickslotPanel` 封装。
+  `quickslotItem`、`quickslotCenterX/Y`、`quickslotPanel`、
+  `statusbarControlBounds` 封装。
 
 ## 验证
 
 - 纯模型单测：`tools/verify/quickslot-model.cpp` PASS，覆盖
   `assign_item`/`item_at`/技能物品互斥/`clear`、键帽带与
-  `labels_outside_slots` 断言。
-- 浏览器 E2E：`QS_PRESET=0`（800×600）与 `QS_PRESET=1`（1280×720）
-  完整流程均 PASS（不跳过技能/冷却段）。`quickslot-flow.mjs` 覆盖
-  slot0 技能点击绑定、slot7 拖拽绑定、Hero's Will 1121011 服务端冷却、
-  从 USE 物品栏拖入默认 2000005 至 slot1、点击消耗与右键清空。
-  `verifyQuickslotLayout` 断言：
-  - 面板 bounds：800 宽 `{655,438,800,531}`，1280 宽 `{1135,558,1280,651}`；
+  `labels_outside_slots` 断言，以及
+  `texture_draw_position(top_left, (-143,143)) - (-143,143) == top_left`
+  （旧写法 `draw(top_left)` 会整体偏移）。
+- 浏览器 E2E：最终构建在 `QS_PRESET=0`（800×600）与
+  `QS_PRESET=1`（1280×720）两档均通过 `verifyQuickslotLayout`（布局段用
+  `QS_SKIP_SKILLS=1 QS_SKIP_COOLDOWN=1 QS_SKIP_ITEMS=1` 独立运行）。
+  `quickslot-flow.mjs` 还覆盖 slot0 技能点击绑定、slot7 拖拽绑定、
+  Hero's Will 1121011 服务端冷却、从 USE 物品栏拖入默认 2000005 至
+  slot1、点击消耗与右键清空；本轮构建的 800×600 技能段与冷却段分别
+  通过（冷却是 60s、标签长度 2），物品段沿用上一提交已通过的同一流程
+  （SwiftShader 在单进程连续打开多次技能书/物品栏时偶发挂起，分段运行
+  可避开该环境问题）。`verifyQuickslotLayout` 断言：
+  - 面板 bounds：800 宽 `{655,437,800,530}`，1280 宽 `{1135,557,1280,650}`；
   - 8 个槽位中心分别落在 `panel + {23,56,89,122} × {31,64}`；
-  - `panel.bottom < shortcutRowTop`（`viewH-67`），间隙 2px。
-- 同一 E2E 还覆盖两档分辨率下的状态栏整体 chrome 与冷却 60s 标签。
+  - 经 `msstatusbar_control_bounds` 读取真实按钮矩形（不使用硬编码期望值）：
+    面板不与 BtMenu(4)/BtSystem(5) 及快捷图标行 BtCharacter..BtSkill(6..11)
+    任一方形重叠，快捷图标行也不与 BtSystem/BtMenu 重叠；
+  - 图标行顶边实测 `viewH-68`，`earliestShortcutTop - panel.bottom` 的间隙
+    为 2px，且 BtSystem/BtMenu 顶边低于所有快捷图标底边。
+- 同一 E2E 在两档分辨率下还覆盖状态栏整体 chrome；冷却 60s 标签在
+  800×600 的独立冷却段验证。
 - WASM 重建成功（`scripts/build_wasm.sh`，产物
   `build/JourneyClient.wasm` / `JourneyClient.js`；`.js` 已确认导出新增探针）。
 
