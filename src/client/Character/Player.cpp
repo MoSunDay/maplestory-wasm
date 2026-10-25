@@ -19,6 +19,7 @@
 
 #include "PlayerStates.h"
 
+#include "../Audio/Audio.h"
 #include "../Constants.h"
 #include "../Data/WeaponData.h"
 #include "../Data/ItemData.h"
@@ -618,6 +619,7 @@ namespace jrc
         if (level > oldlevel)
         {
             show_effect_id(CharEffect::LEVELUP);
+            Sound(Sound::LEVELUP).play();
         }
         stats.set_stat(Maplestat::LEVEL, level);
     }

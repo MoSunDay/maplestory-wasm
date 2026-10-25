@@ -292,6 +292,7 @@ namespace jrc
         else if (effect == 0) // level up
         {
             Stage::get().show_character_effect(cid, CharEffect::LEVELUP);
+            Sound(Sound::LEVELUP).play();
         }
         else if (effect == 8) // job advance
         {
