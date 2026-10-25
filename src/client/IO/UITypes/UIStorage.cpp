@@ -30,6 +30,7 @@
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../Data/ItemData.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
+#include "../../Console.h"
 #include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
@@ -42,7 +43,6 @@ namespace jrc
 {
     namespace
     {
-        constexpr int16_t ROWS_VISIBLE = 5;
 
         constexpr InventoryType::Id INVENTORY_TABS[] = {
             InventoryType::EQUIP,
@@ -54,12 +54,12 @@ namespace jrc
 
         int16_t max_offset(size_t size)
         {
-            if (size <= ROWS_VISIBLE)
+            if (size <= storage_nodes::rows_visible())
             {
                 return 0;
             }
 
-            return static_cast<int16_t>(size - ROWS_VISIBLE);
+            return static_cast<int16_t>(size - storage_nodes::rows_visible());
         }
     }
 
@@ -76,6 +76,11 @@ namespace jrc
           npcid(0)
     {
         nl::node src = storage_nodes::src();
+
+        if (storage_nodes::post_chaos())
+        {
+            Console::get().print("[UIStorage] Legacy list trunk art missing; falling back to the unimplemented post-Chaos grid window.");
+        }
 
         sprites.emplace_back(src["backgrnd"]);
         // v83 ships a single merged background layer.
@@ -124,7 +129,7 @@ namespace jrc
             buttons[TAB2_CASH] = std::make_unique<TwoSpriteButton>(tab_disabled["4"], tab_enabled["4"], storage_nodes::tab_pos(true, 4));
         }
 
-        for (int16_t i = 0; i < ROWS_VISIBLE; ++i)
+        for (int16_t i = 0; i < storage_nodes::rows_visible(); ++i)
         {
             buttons[STORAGE_ROW0 + i] = std::make_unique<AreaButton>(
                 Point<int16_t>(storage_nodes::left_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step()),
@@ -173,7 +178,7 @@ namespace jrc
         static const Charset countset = { nl::nx::ui["Basic.img"]["ItemNo"], Charset::LEFT };
 
         const auto& current_storage = storage_items[tab];
-        for (int16_t i = 0; i < ROWS_VISIBLE; ++i)
+        for (int16_t i = 0; i < storage_nodes::rows_visible(); ++i)
         {
             int16_t storage_index = i + storage_offset;
             Point<int16_t> storage_rowpos = position + Point<int16_t>(storage_nodes::left_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step());
@@ -197,7 +202,7 @@ namespace jrc
             }
             else
             {
-                disabled_slot.draw(storage_iconpos);
+                disabled_slot.draw(storage_rowpos + storage_nodes::empty_slot_shift());
             }
 
             int16_t inventory_index = i + inventory_offset;
@@ -222,7 +227,7 @@ namespace jrc
             }
             else
             {
-                disabled_slot.draw(inventory_iconpos);
+                disabled_slot.draw(inventory_rowpos + storage_nodes::empty_slot_shift());
             }
         }
 
@@ -684,7 +689,7 @@ namespace jrc
         }
 
         int16_t slot = static_cast<int16_t>(yoff / storage_nodes::row_step());
-        if (slot < 0 || slot >= ROWS_VISIBLE)
+        if (slot < 0 || slot >= storage_nodes::rows_visible())
         {
             return -1;
         }

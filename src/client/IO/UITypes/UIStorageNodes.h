@@ -2,13 +2,14 @@
 // Node resolution and layout helpers for the npc storage (trunk) window.
 //
 // The upstream code reads the trunk from the post-Chaos UIWindow2.img and
-// was laid out against its 463x~340 frame. The pre-Chaos (v83) UI.nx has
-// no UIWindow2.img: the Trunk subtree lives directly under UIWindow.img
-// with a different chrome (no backgrnd2/3, no BtFull/BtSmall/BtSlotEx,
-// no disabled slot art, no baked meso node) and a tighter grid:
+// was laid out as a five-row name list, but the shipped post-Chaos Trunk
+// art is a 347x414 icon grid that no branch implements. The legacy (v83)
+// window kept under UIWindow.img is a 463x318 list frame (no backgrnd2/3,
+// no BtFull/BtSmall/BtSlotEx, no disabled slot art, no baked meso node)
+// and is preferred whenever it is present:
 //
-//   - list rows: 5 rows, first row top 84, 40px pitch, 35px art
-//     (post-Chaos: 94 / 42 / 36)
+//   - list rows: 4 visible rows, first row top 84, 40px pitch, 35px art
+//     (post-Chaos list layout: 5 rows at 94 / 42 / 36)
 //   - left column x 6..205, right column x 237..436
 //     (post-Chaos: 8..168 / 177..337)
 //   - `en` (199x35) is the v83 empty-icon slot, drawn at the column origin;
@@ -32,11 +33,22 @@ namespace jrc
 {
     namespace storage_nodes
     {
-        // Generation marker shared with UiAssetVersion.h.
+        // Trunk art generation. The global UI.nx dump marker (see
+        // UiAssetVersion.h) reports post-Chaos, but the shipped UI.nx also
+        // carries the legacy list-style Trunk window (UIWindow.img/Trunk with
+        // the `en` row art, 463x318). The post-Chaos UIWindow2.img Trunk is a
+        // 347x414 icon grid whose layout is not implemented, so the legacy
+        // window wins whenever its art is present and the post-Chaos tree is
+        // only used as a fallback.
+        inline bool legacy()
+        {
+            const nl::node row_art = nl::nx::ui["UIWindow.img"]["Trunk"]["en"];
+            return static_cast<bool>(row_art);
+        }
+
         inline bool post_chaos()
         {
-            const nl::node marker = nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"];
-            return static_cast<bool>(marker);
+            return !legacy();
         }
 
         inline nl::node src()
@@ -46,13 +58,18 @@ namespace jrc
                 : nl::nx::ui["UIWindow.img"]["Trunk"];
         }
 
-        // Row selection highlight. Both generations keep it in the Shop
-        // subtree (162x35); only the img root differs.
+        // Row selection highlight (162x35). Post-Chaos keeps it in the
+        // Shop subtree; the legacy trunk ships it as Trunk/select and only
+        // a pure v83 UI.nx keeps the Shop copy.
         inline nl::node selection()
         {
-            return post_chaos()
-                ? nl::nx::ui["UIWindow2.img"]["Shop"]["select"]
-                : nl::nx::ui["UIWindow.img"]["Shop"]["select"];
+            if (post_chaos())
+            {
+                return nl::nx::ui["UIWindow2.img"]["Shop"]["select"];
+            }
+
+            const nl::node trunk_select = nl::nx::ui["UIWindow.img"]["Trunk"]["select"];
+            return trunk_select ? trunk_select : nl::nx::ui["UIWindow.img"]["Shop"]["select"];
         }
 
         // Empty slot art. Post-Chaos uses Trunk/disabled, v83 ships the
@@ -64,12 +81,18 @@ namespace jrc
             return disabled ? disabled : trunk["en"];
         }
 
-        // Meso coin icon, borrowed from the Shop subtree in both sets.
+        // Meso coin icon. The legacy trunk window has no coin art of its
+        // own and a modern UIWindow.img carries no Shop subtree, so borrow
+        // the post-Chaos coin first and fall back to the v83 Shop copy.
         inline nl::node meso_icon()
         {
-            return post_chaos()
-                ? nl::nx::ui["UIWindow2.img"]["Shop"]["meso"]
-                : nl::nx::ui["UIWindow.img"]["Shop"]["meso"];
+            if (post_chaos())
+            {
+                return nl::nx::ui["UIWindow2.img"]["Shop"]["meso"];
+            }
+
+            const nl::node coin = nl::nx::ui["UIWindow2.img"]["Shop"]["meso"];
+            return coin ? coin : nl::nx::ui["UIWindow.img"]["Shop"]["meso"];
         }
 
         // BtFull/BtSmall/BtSlotEx (window mode and slot expansion) only
@@ -122,6 +145,26 @@ namespace jrc
         inline int16_t icon_y()
         {
             return post_chaos() ? 99 : 86;
+        }
+
+        // Visible list rows. The legacy window frame only carves out four
+        // 40px rows before the parchment button strip; the post-Chaos list
+        // layout kept the historical five.
+        inline int16_t rows_visible()
+        {
+            return post_chaos() ? 5 : 4;
+        }
+
+        // Offset from the row origin where the empty-slot art is anchored.
+        // The post-Chaos slot art (33x33) sits on the icon cell, while the
+        // legacy `en` row backdrop (199x35) covers the row from its origin.
+        inline Point<int16_t> empty_slot_shift()
+        {
+            return post_chaos()
+                ? Point<int16_t>(
+                    left_icon_x() - left_row_x(),
+                    icon_y() - row_top())
+                : Point<int16_t>();
         }
 
         // X shift between the column origin and the `select` highlight:

@@ -158,7 +158,7 @@ namespace jrc
           scroll_offset(0),
           max_scroll(0)
     {
-        nl::node src = nl::nx::ui["UIWindow2.img"]["UtilDlgEx"];
+        nl::node src = npctalk_nodes::src();
 
         top = src["t"];
         fill = src["c"];
