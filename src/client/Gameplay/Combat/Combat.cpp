@@ -18,9 +18,11 @@
 #include "Combat.h"
 
 #include "ComboAttack.h"
+#include "RushMovement.h"
 
 #include "../../Character/Buff.h"
 #include "../../Character/SkillId.h"
+#include "../../Constants.h"
 #include "../../Data/SkillData.h"
 #include "../../IO/KeyAction.h"
 #include "../../IO/Messages.h"
@@ -226,7 +228,7 @@ namespace jrc
             }
             else
             {
-                apply_result_movement(move, result);
+                apply_result_movement(move, attack);
 
                 AttackPacket(result).dispatch();
 
@@ -438,25 +440,31 @@ namespace jrc
         return target;
     }
 
-    void Combat::apply_result_movement(const SpecialMove& move, const AttackResult& result)
+    void Combat::apply_result_movement(const SpecialMove& move, const Attack& attack)
     {
         switch (move.get_id())
         {
         case SkillId::RUSH_HERO:
         case SkillId::RUSH_PALADIN:
         case SkillId::RUSH_DK:
-            apply_rush(result);
+            apply_rush(attack);
             break;
         }
     }
 
-    void Combat::apply_rush(const AttackResult& result)
+    void Combat::apply_rush(const Attack& attack)
     {
-        if (result.mobcount == 0)
-            return;
+        // Rush always dashes forward in the attack facing direction; the
+        // distance comes from the skill hitbox and is capped to half the
+        // viewport, so no mob has to be hit (or even exist).
+        const int16_t targetx = rush_movement::forward_target(
+            attack.origin.x(),
+            !attack.toleft,
+            attack.range,
+            attack.hrange,
+            Constants::viewwidth()
+        );
 
-        Point<int16_t> mob_position = mobs.get_mob_position(result.last_oid);
-        int16_t targetx = mob_position.x();
         player.rush(targetx);
     }
 

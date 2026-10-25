@@ -80,8 +80,8 @@ namespace jrc
         void apply_attack(const AttackResult& attack);
         void apply_move(const SpecialMove& move);
         void apply_use_movement(const SpecialMove& move);
-        void apply_result_movement(const SpecialMove& move, const AttackResult& result);
-        void apply_rush(const AttackResult& result);
+        void apply_result_movement(const SpecialMove& move, const Attack& attack);
+        void apply_rush(const Attack& attack);
         void apply_bullet_effect(const BulletEffect& effect);
         void apply_damage_effect(const DamageEffect& effect);
         void extract_effects(const Char& user, const SpecialMove& move, const AttackResult& result);
