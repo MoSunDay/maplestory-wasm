@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "MapObjects.h"
+#include "Drop.h"
+#include "DropLifecycle/LootSelection.h"
 #include "DropLifecycle/RemovalPolicy.h"
 
 #include "../Spawn.h"
@@ -28,6 +30,7 @@
 #include <cstdint>
 #include <optional>
 #include <queue>
+#include <unordered_set>
 #include <vector>
 
 namespace jrc
@@ -80,6 +83,32 @@ namespace jrc
         };
 
         PetLootTarget find_pet_loot(const PetLootQuery& query) const;
+        // Icon center of the lootable drop nearest to `origin`, or nullopt
+        // when no drop is lootable. Pure read; changes no state.
+        std::optional<Point<int16_t>> find_nearest_lootable_center(
+            Point<int16_t> origin) const
+        {
+            std::optional<Point<int16_t>> nearest;
+            int64_t nearest_distance_sq = 0;
+            for (const auto& entry : drops)
+            {
+                Optional<const Drop> drop = entry.second.get();
+                if (!drop || !drop->is_lootable())
+                    continue;
+
+                const Point<int16_t> center =
+                    drop->get_position() + Point<int16_t>(16, 16);
+                const int64_t distance_sq =
+                    drop_loot::squared_distance(center, origin);
+                if (!nearest || distance_sq < nearest_distance_sq)
+                {
+                    nearest = center;
+                    nearest_distance_sq = distance_sq;
+                }
+            }
+            return nearest;
+        }
+
         bool has_drop(int32_t oid) const;
         bool has_lootable_drop(int32_t oid) const;
         // Collect the oids of lootable meso drops inside the range.
@@ -89,8 +118,6 @@ namespace jrc
         uint32_t pet_pickup_count() const;
 
     private:
-        void try_pickup(int32_t oid, const Drop& drop, Point<int16_t> playerpos,
-            int64_t& closest_distance_sq, Loot& closest_loot) const;
         static bool pet_can_target(const Drop& drop, const PetLootQuery& query);
 
         MapObjects drops;
@@ -102,8 +129,11 @@ namespace jrc
         };
         std::array<Animation, NUM_ICONS> mesoicons;
         bool lootenabled;
+        int32_t last_loot_oid;
         uint32_t confirmed_pet_pickups;
 
         std::queue<DropSpawn> spawns;
+        // Removals that arrived before their queued spawn was instantiated.
+        std::unordered_set<int32_t> pending_removals;
     };
 }

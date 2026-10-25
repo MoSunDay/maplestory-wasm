@@ -303,7 +303,7 @@ namespace jrc
     }
 
     // Modes:
-    // 0 - Item(0) or Meso(1)
+    // 0 - Item(0), Meso(1), Inventory full(0xff) or item unavailable(0xfe)
     // 3 - Exp gain
     // 4 - Fame
     // 5 - Mesos
@@ -337,6 +337,20 @@ namespace jrc
 
                 show_status(Text::WHITE, "Received mesos (" + sign + std::to_string(gain) + ")");
             }
+            else if (mode2 == -1)
+            {
+                // Server sends two trailing zero ints with status packets.
+                recv.skip(8);
+
+                show_status(Text::WHITE, "Your inventory is full.");
+            }
+            else if (mode2 == -2)
+            {
+                recv.skip(8);
+
+                show_status(Text::WHITE, "You can't pick up this item.");
+            }
+        }
         }
         else if (mode == 3)
         {

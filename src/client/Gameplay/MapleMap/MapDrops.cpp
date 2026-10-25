@@ -27,15 +27,10 @@
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
 
-#include <limits>
-
 namespace jrc
 {
     namespace
     {
-        constexpr int16_t PICKUP_RADIUS = 30;
-        constexpr int64_t PICKUP_RADIUS_SQ = PICKUP_RADIUS * PICKUP_RADIUS;
-
         int64_t squared_distance(Point<int16_t> first, Point<int16_t> second)
         {
             const int64_t dx = static_cast<int32_t>(first.x()) - second.x();
@@ -45,7 +40,7 @@ namespace jrc
     }
 
     MapDrops::MapDrops()
-        : confirmed_pet_pickups(0)
+        : last_loot_oid(0), confirmed_pet_pickups(0)
     {
         lootenabled = false;
     }
@@ -86,6 +81,13 @@ namespace jrc
             const DropSpawn& spawn = spawns.front();
 
             int32_t oid = spawn.get_oid();
+
+            // A removal for this oid arrived before its spawn was
+            // instantiated; dropping the queued spawn keeps the client in
+            // sync with the server.
+            if (pending_removals.erase(oid) > 0)
+                continue;
+
             if (Optional<Drop> drop = drops.get(oid))
             {
                 drop->update_ownership(spawn.get_owner(), spawn.get_drop_type(), spawn.is_player_drop());
@@ -131,42 +133,21 @@ namespace jrc
             }
             drop->expire(effect, looter, pickup_target);
         }
+        else
+        {
+            // The drop is still queued for instantiation; suppress it so the
+            // spawn does not resurrect an object the server already removed.
+            pending_removals.insert(oid);
+        }
     }
 
     void MapDrops::clear()
     {
         drops.clear();
         confirmed_pet_pickups = 0;
-    }
-
-    void MapDrops::try_pickup(int32_t oid, const Drop& drop,
-        Point<int16_t> playerpos, int64_t& closest_distance_sq,
-        Loot& closest_loot) const
-    {
-        if (!drop.is_lootable())
-            return;
-
-        Point<int16_t> position = drop.get_position();
-        Point<int16_t> center = position + Point<int16_t>(16, 16);
-
-        const int64_t distance_sq = squared_distance(center, playerpos);
-
-        // Keep strict overlap, but also accept a small proximity window so
-        // slightly offset drops can still be attempted during pickup spam.
-        bool is_overlapping = drop.bounds().contains(playerpos);
-        bool is_nearby = distance_sq <= PICKUP_RADIUS_SQ;
-        if (!is_overlapping && !is_nearby)
-        {
-            return;
-        }
-
-        if (distance_sq >= closest_distance_sq)
-        {
-            return;
-        }
-
-        closest_distance_sq = distance_sq;
-        closest_loot = { oid, position };
+        spawns = {};
+        pending_removals.clear();
+        last_loot_oid = 0;
     }
 
     MapDrops::Loot MapDrops::find_loot_at(Point<int16_t> playerpos)
@@ -174,25 +155,27 @@ namespace jrc
         if (!lootenabled)
             return { 0, {} };
 
-        int64_t closest_distance_sq = std::numeric_limits<int64_t>::max();
-        Loot closest_loot = { 0, {} };
-
+        std::vector<drop_loot::Candidate> candidates;
         for (auto& mmo : drops)
         {
-            Optional<const Drop> drop = mmo.second.get();
-            if (!drop)
+            if (Optional<const Drop> drop = mmo.second.get())
             {
-                continue;
+                candidates.push_back(
+                    { mmo.first, drop->get_position(), drop->is_lootable() });
             }
-            try_pickup(mmo.first, *drop, playerpos, closest_distance_sq, closest_loot);
         }
 
-        if (closest_loot.first)
-        {
-            lootenabled = false;
-        }
+        // Rejections (drop lock, ownership, full inventory) leave the drop
+        // lootable client-side, so skip the oid tried last and fall back to
+        // it only when it is the only reachable drop.
+        const drop_loot::Candidate* chosen =
+            drop_loot::select_nearest(candidates, playerpos, last_loot_oid);
+        if (!chosen)
+            return { 0, {} };
 
-        return closest_loot;
+        last_loot_oid = chosen->oid;
+        lootenabled = false;
+        return { chosen->oid, chosen->position };
     }
 
     bool MapDrops::pet_can_target(const Drop& drop, const PetLootQuery& query)
