@@ -30,7 +30,7 @@
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../Data/ItemData.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
-#include "../../Console.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
@@ -54,12 +54,89 @@ namespace jrc
 
         int16_t max_offset(size_t size)
         {
-            if (size <= storage_nodes::rows_visible())
+            if (size <= storage_nodes::cells_visible())
             {
                 return 0;
             }
 
-            return static_cast<int16_t>(size - storage_nodes::rows_visible());
+            return static_cast<int16_t>(size - storage_nodes::cells_visible());
+        }
+
+        // Translucent overlay on the selected post-Chaos socket; the
+        // legacy list uses the `select` row art underneath the icon.
+        const ColorBox& cell_highlight()
+        {
+            static const ColorBox box = ColorBox(
+                storage_nodes::GRID_CELL_SIZE,
+                storage_nodes::GRID_CELL_SIZE,
+                Geometry::WHITE,
+                0.6f
+            );
+            return box;
+        }
+
+        // Draws one socket panel. The legacy list renders the selection
+        // art beneath the icon inside the row backdrop and anchors the
+        // icon on the slot inside it; the post-Chaos grid anchors the
+        // icon on the cell corner and covers the selected cell with a
+        // translucent ColorBox.
+        template <typename EntryT>
+        void draw_panel(bool inventory_side,
+                        Point<int16_t> position,
+                        const std::vector<EntryT>& items,
+                        int16_t offset,
+                        int16_t selection,
+                        InventoryType::Id tab,
+                        const Texture& selection_art,
+                        const Texture& disabled_slot,
+                        const Charset& countset)
+        {
+            const bool grid = storage_nodes::post_chaos();
+
+            for (int16_t i = 0; i < storage_nodes::cells_visible(); ++i)
+            {
+                const int16_t index = static_cast<int16_t>(i + offset);
+                const Point<int16_t> cellpos = position + storage_nodes::cell_pos(inventory_side, i);
+                const Point<int16_t> iconpos = grid
+                    ? cellpos
+                    : position + storage_nodes::list_icon_pos(inventory_side, i);
+
+                if (!grid && index == selection)
+                {
+                    selection_art.draw(cellpos + Point<int16_t>(storage_nodes::selection_shift(), 0));
+                }
+
+                if (index >= 0 && index < static_cast<int16_t>(items.size()))
+                {
+                    const EntryT& entry = items[index];
+
+                    if (grid)
+                    {
+                        Texture icon = ItemData::get(entry.itemid).get_icon(false);
+                        icon.shift(Point<int16_t>(0, 32));
+                        icon.draw(iconpos);
+                    }
+                    else
+                    {
+                        const Texture& icon = ItemData::get(entry.itemid).get_icon(false);
+                        icon.draw(iconpos);
+                    }
+
+                    if (tab != InventoryType::EQUIP && entry.count > 1)
+                    {
+                        countset.draw(std::to_string(entry.count), iconpos + Point<int16_t>(0, 20));
+                    }
+                }
+                else
+                {
+                    disabled_slot.draw(cellpos + storage_nodes::empty_slot_shift());
+                }
+
+                if (grid && index == selection)
+                {
+                    cell_highlight().draw(cellpos);
+                }
+            }
         }
     }
 
@@ -76,11 +153,6 @@ namespace jrc
           npcid(0)
     {
         nl::node src = storage_nodes::src();
-
-        if (storage_nodes::post_chaos())
-        {
-            Console::get().print("[UIStorage] Legacy list trunk art missing; falling back to the unimplemented post-Chaos grid window.");
-        }
 
         sprites.emplace_back(src["backgrnd"]);
         // v83 ships a single merged background layer.
@@ -129,16 +201,24 @@ namespace jrc
             buttons[TAB2_CASH] = std::make_unique<TwoSpriteButton>(tab_disabled["4"], tab_enabled["4"], storage_nodes::tab_pos(true, 4));
         }
 
-        for (int16_t i = 0; i < storage_nodes::rows_visible(); ++i)
+        // Slot hitboxes: one AreaButton per visible cell, laid out by the
+        // generation (grid cells vs legacy list rows).
+        const int16_t storage_base = storage_nodes::post_chaos() ? STORAGE_CELL0 : STORAGE_ROW0;
+        const int16_t inventory_base = storage_nodes::post_chaos() ? INVENTORY_CELL0 : INVENTORY_ROW0;
+        const Point<int16_t> cell_dim = storage_nodes::post_chaos()
+            ? Point<int16_t>(storage_nodes::GRID_CELL_SIZE, storage_nodes::GRID_CELL_SIZE)
+            : Point<int16_t>(storage_nodes::row_width(), storage_nodes::row_height());
+
+        for (int16_t i = 0; i < storage_nodes::cells_visible(); ++i)
         {
-            buttons[STORAGE_ROW0 + i] = std::make_unique<AreaButton>(
-                Point<int16_t>(storage_nodes::left_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step()),
-                Point<int16_t>(storage_nodes::row_width(), storage_nodes::row_height())
+            buttons[storage_base + i] = std::make_unique<AreaButton>(
+                storage_nodes::cell_pos(false, i),
+                cell_dim
             );
 
-            buttons[INVENTORY_ROW0 + i] = std::make_unique<AreaButton>(
-                Point<int16_t>(storage_nodes::right_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step()),
-                Point<int16_t>(storage_nodes::row_width(), storage_nodes::row_height())
+            buttons[inventory_base + i] = std::make_unique<AreaButton>(
+                storage_nodes::cell_pos(true, i),
+                cell_dim
             );
         }
 
@@ -177,59 +257,29 @@ namespace jrc
 
         static const Charset countset = { nl::nx::ui["Basic.img"]["ItemNo"], Charset::LEFT };
 
-        const auto& current_storage = storage_items[tab];
-        for (int16_t i = 0; i < storage_nodes::rows_visible(); ++i)
-        {
-            int16_t storage_index = i + storage_offset;
-            Point<int16_t> storage_rowpos = position + Point<int16_t>(storage_nodes::left_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step());
-            Point<int16_t> storage_iconpos = position + Point<int16_t>(storage_nodes::left_icon_x(), storage_nodes::icon_y() + i * storage_nodes::row_step());
+        draw_panel(
+            false,
+            position,
+            storage_items[tab],
+            storage_offset,
+            storage_selection,
+            tab,
+            selection,
+            disabled_slot,
+            countset
+        );
 
-            if (storage_index == storage_selection)
-            {
-                selection.draw(storage_rowpos + Point<int16_t>(storage_nodes::selection_shift(), 0));
-            }
-
-            if (storage_index >= 0 && storage_index < static_cast<int16_t>(current_storage.size()))
-            {
-                const ItemEntry& entry = current_storage[storage_index];
-                const Texture& icon = ItemData::get(entry.itemid).get_icon(false);
-                icon.draw(storage_iconpos);
-
-                if (tab != InventoryType::EQUIP && entry.count > 1)
-                {
-                    countset.draw(std::to_string(entry.count), storage_iconpos + Point<int16_t>(0, 20));
-                }
-            }
-            else
-            {
-                disabled_slot.draw(storage_rowpos + storage_nodes::empty_slot_shift());
-            }
-
-            int16_t inventory_index = i + inventory_offset;
-            Point<int16_t> inventory_rowpos = position + Point<int16_t>(storage_nodes::right_row_x(), storage_nodes::row_top() + i * storage_nodes::row_step());
-            Point<int16_t> inventory_iconpos = position + Point<int16_t>(storage_nodes::right_icon_x(), storage_nodes::icon_y() + i * storage_nodes::row_step());
-
-            if (inventory_index == inventory_selection)
-            {
-                selection.draw(inventory_rowpos + Point<int16_t>(storage_nodes::selection_shift(), 0));
-            }
-
-            if (inventory_index >= 0 && inventory_index < static_cast<int16_t>(inventory_items.size()))
-            {
-                const InventoryEntry& entry = inventory_items[inventory_index];
-                const Texture& icon = ItemData::get(entry.itemid).get_icon(false);
-                icon.draw(inventory_iconpos);
-
-                if (tab != InventoryType::EQUIP && entry.count > 1)
-                {
-                    countset.draw(std::to_string(entry.count), inventory_iconpos + Point<int16_t>(0, 20));
-                }
-            }
-            else
-            {
-                disabled_slot.draw(inventory_rowpos + storage_nodes::empty_slot_shift());
-            }
-        }
+        draw_panel(
+            true,
+            position,
+            inventory_items,
+            inventory_offset,
+            inventory_selection,
+            tab,
+            selection,
+            disabled_slot,
+            countset
+        );
 
         meso_icon.draw(position + storage_nodes::storage_meso_icon_pos());
         meso_icon.draw(position + storage_nodes::player_meso_icon_pos());
@@ -260,25 +310,22 @@ namespace jrc
         Point<int16_t> cursoroffset = cursorpos - position;
         last_cursor_pos = cursoroffset;
 
-        int16_t row = slot_by_position(cursoroffset.y());
-        if (row >= 0)
+        int16_t cell = storage_nodes::cell_at(false, cursoroffset);
+        if (cell >= 0)
         {
-            if (cursoroffset.x() >= storage_nodes::left_row_x() && cursoroffset.x() <= storage_nodes::left_row_x() + storage_nodes::row_width())
+            show_item(cell, true);
+        }
+        else
+        {
+            cell = storage_nodes::cell_at(true, cursoroffset);
+            if (cell >= 0)
             {
-                show_item(row, true);
-            }
-            else if (cursoroffset.x() >= storage_nodes::right_row_x() && cursoroffset.x() <= storage_nodes::right_row_x() + storage_nodes::row_width())
-            {
-                show_item(row, false);
+                show_item(cell, false);
             }
             else
             {
                 clear_tooltip();
             }
-        }
-        else
-        {
-            clear_tooltip();
         }
 
         return UIElement::send_cursor(clicked, cursorpos);
@@ -286,23 +333,15 @@ namespace jrc
 
     void UIStorage::send_scroll(double yoffset)
     {
-        int16_t yoff = last_cursor_pos.y();
-        int16_t row = slot_by_position(yoff);
-        if (row < 0)
-        {
-            return;
-        }
+        int16_t step = static_cast<int16_t>(storage_nodes::grid_scroll_step() * (yoffset > 0 ? -1 : 1));
 
-        int16_t shift = yoffset > 0 ? -1 : 1;
-        int16_t xoff = last_cursor_pos.x();
-
-        if (xoff >= storage_nodes::left_row_x() && xoff <= storage_nodes::left_row_x() + storage_nodes::row_width())
+        if (storage_nodes::cell_at(false, last_cursor_pos) >= 0)
         {
-            storage_offset = static_cast<int16_t>(storage_offset + shift);
+            storage_offset = static_cast<int16_t>(storage_offset + step);
         }
-        else if (xoff >= storage_nodes::right_row_x() && xoff <= storage_nodes::right_row_x() + storage_nodes::row_width())
+        else if (storage_nodes::cell_at(true, last_cursor_pos) >= 0)
         {
-            inventory_offset = static_cast<int16_t>(inventory_offset + shift);
+            inventory_offset = static_cast<int16_t>(inventory_offset + step);
         }
 
         clamp_offsets();
@@ -311,25 +350,24 @@ namespace jrc
     void UIStorage::rightclick(Point<int16_t> cursorpos)
     {
         Point<int16_t> cursoroffset = cursorpos - position;
-        int16_t row = slot_by_position(cursoroffset.y());
-        if (row < 0)
-        {
-            return;
-        }
 
-        if (cursoroffset.x() >= storage_nodes::left_row_x() && cursoroffset.x() <= storage_nodes::left_row_x() + storage_nodes::row_width())
+        int16_t cell = storage_nodes::cell_at(false, cursoroffset);
+        if (cell >= 0)
         {
-            int16_t index = row + storage_offset;
+            int16_t index = static_cast<int16_t>(cell + storage_offset);
             if (index >= 0 && index < static_cast<int16_t>(storage_items[tab].size()))
             {
                 storage_selection = index;
                 inventory_selection = -1;
                 request_take_selected();
             }
+            return;
         }
-        else if (cursoroffset.x() >= storage_nodes::right_row_x() && cursoroffset.x() <= storage_nodes::right_row_x() + storage_nodes::row_width())
+
+        cell = storage_nodes::cell_at(true, cursoroffset);
+        if (cell >= 0)
         {
-            int16_t index = row + inventory_offset;
+            int16_t index = static_cast<int16_t>(cell + inventory_offset);
             if (index >= 0 && index < static_cast<int16_t>(inventory_items.size()))
             {
                 inventory_selection = index;
@@ -413,9 +451,12 @@ namespace jrc
     {
         clear_tooltip();
 
-        if (buttonid >= STORAGE_ROW0 && buttonid <= STORAGE_ROW4)
+        const int16_t storage_base = storage_nodes::post_chaos() ? STORAGE_CELL0 : STORAGE_ROW0;
+        const int16_t inventory_base = storage_nodes::post_chaos() ? INVENTORY_CELL0 : INVENTORY_ROW0;
+
+        if (buttonid >= storage_base && buttonid < storage_base + storage_nodes::cells_visible())
         {
-            int16_t visible_slot = static_cast<int16_t>(buttonid - STORAGE_ROW0);
+            int16_t visible_slot = static_cast<int16_t>(buttonid - storage_base);
             int16_t slot = static_cast<int16_t>(visible_slot + storage_offset);
             if (slot >= 0 && slot < static_cast<int16_t>(storage_items[tab].size()))
             {
@@ -432,9 +473,9 @@ namespace jrc
             return Button::NORMAL;
         }
 
-        if (buttonid >= INVENTORY_ROW0 && buttonid <= INVENTORY_ROW4)
+        if (buttonid >= inventory_base && buttonid < inventory_base + storage_nodes::cells_visible())
         {
-            int16_t visible_slot = static_cast<int16_t>(buttonid - INVENTORY_ROW0);
+            int16_t visible_slot = static_cast<int16_t>(buttonid - inventory_base);
             int16_t slot = static_cast<int16_t>(visible_slot + inventory_offset);
             if (slot >= 0 && slot < static_cast<int16_t>(inventory_items.size()))
             {
@@ -678,29 +719,6 @@ namespace jrc
     {
         close();
         StorageActionPacket::leave().dispatch();
-    }
-
-    int16_t UIStorage::slot_by_position(int16_t y) const
-    {
-        int16_t yoff = static_cast<int16_t>(y - storage_nodes::row_top());
-        if (yoff < 0)
-        {
-            return -1;
-        }
-
-        int16_t slot = static_cast<int16_t>(yoff / storage_nodes::row_step());
-        if (slot < 0 || slot >= storage_nodes::rows_visible())
-        {
-            return -1;
-        }
-
-        int16_t row_start = static_cast<int16_t>(slot * storage_nodes::row_step());
-        if (yoff - row_start >= storage_nodes::row_height())
-        {
-            return -1;
-        }
-
-        return slot;
     }
 
     uint16_t UIStorage::button_by_tab(InventoryType::Id type) const

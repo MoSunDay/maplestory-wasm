@@ -85,7 +85,6 @@ namespace jrc
         void request_meso_change(bool store_to_storage);
         void close_with_packet();
 
-        int16_t slot_by_position(int16_t y) const;
         uint16_t button_by_tab(InventoryType::Id type) const;
 
         const Inventory& inventory;
@@ -134,7 +133,10 @@ namespace jrc
             TAB2_USE = 25,
             TAB2_ETC = 26,
             TAB2_SETUP = 27,
-            TAB2_CASH = 28
+            TAB2_CASH = 28,
+            // Grid cell buttons (post-Chaos 4x8 socket panels).
+            STORAGE_CELL0 = 29,
+            INVENTORY_CELL0 = 61
         };
     };
 }
