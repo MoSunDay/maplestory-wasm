@@ -23,6 +23,8 @@
 namespace jrc
 {
     // Class that stores information on the questlog of an individual character.
+    // Grandfathered class: the container API is kept, every mutator bumps the
+    // revision counter so UI windows can cheaply detect changes.
     class Questlog
     {
     public:
@@ -32,10 +34,26 @@ namespace jrc
         bool is_started(int16_t);
         int16_t get_last_started();
 
+        // Remove a quest from both active lists (forfeit or done).
+        void forfeit(int16_t qid);
+        // Refresh a started quest's progress data, adding it if unknown.
+        void update_data(int16_t qid, const std::string& quest_data);
+        // Move a quest into the completed list with a completion time.
+        void complete(int16_t qid, int64_t time);
+
+        // Monotonic counter bumped by every mutator call.
+        uint64_t revision() const;
+
+        const std::map<int16_t, std::string>& list_started() const;
+        const std::map<int16_t, std::pair<int16_t, std::string>>&
+            list_in_progress() const;
+        const std::map<int16_t, int64_t>& list_completed() const;
+
     private:
         std::map<int16_t, std::string> started;
         std::map<int16_t, std::pair<int16_t, std::string>> in_progress;
         std::map<int16_t, int64_t> completed;
+        uint64_t rev = 0;
     };
 }
 

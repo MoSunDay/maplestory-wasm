@@ -7,6 +7,7 @@
 #include "UITypes/UICharCreation.h"
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
+#include "../Gameplay/Stage.h"
 #include "../Net/Login/CharlistTransition.h"
 
 #ifdef MS_PLATFORM_WASM
@@ -251,6 +252,11 @@ extern "C"
         return jrc::UI::get().is_element_active(jrc::UIElement::NOTICE) ? 1 : 0;
     }
 
+    EMSCRIPTEN_KEEPALIVE int msui_questlog_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::QUESTLOG) ? 1 : 0;
+    }
+
     EMSCRIPTEN_KEEPALIVE int msui_progressbanner_active()
     {
         return jrc::UI::get().is_element_active(jrc::UIElement::PROGRESSBANNER) ? 1 : 0;
@@ -326,6 +332,17 @@ extern "C"
     {
         auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
         return shop ? shop->preview_cap_id() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_preview_weapon()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->preview_weapon_id() : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msplayer_frame()
+    {
+        return jrc::Stage::get().get_player().get_look().get_frame();
     }
 
 

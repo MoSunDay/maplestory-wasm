@@ -263,6 +263,12 @@ namespace jrc
         PosINV() : PointEntry("PosINV", "(300,150)") {}
     };
 
+    // The default position of the quest log window.
+    struct PosQUEST : public Configuration::PointEntry
+    {
+        PosQUEST() : PointEntry("PosQUEST", "(150,120)") {}
+    };
+
     // The default position of the skill inventory.
     struct PosSKILL : public Configuration::PointEntry
     {

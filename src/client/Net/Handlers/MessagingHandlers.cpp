@@ -1,6 +1,7 @@
 #include "MessagingHandlers.h"
 
 #include "../../Character/Char.h"
+#include "../../Character/QuestLog.h"
 #include "../../Console.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -304,6 +305,8 @@ namespace jrc
 
     // Modes:
     // 0 - Item(0), Meso(1), Inventory full(0xff) or item unavailable(0xfe)
+    // 1 - Quest state (0 forfeit, 1 progress data, 2 completed)
+    // 2 - Item expired
     // 3 - Exp gain
     // 4 - Fame
     // 5 - Mesos
@@ -351,6 +354,42 @@ namespace jrc
                 show_status(Text::WHITE, "You can't pick up this item.");
             }
         }
+        else if (mode == 1)
+        {
+            const int16_t quest_id = recv.read_short();
+            const int8_t status = recv.read_byte();
+            Questlog& quests = Stage::get().get_player().get_quests();
+            if (status == 0)
+            {
+                quests.forfeit(quest_id);
+                show_status(
+                    Text::WHITE,
+                    "Quest forfeited (" + std::to_string(quest_id) + ")"
+                );
+            }
+            else if (status == 1)
+            {
+                // Five zero bytes trail the string; they carry no state.
+                const std::string data = recv.read_string();
+                quests.update_data(quest_id, data);
+            }
+            else if (status == 2)
+            {
+                const int64_t completion_time = recv.read_long();
+                quests.complete(quest_id, completion_time);
+                show_status(
+                    Text::WHITE,
+                    "Quest completed (" + std::to_string(quest_id) + ")"
+                );
+            }
+        }
+        else if (mode == 2)
+        {
+            const int32_t itemid = recv.read_int();
+            show_status(
+                Text::WHITE,
+                "An item has expired (" + std::to_string(itemid) + ")"
+            );
         }
         else if (mode == 3)
         {

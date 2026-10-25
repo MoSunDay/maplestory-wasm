@@ -42,6 +42,7 @@ namespace jrc
         settings.emplace<PosSTATS>();
         settings.emplace<PosEQINV>();
         settings.emplace<PosINV>();
+        settings.emplace<PosQUEST>();
         settings.emplace<PosSKILL>();
         settings.emplace<PosKEYCONFIG>();
         settings.emplace<PosPARTY>();

@@ -26,6 +26,7 @@
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/InventoryHandlers.h"
 #include "Handlers/MessagingHandlers.h"
+#include "Handlers/QuestHandlers.h"
 #include "Handlers/Social/SocialHandlers.h"
 #include "Handlers/NpcInteractionHandlers.h"
 #include "Handlers/CashShopHandlers.h"
@@ -61,6 +62,9 @@ namespace jrc
 
         // Inventory 1
         MODIFY_INVENTORY = 29,
+
+        // Quest
+        QUEST_CLEAR = 49,
 
         // Player 2
         CHANGE_STATS      = 31,
@@ -105,6 +109,7 @@ namespace jrc
         FIELD_OBSTACLE_LIST    = 140,
         FIELD_OBSTACLE_RESET   = 141,
         CLOCK                   = 147,
+        SET_QUEST_CLEAR         = 150,
         STOP_CLOCK              = 154,
         LEGACY_FIELD_OBJECT     = 159,
 
@@ -136,6 +141,7 @@ namespace jrc
         UPDATE_PARTYMEMBER_HP = 201,
         CANCEL_CHAIR          = 205,
         SHOW_ITEM_GAIN_INCHAT = 206, // this is terribly named
+        UPDATE_QUEST_INFO     = 211,
         LOCK_UI               = 221,
         TOGGLE_UI             = 222,
 
@@ -294,6 +300,12 @@ namespace jrc
         emplace<LOCK_UI, NullHandler>();
         emplace<TOGGLE_UI, NullHandler>();
         emplace<MAKE_NPC_SCRIPTED, NullHandler>();
+
+        // Quest handlers
+        emplace<QUEST_CLEAR, QuestClearHandler>();
+        emplace<SET_QUEST_CLEAR, SetQuestClearHandler>();
+        emplace<UPDATE_QUEST_INFO, UpdateQuestInfoHandler>();
+        emplace<SHOW_ITEM_EFFECT, ShowItemEffectHandler>();
 
         // Ignored
         emplace<SELECT_WORLD, NullHandler>();

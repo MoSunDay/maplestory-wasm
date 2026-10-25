@@ -30,6 +30,7 @@ namespace jrc
             EQUIPS,
             ITEMS,
             SKILLS,
+            QUESTS,
             KEY_CONFIG,
             PET_OPTIONS,
             GAME_OPTIONS,

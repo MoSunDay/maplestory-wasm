@@ -307,6 +307,7 @@ namespace jrc
                 UIElement::ITEMINVENTORY,
                 UIElement::EQUIPINVENTORY,
                 UIElement::SKILLBOOK,
+                UIElement::QUESTLOG,
                 UIElement::PARTY,
                 UIElement::TRADE,
                 UIElement::PLAYER_CONTEXT,

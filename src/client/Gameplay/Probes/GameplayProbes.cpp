@@ -8,6 +8,7 @@
 #include "../../IO/Trade/UIPlayerContext.h"
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/Pet/UIPetOptions.h"
+#include "../../IO/UITypes/Quest/UIQuestLog.h"
 #include "../../IO/UITypes/Settings/UIGameOptions.h"
 #include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIItemInventory.h"
@@ -295,6 +296,22 @@ extern "C"
     int msdrop_has(int32_t oid)
     {
         return jrc::Stage::get().get_drops().has_drop(oid) ? 1 : 0;
+    }
+
+    int msdrop_nearest_x()
+    {
+        auto& stage = jrc::Stage::get();
+        const auto center = stage.get_drops().find_nearest_lootable_center(
+            stage.get_player().get_position());
+        return center ? center->x() : MISSING_COORDINATE;
+    }
+
+    int msdrop_nearest_y()
+    {
+        auto& stage = jrc::Stage::get();
+        const auto center = stage.get_drops().find_nearest_lootable_center(
+            stage.get_player().get_position());
+        return center ? center->y() : MISSING_COORDINATE;
     }
 
     int msplayer_hp()
@@ -594,6 +611,12 @@ extern "C"
         return jrc::UI::get().is_element_active(jrc::UIElement::NPCTALK) ? 1 : 0;
     }
 
+    int msui_questlog_rows()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIQuestLog>();
+        return window ? window->row_count() : -1;
+    }
+
     const char* msnpc_prompt()
     {
         auto dialogue = jrc::UI::get().get_element<jrc::UINpcTalk>();
@@ -618,6 +641,14 @@ extern "C"
             return 0;
         }
         return static_cast<int>(jrc::Stage::get().count_active_named_objects(name));
+    }
+
+    const char* msstatusbar_stat_label(int which)
+    {
+        auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return statusbar
+            ? statusbar->get_stat_label(static_cast<int16_t>(which))
+            : "";
     }
 
     int msstatusbar_hit(int x, int y)

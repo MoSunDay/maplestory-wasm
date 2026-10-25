@@ -1,0 +1,43 @@
+//////////////////////////////////////////////////////////////////////////////
+// Pure row model for the quest log window.
+//
+// Deliberately nx-free so the filters can be linked and tested standalone
+// (tools/verify/quest-log-model.cpp); the nx lookups live in the .cpp.
+//////////////////////////////////////////////////////////////////////////////
+#pragma once
+
+#include "../../../Character/QuestLog.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace jrc::quest_log_model
+{
+    // One row of the quest list.
+    struct QuestRow
+    {
+        int16_t id = 0;
+        std::string name;
+        std::string category;
+    };
+
+    // Which half of the log the left pane lists.
+    enum class Filter : int8_t
+    {
+        IN_PROGRESS = 0,
+        COMPLETED = 1
+    };
+
+    // Rows for one filter, sorted by quest id. Names and categories come
+    // from the QuestInfo nx data; unknown quests fall back to "?" + id.
+    std::vector<QuestRow> collect_rows(const Questlog& log, Filter filter);
+
+    // Short headline for the info pane: category + name, no long state
+    // dialogues.
+    std::string quest_summary(int16_t id);
+
+    constexpr size_t ROWS_PER_PAGE = 9;
+    constexpr int16_t ROW_HEIGHT = 24;
+}

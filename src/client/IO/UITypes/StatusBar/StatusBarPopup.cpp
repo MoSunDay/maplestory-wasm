@@ -24,7 +24,7 @@ namespace jrc
                 { "Equip", Action::EQUIPS },
                 { "Inventory", Action::ITEMS },
                 { "Skills", Action::SKILLS },
-                { "Quests", Action::NONE }
+                { "Quests", Action::QUESTS }
             });
             initialize_panel_prechaos(system, {
                 { "Key Config", Action::KEY_CONFIG },
@@ -41,7 +41,7 @@ namespace jrc
             { "BtEquip", Action::EQUIPS },
             { "BtItem", Action::ITEMS },
             { "BtSkill", Action::SKILLS },
-            { "BtQuest", Action::NONE },
+            { "BtQuest", Action::QUESTS },
             { "BtCommunity", Action::NONE },
             { "BtEpisodBook", Action::NONE },
             { "BtEvent", Action::NONE },
