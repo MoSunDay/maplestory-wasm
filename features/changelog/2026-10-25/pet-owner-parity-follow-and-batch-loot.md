@@ -52,6 +52,7 @@
 - `E2E_PET_OPTIONS=follow` 全绿：petP95=playerP95=4、距离 33（max 82.3）、3 次折返 ≤4、warpSamples=0、unauthorizedJumps=[]、recovered=true。
 - 召唤链路修复：宠物召唤双击改为探针驱动（窗口原点 + 页槽位 + 命中测试），不再依赖硬编码坐标；证据目录 /tmp/accept-pet-pickup-final、/tmp/accept-pet-follow-final（pet-automation-evidence.json、pet-pickup-trace.json）。
 - 已知环境干扰：并行会话/外部进程偶发杀掉 Chrome 导致 `unsettled top-level await`（exit 13），重跑即可恢复。
+- 证据 JSON 已归档至 features/changelog/2026-10-25/pet-acceptance-evidence/（含 SHA256 清单）。
 
 ## Related Docs
 

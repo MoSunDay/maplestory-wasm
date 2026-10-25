@@ -1,0 +1,49 @@
+{
+  "mode": "follow",
+  "petIdentity": {
+    "itemId": 5000001,
+    "capabilityMask": 31
+  },
+  "selected": null,
+  "configured": {
+    "hpItem": 0,
+    "mpItem": 0,
+    "hpThreshold": 50,
+    "mpThreshold": 50,
+    "hpQuantity": 0,
+    "mpQuantity": 0,
+    "hp": 30000,
+    "maxHp": 30000,
+    "mp": 12000,
+    "maxMp": 12000
+  },
+  "loot": null,
+  "follow": {
+    "before": {
+      "playerX": 129,
+      "petX": 95
+    },
+    "after": {
+      "playerX": -245,
+      "playerY": 395,
+      "petX": -211,
+      "petY": 395,
+      "stance": 1
+    },
+    "distance": 34,
+    "sampleCount": 437,
+    "playerP95": 5,
+    "petP95": 5,
+    "maxDistance": 75,
+    "reversals": 0,
+    "warpSamples": 0,
+    "warpTransitions": [],
+    "recordedWarpDistance": 0,
+    "warpObserved": false,
+    "jumpSamples": 0,
+    "slopeSamples": 0,
+    "wallBlockedSamples": 0,
+    "unauthorizedJumps": [],
+    "recovered": true
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "mode": "pickup",
+  "petIdentity": {
+    "itemId": 5000001,
+    "capabilityMask": 31
+  },
+  "selected": null,
+  "configured": {
+    "hpItem": 0,
+    "mpItem": 0,
+    "hpThreshold": 50,
+    "mpThreshold": 50,
+    "hpQuantity": 0,
+    "mpQuantity": 0,
+    "hp": 30000,
+    "maxHp": 30000,
+    "mp": 12000,
+    "maxMp": 12000
+  },
+  "loot": {
+    "before": {
+      "pickups": 0,
+      "drops": 0,
+      "meso": 1000000000
+    },
+    "after": {
+      "pickups": 3,
+      "drops": 1,
+      "meso": 1000000000
+    },
+    "active": false,
+    "targetSeen": true,
+    "maxDrops": 4,
+    "targetOids": [
+      1000000029
+    ],
+    "lastNonzeroTargetOid": 1000000029,
+    "lastPickupCount": 3,
+    "confirmedTargetOid": 1000000029,
+    "removal": {
+      "targetOid": 1000000029,
+      "removed": true,
+      "elapsedMs": 1,
+      "finalTargetOid": 0
+    }
+  },
+  "follow": {
+    "before": {
+      "playerX": 231,
+      "petX": 200
+    },
+    "after": {
+      "playerX": 107,
+      "playerY": 395,
+      "petX": 67,
+      "petY": 395,
+      "stance": 1
+    },
+    "distance": 40,
+    "sampleCount": 444,
+    "playerP95": 3,
+    "petP95": 4,
+    "maxDistance": 75,
+    "reversals": 2,
+    "warpSamples": 0,
+    "warpTransitions": [],
+    "recordedWarpDistance": 0,
+    "warpObserved": false,
+    "jumpSamples": 0,
+    "slopeSamples": 0,
+    "wallBlockedSamples": 0,
+    "unauthorizedJumps": [],
+    "recovered": true
+  }
+}
