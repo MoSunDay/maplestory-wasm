@@ -279,6 +279,11 @@ namespace jrc
         return tilesobjs.count_active_named_objects(name);
     }
 
+    size_t Stage::reset_named_objects()
+    {
+        return tilesobjs.reset_named_objects();
+    }
+
     void Stage::clear_pet_loot_target(PetLook* pet)
     {
         if (pet)

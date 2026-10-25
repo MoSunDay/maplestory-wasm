@@ -104,6 +104,19 @@ namespace jrc
         return count;
     }
 
+    size_t TilesObjs::reset_named_objects()
+    {
+        size_t reset = 0;
+        for (auto& iter : objs)
+        {
+            if (iter.second.reset_named_active())
+            {
+                reset++;
+            }
+        }
+        return reset;
+    }
+
 
     MapTilesObjs::MapTilesObjs(nl::node src)
     {
@@ -155,5 +168,15 @@ namespace jrc
             count += iter.second.count_active_named_objects(name);
         }
         return count;
+    }
+
+    size_t MapTilesObjs::reset_named_objects()
+    {
+        size_t reset = 0;
+        for (auto iter : layers)
+        {
+            reset += iter.second.reset_named_objects();
+        }
+        return reset;
     }
 }

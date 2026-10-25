@@ -20,6 +20,7 @@
 #include "Handlers/CommonHandlers.h"
 #include "Handlers/LoginHandlers.h"
 #include "Handlers/SetfieldHandlers.h"
+#include "Handlers/FieldObstacleHandlers.h"
 #include "Handlers/PlayerHandlers.h"
 #include "Handlers/AttackHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
@@ -283,12 +284,12 @@ namespace jrc
         emplace<FAMILY_INFO_RESULT, NullHandler>();
         emplace<GUILD_OPERATION, NullHandler>();
         emplace<FAMILY_PRIV_LIST, NullHandler>();
-        emplace<SCRIPT_PROGRESS_MESSAGE, NullHandler>();
+        emplace<SCRIPT_PROGRESS_MESSAGE, ScriptProgressMessageHandler>();
         emplace<RECEIVE_POLICE, NullHandler>();
         emplace<FIELD_EFFECT, FieldEffectHandler>();
-        emplace<FIELD_OBSTACLE_ONOFF, NullHandler>();
-        emplace<FIELD_OBSTACLE_LIST, NullHandler>();
-        emplace<FIELD_OBSTACLE_RESET, NullHandler>();
+        emplace<FIELD_OBSTACLE_ONOFF, FieldObstacleOnoffHandler>();
+        emplace<FIELD_OBSTACLE_LIST, FieldObstacleListHandler>();
+        emplace<FIELD_OBSTACLE_RESET, FieldObstacleResetHandler>();
         emplace<LEGACY_FIELD_OBJECT, NullHandler>();
         emplace<LOCK_UI, NullHandler>();
         emplace<TOGGLE_UI, NullHandler>();

@@ -41,6 +41,7 @@ namespace jrc
         void update();
         size_t set_named_object_active(const std::string& name, bool active);
         size_t count_active_named_objects(const std::string& name) const;
+        size_t reset_named_objects();
 
     private:
         std::multimap<uint8_t, Tile> tiles;
@@ -60,6 +61,7 @@ namespace jrc
         void update();
         size_t set_named_object_active(const std::string& name, bool active);
         size_t count_active_named_objects(const std::string& name) const;
+        size_t reset_named_objects();
 
     private:
         EnumMap<Layer::Id, TilesObjs> layers;

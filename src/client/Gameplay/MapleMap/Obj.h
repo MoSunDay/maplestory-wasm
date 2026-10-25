@@ -38,6 +38,9 @@ namespace jrc
         uint8_t getz() const;
         bool set_active_if_named(const std::string& target_name, bool value);
         bool is_named_active(const std::string& target_name) const;
+        // Return a named obj to the map default (active) state.
+        // Returns true if the obj is named.
+        bool reset_named_active();
 
     private:
         Animation animation;

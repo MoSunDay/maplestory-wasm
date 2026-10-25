@@ -26,6 +26,7 @@
 #include "../../Constants.h"
 #include "../../Timer.h"
 #include "../../Audio/Audio.h"
+#include "../../Audio/FieldMusicPath.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../IO/UI.h"
@@ -339,6 +340,21 @@ namespace jrc
                     "[FieldEffectHandler] Field sound could not be resolved: " + path
                 );
             }
+            return;
+        }
+
+        if (mode == 6)
+        {
+            std::string path = recv.read_string();
+            if (path.empty())
+            {
+                Console::get().print("[FieldEffectHandler] Received empty bgm path for mode 6");
+                return;
+            }
+
+            const std::string normalized = field_music::normalize_bgm_path(path);
+            Music(normalized).prepare();
+            Music(normalized).play();
             return;
         }
 

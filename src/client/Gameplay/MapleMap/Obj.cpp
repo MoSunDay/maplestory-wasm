@@ -74,4 +74,15 @@ namespace jrc
     {
         return !name.empty() && name == target_name && active;
     }
+
+    bool Obj::reset_named_active()
+    {
+        if (name.empty())
+        {
+            return false;
+        }
+
+        active = true;
+        return true;
+    }
 }

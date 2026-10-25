@@ -84,6 +84,7 @@ namespace jrc
             USERINFO,
             TRADE,
             GAMEOPTIONS,
+            PROGRESSBANNER,
             NUM_TYPES
         };
 

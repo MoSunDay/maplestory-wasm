@@ -251,6 +251,11 @@ extern "C"
         return jrc::UI::get().is_element_active(jrc::UIElement::NOTICE) ? 1 : 0;
     }
 
+    EMSCRIPTEN_KEEPALIVE int msui_progressbanner_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::PROGRESSBANNER) ? 1 : 0;
+    }
+
     EMSCRIPTEN_KEEPALIVE int mscashshop_locker_count()
     {
         auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
