@@ -164,10 +164,21 @@ async function openItemInventory() {
 // UIWindow2 item inventory geometry (11,51) + 36x35.
 async function verifyItemBinding() {
   await openItemInventory();
+  // Opening the window constructs every slot icon and can start a LazyFS
+  // chunk request after openItemInventory's last idle check. Retry the tab
+  // click so a press dropped while input is blocked is not a hard failure.
+  await waitAssetsIdle('item inventory open assets idle');
   const originX = await probes.itemInventoryX();
   const originY = await probes.itemInventoryY();
-  await driver.click(originX + 42, originY + 28);  // USE tab
-  await waitFor('item inventory USE tab', async () => await probes.itemInventoryTab() === 2, 10);
+  const useTab = { x: originX + 42, y: originY + 28 };
+  let inventoryTab = await probes.itemInventoryTab();
+  for (let attempt = 0; attempt < 3 && inventoryTab !== 2; attempt += 1) {
+    await waitAssetsIdle(`item inventory tab assets idle ${attempt}`);
+    await driver.click(useTab.x, useTab.y);
+    await sleep(350);
+    inventoryTab = await probes.itemInventoryTab();
+  }
+  equal('item inventory USE tab', inventoryTab, 2);
   await waitAssetsIdle('use inventory assets idle');
 
   const itemSlot = await probes.inventorySlot(bindItemId);
@@ -188,10 +199,30 @@ async function verifyItemBinding() {
   equal('item grid hit test', await probes.itemInventorySlotAt(itemX, itemY), itemSlot);
 
   const target = slotCenter(1);
-  await driver.drag(itemX, itemY, target.x, target.y);
-  await sleep(700);
+  let assigned = 0;
+  for (let attempt = 0; attempt < 3 && assigned !== bindItemId; attempt += 1) {
+    await waitAssetsIdle(`item drag assets idle ${attempt}`);
+    // Settle the cursor on the destination before pressing on the source
+    // icon; CDP drags are occasionally lost while the inventory settles.
+    await hover(target.x, target.y);
+    await sleep(250);
+    await driver.drag(itemX, itemY, target.x, target.y);
+    await sleep(700);
+    assigned = await probes.quickslotItem(1);
+    if (assigned !== bindItemId) {
+      const slots = [];
+      for (let index = 0; index < 8; index += 1) {
+        slots.push(await probes.quickslotItem(index));
+      }
+      console.log(`INFO  item drag attempt=${attempt} slots=${JSON.stringify(slots)}`);
+      const misplaced = slots.some((value, index) => value !== 0 && index !== 1);
+      if (misplaced) {
+        throw new Error(`item drag assigned to an unexpected slot: ${JSON.stringify(slots)}`);
+      }
+    }
+  }
   await driver.screenshot('slot1-item-drop');
-  equal('slot 1 item assigned', await probes.quickslotItem(1), bindItemId);
+  equal('slot 1 item assigned', assigned, bindItemId);
   equal('slot 1 skill replaced', await probes.quickslotSkill(1), 0);
   await waitAssetsIdle('item assign assets idle');
   await driver.screenshot('slot1-item-assigned');
@@ -566,6 +597,12 @@ try {
     const secondSkill = await selectAnySkill();
     const secondIcon = skillIconCenter(secondSkill.row);
     const last = slotCenter(7);
+    // Settle the cursor on the rightmost slot before dragging. Besides
+    // proving the target is reachable, this dismisses any pending skill
+    // tooltip that can otherwise consume the drag's initial press.
+    await hover(last.x, last.y);
+    await sleep(300);
+    equal('slot 7 target hovered', await probes.quickslotHovered(), 7);
     await driver.drag(secondIcon.x, secondIcon.y, last.x, last.y);
     await sleep(600);
     equal('slot 7 drag assigned', (await quickslots())[7], secondSkill.id);
