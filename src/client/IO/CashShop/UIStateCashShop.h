@@ -43,6 +43,9 @@ namespace jrc
         UIElement* get_front(Point<int16_t> pos) override;
 
     private:
+        // True while a focused modal (UIYesNo/UIOk and friends) sits above the
+        // cash shop window, so pointer events must not fall through to it.
+        bool modal_focused();
         void clear_cursors(bool clicked, Point<int16_t> pos, UIElement::Type except);
         template <class T, typename... Args>
         void emplace(Args&&... args);

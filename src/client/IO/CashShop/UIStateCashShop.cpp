@@ -44,14 +44,26 @@ namespace jrc
         }
     }
 
+    bool UIStateCashShop::modal_focused()
+    {
+        if (focused == UIElement::NONE || focused == UIElement::CASHSHOP)
+            return false;
+        const UIElement* front = get(focused);
+        return front && front->is_active();
+    }
+
     void UIStateCashShop::doubleclick(Point<int16_t> pos)
     {
+        if (modal_focused())
+            return;
         if (UIElement* front = get_front(pos))
             front->doubleclick(pos);
     }
 
     void UIStateCashShop::rightclick(Point<int16_t> pos)
     {
+        if (modal_focused())
+            return;
         if (UIElement* front = get_front(pos))
             front->rightclick(pos);
     }
@@ -98,6 +110,8 @@ namespace jrc
 
     void UIStateCashShop::send_scroll(Point<int16_t> pos, double yoffset)
     {
+        if (modal_focused())
+            return;
         if (UIElement* front = get_front(pos))
             front->send_scroll(yoffset);
     }
@@ -166,9 +180,19 @@ namespace jrc
 
     UIElement* UIStateCashShop::get_front(Point<int16_t> pos)
     {
+        // CASHSHOP is the bottom layer: draw() paints it first and every other
+        // element on top of it, so overlays (notice, yes/no, ...) are tested
+        // before it and the base window only answers where no overlay covers
+        // the cursor.
         for (auto iter = elements.values().rbegin(); iter != elements.values().rend(); ++iter)
-            if (*iter && (*iter)->is_active() && (*iter)->is_in_range(pos))
+            if (*iter && (*iter)->get_type() != UIElement::CASHSHOP &&
+                (*iter)->is_active() && (*iter)->is_in_range(pos))
                 return iter->get();
+
+        UIElement* cash_shop = get(UIElement::CASHSHOP);
+        if (cash_shop && cash_shop->is_active() && cash_shop->is_in_range(pos))
+            return cash_shop;
+
         return nullptr;
     }
 
