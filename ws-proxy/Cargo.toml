@@ -16,3 +16,7 @@ tracing-subscriber = { workspace = true }
 [[test]]
 name = "proxy"
 path = "tests/proxy.rs"
+
+[[test]]
+name = "liveness"
+path = "tests/liveness.rs"

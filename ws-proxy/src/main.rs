@@ -47,5 +47,10 @@ async fn main() -> std::io::Result<()> {
     info!("============================================================");
     info!("Waiting for connections...");
 
-    ws_proxy::run(listener, ws_proxy::DockerMap::from_env()).await
+    let liveness = ws_proxy::LivenessConfig::from_env();
+    info!(
+        "Liveness: ping every {:?}, drop after {:?} of downstream silence",
+        liveness.ping_interval, liveness.liveness_timeout
+    );
+    ws_proxy::run(listener, ws_proxy::DockerMap::from_env(), liveness).await
 }
