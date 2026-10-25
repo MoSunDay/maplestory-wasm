@@ -90,6 +90,14 @@ namespace jrc
         return delayit != expressions[exp].end() ? delayit->second.delay : 100;
     }
 
+    void Face::prepare(Expression::Id expression) const
+    {
+        for (const auto& entry : expressions[expression])
+        {
+            entry.second.texture.prepare_map_required();
+        }
+    }
+
     void Face::prepare_background() const
     {
         for (size_t expression = 0; expression < Expression::LENGTH; ++expression)

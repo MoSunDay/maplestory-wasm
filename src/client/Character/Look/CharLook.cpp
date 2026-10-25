@@ -306,6 +306,30 @@ namespace jrc
         return attack_stances;
     }
 
+    void CharLook::prepare_movement_assets() const
+    {
+        // Standing, alert and walk frames are drawn within the first seconds
+        // of field entry; warming them as MAP_REQUIRED avoids the blocking
+        // escalation that pauses Stage and UI updates mid-frame.
+        constexpr Stance::Id MOVEMENT_STANCES[] = {
+            Stance::STAND1, Stance::STAND2, Stance::ALERT,
+            Stance::WALK1, Stance::WALK2
+        };
+        for (Stance::Id stance : MOVEMENT_STANCES)
+        {
+            if (body)
+                body->prepare(stance);
+            if (hair)
+                hair->prepare(stance);
+            equips.prepare(stance);
+        }
+        if (face)
+        {
+            face->prepare(Expression::DEFAULT);
+            face->prepare(Expression::BLINK);
+        }
+    }
+
     bool CharLook::update(uint16_t timestep)
     {
         if (timestep == 0)

@@ -77,6 +77,7 @@ namespace jrc
     {
         begin_loading(std::move(onready));
         player.prepare_attack_assets();
+        player.get_look().prepare_movement_assets();
         load_map(mapid);
         respawn(portalid);
         report_loading_progress();

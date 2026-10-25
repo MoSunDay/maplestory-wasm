@@ -51,6 +51,7 @@ namespace jrc
 
         uint8_t nextframe(Expression::Id expression, uint8_t frame) const;
         int16_t get_delay(Expression::Id expression, uint8_t frame) const;
+        void prepare(Expression::Id expression) const;
         void prepare_background() const;
         const std::string& get_name() const;
 

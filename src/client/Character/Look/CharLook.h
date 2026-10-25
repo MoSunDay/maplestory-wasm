@@ -47,6 +47,7 @@ namespace jrc
         void draw(Point<int16_t> pos, bool flip,
             Stance::Id stance, Expression::Id expression) const;
         std::vector<Stance::Id> prepare_attack_assets() const;
+        void prepare_movement_assets() const;
         bool update(uint16_t timestep);
 
         void set_hair(int32_t hairid);

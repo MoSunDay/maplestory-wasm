@@ -643,6 +643,26 @@ try {
     await requireState('all blocking assets released', async () =>
       await assetBlocking() === 0, mapGateSeconds);
     await requireAssetIdle('in-game foreground assets ready');
+    // Standing animation must keep advancing without blocking asset loads:
+    // prewarmed stance frames must not escalate to blocking-visible.
+    {
+      const frames = new Set();
+      let blockingSeen = false;
+      for (let sample = 0; sample < 6; sample += 1) {
+        frames.add(await driver.evaluate(
+          "Module.ccall('msplayer_frame', 'number', [], [])"));
+        blockingSeen = blockingSeen ||
+          await driver.evaluate("Module.ccall('msasset_blocking', 'number', [], [])") !== 0;
+        await sleep(600);
+      }
+      if (blockingSeen) {
+        throw new Error('Standing animation escalated to blocking asset loads');
+      }
+      if (frames.size < 2) {
+        throw new Error(`Standing animation froze on frame ${[...frames]} (expected >= 2 distinct frames)`);
+      }
+      console.log(`PASS  standing animation advanced through ${frames.size} frames without blocking`);
+    }
     if (requireMobs) {
       const initialMapId = await mapId();
       const initialMobCount = await mobCount();
