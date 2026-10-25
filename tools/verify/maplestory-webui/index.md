@@ -319,3 +319,46 @@ UPDATE accounts SET loggedin=0 WHERE name='test1';
 ```
 
 注意：`skill-keymap-prep.py` 重跑会整表重建 keymap 并把角色迁回 40001，届时需重新执行上述绑定。与其它驱动共用 test1 账号，勿与其它 E2E 并发运行（服务端重复登录接管会踢掉旧会话）。协议层（伪客户端）回归见 `scripts/test_accounts/iron_body_buff_proto.mjs`（已挂入 `verify_all.sh` proto 阶段）。
+
+## 掉落拾取压测
+
+`pickup-stress-e2e.mjs` 复现并回归"自己击杀的掉落有概率无法捡取"：登录
+test1（test1Hero，出生点 40001 蜗牛狩猎场）→ 每轮用 Slash Blast（绑 S）
+击杀蜗牛 → 人式走向最近掉落按住 Z 拾取（必要时左右扫动补救）→ 清空
+统计进入下一轮。每轮记录直接拾取耗时/是否扫动/是否卡住；卡住（dropCount
+恒定 + meso 不变，证明服务端从未发放拾取奖励）回合截图并连续采样留证。
+退出码：0 = 无卡住回合（且有效回合 ≥3），1 = 存在卡住或流程失败。
+
+```bash
+E2E_ROUNDS=5 CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/pickup-stress-e2e.mjs
+```
+
+环境变量：`E2E_URL/E2E_ACCOUNT/E2E_PASSWORD/E2E_CHAR_INDEX/E2E_ROUNDS/
+E2E_ARTIFACT_DIR/E2E_DEBUG_PORT`（默认本地 8000、test1、10 轮、
+/tmp/pickup-stress、9330）；产物在 `/tmp/pickup-stress/`（轮次报告 +
+截图 + browser-console.log）。运行前需先执行
+`scripts/test_accounts/skill-keymap-prep.py` 恢复键位（Z 拾取/S 攻击）
+与 40001 出生点（keymap 会被服务端存档覆盖为空）。与其它驱动共用
+test1 账号，勿并发运行。
+
+## 掉落拾取几何采样
+
+`drop-reach-diagnose.mjs` 量化玩家坐标与最近可拾取掉落
+（`msdrop_nearest_x/y`）的几何关系：先可选击杀刷掉落，再按 ~500ms
+节奏补发 Z 并逐帧记录玩家/掉落/宠物坐标与 meso，结束后输出最小
+|dx|/|dy|/距离、30/60/100px 内样本数与最近 10 帧样本，用于判断拾取
+窗口是否可达（掉落长期滞留而采样距离普遍超出窗口 ⇒ 按 Z 的请求
+不生效）。只测量不判定成败：正常结束恒退出 0，致命错误退出 1
+（附 fatal 截图）。
+
+```bash
+E2E_KILL_SECONDS=5 E2E_DIAG_SECONDS=30 CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/drop-reach-diagnose.mjs
+```
+
+环境变量：`E2E_URL/E2E_ACCOUNT/E2E_PASSWORD/E2E_CHAR_INDEX/
+E2E_KILL_SECONDS/E2E_DIAG_SECONDS/E2E_ARTIFACT_DIR/E2E_DEBUG_PORT`（默认
+本地 8000、test1、不预击杀、30s、/tmp/drop-reach、9330）；产物在
+`/tmp/drop-reach/`（样本 JSON + 截图）。与拾取压测同样依赖
+`skill-keymap-prep.py` 准备键位，勿与其它 test1 E2E 并发。

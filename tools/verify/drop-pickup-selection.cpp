@@ -85,9 +85,9 @@ int main()
     }
 
     // 5. Overlap-only reach: drop at (0,0), player at (0,31). The center
-    // (16,16) distance^2 is 16^2 + 15^2 = 481, so both the 30px radius and
-    // the 32x32 bounds cover it; the bounds path is what keeps the whole
-    // icon footprint pickable. It must be reachable.
+    // (16,16) distance^2 is 16^2 + 15^2 = 481, well within the 80px radius
+    // and the 32x32 bounds; the bounds path is what keeps the whole icon
+    // footprint pickable. It must be reachable.
     {
         const Point<int16_t> at_corner_edge(0, 31);
         const std::vector<Candidate> candidates{
@@ -98,8 +98,8 @@ int main()
         CHECK(chosen != nullptr);
         CHECK(chosen->oid == 11);
 
-        // Just past the bounds and beyond the radius: out of reach.
-        const Point<int16_t> too_far(0, 45);
+        // Beyond the 80px radius from the center (16,16): out of reach.
+        const Point<int16_t> too_far(0, 100);
         CHECK(select_nearest(candidates, too_far, 0) == nullptr);
     }
 

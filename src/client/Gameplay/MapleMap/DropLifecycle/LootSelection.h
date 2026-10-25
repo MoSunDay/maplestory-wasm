@@ -25,7 +25,12 @@
 namespace jrc::drop_loot
 {
     // Radius around a drop's icon center within which pickup is offered.
-    constexpr int16_t PICKUP_RADIUS = 30;
+    // The server accepts pickups well past this range (800x600), but drops
+    // land up to ~80px from where the kill happened and the drop icon center
+    // sits ~16px above the player's feet, so a tight radius here made drops
+    // that are visually adjacent unpickable. 80px keeps pickup proximity
+    // gated while covering the natural drop scatter.
+    constexpr int16_t PICKUP_RADIUS = 80;
 
     struct Candidate
     {
