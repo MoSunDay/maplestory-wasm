@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "ComboOrbs.h"
 
+#include "ComboOrbPulse.h"
+
 #include "../Buff.h"
 #include "../Char.h"
 
@@ -58,6 +60,11 @@ namespace jrc
             std::vector<OrbFrame> orbs;
             // Sum of all orb frame delays, computed once at load time.
             int64_t duration = 0;
+            // Dimmest a0 and brightest a1 over all frames. The glow breathes
+            // between these across the whole loop; both default to 255 so
+            // frames without alpha props stay steady.
+            int16_t glow_min = 255;
+            int16_t glow_max = 255;
             bool valid = false;
         };
 
@@ -108,6 +115,11 @@ namespace jrc
                 visuals.orbs.push_back(frame);
                 visuals.duration += frame.delay;
             }
+            for (const OrbFrame& frame : visuals.orbs)
+            {
+                visuals.glow_min = std::min(visuals.glow_min, frame.a0);
+                visuals.glow_max = std::max(visuals.glow_max, frame.a1);
+            }
             visuals.valid = visuals.aura.is_valid() && !visuals.orbs.empty();
             return visuals;
         }
@@ -119,13 +131,14 @@ namespace jrc
             float opacity = 0.0f;
         };
 
-        // Pick the pattern playing at 'time' and its interpolated opacity.
-        // The frame delay list loops with 'duration', so this stays a pure
-        // function of the timestamp.
-        OrbSample sample_orb(const std::vector<OrbFrame>& frames,
-            int64_t duration, int64_t time)
+        // Pick the pattern playing at 'time' and its glow opacity. The frame
+        // delay list loops with 'duration', so this stays a pure function of
+        // the timestamp.
+        OrbSample sample_orb(const ComboVisuals& visuals, int64_t time)
         {
             OrbSample sample;
+            const std::vector<OrbFrame>& frames = visuals.orbs;
+            const int64_t duration = visuals.duration;
             if (frames.empty() || duration <= 0)
                 return sample;
 
@@ -141,14 +154,14 @@ namespace jrc
             if (index >= frames.size())
                 index = frames.size() - 1;
 
-            const OrbFrame& frame = frames[index];
-            const int64_t frame_start = elapsed - frame.delay;
-            const float progress = frame.delay > 0
-                ? static_cast<float>(t - frame_start) / frame.delay
-                : 0.0f;
-            const float pulse = frame.a0 + (frame.a1 - frame.a0) * progress;
+            // The opacity does not follow the per-frame a0 -> a1 ramp (those
+            // snap back to a0 at every frame boundary), it breathes once per
+            // full frame loop between the data's dimmest and brightest alpha.
+            const float pulse = static_cast<float>(visuals.glow_min)
+                + static_cast<float>(visuals.glow_max - visuals.glow_min)
+                    * combo_pulse::breathe(t, duration);
 
-            sample.frame = &frame;
+            sample.frame = &frames[index];
             sample.opacity = std::clamp(pulse, 0.0f, 255.0f) / 255.0f;
             return sample;
         }
@@ -223,6 +236,8 @@ namespace jrc
 
         // Draw the far half of the orbit first and dim it, so that the near
         // half overlaps the far orbs and the ring reads as three dimensional.
+        // The dimming tracks the orbit height continuously, so an orb does
+        // not pop when it crosses the orbit's horizontal diameter.
         for (int16_t pass = 0; pass < 2; ++pass)
         {
             for (int16_t i = 0; i < n; ++i)
@@ -236,8 +251,7 @@ namespace jrc
                 // shows a different pattern at the same moment instead of all
                 // sharing one frame. 10 orbs pair up over the 5 patterns.
                 const int64_t local_time = now + visuals.duration * i / n;
-                const OrbSample sample =
-                    sample_orb(visuals.orbs, visuals.duration, local_time);
+                const OrbSample sample = sample_orb(visuals, local_time);
                 if (!sample.frame)
                     continue;
 
@@ -247,7 +261,7 @@ namespace jrc
                     static_cast<int16_t>(std::lround(
                         center.y() + ORBIT_RADIUS * std::sin(angle)))
                 };
-                const float shade = near_side ? 1.0f : 0.65f;
+                const float shade = combo_pulse::depth_shade(std::sin(angle));
                 sample.frame->texture.draw(
                     DrawArgument(pos, alpha * sample.opacity * shade));
             }
