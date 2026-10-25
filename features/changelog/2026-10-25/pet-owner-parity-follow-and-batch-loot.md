@@ -53,6 +53,9 @@
 - 召唤链路修复：宠物召唤双击改为探针驱动（窗口原点 + 页槽位 + 命中测试），不再依赖硬编码坐标；证据目录 /tmp/accept-pet-pickup-final、/tmp/accept-pet-follow-final（pet-automation-evidence.json、pet-pickup-trace.json）。
 - 已知环境干扰：并行会话/外部进程偶发杀掉 Chrome 导致 `unsettled top-level await`（exit 13），重跑即可恢复。
 - 证据 JSON 已归档至 features/changelog/2026-10-25/pet-acceptance-evidence/（含 SHA256 清单）。
+- 提速背书已固化为可重复回归：E2E_PET_SHOE_STATS="speed,jump"（绝对装备值写入 -7 鞋位，测试后按业务键还原并断言命中 1 行，见 pet-stat-boost.mjs；还原在浏览器断开并等待 5s 服务器落盘保存之后执行——登出保存会用内存中的增益值重写装备行主键）。
+- 提速态 follow 复验全绿（SPEED 140/JUMP 127，playerP95=petP95=5、距离 34、2 折返、0 越权/0 瞬移、recovered）：动态 movement profile 随 buff 生效。
+- 物品栏 tab 精确探针：`UIItemInventory::tab_button_center` + `msiteminventory_tab_x/y`（按 item id 定位 tab 按钮真实中心，两代布局通用）；召唤流程改为「窗口 active 硬门槛 + 探针坐标优先（origin+138 兜底）+ tab 切换三次重试」——状态栏菜单弹窗有时序竞态且首击可被吞（实测首击落空、第二次点击即命中），重试后召唤链路稳定。
 
 ## Related Docs
 

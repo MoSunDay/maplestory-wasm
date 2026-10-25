@@ -606,6 +606,24 @@ extern "C"
             static_cast<int16_t>(x), static_cast<int16_t>(y))) : -1;
     }
 
+    int msiteminventory_tab_x(int32_t item_id)
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items && items->is_active()
+            ? items->tab_button_center(
+                jrc::InventoryType::by_item_id(item_id)).x()
+            : MISSING_COORDINATE;
+    }
+
+    int msiteminventory_tab_y(int32_t item_id)
+    {
+        auto items = jrc::UI::get().get_element<jrc::UIItemInventory>();
+        return items && items->is_active()
+            ? items->tab_button_center(
+                jrc::InventoryType::by_item_id(item_id)).y()
+            : MISSING_COORDINATE;
+    }
+
     int msnpc_active()
     {
         return jrc::UI::get().is_element_active(jrc::UIElement::NPCTALK) ? 1 : 0;

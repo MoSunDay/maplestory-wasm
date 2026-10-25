@@ -5,6 +5,7 @@ import { assertCharSelectModernLayout, assertWorldSelectNovaTopSlot } from './la
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
 import { verifyUserInfoFlow } from './user-info-flow.mjs';
+import { boostShoeStats, parseShoeStatsEnv } from './pet-stat-boost.mjs';
 import {
   createAssetIdleWaiter,
   createRuntimeProbes,
@@ -44,6 +45,7 @@ const verifyPetOptions = ['1', 'configure', 'runtime', 'pickup', 'follow'].inclu
 const verifyCharacterInfo = process.env.E2E_CHARACTER_INFO === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
+const shoeStats = parseShoeStatsEnv(process.env.E2E_PET_SHOE_STATS);
 
 const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5, cashShop: 6 });
 
@@ -94,6 +96,10 @@ function assertRuntimeHealthy() {
     throw new Error(`Browser errors: ${driver.errors.length}; fatal logs: ${fatalLogs.length}`);
   }
 }
+
+const restoreShoeStats = shoeStats && verifyPetOptions
+  ? boostShoeStats({ configPath: process.env.MS_SERVER_CONFIG, account, speed: shoeStats.speed, jump: shoeStats.jump }).restore
+  : null;
 
 try {
   const pageUrl = await resolvePageUrl();
@@ -1052,6 +1058,20 @@ try {
   console.log(`artifacts: ${driver.artifactDir}`);
   console.log(`console lines: ${driver.logs.length}; browser exceptions: ${driver.errors.length}`);
   await driver.stop();
+  if (restoreShoeStats) {
+    // The server saves the character (rewriting equipment rows with the
+    // in-memory buffed values) only after the browser disconnects above;
+    // let that logout save land before restoring, or it clobbers the
+    // restore with a new buffed row.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5000);
+    });
+    try {
+      console.log(`PASS  pet shoe stats restored ${JSON.stringify(restoreShoeStats())}`);
+    } catch (error) {
+      console.log(`FAIL  pet shoe stats restore: ${error.message}`);
+    }
+  }
 }
 
 // Piped stdout is asynchronous in Node: exiting right after console.log

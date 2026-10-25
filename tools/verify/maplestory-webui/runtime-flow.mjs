@@ -106,6 +106,8 @@ export function createRuntimeProbes(driver) {
     itemInventoryFirstSlot: () => number('msiteminventory_first_slot'),
     itemInventoryLastSlot: () => number('msiteminventory_last_slot'),
     itemInventorySlotAt: (x, y) => pointArgument('msiteminventory_slot_at', x, y),
+    itemInventoryTabX: itemId => numberArgument('msiteminventory_tab_x', itemId),
+    itemInventoryTabY: itemId => numberArgument('msiteminventory_tab_y', itemId),
     itemInventoryIconItemId: slot => numberArgument('msiteminventory_icon_item_id', slot),
     quickslotSkill: index => numberArgument('msquickslot_skill', index),
     quickslotItem: index => numberArgument('msquickslot_item', index),

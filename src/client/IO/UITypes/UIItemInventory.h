@@ -58,6 +58,9 @@ namespace jrc
         int16_t hit_test(Point<int16_t> cursorpos) const;
         /// Item id represented by the icon in visible slot `slot` (0 if empty).
         int32_t item_id_at(int16_t slot) const;
+        // Screen-space center of a tab strip button (exact for both layout
+        // generations; sprites carry their own origins post-Chaos).
+        Point<int16_t> tab_button_center(InventoryType::Id tb) const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;

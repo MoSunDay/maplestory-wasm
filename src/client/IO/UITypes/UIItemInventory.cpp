@@ -510,6 +510,18 @@ namespace jrc
         return icon != icons.end() ? icon->second->get_item_id() : 0;
     }
 
+    Point<int16_t> UIItemInventory::tab_button_center(InventoryType::Id tb) const
+    {
+        const auto iter = buttons.find(button_by_tab(tb));
+        if (iter == buttons.end())
+            return { -32768, -32768 };
+        const Rectangle<int16_t> rect = iter->second->bounds(position);
+        return {
+            static_cast<int16_t>((rect.l() + rect.r()) / 2),
+            static_cast<int16_t>((rect.t() + rect.b()) / 2)
+        };
+    }
+
     int16_t UIItemInventory::slot_by_position(Point<int16_t> cursorpos) const
     {
         // Socket hit test against the generation's grid geometry (see

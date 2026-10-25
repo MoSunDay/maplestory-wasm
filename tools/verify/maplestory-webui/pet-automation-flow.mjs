@@ -40,23 +40,55 @@ async function ensurePetSummoned(driver, probes, requireState) {
   if (puppySlot < 1 || puppySlot > 24)
     throw new Error(`Starter puppy is unavailable in visible cash inventory: slot=${puppySlot}`);
 
-  await driver.click(711, 574);
-  await sleep(400);
-  const menu = { x: await probes.itemsMenuX(), y: await probes.itemsMenuY() };
-  if (!Number.isFinite(menu.x) || !Number.isFinite(menu.y) || menu.x < 0 || menu.y < 0)
-    throw new Error(`Items menu point unavailable: ${JSON.stringify(menu)}`);
-  await driver.click(menu.x, menu.y);
-  await sleep(500);
-  await requireState('item inventory assets ready', async () =>
-    await probes.assetBlocking() === 0 &&
-    await driver.evaluate("document.getElementById('asset-loading-screen').classList.contains('is-hidden')"),
-    45);
-  await sleep(500);
-  const originX = await probes.itemInventoryX();
-  const originY = await probes.itemInventoryY();
-  await driver.click(originX + 138, originY + 28);
-  await requireState('cash inventory tab selected', async () =>
-    await probes.itemInventoryTab() === 5, 10);
+  // The statusbar menu popup can dismiss itself between the point probe and
+  // the click, leaving the inventory unopened while the asset gate below
+  // still passes (it only observes blocking, not the window state). Retry
+  // the open-and-switch sequence: gate on the window being active, re-read
+  // the tab point each attempt, and only accept once the tab reads CASH.
+  let tabSelected = false;
+  let originX = 0;
+  let originY = 0;
+  for (let attempt = 0; attempt < 3 && !tabSelected; attempt += 1) {
+    if (attempt > 0) await sleep(600);
+    if (await probes.itemInventoryActive() !== 1) {
+      await requireState('item menu assets idle', async () =>
+        await probes.assetBlocking() === 0, 45);
+      if (await probes.itemsMenuX() < 0) {
+        await driver.click(711, 574);
+        await sleep(400);
+      }
+      const menu = { x: await probes.itemsMenuX(), y: await probes.itemsMenuY() };
+      if (!Number.isFinite(menu.x) || !Number.isFinite(menu.y) || menu.x < 0 || menu.y < 0)
+        throw new Error(`Items menu point unavailable: ${JSON.stringify(menu)}`);
+      await driver.click(menu.x, menu.y);
+      await requireState('item inventory opened', async () =>
+        await probes.itemInventoryActive() === 1, 10);
+    }
+    await requireState('item inventory assets ready', async () =>
+      await probes.assetBlocking() === 0 &&
+      await driver.evaluate("document.getElementById('asset-loading-screen').classList.contains('is-hidden')"),
+      45);
+    await sleep(500);
+    originX = await probes.itemInventoryX();
+    originY = await probes.itemInventoryY();
+    // Exact tab-strip center from the button rect probe; falls back to the
+    // legacy window-relative offset when the probe is unavailable (inactive
+    // window -> MISSING_COORDINATE, or export absent from this WASM build).
+    const tabX = await probes.itemInventoryTabX(STARTER_PUPPY).catch(() => Number.NaN);
+    const tabY = await probes.itemInventoryTabY(STARTER_PUPPY).catch(() => Number.NaN);
+    const tabPoint = Number.isFinite(tabX) && tabX > 0 && Number.isFinite(tabY) && tabY > 0
+      ? { x: tabX, y: tabY }
+      : { x: originX + 138, y: originY + 28 };
+    console.log(`INFO  pet cash tab attempt=${attempt} origin=${originX},${originY} point=${tabPoint.x},${tabPoint.y}`);
+    await driver.click(tabPoint.x, tabPoint.y);
+    for (let second = 0; second < 4 && !tabSelected; second += 1) {
+      tabSelected = await probes.itemInventoryTab() === 5;
+      if (!tabSelected) await sleep(1000);
+    }
+    if (!tabSelected) await driver.screenshot('08e-pet-cash-tab-retry');
+  }
+  if (!tabSelected)
+    throw new Error('cash inventory tab never selected after retries');
   await sleep(500);
   await requireState('cash inventory assets ready', async () =>
     await probes.assetBlocking() === 0 &&
