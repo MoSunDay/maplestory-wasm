@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -23,15 +23,46 @@ export class BrowserDriver {
   }
 
   async start() {
+    // A previous run killed mid-flight can leave its chromium holding the
+    // debug port. A fresh spawn would then fail to bind while the /json/list
+    // poll silently attaches to the stale, half-dead instance below, so kill
+    // any leftover listener before spawning a new browser process.
+    const probeDebugPort = () => {
+      const signal = typeof AbortSignal?.timeout === 'function'
+        ? AbortSignal.timeout(500)
+        : undefined;
+      return fetch(`http://127.0.0.1:${this.debugPort}/json/version`, signal ? { signal } : {});
+    };
     try {
-      const response = await fetch(`http://127.0.0.1:${this.debugPort}/json/version`, {
-        signal: AbortSignal.timeout(500)
-      });
+      const response = await probeDebugPort();
       if (response.ok) {
-        throw new Error(`Chromium debug port is already in use: ${this.debugPort}`);
+        console.warn(`[cdp] stale chromium on port ${this.debugPort}; killing listeners`);
+        try {
+          execSync(`fuser -k ${this.debugPort}/tcp`, { stdio: 'ignore' });
+        } catch (error) {
+          try {
+            execSync(`pkill -9 -f "remote-debugging-port=${this.debugPort}"`, { stdio: 'ignore' });
+          } catch (fallbackError) {}
+        }
+        let portFreed = false;
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          try {
+            await probeDebugPort();
+            await sleep(100);
+          } catch (error) {
+            portFreed = true;
+            break; // Fetch failed: nothing answers on the port any more.
+          }
+        }
+        if (!portFreed) {
+          // Better a loud failure than silently attaching to a zombie
+          // DevTools endpoint whose pages no longer exist.
+          throw new Error(
+            `[cdp] port ${this.debugPort} still held after killing the stale chromium`);
+        }
       }
     } catch (error) {
-      if (error.message?.includes('already in use')) throw error;
+      // Fetch failed: the debug port is free, safe to spawn below.
     }
     const extraArgs = (process.env.E2E_CHROME_ARGS || '')
       .split(/\s+/)

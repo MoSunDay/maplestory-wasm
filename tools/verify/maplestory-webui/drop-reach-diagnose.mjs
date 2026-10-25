@@ -198,7 +198,23 @@ async function main() {
     console.log(`INFO  entered game: mobs=${before.mobCount} drops=${drops0} player=(${before.playerX},${before.playerY}) hp=${before.hp}`);
     await driver.screenshot('entry');
     if (drops0 === 0) {
-      await killUntilDrop(driver, drops0, 20000);
+      // 先原地连杀 killSeconds 秒（AoE 会一次掉多堆），制造掉落堆叠再采样
+      const killSeconds = Number(process.env.E2E_KILL_SECONDS || 0);
+      if (killSeconds > 0) {
+        const killDeadline = Date.now() + killSeconds * 1000;
+        while (Date.now() < killDeadline) {
+          const s = await snapshot(driver);
+          if (s.mobCount > 0 && s.mobX !== MISSING_COORDINATE) {
+            if (Math.abs(s.mobX - s.playerX) > 60) await walkTo(driver, s.mobX, 50);
+            const face = (s.mobX > s.playerX) ? RIGHT : LEFT;
+            await driver.keyHold(face.key, face.code, face.vk, 150);
+          }
+          await driver.keyHold(ATTACK.key, ATTACK.code, ATTACK.vk, 500);
+          await sleep(400);
+        }
+      } else {
+        await killUntilDrop(driver, drops0, 20000);
+      }
       const spawnDeadline = Date.now() + 4000; // 掉落在死亡动画后才落地
       while (Date.now() < spawnDeadline && (await snapshot(driver)).drops <= drops0) await sleep(200);
     }
