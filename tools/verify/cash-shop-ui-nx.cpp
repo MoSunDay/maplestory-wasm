@@ -27,14 +27,6 @@ namespace
         return image.width() == width && image.height() == height;
     }
 
-    bool bitmap_is(nl::node node)
-    {
-        if (node.data_type() != nl::node::type::bitmap)
-            return false;
-        const auto image = node.get_bitmap();
-        return image.width() > 0 && image.height() > 0;
-    }
-
     bool button_is_complete(nl::node button, uint16_t width, uint16_t height)
     {
         const char* states[] = { "normal", "pressed", "disabled", "mouseOver" };
@@ -80,6 +72,21 @@ namespace
                 shop["CSLockerNew"]["LockerTransfer"]["BtTransfer"], 73, 16);
     }
 
+    bool effect_assets_ok(nl::node shop)
+    {
+        bool ok = true;
+        for (uint16_t frame = 0; frame < 3; ++frame)
+            ok = ok && bitmap_is(
+                shop["Base"]["Preview"][std::to_string(frame)], 366, 238);
+        const char* badges[] = { "new", "hot", "sale", "event", "limited" };
+        for (const char* badge : badges)
+            ok = ok && bitmap_is(shop["CSEffect"][badge]["0"], 31, 29);
+        return ok &&
+            bitmap_is(shop["CSIcon"]["0"], 15, 14) &&
+            bitmap_is(shop["CSIcon"]["1"], 15, 14) &&
+            bitmap_is(shop["CSLocker"]["backgrndCover"], 346, 146);
+    }
+
     bool status_assets_ok(nl::node shop)
     {
         return button_is_complete(shop["CSStatus"]["BtCharge"], 77, 23) &&
@@ -100,7 +107,7 @@ int main(int argc, char** argv)
     nl::node shop = ui.root()["CashShop.img"];
 
     bool ok = catalog_assets_ok(shop) && inventory_assets_ok(shop) &&
-        status_assets_ok(shop);
+        status_assets_ok(shop) && effect_assets_ok(shop);
 
     std::ifstream catalog_file(catalog_path, std::ios::binary);
     const std::string catalog{
@@ -127,7 +134,7 @@ int main(int argc, char** argv)
         const auto box_image = notice["box"].get_bitmap();
         const auto bottom_image = notice["s"].get_bitmap();
         std::cout << "PASS modern CashShop.img 1024x768 full-screen set, buttons, "
-                  << "SN 80000002; cash-button="
+                  << "previews/badges/currency/locker-cover, SN 80000002; cash-button="
                   << origin.first << ',' << origin.second << ' '
                   << image.width() << 'x' << image.height() << "; ok-button="
                   << ok_origin.first << ',' << ok_origin.second << ' '

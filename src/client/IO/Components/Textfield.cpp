@@ -419,6 +419,16 @@ namespace jrc
         crypt = c;
     }
 
+    void Textfield::set_bounds(Rectangle<int16_t> bnd)
+    {
+        bounds = bnd;
+        if (state == FOCUSED)
+        {
+            // Keep the DOM input anchored to the moved field.
+            ImeBridge::reposition_field(this);
+        }
+    }
+
     bool Textfield::belowlimit(size_t extra) const
     {
         if (limit > 0)

@@ -1,4 +1,4 @@
-// 现金商城试穿流程：浮层自动收起、试穿集累计（同槽覆盖）、重置按钮还原。
+// 现金商城试穿流程：原位子菜单自动收起、试穿集累计（同槽覆盖）、重置按钮还原。
 // 依赖只读探针：mscashshop_equip_menu_open / mscashshop_equip_sub /
 // mscashshop_filtered_count / mscashshop_highlighted_item /
 // mscashshop_selected_left / mscashshop_tryon_count / mscashshop_preview_cap。
@@ -15,14 +15,19 @@ const cardIndex = Number(process.env.TRYON_FLOW_CARD ?? process.env.CASH_EQUIP_C
 const uiState = Object.freeze({ login: 1, world: 2, characters: 3, game: 5, cashShop: 6 });
 // game 800x600 设计坐标。
 const charCard = index => ({ x: 105 + 120 * index + 25, y: 210 });
-const rail = Object.freeze({ equip: { x: 49, y: 40 + 34 * 1 + 12 } });
-const subRow = sub => ({ x: 148, y: 106 + 22 * sub + 11 });
+const rail = Object.freeze({ equip: { x: 49, y: 58 + 22 * 1 + 11 } });
+const subRow = sub => ({ x: 49, y: 60 + 21 * sub + 10 });
 const gridCard = index => ({
-  x: 109 + (index % 4) * 97 + 46,
-  y: 86 + Math.floor(index / 4) * 148 + 72
+  x: 100 + (index % 4) * 101 + 42,
+  y: 88 + Math.floor(index / 4) * 148 + 40
 });
-const resetButton = Object.freeze({ x: 528, y: 564 });
-const shopEntry = Object.freeze({ x: 597, y: 571 });
+const resetButton = Object.freeze({ x: 540, y: 571 });
+// 商城入口按钮随 HUD 世代移动：新版状态栏 (597,571)，传统 v83 状态栏
+// (562,583)，依次尝试直到现金商城激活。
+const shopEntries = Object.freeze([
+  { x: 597, y: 571 },
+  { x: 562, y: 583 }
+]);
 // 试穿人像采样带（avatar frame 内部）。
 const avatarBand = Object.freeze({ x0: 514, x1: 586, y0: 458, y1: 544 });
 
@@ -153,10 +158,13 @@ async function loginAndEnterGame(driver) {
 }
 
 async function enterCashShop(driver) {
-  for (let attempt = 0; attempt < 5 &&
-    !await uiStateIs(driver, uiState.cashShop)(); attempt += 1) {
-    await driver.click(shopEntry.x, shopEntry.y);
-    await sleep(2000);
+  for (const entry of shopEntries) {
+    for (let attempt = 0; attempt < 3 &&
+      !await uiStateIs(driver, uiState.cashShop)(); attempt += 1) {
+      await driver.click(entry.x, entry.y);
+      await sleep(2000);
+    }
+    if (await uiStateIs(driver, uiState.cashShop)()) break;
   }
   if (!await waitFor(uiStateIs(driver, uiState.cashShop), 20)) {
     throw new Error('cash shop did not activate');
@@ -174,10 +182,10 @@ async function selectEquipSub(driver, sub) {
 }
 
 async function verifyTryon(driver) {
-  // 1. 装备→帽子：选中后浮层自动收起，目录只剩帽子。
+  // 1. 装备→帽子：选中后原位菜单自动收起，目录只剩帽子。
   await selectEquipSub(driver, 1);
   report(await probe(driver, 'mscashshop_equip_menu_open') === 0,
-    '子分类选中后浮层自动收起');
+    '子分类选中后原位菜单自动收起');
   report(await probe(driver, 'mscashshop_equip_sub') === 1,
     '帽子子分类生效');
   const hatCount = await probe(driver, 'mscashshop_filtered_count');
@@ -232,6 +240,31 @@ async function verifyTryon(driver) {
     `人像像素随上衣变化 (${Math.round(afterTop.changed * 100)}% cells, mean ${afterHat1.mean} -> ${afterTop.mean})`);
   await driver.screenshot('23-tryon-accumulated');
 
+  // 5.5 现金武器（1702xxx）：子分类「武器」+ SN 搜索，武器槽入集预览。
+  await selectEquipSub(driver, 16);
+  report(await probe(driver, 'mscashshop_equip_sub') === 16, '武器子分类生效');
+  const playerWeapon = await probe(driver, 'mscashshop_preview_weapon');
+  await driver.click(300, 50);                      // 聚焦搜索框 (100,34)-(471,59)
+  await waitFor(async () => driver.evaluate('MapleWasmIME.active === true'), 10);
+  await driver.compose('20800118');                 // 在售 1702000 的 SN
+  await sleep(250);
+  await driver.key('Enter', 'Enter', 13);
+  await sleep(600);
+  report(await probe(driver, 'mscashshop_filtered_count') === 1,
+    `SN 搜索过滤到唯一商品 (filtered=${await probe(driver, 'mscashshop_filtered_count')})`);
+  report(await probe(driver, 'mscashshop_highlighted_item') === 1702000,
+    `搜索命中现金武器 (item=${await probe(driver, 'mscashshop_highlighted_item')})`);
+  await driver.click(gridCard(0).x, gridCard(0).y);
+  await sleep(700);
+  report(await probe(driver, 'mscashshop_tryon_count') === 3,
+    `现金武器累计入试穿集 (count=${await probe(driver, 'mscashshop_tryon_count')} === 3)`);
+  report(await probe(driver, 'mscashshop_preview_weapon') === 1702000,
+    `预览武器切换为现金武器 (weapon=${await probe(driver, 'mscashshop_preview_weapon')} === 1702000)`);
+  const afterWeapon = await avatarStats(driver, afterTop.grid);
+  report(afterWeapon.changed >= 0.02,
+    `人像像素随现金武器变化 (${Math.round(afterWeapon.changed * 100)}% cells)`);
+  await driver.screenshot('23b-tryon-cash-weapon');
+
   // 6. 重置：集清空、人像还原玩家外观。
   await driver.click(resetButton.x, resetButton.y);
   await sleep(700);
@@ -239,6 +272,8 @@ async function verifyTryon(driver) {
     '重置按钮清空试穿集');
   report(await probe(driver, 'mscashshop_preview_cap') === playerCap,
     `预览还原玩家外观 (cap=${await probe(driver, 'mscashshop_preview_cap')} === ${playerCap})`);
+  report(await probe(driver, 'mscashshop_preview_weapon') === playerWeapon,
+    `预览武器还原玩家外观 (weapon=${await probe(driver, 'mscashshop_preview_weapon')} === ${playerWeapon})`);
   const afterReset = await avatarStats(driver);
   report(Math.abs(afterReset.mean - baseline.mean) < 1.5,
     `人像带亮度回到基线 (mean ${afterReset.mean} ≈ ${baseline.mean})`);

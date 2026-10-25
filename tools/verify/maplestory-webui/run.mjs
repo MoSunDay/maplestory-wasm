@@ -731,13 +731,13 @@ try {
       await sleep(250);
       await driver.key('Enter', 'Enter', 13);
       await sleep(900);
-      await driver.click(155, 120);
+      await driver.click(142, 128);
       await sleep(1000);
       await requireAssetIdle('cash-shop avatar preview assets ready');
       await driver.screenshot('10b-cash-shop-avatar-preview');
 
       // Modern CashShop fills the 800x600 canvas; the search field occupies
-      // (109,34)-(493,59) in canvas coordinates.
+      // (100,34)-(471,59) in canvas coordinates.
       await driver.click(300, 50);
       await requireState('cash-shop search focused', async () =>
         await driver.evaluate('MapleWasmIME.active === true'));
@@ -747,12 +747,12 @@ try {
       await sleep(250);
       await driver.key('Enter', 'Enter', 13);
       await sleep(500);
-      // First catalog card sits at (109,86) with size 93x144; the icon is
-      // centred at (155,120).
-      await driver.click(155, 120);
+      // First catalog card sits at (100,88) with size 93x144; the icon is
+      // centred at (142,128).
+      await driver.click(142, 128);
       await sleep(250);
       await driver.screenshot('11-cash-shop-selected');
-      await driver.click(155, 120);
+      await driver.click(142, 128);
       await requireState('cash purchase confirmation visible', async () =>
         await noticeActive() === 1);
       await sleep(500);
@@ -768,8 +768,8 @@ try {
       if (lockerRow < 0) {
         throw new Error('Purchased locker item was not selected');
       }
-      // Locker slots form a 7x3 grid from (504,102) with 39px steps.
-      await driver.doubleClick(504 + (lockerRow % 7) * 39 + 18, 102 + Math.floor(lockerRow / 7) * 39 + 18);
+      // Locker slots form a 7x3 grid from (517,88) with 39px steps.
+      await driver.doubleClick(517 + (lockerRow % 7) * 39 + 18, 88 + Math.floor(lockerRow / 7) * 39 + 18);
       await requireState('cash item taken into character inventory', async () =>
         await cashShopProbe('mscashshop_pending') === 0 &&
         await cashShopProbe('mscashshop_locker_count') === initial.locker &&
@@ -780,7 +780,7 @@ try {
       if (inventoryRow < 0) {
         throw new Error('Taken cash item was not selected');
       }
-      await driver.doubleClick(504 + (inventoryRow % 7) * 39 + 18, 102 + Math.floor(inventoryRow / 7) * 39 + 18);
+      await driver.doubleClick(517 + (inventoryRow % 7) * 39 + 18, 88 + Math.floor(inventoryRow / 7) * 39 + 18);
       await requireState('cash item returned to locker', async () =>
         await cashShopProbe('mscashshop_pending') === 0 &&
         await cashShopProbe('mscashshop_locker_count') === initial.locker + 1 &&

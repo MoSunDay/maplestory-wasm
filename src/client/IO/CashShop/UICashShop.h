@@ -63,6 +63,7 @@ namespace jrc
         int32_t highlighted_item_id() const;
         int32_t selected_left_index() const;
         int32_t preview_cap_id() const;
+        int32_t preview_weapon_id() const;
         int32_t tryon_count() const;
         bool is_equip_menu_open() const;
         int64_t transfer_cash_id() const;
@@ -73,8 +74,10 @@ namespace jrc
 
     private:
         void rebuild_catalog();
+        void clear_search();
         void refresh();
         void refresh_rows();
+        void refresh_category_icons();
         void press_equip_menu(uint16_t id);
         std::optional<size_t> highlighted_index() const;
         void refresh_preview();
@@ -88,6 +91,8 @@ namespace jrc
         void select_new_locker_item(int64_t cash_id);
         void select_inventory_item(int64_t cash_id);
         void request_purchase(size_t filtered_index);
+        // Selected catalog entry exists and lives on the currently shown page.
+        bool left_selection_visible() const;
         void request_transfer(size_t item_index);
         size_t right_count() const;
         int32_t right_item_id(size_t index) const;
@@ -125,6 +130,8 @@ namespace jrc
         std::optional<size_t> selected_left;
         std::optional<size_t> selected_right;
         std::vector<size_t> filtered;
+        std::string applied_query;
+        int32_t category_icon_ids[cash_shop_view::CATEGORY_COUNT] = {};
         Point<int16_t> last_cursor_position;
 
         cash_shop_skin::CashShopSkin skin;
@@ -139,6 +146,11 @@ namespace jrc
         Text pane_title;
         Text pane_info;
         Text search_label;
+        Text search_clear_label;
+        Text rail_help;
+        Text rail_status;
+        Text details_title;
+        Text empty_catalog_text;
         Text transfer_hint;
         Text details_hint;
         Text details_name;

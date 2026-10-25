@@ -11,10 +11,22 @@ namespace jrc::cash_shop_view
             return gender < 0 || gender == 2 || gender == (female ? 1 : 0);
         }
 
+        std::string ascii_lower(std::string value)
+        {
+            for (char& character : value)
+                if (character >= 'A' && character <= 'Z')
+                    character = static_cast<char>(character - 'A' + 'a');
+            return value;
+        }
+
         bool query_matches(const CashCommodity& item, const std::string& query)
         {
-            return query.empty() || item.name.find(query) != std::string::npos ||
-                std::to_string(item.sn).find(query) != std::string::npos;
+            if (query.empty())
+                return true;
+            const std::string needle = ascii_lower(query);
+            return ascii_lower(item.name).find(needle) != std::string::npos ||
+                std::to_string(item.sn).find(query) != std::string::npos ||
+                std::to_string(item.item_id).find(query) != std::string::npos;
         }
     }
 

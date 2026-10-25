@@ -49,6 +49,7 @@ namespace jrc
         BT_LEFT_NEXT,
         BT_RIGHT_PREV,
         BT_RIGHT_NEXT,
-        BT_FEATURED
+        BT_FEATURED,
+        BT_SEARCH_CLEAR
     };
 }

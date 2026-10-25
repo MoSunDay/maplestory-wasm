@@ -78,70 +78,97 @@ namespace jrc::cash_shop_layout
     constexpr int16_t TEXT_BASELINE_SHIFT = 5;
 
     // --- Header ----------------------------------------------------------
-    // Title, three currency readouts and the two action pills.
-    constexpr Point<int16_t> TITLE_POS{ 109, 3 };
-    constexpr Point<int16_t> TOP_BAR_POS{ 100, 0 };
-    constexpr Point<int16_t> TOP_BAR_SIZE{ 700, 32 };
-    constexpr int16_t BALANCE_ICON_XS[3]{ 184, 294, 404 };
-    constexpr int16_t BALANCE_ICON_Y = 6;
-    constexpr int16_t BALANCE_LABEL_XS[3]{ 200, 310, 420 };
-    constexpr int16_t BALANCE_VALUE_RIGHT_XS[3]{ 292, 402, 512 };
+    // Title, three currency readouts and the two action pills. The balance
+    // columns are 140px apart so a nine-digit value never reaches the label
+    // on its left; the action pair is anchored ten pixels from the edge.
+    constexpr Point<int16_t> TITLE_POS{ 12, 4 };
+    constexpr Point<int16_t> TOP_BAR_POS{ 0, 0 };
+    constexpr Point<int16_t> TOP_BAR_SIZE{ VIEW_WIDTH, 32 };
+    constexpr int16_t BALANCE_ICON_XS[3]{ 100, 240, 380 };
+    constexpr int16_t BALANCE_ICON_Y = 7;
+    constexpr int16_t BALANCE_LABEL_XS[3]{ 116, 256, 396 };
+    constexpr int16_t BALANCE_VALUE_RIGHT_XS[3]{ 232, 372, 512 };
     constexpr int16_t BALANCE_Y = 11;
     constexpr Point<int16_t> CHARGE_POS{ 606, 6 };
     constexpr Point<int16_t> CHARGE_SIZE{ 72, 20 };
-    constexpr Point<int16_t> EXIT_POS{ 700, 5 };
-    constexpr Point<int16_t> EXIT_SIZE{ 90, 23 };
+    constexpr Point<int16_t> EXIT_POS{ 698, 6 };
+    constexpr Point<int16_t> EXIT_SIZE{ 92, 20 };
 
     // --- Left rail -------------------------------------------------------
-    // The bright 0..98 strip of the painted background holds the categories.
-    constexpr Point<int16_t> CATEGORY_TITLE_POS{ 10, 0 };
-    constexpr Point<int16_t> CATEGORY_POS{ 4, 40 };
-    constexpr Point<int16_t> CATEGORY_SIZE{ 90, 24 };
-    constexpr int16_t CATEGORY_STEP_Y = 34;
-    constexpr Point<int16_t> CATEGORY_LABEL_OFFSET{ 0, 1 };
-    constexpr Point<int16_t> CATEGORY_COUNT_OFFSET{ 84, 1 };
+    // One translucent 90px rail runs from below the header to the footer.
+    // Primary categories occupy 8 x 22px rows; the lower half is a quiet
+    // badge legend. Opening the equipment sub-menu swaps the rail content
+    // in place instead of covering the catalog.
+    constexpr Point<int16_t> RAIL_PANEL_POS{ 4, 34 };
+    constexpr Point<int16_t> RAIL_PANEL_SIZE{ 90, 512 };
+    constexpr Point<int16_t> CATEGORY_TITLE_POS{ 10, 38 };
+    constexpr Point<int16_t> CATEGORY_POS{ 4, 58 };
+    constexpr Point<int16_t> CATEGORY_SIZE{ 90, 22 };
+    constexpr int16_t CATEGORY_STEP_Y = 22;
+    constexpr Point<int16_t> CATEGORY_ICON_CENTER{ 16, 11 };
+    constexpr int16_t CATEGORY_ICON_MAX = 16;
+    constexpr Point<int16_t> CATEGORY_LABEL_OFFSET{ 34, 0 };
+    constexpr int16_t CATEGORY_LABEL_WIDTH = 26;
+    constexpr Point<int16_t> CATEGORY_COUNT_OFFSET{ 84, 0 };
     constexpr int16_t CATEGORY_COUNT_WIDTH = 40;
-    constexpr Point<int16_t> CATEGORY_LINE_OFFSET{ 0, 21 };
-    constexpr Point<int16_t> CATEGORY_LINE_SIZE{ 90, 2 };
+    constexpr Point<int16_t> CATEGORY_LINE_OFFSET{ 0, 0 };
+    constexpr Point<int16_t> CATEGORY_LINE_SIZE{ 3, 22 };
+    constexpr Point<int16_t> CATEGORY_SECTION_LINE_POS{ 10, 241 };
+    constexpr Point<int16_t> CATEGORY_SECTION_LINE_SIZE{ 80, 1 };
 
     // --- Equipment sub-menu ----------------------------------------------
-    // Flyout opened from the rail's 装备 entry. It overlays the first
-    // catalog column while an equipment sub-category is being picked.
-    constexpr Point<int16_t> EQSUB_POS{ 100, 86 };
-    constexpr int16_t EQSUB_WIDTH = 96;
-    constexpr int16_t EQSUB_HEADER_HEIGHT = 20;
-    constexpr int16_t EQSUB_ENTRY_STEP_Y = 22;
+    // The sub-menu replaces the primary rows. Back lives in the rail title
+    // row; the 17 sub categories use compact 21px rows, and the space below
+    // becomes a live filter summary.
+    constexpr Point<int16_t> EQSUB_POS{ 4, 60 };
+    constexpr int16_t EQSUB_WIDTH = 90;
+    constexpr int16_t EQSUB_ENTRY_STEP_Y = 21;
     constexpr Point<int16_t> EQSUB_ENTRY_SIZE{ EQSUB_WIDTH, EQSUB_ENTRY_STEP_Y };
-    constexpr Point<int16_t> EQSUB_HEADER_LABEL_OFFSET{ 8, 0 };
-    constexpr Point<int16_t> EQSUB_LABEL_OFFSET{ 8, 1 };
-    constexpr Point<int16_t> EQSUB_COUNT_OFFSET{ 54, 1 };
-    constexpr int16_t EQSUB_COUNT_WIDTH = 36;
-    constexpr Point<int16_t> EQSUB_CLOSE_POS{ 178, 88 };
-    constexpr Point<int16_t> EQSUB_CLOSE_SIZE{ 14, 16 };
+    constexpr Point<int16_t> EQSUB_TITLE_POS{ 10, 40 };
+    constexpr Point<int16_t> EQSUB_BACK_POS{ 88, 40 };
+    constexpr Point<int16_t> EQSUB_LABEL_OFFSET{ 12, 0 };
+    constexpr int16_t EQSUB_LABEL_WIDTH = 46;
+    constexpr Point<int16_t> EQSUB_COUNT_OFFSET{ 84, 0 };
+    constexpr int16_t EQSUB_COUNT_WIDTH = 40;
+    constexpr Point<int16_t> EQSUB_CLOSE_POS{ 4, 36 };
+    constexpr Point<int16_t> EQSUB_CLOSE_SIZE{ 90, 22 };
+    constexpr Point<int16_t> EQSUB_SECTION_LINE_POS{ 10, 423 };
+    constexpr Point<int16_t> EQSUB_SECTION_LINE_SIZE{ 80, 1 };
+    constexpr Point<int16_t> EQSUB_STATUS_PANEL_POS{ 6, 430 };
+    constexpr Point<int16_t> EQSUB_STATUS_PANEL_SIZE{ 86, 108 };
+    constexpr Point<int16_t> EQSUB_STATUS_POS{ 10, 436 };
+    constexpr int16_t EQSUB_STATUS_WIDTH = 78;
 
-    // Legend explaining the badge overlays on cards and slots.
-    constexpr Point<int16_t> LEGEND_PANEL_POS{ 4, 274 };
-    constexpr Point<int16_t> LEGEND_PANEL_SIZE{ 90, 172 };
-    constexpr Point<int16_t> LEGEND_TITLE_POS{ 12, 280 };
-    constexpr Point<int16_t> LEGEND_ROW_POS{ 10, 300 };
+    // Badge legend in the lower half of the rail. It is plain content on the
+    // shared rail surface, not a second nested panel.
+    constexpr Point<int16_t> LEGEND_TITLE_POS{ 10, 246 };
+    constexpr Point<int16_t> LEGEND_ROW_POS{ 10, 266 };
     constexpr int16_t LEGEND_ROW_STEP = 29;
     constexpr Point<int16_t> LEGEND_BADGE_SIZE{ 24, 22 };
-    constexpr Point<int16_t> LEGEND_LABEL_OFFSET{ 38, 4 };
-    constexpr int16_t LEGEND_LABEL_WIDTH = 48;
-    constexpr Point<int16_t> LEGEND_NOTE_POS{ 8, 452 };
+    constexpr Point<int16_t> LEGEND_LABEL_OFFSET{ 32, 4 };
+    constexpr int16_t LEGEND_LABEL_WIDTH = 50;
+    constexpr Point<int16_t> LEGEND_NOTE_SEPARATOR_POS{ 10, 412 };
+    constexpr Point<int16_t> LEGEND_NOTE_SEPARATOR_SIZE{ 80, 1 };
+    constexpr Point<int16_t> LEGEND_NOTE_POS{ 8, 420 };
     constexpr int16_t LEGEND_NOTE_WIDTH = 82;
+    constexpr Point<int16_t> RAIL_HELP_POS{ 8, 466 };
+    constexpr int16_t RAIL_HELP_WIDTH = 82;
 
     // --- Catalog ---------------------------------------------------------
-    // Native search bar at (140,44), 491x32, matching the card row width.
-    constexpr Point<int16_t> SEARCH_BAR_POS{ 109, 34 };
-    constexpr Point<int16_t> SEARCH_BAR_SIZE{ 384, 25 };
-    constexpr Point<int16_t> SEARCH_LABEL_POS{ 114, 36 };
+    // Left content is a strict 100..496 column. The search bar, currency
+    // row, card grid and footer rule share that width; the right pane starts
+    // at 508, leaving a consistent 12px gutter.
+    constexpr Point<int16_t> SEARCH_BAR_POS{ 100, 34 };
+    constexpr Point<int16_t> SEARCH_BAR_SIZE{ 396, 25 };
+    constexpr Point<int16_t> SEARCH_LABEL_POS{ 105, 36 };
     // Canvas-space rect drawn without draw_position(): Textfield::draw()
     // reports these bounds to the IME verbatim, so it must stay unshifted.
     constexpr Rectangle<int16_t> SEARCH_FIELD_BOUNDS{
-        { 156, 26 }, { 480, 44 } };
+        { 148, 36 }, { 470, 54 } };
     constexpr Rectangle<int16_t> SEARCH_HITBOX{
-        { 109, 34 }, { 493, 59 } };
+        { 100, 34 }, { 471, 59 } };
+    constexpr Point<int16_t> SEARCH_CLEAR_POS{ 472, 36 };
+    constexpr Point<int16_t> SEARCH_CLEAR_SIZE{ 16, 21 };
 
     // Viewport-space search hitbox: the scaled design rect moved by origin().
     inline Rectangle<int16_t> search_hitbox()
@@ -154,21 +181,23 @@ namespace jrc::cash_shop_layout
     }
 
     // Payment currency chips under the search bar.
-    constexpr Point<int16_t> CURRENCY_POS{ 109, 66 };
+    constexpr Point<int16_t> CURRENCY_POS{ 100, 64 };
     constexpr Point<int16_t> CURRENCY_SIZE{ 48, 16 };
     constexpr int16_t CURRENCY_STEP_X = 52;
 
-    // Filter summary shown above the right pane.
-    constexpr Point<int16_t> CATALOG_INFO_POS{ 492, 69 };
-    constexpr int16_t CATALOG_INFO_WIDTH = 224;
+    // Filter summary at the right end of the currency row.
+    constexpr Point<int16_t> CATALOG_INFO_BOX_POS{ 268, 64 };
+    constexpr Point<int16_t> CATALOG_INFO_BOX_SIZE{ 228, 18 };
+    constexpr Point<int16_t> CATALOG_INFO_POS{ 492, 66 };
+    constexpr int16_t CATALOG_INFO_WIDTH = 220;
 
-    // Native card grid at (140,110) with 119x184 cards and a 124/189 pitch.
-    constexpr Point<int16_t> GRID_POS{ 109, 86 };
-    constexpr int16_t GRID_STEP_X = 97;
+    // Four 93px cards on a 101px pitch: the last card ends at x=496.
+    constexpr Point<int16_t> GRID_POS{ 100, 88 };
+    constexpr int16_t GRID_STEP_X = 101;
     constexpr int16_t GRID_STEP_Y = 148;
     constexpr Point<int16_t> CARD_SIZE{ 93, 144 };
-    constexpr Point<int16_t> CARD_ICON_CENTER{ 46, 34 };
-    constexpr int16_t CARD_ICON_MAX = 56;
+    constexpr Point<int16_t> CARD_ICON_CENTER{ 42, 40 };
+    constexpr int16_t CARD_ICON_MAX = 44;
     constexpr Point<int16_t> CARD_NAME_POS{ 46, 67 };
     constexpr int16_t CARD_NAME_WIDTH = 88;
     constexpr Point<int16_t> CARD_META_POS{ 46, 99 };
@@ -180,38 +209,39 @@ namespace jrc::cash_shop_layout
     constexpr Point<int16_t> CARD_BUY_OFFSET{ 7, 117 };
     constexpr Point<int16_t> CARD_BUY_SIZE{ 79, 19 };
 
-    // Page placeholders are centred on the catalog grid.
-    constexpr Point<int16_t> EMPTY_CATALOG_CENTER{ 301, 306 };
-    constexpr int16_t EMPTY_HINT_WIDTH = 280;
+    // Page placeholders are centred on the catalog column.
+    constexpr Point<int16_t> EMPTY_CATALOG_CENTER{ 298, 310 };
     constexpr Point<int16_t> EMPTY_HINT_SIZE{ px(348), px(148) };
+    constexpr Point<int16_t> EMPTY_CATALOG_LABEL_POS{ 298, 378 };
+    constexpr int16_t EMPTY_CATALOG_LABEL_WIDTH = 300;
 
-    // Left pager (native 30x47 arrows at y680).
-    constexpr Point<int16_t> LEFT_PREV_POS{ 109, 534 };
-    constexpr Point<int16_t> LEFT_NEXT_POS{ 463, 534 };
-    constexpr Point<int16_t> LEFT_PAGE_POS{ 301, 542 };
+    // Left pager (native 30x47 arrows).
+    constexpr Point<int16_t> LEFT_PREV_POS{ 100, 534 };
+    constexpr Point<int16_t> LEFT_NEXT_POS{ 473, 534 };
+    constexpr Point<int16_t> LEFT_PAGE_POS{ 298, 542 };
     constexpr int16_t LEFT_PAGE_WIDTH = 160;
     constexpr Point<int16_t> PAGER_SIZE{ px(30), px(47) };
 
     // Footer rule and hint under the catalog grid.
-    constexpr Point<int16_t> CATALOG_LINE_POS{ 109, 573 };
-    constexpr Point<int16_t> CATALOG_LINE_SIZE{ 384, 2 };
-    constexpr Point<int16_t> CATALOG_HINT_POS{ 301, 578 };
-    constexpr int16_t CATALOG_HINT_WIDTH = 384;
+    constexpr Point<int16_t> CATALOG_LINE_POS{ 100, 575 };
+    constexpr Point<int16_t> CATALOG_LINE_SIZE{ 396, 1 };
+    constexpr Point<int16_t> CATALOG_HINT_POS{ 298, 579 };
+    constexpr int16_t CATALOG_HINT_WIDTH = 396;
 
     // --- Right pane ------------------------------------------------------
-    // Native inventory panel at (635,73), 380x213, 46x46 slots with 50 pitch
-    // starting (10,57) inside the panel.
-    constexpr Point<int16_t> TAB_LOCKER_POS{ 496, 34 };
-    constexpr Point<int16_t> TAB_INVENTORY_POS{ 646, 34 };
-    constexpr Point<int16_t> TAB_SIZE{ 147, 18 };
+    // Two 142px tabs, a 288px panel and an inner slot grid centred with
+    // nine pixels on both sides (517..787 inside 508..796).
+    constexpr Point<int16_t> TAB_LOCKER_POS{ 508, 34 };
+    constexpr Point<int16_t> TAB_INVENTORY_POS{ 654, 34 };
+    constexpr Point<int16_t> TAB_SIZE{ 142, 18 };
     constexpr int16_t TAB_LABEL_WIDTH = TAB_SIZE.x();
-    constexpr Point<int16_t> TAB_BAR_POS{ 496, 54 };
-    constexpr Point<int16_t> TAB_BAR_SIZE{ 297, 2 };
-    constexpr Point<int16_t> PANEL_POS{ 496, 57 };
-    constexpr Point<int16_t> PANEL_SIZE{ 297, 166 };
-    constexpr Point<int16_t> PANE_TITLE_POS{ 508, 66 };
-    constexpr Point<int16_t> PANE_INFO_RIGHT{ 781, 69 };
-    constexpr Point<int16_t> SLOT_GRID_POS{ 504, 102 };
+    constexpr Point<int16_t> TAB_BAR_POS{ 508, 54 };
+    constexpr Point<int16_t> TAB_BAR_SIZE{ 288, 2 };
+    constexpr Point<int16_t> PANEL_POS{ 508, 57 };
+    constexpr Point<int16_t> PANEL_SIZE{ 288, 166 };
+    constexpr Point<int16_t> PANE_TITLE_POS{ 516, 64 };
+    constexpr Point<int16_t> PANE_INFO_RIGHT{ 788, 64 };
+    constexpr Point<int16_t> SLOT_GRID_POS{ 517, 88 };
     constexpr int16_t SLOT_STEP = 39;
     constexpr Point<int16_t> SLOT_SIZE{ 36, 36 };
     constexpr int16_t SLOT_ICON_MAX = 34;
@@ -219,63 +249,69 @@ namespace jrc::cash_shop_layout
     constexpr Point<int16_t> SLOT_MARKER_CENTER{ 7, 7 };
     // Canvas size of the 346x146 slot-grid cover bitmap.
     constexpr Point<int16_t> SLOT_COVER_SIZE{ px(346), px(146) };
-    constexpr Point<int16_t> EMPTY_RIGHT_CENTER{ 644, 162 };
+    constexpr Point<int16_t> EMPTY_RIGHT_CENTER{ 652, 145 };
 
     // Footer under the panel: pager, page label and the transfer action.
-    constexpr Point<int16_t> RIGHT_PREV_POS{ 496, 228 };
-    constexpr Point<int16_t> RIGHT_NEXT_POS{ 761, 228 };
-    constexpr Point<int16_t> RIGHT_PAGE_POS{ 630, 236 };
-    constexpr int16_t RIGHT_PAGE_WIDTH = 100;
-    constexpr Point<int16_t> TRANSFER_POS{ 686, 241 };
+    constexpr Point<int16_t> RIGHT_PREV_POS{ 508, 228 };
+    constexpr Point<int16_t> RIGHT_NEXT_POS{ 773, 228 };
+    constexpr Point<int16_t> RIGHT_PAGE_POS{ 612, 236 };
+    constexpr int16_t RIGHT_PAGE_WIDTH = 96;
+    constexpr Point<int16_t> TRANSFER_POS{ 680, 239 };
     constexpr Point<int16_t> TRANSFER_SIZE{ 64, 16 };
-    constexpr Point<int16_t> TRANSFER_HINT_POS{ 644, 281 };
-    constexpr int16_t TRANSFER_HINT_WIDTH = 290;
+    constexpr Point<int16_t> TRANSFER_HINT_POS{ 652, 270 };
+    constexpr int16_t TRANSFER_HINT_WIDTH = 280;
 
-    // Selected item details between the footer and the bottom of the pane.
-    constexpr Point<int16_t> DETAILS_PANEL_POS{ 496, 300 };
-    constexpr Point<int16_t> DETAILS_PANEL_SIZE{ 297, 118 };
-    constexpr Point<int16_t> DETAILS_LINE_POS{ 496, 300 };
-    constexpr Point<int16_t> DETAILS_LINE_SIZE{ 297, 2 };
-    constexpr Point<int16_t> DETAILS_ICON_CENTER{ 546, 358 };
-    constexpr int16_t DETAILS_ICON_MAX = 84;
-    constexpr Point<int16_t> DETAILS_TEXT_CENTER{ 700, 310 };
-    constexpr int16_t DETAILS_TEXT_WIDTH = 170;
-    constexpr int16_t DETAILS_COUNT_Y = 338;
-    constexpr int16_t DETAILS_META_Y = 356;
-    constexpr int16_t DETAILS_EXTRA_Y = 376;
-    constexpr Point<int16_t> DETAILS_HINT_CENTER{ 644, 340 };
+    // Selected item details: a 22px header and one icon/three-line block.
+    constexpr Point<int16_t> DETAILS_PANEL_POS{ 508, 294 };
+    constexpr Point<int16_t> DETAILS_PANEL_SIZE{ 288, 94 };
+    constexpr Point<int16_t> DETAILS_HEADER_LINE_POS{ 508, 316 };
+    constexpr Point<int16_t> DETAILS_HEADER_LINE_SIZE{ 288, 1 };
+    constexpr Point<int16_t> DETAILS_TITLE_POS{ 516, 298 };
+    constexpr Point<int16_t> DETAILS_ICON_CENTER{ 552, 352 };
+    constexpr int16_t DETAILS_ICON_MAX = 62;
+    constexpr Point<int16_t> DETAILS_TEXT_CENTER{ 694, 318 };
+    constexpr int16_t DETAILS_TEXT_WIDTH = 178;
+    constexpr int16_t DETAILS_COUNT_Y = 334;
+    constexpr int16_t DETAILS_META_Y = 348;
+    constexpr int16_t DETAILS_EXTRA_Y = 362;
+    constexpr Point<int16_t> DETAILS_HINT_CENTER{ 652, 342 };
     constexpr int16_t DETAILS_HINT_WIDTH = 280;
 
-    // Featured commodity panel below the right pane.
-    constexpr Point<int16_t> FEATURED_PANEL_POS{ 496, 426 };
-    constexpr Point<int16_t> FEATURED_PANEL_SIZE{ 297, 162 };
-    constexpr Point<int16_t> FEATURED_AVATAR_FRAME_POS{ 504, 452 };
-    constexpr Point<int16_t> FEATURED_AVATAR_FRAME_SIZE{ 92, 98 };
-    constexpr Point<int16_t> FEATURED_AVATAR_POS{ 550, 548 };
-    constexpr Point<int16_t> FEATURED_AVATAR_FLOOR_POS{ 518, 548 };
-    constexpr Point<int16_t> FEATURED_AVATAR_FLOOR_SIZE{ 64, 2 };
-    constexpr Point<int16_t> FEATURED_TITLE_POS{ 508, 432 };
-    constexpr Point<int16_t> FEATURED_BADGE_POS{ 755, 430 };
+    // Featured commodity preview below the details card.
+    constexpr Point<int16_t> FEATURED_PANEL_POS{ 508, 396 };
+    constexpr Point<int16_t> FEATURED_PANEL_SIZE{ 288, 196 };
+    constexpr Point<int16_t> FEATURED_BUTTON_POS{ 508, 396 };
+    constexpr Point<int16_t> FEATURED_BUTTON_SIZE{ 288, 148 };
+    constexpr Point<int16_t> FEATURED_TITLE_POS{ 516, 400 };
+    constexpr Point<int16_t> FEATURED_HEADER_SIZE{ 288, 28 };
+    constexpr Point<int16_t> FEATURED_HEADER_LINE_POS{ 508, 424 };
+    constexpr Point<int16_t> FEATURED_HEADER_LINE_SIZE{ 288, 1 };
+    constexpr Point<int16_t> FEATURED_BADGE_POS{ 762, 400 };
     constexpr Point<int16_t> FEATURED_BADGE_SIZE{ 26, 24 };
-    constexpr Point<int16_t> FEATURED_ICON_FRAME_POS{ 512, 464 };
+    constexpr Point<int16_t> FEATURED_AVATAR_FRAME_POS{ 516, 434 };
+    constexpr Point<int16_t> FEATURED_AVATAR_FRAME_SIZE{ 92, 110 };
+    constexpr Point<int16_t> FEATURED_AVATAR_POS{ 562, 540 };
+    constexpr Point<int16_t> FEATURED_AVATAR_FLOOR_POS{ 530, 540 };
+    constexpr Point<int16_t> FEATURED_AVATAR_FLOOR_SIZE{ 64, 2 };
+    constexpr Point<int16_t> FEATURED_ICON_FRAME_POS{ 524, 446 };
     constexpr Point<int16_t> FEATURED_ICON_FRAME_SIZE{ 76, 76 };
-    constexpr Point<int16_t> FEATURED_ICON_CENTER{ 550, 502 };
+    constexpr Point<int16_t> FEATURED_ICON_CENTER{ 562, 484 };
     constexpr int16_t FEATURED_ICON_MAX = 62;
-    constexpr Point<int16_t> FEATURED_NAME_POS{ 630, 454 };
-    constexpr Point<int16_t> FEATURED_PRICE_ICON_POS{ 630, 486 };
-    constexpr Point<int16_t> FEATURED_META_POS{ 630, 508 };
+    constexpr Point<int16_t> FEATURED_TEXT_BLOCK_POS{ 616, 434 };
+    constexpr Point<int16_t> FEATURED_TEXT_BLOCK_SIZE{ 172, 84 };
+    constexpr Point<int16_t> FEATURED_NAME_POS{ 624, 438 };
+    constexpr Point<int16_t> FEATURED_PRICE_ICON_POS{ 624, 462 };
+    constexpr Point<int16_t> FEATURED_META_POS{ 624, 486 };
     constexpr int16_t FEATURED_TEXT_WIDTH = 156;
-    constexpr Point<int16_t> FEATURED_HINT_POS{ 644, 568 };
-
-    // Reset button for the accumulated try-on set, left of the hint band.
-    constexpr Point<int16_t> RESET_POS{ 508, 556 };
-    constexpr Point<int16_t> RESET_SIZE{ 40, 16 };
-    constexpr int16_t FEATURED_HINT_WIDTH = 270;
-    constexpr Point<int16_t> FEATURED_TEXT_BLOCK_POS{ 622, 448 };
-    constexpr Point<int16_t> FEATURED_TEXT_BLOCK_SIZE{ 164, 74 };
+    constexpr Point<int16_t> FEATURED_HINT_BAND_POS{ 508, 552 };
+    constexpr Point<int16_t> FEATURED_HINT_BAND_SIZE{ 288, 40 };
+    constexpr Point<int16_t> FEATURED_HINT_POS{ 678, 562 };
+    constexpr int16_t FEATURED_HINT_WIDTH = 220;
+    constexpr Point<int16_t> RESET_POS{ 516, 562 };
+    constexpr Point<int16_t> RESET_SIZE{ 48, 18 };
 
     // Cursor x that separates the catalog from the right pane when scrolling.
-    constexpr int16_t SCROLL_SPLIT_X = 495;
+    constexpr int16_t SCROLL_SPLIT_X = 504;
 
     // Viewport-space x of the catalog/right-pane scroll split.
     inline int16_t scroll_split_x()
@@ -292,22 +328,12 @@ namespace jrc::cash_shop_layout
         };
     }
 
-    // Size of the whole equipment flyout: header plus every sub entry.
-    inline Point<int16_t> equip_menu_size()
-    {
-        return {
-            EQSUB_WIDTH,
-            static_cast<int16_t>(EQSUB_HEADER_HEIGHT +
-                cash_shop_view::EQSUB_COUNT * EQSUB_ENTRY_STEP_Y)
-        };
-    }
-
     // Top-left corner of the n-th equipment sub-category entry.
     inline Point<int16_t> equip_sub_position(int8_t index)
     {
         return {
             EQSUB_POS.x(),
-            static_cast<int16_t>(EQSUB_POS.y() + EQSUB_HEADER_HEIGHT +
+            static_cast<int16_t>(EQSUB_POS.y() +
                 index * EQSUB_ENTRY_STEP_Y)
         };
     }

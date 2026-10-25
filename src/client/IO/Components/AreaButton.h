@@ -28,6 +28,7 @@ namespace jrc
 
         void draw(Point<int16_t>) const {}
         Rectangle<int16_t> bounds(Point<int16_t> parentpos) const;
+        void set_dimension(Point<int16_t> dimensions);
 
     private:
         Point<int16_t> dimension;

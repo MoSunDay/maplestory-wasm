@@ -32,4 +32,9 @@ namespace jrc
         Point<int16_t> absp = position + parentpos;
         return Rectangle<int16_t>(absp, absp + dimension);
     }
+
+    void AreaButton::set_dimension(Point<int16_t> dim)
+    {
+        dimension = dim;
+    }
 }

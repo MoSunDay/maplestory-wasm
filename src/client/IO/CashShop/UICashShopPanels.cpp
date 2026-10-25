@@ -1,8 +1,8 @@
 #include "UICashShop.h"
+#include "CashShopDraw.h"
 
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
-#include "../../Graphics/GraphicsGL.h"
 
 #include <algorithm>
 
@@ -11,47 +11,22 @@ namespace jrc
     namespace view = cash_shop_view;
     namespace layout = cash_shop_layout;
 
+    using cash_shop_draw::draw_position;
+    using cash_shop_draw::draw_size;
+    using cash_shop_draw::fill_rect;
+    using cash_shop_draw::outline_rect;
+
     namespace
     {
-        // Mirrors the offset correction in UICashShop.cpp: layout constants
-        // use design-canvas coordinates; the scene scales them onto the
-        // enlarged canvas, shifts by the content origin and VIEWYOFFSET.
-        Point<int16_t> draw_position(Point<int16_t> position)
+        size_t button_frame(Button::State state)
         {
-            return layout::origin() + layout::scale_point(position) -
-                Point<int16_t>{ 0, Constants::VIEWYOFFSET };
-        }
-
-        Point<int16_t> draw_size(Point<int16_t> size)
-        {
-            return layout::scale_point(size);
-        }
-
-        void fill_rect(Point<int16_t> position, Point<int16_t> size,
-            float r, float g, float b, float a)
-        {
-            const Point<int16_t> drawn = draw_position(position);
-            const Point<int16_t> scaled = draw_size(size);
-            GraphicsGL::get().drawrectangle(
-                drawn.x(), drawn.y(), scaled.x(), scaled.y(), r, g, b, a);
-        }
-
-        void outline_rect(Point<int16_t> position, Point<int16_t> size,
-            float r, float g, float b, float a, int16_t thickness = 1)
-        {
-            const int16_t width = size.x();
-            const int16_t height = size.y();
-            fill_rect(position, { width, thickness }, r, g, b, a);
-            fill_rect(
-                { position.x(),
-                    static_cast<int16_t>(
-                        position.y() + height - thickness) },
-                { width, thickness }, r, g, b, a);
-            fill_rect(position, { thickness, height }, r, g, b, a);
-            fill_rect(
-                { static_cast<int16_t>(
-                    position.x() + width - thickness), position.y() },
-                { thickness, height }, r, g, b, a);
+            switch (state)
+            {
+            case Button::PRESSED: return 1;
+            case Button::MOUSEOVER: return 2;
+            case Button::DISABLED: return 3;
+            default: return 0;
+            }
         }
 
         const Texture* badge_texture(
@@ -94,8 +69,13 @@ namespace jrc
 
     void UICashShop::draw_catalog_info() const
     {
-        fill_rect({ 268, 65 }, { 225, 18 }, 0.06f, 0.07f, 0.09f, 0.88f);
-        outline_rect({ 268, 65 }, { 225, 18 }, 0.25f, 0.28f, 0.34f, 1.0f);
+        fill_rect(layout::CATALOG_INFO_BOX_POS,
+            layout::CATALOG_INFO_BOX_SIZE, 0.06f, 0.07f, 0.09f, 0.88f);
+        const bool filtered = !applied_query.empty();
+        outline_rect(layout::CATALOG_INFO_BOX_POS,
+            layout::CATALOG_INFO_BOX_SIZE,
+            filtered ? 0.88f : 0.25f, filtered ? 0.52f : 0.28f,
+            filtered ? 0.16f : 0.34f, 1.0f);
         catalog_info.draw(draw_position(layout::CATALOG_INFO_POS));
     }
 
@@ -151,17 +131,55 @@ namespace jrc
         skin.preview[left_page % 3].draw(
             { draw_position(panel), draw_size(panel_size) });
         fill_rect(panel, panel_size, 0.04f, 0.05f, 0.07f, 0.82f);
-        outline_rect(panel, panel_size, 0.25f, 0.28f, 0.34f, 1.0f);
+        fill_rect(panel, layout::FEATURED_HEADER_SIZE,
+            0.02f, 0.03f, 0.05f, 0.94f);
         fill_rect(panel, { 64, 2 }, 0.88f, 0.52f, 0.16f, 1.0f);
+        fill_rect(layout::FEATURED_HEADER_LINE_POS,
+            layout::FEATURED_HEADER_LINE_SIZE, 0.88f, 0.52f, 0.16f, 0.72f);
+        outline_rect(panel, panel_size, 0.25f, 0.28f, 0.34f, 1.0f);
+
         const auto featured = buttons.find(BT_FEATURED);
         if (featured != buttons.end() && featured->second->is_active() &&
             featured->second->get_state() == Button::MOUSEOVER)
             outline_rect(panel, panel_size, 1.0f, 0.62f, 0.22f, 1.0f, 2);
         featured_title.draw(draw_position(layout::FEATURED_TITLE_POS));
+
+        const auto draw_hint = [this, &panel]()
+        {
+            fill_rect(layout::FEATURED_HINT_BAND_POS,
+                layout::FEATURED_HINT_BAND_SIZE, 0.04f, 0.05f, 0.07f, 0.90f);
+            fill_rect(layout::FEATURED_HINT_BAND_POS,
+                { layout::FEATURED_HINT_BAND_SIZE.x(), 1 },
+                0.88f, 0.52f, 0.16f, 0.65f);
+            if (!tryon_items.empty())
+                fill_rect({ panel.x(), layout::FEATURED_HINT_BAND_POS.y() },
+                    { 3, layout::FEATURED_HINT_BAND_SIZE.y() },
+                    0.88f, 0.52f, 0.16f, 0.85f);
+            featured_hint.draw(draw_position(layout::FEATURED_HINT_POS));
+        };
+        const auto draw_reset = [this]()
+        {
+            const auto reset = buttons.find(BT_RESET);
+            if (reset == buttons.end() || !reset->second->is_active())
+                return;
+            const Button::State state = reset->second->get_state();
+            const float shade = state == Button::PRESSED ? 0.82f :
+                state == Button::MOUSEOVER ? 1.16f : 1.0f;
+            fill_rect(layout::RESET_POS, layout::RESET_SIZE,
+                std::min(1.0f, 0.86f * shade),
+                std::min(1.0f, 0.36f * shade),
+                std::min(1.0f, 0.30f * shade), 0.98f);
+            outline_rect(layout::RESET_POS, layout::RESET_SIZE,
+                0.98f, 0.52f, 0.44f, 1.0f);
+            reset_label.draw(draw_position(
+                layout::pill_label(layout::RESET_POS, layout::RESET_SIZE)));
+        };
+
         const auto highlighted = highlighted_index();
         if (!highlighted)
         {
-            featured_hint.draw(draw_position(layout::FEATURED_HINT_POS));
+            draw_hint();
+            draw_reset();
             return;
         }
 
@@ -179,7 +197,7 @@ namespace jrc
             outline_rect(layout::FEATURED_AVATAR_FRAME_POS,
                 layout::FEATURED_AVATAR_FRAME_SIZE, 0.25f, 0.28f, 0.34f, 1.0f);
             fill_rect(layout::FEATURED_AVATAR_FLOOR_POS,
-                layout::FEATURED_AVATAR_FLOOR_SIZE, 0.88f, 0.52f, 0.16f, 0.55f);
+                layout::FEATURED_AVATAR_FLOOR_SIZE, 0.25f, 0.28f, 0.34f, 0.55f);
             preview_look.draw(draw_position(layout::FEATURED_AVATAR_POS),
                 false, Stance::STAND1, Expression::DEFAULT);
         }
@@ -195,9 +213,12 @@ namespace jrc
         }
 
         fill_rect(layout::FEATURED_TEXT_BLOCK_POS,
-            layout::FEATURED_TEXT_BLOCK_SIZE, 0.03f, 0.04f, 0.06f, 0.84f);
+            layout::FEATURED_TEXT_BLOCK_SIZE, 0.03f, 0.04f, 0.06f, 0.90f);
         outline_rect(layout::FEATURED_TEXT_BLOCK_POS,
             layout::FEATURED_TEXT_BLOCK_SIZE, 0.18f, 0.21f, 0.26f, 0.85f);
+        fill_rect(layout::FEATURED_TEXT_BLOCK_POS,
+            { 3, layout::FEATURED_TEXT_BLOCK_SIZE.y() },
+            0.88f, 0.52f, 0.16f, 0.70f);
         featured_name.draw(draw_position(layout::FEATURED_NAME_POS));
 
         const Point<int16_t> price = layout::FEATURED_PRICE_ICON_POS;
@@ -208,36 +229,14 @@ namespace jrc
             item.price, Color::WHITE);
         featured_meta.draw(draw_position(layout::FEATURED_META_POS));
 
-        const Point<int16_t> hint_band{ panel.x(), 552 };
-        const Point<int16_t> hint_size{ panel_size.x(), 36 };
-        fill_rect(hint_band, hint_size, 0.04f, 0.05f, 0.07f, 0.90f);
-        fill_rect(hint_band, { hint_size.x(), 1 },
-            0.88f, 0.52f, 0.16f, 0.65f);
-        featured_hint.draw(draw_position(layout::FEATURED_HINT_POS));
-
-        const auto reset = buttons.find(BT_RESET);
-        if (reset != buttons.end() && reset->second->is_active())
-        {
-            const Button::State state = reset->second->get_state();
-            const float shade = state == Button::PRESSED ? 0.82f :
-                state == Button::MOUSEOVER ? 1.16f : 1.0f;
-            fill_rect(layout::RESET_POS, layout::RESET_SIZE,
-                std::min(1.0f, 0.86f * shade),
-                std::min(1.0f, 0.36f * shade),
-                std::min(1.0f, 0.30f * shade), 0.98f);
-            outline_rect(layout::RESET_POS, layout::RESET_SIZE,
-                0.98f, 0.52f, 0.44f, 1.0f);
-            reset_label.draw(draw_position(
-                layout::pill_label(layout::RESET_POS, layout::RESET_SIZE)));
-        }
+        draw_hint();
+        draw_reset();
     }
 
     void UICashShop::draw_sidebar_legend() const
     {
-        fill_rect(layout::LEGEND_PANEL_POS, layout::LEGEND_PANEL_SIZE,
-            0.97f, 0.98f, 1.0f, 0.16f);
-        outline_rect(layout::LEGEND_PANEL_POS, layout::LEGEND_PANEL_SIZE,
-            0.0f, 0.0f, 0.0f, 0.18f);
+        fill_rect(layout::CATEGORY_SECTION_LINE_POS,
+            layout::CATEGORY_SECTION_LINE_SIZE, 0.0f, 0.0f, 0.0f, 0.14f);
         legend_title.draw(draw_position(layout::LEGEND_TITLE_POS));
 
         constexpr view::CommodityBadge badges[5] = {
@@ -255,8 +254,10 @@ namespace jrc
             legend_labels[row].draw(draw_position(
                 position + layout::LEGEND_LABEL_OFFSET));
         }
-        fill_rect({ 10, 444 }, { 84, 1 }, 0.0f, 0.0f, 0.0f, 0.12f);
+        fill_rect(layout::LEGEND_NOTE_SEPARATOR_POS,
+            layout::LEGEND_NOTE_SEPARATOR_SIZE, 0.0f, 0.0f, 0.0f, 0.14f);
         legend_note.draw(draw_position(layout::LEGEND_NOTE_POS));
+        rail_help.draw(draw_position(layout::RAIL_HELP_POS));
     }
 
     void UICashShop::draw_catalog_hint() const
@@ -270,27 +271,6 @@ namespace jrc
     {
         if (category != view::EQUIP_CATEGORY || !equip_menu_open)
             return;
-        const Point<int16_t> size = layout::equip_menu_size();
-
-        // Drop shadow, dark panel and a header band with a warm accent rule.
-        fill_rect(layout::EQSUB_POS + Point<int16_t>{ 2, 2 }, size,
-            0.0f, 0.0f, 0.0f, 0.35f);
-        fill_rect(layout::EQSUB_POS, size, 0.07f, 0.08f, 0.10f, 0.98f);
-        outline_rect(layout::EQSUB_POS, size,
-            0.25f, 0.28f, 0.34f, 1.0f);
-        fill_rect(layout::EQSUB_POS,
-            { size.x(), layout::EQSUB_HEADER_HEIGHT },
-            0.04f, 0.05f, 0.07f, 1.0f);
-        fill_rect(
-            { layout::EQSUB_POS.x(),
-              static_cast<int16_t>(layout::EQSUB_POS.y() +
-                  layout::EQSUB_HEADER_HEIGHT - 1) },
-            { size.x(), 1 }, 0.88f, 0.52f, 0.16f, 0.85f);
-        equip_menu_title.draw(draw_position(
-            layout::EQSUB_POS + layout::EQSUB_HEADER_LABEL_OFFSET));
-        equip_close_label.draw(draw_position(
-            layout::pill_label(layout::EQSUB_CLOSE_POS,
-                layout::EQSUB_CLOSE_SIZE)));
 
         const auto state_of = [this](uint16_t id) -> Button::State
         {
@@ -298,6 +278,17 @@ namespace jrc
             return found != buttons.end() ? found->second->get_state() :
                 Button::NORMAL;
         };
+
+        // The rail itself is already painted by draw(); this menu swaps the
+        // category list for a compact sub-menu without covering the catalog.
+        const bool back_hovered =
+            state_of(BT_EQSUB_CLOSE) == Button::MOUSEOVER;
+        if (back_hovered)
+            fill_rect(layout::EQSUB_CLOSE_POS, layout::EQSUB_CLOSE_SIZE,
+                1.0f, 0.62f, 0.22f, 0.30f);
+        equip_menu_title.draw(draw_position(layout::EQSUB_TITLE_POS));
+        equip_close_label.draw(draw_position(layout::EQSUB_BACK_POS));
+
         for (int8_t sub = 0; sub < view::EQSUB_COUNT; ++sub)
         {
             const Point<int16_t> base = layout::equip_sub_position(sub);
@@ -306,18 +297,83 @@ namespace jrc
                 state_of(static_cast<uint16_t>(
                     BT_EQSUB_FIRST + sub)) == Button::MOUSEOVER;
             if (selected)
+            {
                 fill_rect(base, layout::EQSUB_ENTRY_SIZE,
-                    0.88f, 0.52f, 0.16f, 0.92f);
+                    0.88f, 0.52f, 0.16f, 0.96f);
+                fill_rect(base, { 3, layout::EQSUB_ENTRY_SIZE.y() },
+                    0.55f, 0.30f, 0.08f, 1.0f);
+            }
             else if (hovered)
+            {
                 fill_rect(base, layout::EQSUB_ENTRY_SIZE,
-                    0.16f, 0.17f, 0.20f, 0.92f);
+                    1.0f, 1.0f, 1.0f, 0.58f);
+            }
             else
+            {
                 fill_rect(base, layout::EQSUB_ENTRY_SIZE,
-                    0.10f, 0.11f, 0.135f, 0.55f);
+                    0.97f, 0.98f, 1.0f, 0.16f);
+            }
             equip_sub_labels[sub].draw(
                 draw_position(base + layout::EQSUB_LABEL_OFFSET));
             equip_sub_counts[sub].draw(
                 draw_position(base + layout::EQSUB_COUNT_OFFSET));
+            if (!selected)
+                fill_rect(
+                    { static_cast<int16_t>(base.x() + 8),
+                      static_cast<int16_t>(base.y() +
+                        layout::EQSUB_ENTRY_SIZE.y() - 1) },
+                    { static_cast<int16_t>(
+                        layout::EQSUB_ENTRY_SIZE.x() - 16), 1 },
+                    0.0f, 0.0f, 0.0f, 0.06f);
         }
+
+        fill_rect(layout::EQSUB_SECTION_LINE_POS,
+            layout::EQSUB_SECTION_LINE_SIZE, 0.0f, 0.0f, 0.0f, 0.14f);
+        fill_rect(layout::EQSUB_STATUS_PANEL_POS,
+            layout::EQSUB_STATUS_PANEL_SIZE, 0.97f, 0.98f, 1.0f, 0.55f);
+        outline_rect(layout::EQSUB_STATUS_PANEL_POS,
+            layout::EQSUB_STATUS_PANEL_SIZE, 0.0f, 0.0f, 0.0f, 0.12f);
+        rail_status.draw(draw_position(layout::EQSUB_STATUS_POS));
     }
+
+    void UICashShop::draw_action(uint16_t id,
+        const cash_shop_skin::CashShopButtonSkin& source,
+        Point<int16_t> pos, Point<int16_t> size) const
+    {
+        auto found = buttons.find(id);
+        if (found == buttons.end())
+            return;
+        const size_t frame = found->second->is_active() ?
+            button_frame(found->second->get_state()) : 3;
+        const Texture& texture = source.frames[frame];
+        texture.draw(
+            { draw_position(pos) + texture.get_origin(), draw_size(size) });
+    }
+
+    void UICashShop::draw_icon(const Texture& icon, Point<int16_t> center,
+        int16_t max_side) const
+    {
+        if (!icon.is_valid())
+            return;
+        const Point<int16_t> dimensions = icon.get_dimensions();
+        if (dimensions.x() <= 0 || dimensions.y() <= 0)
+            return;
+        // The native glyph scales with the canvas while the fit-to-max rule
+        // keeps it inside the scaled cell.
+        Point<int16_t> size = draw_size(dimensions);
+        const int16_t limit = layout::scale_coord(max_side);
+        const int16_t longest = std::max(size.x(), size.y());
+        if (limit > 0 && longest > limit)
+        {
+            size = {
+                static_cast<int16_t>(
+                    static_cast<int32_t>(size.x()) * limit / longest),
+                static_cast<int16_t>(
+                    static_cast<int32_t>(size.y()) * limit / longest)
+            };
+        }
+        icon.draw(
+            { draw_position(center) - size / 2 + icon.get_origin(), size });
+    }
+
 }

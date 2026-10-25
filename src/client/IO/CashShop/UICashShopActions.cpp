@@ -12,6 +12,7 @@
 namespace jrc
 {
     namespace view = cash_shop_view;
+    namespace layout = cash_shop_layout;
 
     namespace
     {
@@ -32,6 +33,18 @@ namespace jrc
             const auto found = std::find_if(catalog.begin(), catalog.end(),
                 [sn](const CashCommodity& item) { return item.sn == sn; });
             return found != catalog.end() ? &*found : nullptr;
+        }
+
+        void truncate_text(Text& label, int16_t max_width)
+        {
+            if (max_width <= 0 || label.width() <= max_width)
+                return;
+            std::string text = label.get_text();
+            while (!text.empty() && label.width() > max_width)
+            {
+                text.pop_back();
+                label.change_text(text + "..");
+            }
         }
     }
 
@@ -119,11 +132,37 @@ namespace jrc
     void UICashShop::rebuild_catalog()
     {
         filtered = view::filter_catalog(model->catalog(),
-            { female, category, search.get_text(),
+            { female, category, applied_query,
               category == view::EQUIP_CATEGORY ? equip_sub : 0 });
         left_page = 0;
         selected_left.reset();
         refresh();
+    }
+
+    void UICashShop::clear_search()
+    {
+        applied_query.clear();
+        search.change_text("");
+        rebuild_catalog();
+    }
+
+    void UICashShop::refresh_category_icons()
+    {
+        for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+            category_icon_ids[entry] = 0;
+
+        // One representative icon per category. "All" keeps the drawn
+        // four-square glyph; the remaining rows use the first catalog item
+        // whose Item.nx entry actually loaded.
+        for (const CashCommodity& item : model->catalog())
+        {
+            const int8_t entry = item.category;
+            if (entry <= 0 || entry >= view::CATEGORY_COUNT ||
+                category_icon_ids[entry] != 0 || item.item_id == 0)
+                continue;
+            if (ItemData::get(item.item_id).is_valid())
+                category_icon_ids[entry] = item.item_id;
+        }
     }
 
     void UICashShop::press_equip_menu(uint16_t id)
@@ -154,6 +193,12 @@ namespace jrc
         return view::highlighted_index(left_page, filtered, selected_left);
     }
 
+    bool UICashShop::left_selection_visible() const
+    {
+        return selected_left && *selected_left < filtered.size() &&
+            *selected_left / view::CATALOG_PAGE_SIZE == left_page;
+    }
+
     bool UICashShop::avatar_preview_ready() const
     {
         return preview_look.get_body() && preview_look.get_hair() &&
@@ -168,6 +213,7 @@ namespace jrc
         preview_look = Stage::get().get_player().get_look();
         for (int32_t item_id : tryon_items)
             preview_look.add_equip(item_id, Texture::LoadMode::DEFERRED);
+        preview_look.prepare_movement_assets();
     }
 
     void UICashShop::add_tryon(size_t filtered_index)
@@ -208,9 +254,13 @@ namespace jrc
                 entry == category ? Text::BLACK : Text::DARKGREY);
         const bool equip_active = category == view::EQUIP_CATEGORY;
         for (int8_t sub = 0; sub < view::EQSUB_COUNT; ++sub)
+        {
+            const bool selected = equip_active && sub == equip_sub;
             equip_sub_labels[sub].change_color(
-                equip_active && sub == equip_sub ? Text::BLACK :
-                    Text::DARKGREY);
+                selected ? Text::BLACK : Text::DARKGREY);
+            equip_sub_counts[sub].change_color(
+                selected ? Text::BLACK : Text::DARKGREY);
+        }
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
             currency_labels[choice].change_color(
                 currency == currency_choice(choice) ? Text::WHITE :
@@ -233,6 +283,15 @@ namespace jrc
             info += std::string(" · ") + view::equip_sub_name(equip_sub);
         catalog_info.change_text(info + " · " +
             std::to_string(filtered.size()) + " 件");
+        if (filtered.empty())
+            empty_catalog_text.change_text(applied_query.empty() ?
+                "此分类暂无商品" : "未找到匹配商品\n按清除按钮恢复");
+        else
+            empty_catalog_text.change_text("");
+        std::string status = view::equip_sub_name(equip_sub);
+        status += "\n筛选 " + std::to_string(filtered.size()) + " 件";
+        status += "\n\n点击分类切换\n返回浏览全部";
+        rail_status.change_text(status);
         pane_title.change_text(view::pane_name(right_pane));
         pane_info.change_text("共 " + std::to_string(right_count()) + " 件");
         refresh_rows();
@@ -261,6 +320,7 @@ namespace jrc
                 meta = period_label(item.period);
             }
             card_names[card].change_text(name);
+            truncate_text(card_names[card], layout::CARD_NAME_WIDTH);
             card_meta[card].change_text(meta);
         }
         for (size_t slot = 0; slot < view::RIGHT_PAGE_SIZE; ++slot)
@@ -272,30 +332,32 @@ namespace jrc
             slot_counts[slot].change_text(
                 count > 1 ? std::to_string(count) : "");
         }
+        const bool equip_menu_active = !pending && equip_menu_open &&
+            category == view::EQUIP_CATEGORY;
         for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
         {
-            buttons[BT_TAB_FIRST + entry]->set_active(!pending);
+            buttons[BT_TAB_FIRST + entry]->set_active(
+                !pending && !equip_menu_active);
             const size_t count = view::filter_catalog(model->catalog(),
-                { female, entry, search.get_text() }).size();
+                { female, entry, applied_query }).size();
             category_counts[entry].change_text(std::to_string(count));
             category_counts[entry].change_color(
                 entry == category ? Text::BLACK : Text::DARKGREY);
         }
-        const bool equip_menu_active = !pending && equip_menu_open &&
-            category == view::EQUIP_CATEGORY;
         buttons[BT_EQSUB_CLOSE]->set_active(equip_menu_active);
         for (int8_t sub = 0; sub < view::EQSUB_COUNT; ++sub)
         {
             buttons[BT_EQSUB_FIRST + sub]->set_active(equip_menu_active);
             equip_sub_counts[sub].change_text(std::to_string(
                 view::filter_catalog(model->catalog(),
-                    { female, view::EQUIP_CATEGORY, search.get_text(), sub })
+                    { female, view::EQUIP_CATEGORY, applied_query, sub })
                     .size()));
         }
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
             buttons[BT_CURRENCY_FIRST + choice]->set_active(!pending);
-        const bool buy_visible = selected_left &&
-            *selected_left / view::CATALOG_PAGE_SIZE == left_page;
+        const bool buy_visible = left_selection_visible();
+        buttons[BT_SEARCH_CLEAR]->set_active(!pending &&
+            !applied_query.empty());
         buttons[BT_BUY]->set_active(!pending && buy_visible &&
             !(equip_menu_open && category == view::EQUIP_CATEGORY));
         buttons[BT_RESET]->set_active(!tryon_items.empty());
@@ -431,7 +493,8 @@ namespace jrc
 
     void UICashShop::request_purchase(size_t filtered_index)
     {
-        if (filtered_index >= filtered.size())
+        if (filtered_index >= filtered.size() ||
+            filtered_index / view::CATALOG_PAGE_SIZE != left_page)
             return;
         const CashCommodity item = model->catalog()[filtered[filtered_index]];
         const std::string question = "使用 " + std::string(view::currency_name(currency)) +
@@ -544,6 +607,11 @@ namespace jrc
     int32_t UICashShop::preview_cap_id() const
     {
         return preview_look.get_equips().get_equip(Equipslot::CAP);
+    }
+
+    int32_t UICashShop::preview_weapon_id() const
+    {
+        return preview_look.get_equips().get_equip(Equipslot::WEAPON);
     }
 
 

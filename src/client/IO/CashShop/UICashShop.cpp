@@ -1,4 +1,5 @@
 #include "UICashShop.h"
+#include "CashShopDraw.h"
 
 #include "../KeyAction.h"
 #include "../UI.h"
@@ -16,72 +17,12 @@ namespace jrc
     namespace view = cash_shop_view;
     namespace layout = cash_shop_layout;
 
-    namespace
-    {
-        // The scene is rendered with Constants::VIEWYOFFSET applied, while
-        // hitboxes and layout constants use the final canvas coordinates.
-        // Design coordinates are scaled onto the enlarged canvas first, then
-        // centred in the viewport before subtracting that offset.
-        Point<int16_t> draw_position(Point<int16_t> position)
-        {
-            return layout::origin() + layout::scale_point(position) -
-                Point<int16_t>{ 0, Constants::VIEWYOFFSET };
-        }
-
-        Point<int16_t> draw_size(Point<int16_t> size)
-        {
-            return layout::scale_point(size);
-        }
-
-        void fill_rect(Point<int16_t> position, Point<int16_t> size,
-            float r, float g, float b, float a)
-        {
-            const Point<int16_t> drawn = draw_position(position);
-            const Point<int16_t> scaled = draw_size(size);
-            GraphicsGL::get().drawrectangle(
-                drawn.x(), drawn.y(), scaled.x(), scaled.y(), r, g, b, a);
-        }
-
-        void outline_rect(Point<int16_t> position, Point<int16_t> size,
-            float r, float g, float b, float a, int16_t thickness = 1)
-        {
-            const int16_t width = size.x();
-            const int16_t height = size.y();
-            fill_rect(position, { width, thickness }, r, g, b, a);
-            fill_rect(
-                { position.x(),
-                    static_cast<int16_t>(
-                        position.y() + height - thickness) },
-                { width, thickness }, r, g, b, a);
-            fill_rect(position, { thickness, height }, r, g, b, a);
-            fill_rect(
-                { static_cast<int16_t>(
-                    position.x() + width - thickness), position.y() },
-                { thickness, height }, r, g, b, a);
-        }
-
-        Point<int16_t> currency_label_position(size_t index)
-        {
-            return layout::pill_label(
-                layout::currency_position(index), layout::CURRENCY_SIZE);
-        }
-
-        Point<int16_t> tab_label_position(Point<int16_t> tab_position)
-        {
-            return layout::pill_label(tab_position, layout::TAB_SIZE);
-        }
-
-        size_t button_frame(Button::State state)
-        {
-            switch (state)
-            {
-            case Button::PRESSED: return 1;
-            case Button::MOUSEOVER: return 2;
-            case Button::DISABLED: return 3;
-            default: return 0;
-            }
-        }
-    }
+    using cash_shop_draw::draw_position;
+    using cash_shop_draw::draw_size;
+    using cash_shop_draw::fill_rect;
+    using cash_shop_draw::outline_rect;
+    using cash_shop_draw::currency_label_position;
+    using cash_shop_draw::tab_label_position;
 
     UICashShop::UICashShop(std::shared_ptr<CashShopModel> value, bool is_female)
         : model(std::move(value)), female(is_female),
@@ -94,13 +35,14 @@ namespace jrc
           skin(cash_shop_skin::load_cash_shop_skin()),
           search(Text::A11M, Text::LEFT, Text::WHITE,
               layout::SEARCH_FIELD_BOUNDS, 40),
-          title(Text::A12B, Text::LEFT, Text::YELLOW, "现金商城"),
-          category_title(Text::A12B, Text::LEFT, Text::WHITE, "分类"),
-          equip_menu_title(Text::A11B, Text::LEFT, Text::WHITE, "装备分类"),
-          equip_close_label(Text::A11M, Text::CENTER, Text::LIGHTGREY, "×"),
+          title(Text::A12B, Text::LEFT, Text::WHITE, "现金商城"),
+          category_title(Text::A11B, Text::LEFT, Text::BLACK, "商品分类"),
+          equip_menu_title(Text::A11B, Text::LEFT, Text::BLACK, "装备分类"),
+          equip_close_label(Text::A11M, Text::RIGHT, Text::DARKGREY, "← 返回"),
           pane_title(Text::A12B, Text::LEFT, Text::WHITE),
           pane_info(Text::A11M, Text::RIGHT, Text::LIGHTGREY),
           search_label(Text::A11M, Text::LEFT, Text::LIGHTGREY, "搜索:"),
+          search_clear_label(Text::A11M, Text::CENTER, Text::BLACK, "×"),
           transfer_hint(Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
               layout::TRANSFER_HINT_WIDTH),
           details_hint(Text::A11M, Text::CENTER, Text::LIGHTGREY,
@@ -135,8 +77,8 @@ namespace jrc
         for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
         {
             category_labels[entry] = Text(
-                Text::A11M, Text::LEFT, Text::DARKGREY,
-                view::category_name(entry));
+                Text::A11M, Text::LEFT, Text::BLACK,
+                view::category_name(entry), layout::CATEGORY_LABEL_WIDTH);
             category_counts[entry] = Text(
                 Text::A11M, Text::RIGHT, Text::DARKGREY, "",
                 layout::CATEGORY_COUNT_WIDTH);
@@ -145,7 +87,7 @@ namespace jrc
         {
             equip_sub_labels[sub] = Text(
                 Text::A11M, Text::LEFT, Text::DARKGREY,
-                view::equip_sub_name(sub));
+                view::equip_sub_name(sub), layout::EQSUB_LABEL_WIDTH);
             equip_sub_counts[sub] = Text(
                 Text::A11M, Text::RIGHT, Text::DARKGREY, "",
                 layout::EQSUB_COUNT_WIDTH);
@@ -179,10 +121,21 @@ namespace jrc
             Text::A11M, Text::CENTER, Text::LIGHTGREY,
             "点击卡片选中 · 双击/回车购买", layout::CATALOG_HINT_WIDTH);
         legend_title = Text(
-            Text::A11M, Text::LEFT, Text::DARKGREY, "标签");
+            Text::A11B, Text::LEFT, Text::BLACK, "徽章说明");
         legend_note = Text(
             Text::A11M, Text::LEFT, Text::DARKGREY,
-            "徽章随商品属性自动显示", layout::LEGEND_NOTE_WIDTH);
+            "徽章随商品属性\n自动显示", layout::LEGEND_NOTE_WIDTH);
+        rail_help = Text(
+            Text::A11M, Text::LEFT, Text::DARKGREY,
+            "Enter 搜索\n单击选中\n双击购买", layout::RAIL_HELP_WIDTH);
+        rail_status = Text(
+            Text::A11M, Text::LEFT, Text::DARKGREY, "",
+            layout::EQSUB_STATUS_WIDTH);
+        details_title = Text(
+            Text::A11B, Text::LEFT, Text::WHITE, "物品详情");
+        empty_catalog_text = Text(
+            Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
+            layout::EMPTY_CATALOG_LABEL_WIDTH);
         details_meta = Text(
             Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
             layout::DETAILS_TEXT_WIDTH);
@@ -211,10 +164,17 @@ namespace jrc
                 view::badge_name(legend_badges[badge]),
                 layout::LEGEND_LABEL_WIDTH);
 
-        search.set_enter_callback([this](const std::string&) { rebuild_catalog(); });
+        search.set_enter_callback([this](const std::string& text)
+        {
+            if (text == applied_query)
+                return;
+            applied_query = text;
+            rebuild_catalog();
+        });
         update_screen(Constants::viewwidth(), Constants::viewheight());
         preview_look = Stage::get().get_player().get_look();
         rebuild_catalog();
+        refresh_category_icons();
     }
 
     void UICashShop::draw(float alpha) const
@@ -243,8 +203,8 @@ namespace jrc
             static_cast<int16_t>(band_top + band_height - 1),
             Constants::viewwidth(), 1, 0.88f, 0.52f, 0.16f, 0.35f);
 
+        fill_rect({ 6, 8 }, { 3, 16 }, 0.88f, 0.52f, 0.16f, 1.0f);
         title.draw(draw_position(layout::TITLE_POS));
-        category_title.draw(draw_position(layout::CATEGORY_TITLE_POS));
         draw_balance_icons();
 
         const CashBalances& balances = model->balances();
@@ -278,6 +238,20 @@ namespace jrc
         search_label.draw(draw_position(layout::SEARCH_LABEL_POS));
         // Design-space-scaled Textfield bounds move with the content origin.
         search.draw(layout::origin());
+        if (!applied_query.empty())
+        {
+            const auto clear = buttons.find(BT_SEARCH_CLEAR);
+            const bool clear_active = clear != buttons.end() &&
+                clear->second->is_active();
+            const bool clear_hovered = clear_active &&
+                clear->second->get_state() == Button::MOUSEOVER;
+            fill_rect(layout::SEARCH_CLEAR_POS, layout::SEARCH_CLEAR_SIZE,
+                0.88f, 0.52f, 0.16f, clear_hovered ? 1.0f : 0.90f);
+            outline_rect(layout::SEARCH_CLEAR_POS, layout::SEARCH_CLEAR_SIZE,
+                0.98f, 0.72f, 0.36f, 1.0f);
+            search_clear_label.draw(draw_position(layout::pill_label(
+                layout::SEARCH_CLEAR_POS, layout::SEARCH_CLEAR_SIZE)));
+        }
 
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
         {
@@ -310,22 +284,82 @@ namespace jrc
         }
         draw_catalog_info();
 
-        for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+        // One continuous light rail. The equipment sub-menu swaps its
+        // contents in place, so no popup ever covers a catalog column.
+        fill_rect(layout::RAIL_PANEL_POS, layout::RAIL_PANEL_SIZE,
+            0.97f, 0.98f, 1.0f, 0.30f);
+        outline_rect(layout::RAIL_PANEL_POS, layout::RAIL_PANEL_SIZE,
+            0.0f, 0.0f, 0.0f, 0.14f);
+        fill_rect(layout::RAIL_PANEL_POS,
+            { layout::RAIL_PANEL_SIZE.x(), 3 },
+            0.88f, 0.52f, 0.16f, 0.90f);
+        if (category == view::EQUIP_CATEGORY && equip_menu_open)
         {
-            const Point<int16_t> base = layout::category_position(entry);
-            if (entry == category)
-            {
-                fill_rect(base, layout::CATEGORY_SIZE,
-                    0.02f, 0.03f, 0.05f, 0.08f);
-                fill_rect(base + layout::CATEGORY_LINE_OFFSET,
-                    layout::CATEGORY_LINE_SIZE,
-                    0.88f, 0.52f, 0.16f, 1.0f);
-            }
-            category_labels[entry].draw(
-                draw_position(base + layout::CATEGORY_LABEL_OFFSET));
+            draw_equip_menu();
         }
-        draw_category_counts();
-        draw_sidebar_legend();
+        else
+        {
+            category_title.draw(draw_position(layout::CATEGORY_TITLE_POS));
+            for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
+            {
+                const Point<int16_t> base = layout::category_position(entry);
+                const bool selected = entry == category;
+                const bool hovered = !selected &&
+                    state_of(BT_TAB_FIRST + entry) == Button::MOUSEOVER;
+                if (selected)
+                {
+                    fill_rect(base, layout::CATEGORY_SIZE,
+                        0.88f, 0.52f, 0.16f, 0.96f);
+                    fill_rect(base + layout::CATEGORY_LINE_OFFSET,
+                        layout::CATEGORY_LINE_SIZE,
+                        0.55f, 0.30f, 0.08f, 1.0f);
+                }
+                else if (hovered)
+                {
+                    fill_rect(base, layout::CATEGORY_SIZE,
+                        1.0f, 1.0f, 1.0f, 0.48f);
+                }
+                const Point<int16_t> icon_center =
+                    base + layout::CATEGORY_ICON_CENTER;
+                fill_rect(
+                    { static_cast<int16_t>(icon_center.x() - 8),
+                        static_cast<int16_t>(icon_center.y() - 8) },
+                    { 16, 16 },
+                    selected ? 0.30f : 0.08f,
+                    selected ? 0.20f : 0.07f,
+                    selected ? 0.08f : 0.05f, 0.55f);
+                if (entry == 0)
+                {
+                    const float cell = selected ? 1.0f : 0.25f;
+                    for (int8_t square = 0; square < 4; ++square)
+                        fill_rect(
+                            { static_cast<int16_t>(icon_center.x() - 6 +
+                                (square % 2) * 7),
+                              static_cast<int16_t>(icon_center.y() - 6 +
+                                (square / 2) * 7) },
+                            { 5, 5 }, cell, cell, cell, 0.95f);
+                }
+                else if (category_icon_ids[entry] != 0)
+                {
+                    if (const ItemData& data =
+                            ItemData::get(category_icon_ids[entry]))
+                        draw_icon(data.get_icon(false), icon_center,
+                            layout::CATEGORY_ICON_MAX);
+                }
+                category_labels[entry].draw(
+                    draw_position(base + layout::CATEGORY_LABEL_OFFSET));
+                if (!selected)
+                    fill_rect(
+                        { static_cast<int16_t>(base.x() + 8),
+                          static_cast<int16_t>(base.y() +
+                            layout::CATEGORY_SIZE.y() - 1) },
+                        { static_cast<int16_t>(
+                            layout::CATEGORY_SIZE.x() - 16), 1 },
+                        0.0f, 0.0f, 0.0f, 0.06f);
+            }
+            draw_category_counts();
+            draw_sidebar_legend();
+        }
 
         const auto left_range =
             view::page_range(left_page, filtered.size(), view::CATALOG_PAGE_SIZE);
@@ -334,6 +368,8 @@ namespace jrc
             skin.no_item.draw({ draw_position(layout::EMPTY_CATALOG_CENTER -
                 layout::EMPTY_HINT_SIZE / 2),
                 draw_size(layout::EMPTY_HINT_SIZE) });
+            empty_catalog_text.draw(
+                draw_position(layout::EMPTY_CATALOG_LABEL_POS));
         }
         else
         {
@@ -487,6 +523,12 @@ namespace jrc
             0.25f, 0.28f, 0.34f, 1.0f);
         fill_rect(layout::DETAILS_PANEL_POS, { 64, 2 },
             0.88f, 0.52f, 0.16f, 1.0f);
+        fill_rect(layout::DETAILS_PANEL_POS,
+            { layout::DETAILS_PANEL_SIZE.x(), 22 },
+            0.04f, 0.05f, 0.07f, 0.94f);
+        fill_rect(layout::DETAILS_HEADER_LINE_POS,
+            layout::DETAILS_HEADER_LINE_SIZE, 0.25f, 0.28f, 0.34f, 1.0f);
+        details_title.draw(draw_position(layout::DETAILS_TITLE_POS));
         const bool details_visible = selected_right &&
             *selected_right / view::RIGHT_PAGE_SIZE == right_page &&
             *selected_right < right_count();
@@ -553,47 +595,6 @@ namespace jrc
             layout::RIGHT_PREV_POS, layout::PAGER_SIZE);
         draw_action(BT_RIGHT_NEXT, skin.next_button,
             layout::RIGHT_NEXT_POS, layout::PAGER_SIZE);
-        draw_equip_menu();
-    }
-
-    void UICashShop::draw_action(uint16_t id,
-        const cash_shop_skin::CashShopButtonSkin& source,
-        Point<int16_t> pos, Point<int16_t> size) const
-    {
-        auto found = buttons.find(id);
-        if (found == buttons.end())
-            return;
-        const size_t frame = found->second->is_active() ?
-            button_frame(found->second->get_state()) : 3;
-        const Texture& texture = source.frames[frame];
-        texture.draw(
-            { draw_position(pos + texture.get_origin()), draw_size(size) });
-    }
-
-    void UICashShop::draw_icon(const Texture& icon, Point<int16_t> center,
-        int16_t max_side) const
-    {
-        if (!icon.is_valid())
-            return;
-        const Point<int16_t> dimensions = icon.get_dimensions();
-        if (dimensions.x() <= 0 || dimensions.y() <= 0)
-            return;
-        // The native glyph scales with the canvas while the fit-to-max rule
-        // keeps it inside the scaled cell.
-        Point<int16_t> size = draw_size(dimensions);
-        const int16_t limit = layout::scale_coord(max_side);
-        const int16_t longest = std::max(size.x(), size.y());
-        if (limit > 0 && longest > limit)
-        {
-            size = {
-                static_cast<int16_t>(
-                    static_cast<int32_t>(size.x()) * limit / longest),
-                static_cast<int16_t>(
-                    static_cast<int32_t>(size.y()) * limit / longest)
-            };
-        }
-        icon.draw(
-            { draw_position(center - size / 2 + icon.get_origin()), size });
     }
 
     void UICashShop::update()
@@ -629,8 +630,7 @@ namespace jrc
 
     void UICashShop::position_buy_button()
     {
-        if (!selected_left ||
-            *selected_left / view::CATALOG_PAGE_SIZE != left_page)
+        if (!left_selection_visible())
             return;
         buttons[BT_BUY]->set_position(
             layout::scale_point(
@@ -693,7 +693,8 @@ namespace jrc
     {
         if (pressed && escape && !pending)
             button_pressed(BT_EXIT);
-        else if (pressed && keycode == KeyAction::RETURN && selected_left && !pending)
+        else if (pressed && keycode == KeyAction::RETURN &&
+            left_selection_visible() && !pending)
             request_purchase(*selected_left);
     }
 
@@ -712,7 +713,8 @@ namespace jrc
             UI::get().emplace<UIOk>("当前版本暂不支持充值。", []() {});
         }
         else if (id == BT_RESET) clear_tryon();
-        else if (id == BT_BUY && selected_left)
+        else if (id == BT_SEARCH_CLEAR) clear_search();
+        else if (id == BT_BUY && left_selection_visible())
             request_purchase(*selected_left);
         else if (id == BT_TRANSFER && selected_right)
             request_transfer(*selected_right);

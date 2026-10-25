@@ -24,7 +24,7 @@ namespace jrc
             std::vector<uint16_t> ids = {
                 BT_EXIT, BT_CHARGE, BT_BUY, BT_RESET, BT_TRANSFER,
                 BT_LEFT_PREV, BT_LEFT_NEXT, BT_RIGHT_PREV, BT_RIGHT_NEXT,
-                BT_FEATURED, BT_EQSUB_CLOSE,
+                BT_FEATURED, BT_SEARCH_CLEAR, BT_EQSUB_CLOSE,
                 BT_RIGHT_LOCKER_TAB, BT_RIGHT_INVENTORY_TAB
             };
             const auto append = [&ids](uint16_t first, uint16_t last)
@@ -72,8 +72,11 @@ namespace jrc
             case BT_RIGHT_NEXT:
                 return place(layout::RIGHT_NEXT_POS, layout::PAGER_SIZE);
             case BT_FEATURED:
-                return place(layout::FEATURED_PANEL_POS,
-                    layout::FEATURED_PANEL_SIZE);
+                return place(layout::FEATURED_BUTTON_POS,
+                    layout::FEATURED_BUTTON_SIZE);
+            case BT_SEARCH_CLEAR:
+                return place(layout::SEARCH_CLEAR_POS,
+                    layout::SEARCH_CLEAR_SIZE);
             case BT_EQSUB_CLOSE:
                 return place(layout::EQSUB_CLOSE_POS,
                     layout::EQSUB_CLOSE_SIZE);

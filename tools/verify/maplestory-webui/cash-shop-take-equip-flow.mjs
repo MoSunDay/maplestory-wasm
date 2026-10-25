@@ -32,7 +32,7 @@ const capEquipSlot = Number(process.env.TAKE_EQUIP_CAP_SLOT || 1);
 
 const uiState = Object.freeze({ login: 1, world: 2, characters: 3, game: 5, cashShop: 6 });
 const inventoryTypeEquip = 1;
-const rightGrid = Object.freeze({ x: 504, y: 102, pitch: 39, hit: 18 });
+const rightGrid = Object.freeze({ x: 517, y: 88, pitch: 39, hit: 18 });
 const charCard = index => ({ x: 105 + 120 * index + 25, y: 210 });
 
 let failed = false;
@@ -98,8 +98,15 @@ async function loginAndEnterGame(driver) {
 }
 
 async function enterCashShop(driver) {
-  await driver.click(597, 571);
-  await requireState('cash-shop UI active', uiStateIs(driver, uiState.cashShop), 30);
+  // 商城入口按钮随 HUD 世代移动（新版 (597,571)，传统 v83 (562,583)）。
+  let active = false;
+  for (const [x, y] of [[597, 571], [562, 583]]) {
+    await driver.click(x, y);
+    active = await waitFor(uiStateIs(driver, uiState.cashShop), 15);
+    if (active) break;
+  }
+  if (!active) throw new Error('cash-shop UI did not activate');
+  console.log('PASS  cash-shop UI active');
   await requireState('cash-shop assets ready', assetsIdle(driver), 60);
 }
 
@@ -156,8 +163,13 @@ async function openItemInventory(driver) {
     if (await probe(driver, 'msiteminventory_active') === 1) return true;
     if (await probe(driver, 'msitems_menu_x') < 0) {
       await requireState('map assets idle before menu', assetsIdle(driver), 45);
-      await driver.click(711, 574);
-      if (!await waitFor(async () => await probe(driver, 'msitems_menu_x') > 0, 5)) continue;
+      // 物品菜单快捷图标随 HUD 世代移动：StatusBar2 在 (711,574)，
+      // 传统 v83 状态栏 InvenKey 图标在 (537,544)。
+      for (const [x, y] of [[711, 574], [537, 544]]) {
+        await driver.click(x, y);
+        if (await waitFor(async () => await probe(driver, 'msitems_menu_x') > 0, 5)) break;
+      }
+      if (await probe(driver, 'msitems_menu_x') < 0) continue;
     }
     const menuX = await probe(driver, 'msitems_menu_x');
     const menuY = await probe(driver, 'msitems_menu_y');

@@ -1,10 +1,11 @@
-// 现金商城「装备」分类二级菜单（装备子分类浮层）的浏览器专项验收。
+// 现金商城「装备」分类二级菜单（左栏原位子菜单）的浏览器专项验收。
 //
 // 用途：
-//   验证新加的装备分类菜单：点击左侧分类栏「装备」展开浮层（全部装备/帽子/
-//   脸饰/眼饰/耳环/上衣/套装/裤子/鞋子/手套/盾牌/披风/戒指/坠饰/腰带/勋章/
-//   武器），选择子分类后目录按物品 ID 槽位过滤、数量摘要变化；「×」或再次
-//   点击「装备」收起；切换回「全部」分类时菜单收起且子分类复位。
+//   验证装备子菜单：点击左侧分类栏「装备」后，分类列表在原位替换为子菜单
+//   （全部装备/帽子/脸饰/眼饰/耳环/上衣/套装/裤子/鞋子/手套/盾牌/披风/
+//   戒指/坠饰/腰带/勋章/武器），不会遮挡商品卡；选择子分类后目录按槽位
+//   过滤、数量摘要变化；「← 返回」收起，再点「装备」重新展开；切换回
+//   「全部」分类时菜单收起且子分类复位。
 //
 //   断言分两层：
 //   1) 只读状态探针（Module.ccall）：mscashshop_equip_menu_open /
@@ -42,28 +43,32 @@ const uiState = Object.freeze({ login: 1, world: 2, characters: 3, game: 5, cash
 // 角色卡中心 = game(105 + 120*i + 25, 210)。
 const cardCenter = index => ({ x: 105 + 120 * index + 25, y: 210 });
 
-// StatusBar2 BtCashShop：x=569..625, y=554..589（与 run.mjs 现金商城流程一致）。
-const cashShopButton = Object.freeze({ x: 597, y: 571 });
+// 商城入口按钮随 HUD 世代移动：StatusBar2 BtCashShop x=569..625, y=554..589；
+// 传统 v83 状态栏 BtShop 右锚在 x=535..589, y=566..600。依次尝试直到激活。
+const cashShopButtons = Object.freeze([
+  { x: 597, y: 571 },
+  { x: 562, y: 583 }
+]);
 
-// 左侧分类栏条目：x=4..94, 第 i 项 y = 40 + 34*i, 高 24。
-const railEntry = index => ({ x: 49, y: 40 + 34 * index + 12 });
+// 左侧分类栏条目：x=4..94, 第 i 项 y = 58 + 22*i, 高 22。
+const railEntry = index => ({ x: 49, y: 58 + 22 * index + 11 });
 const rail = Object.freeze({ all: railEntry(0), equip: railEntry(1) });
 
-// 装备子分类浮层：x=100..196, 表头 y=86..106（「×」在 x178..192 y88..104），
-// 条目区从 y=106 起每行 22px，第 sub 行中心 (148, 106 + 22*sub + 11)。
-const equipSub = sub => ({ x: 148, y: 106 + 22 * sub + 11 });
+// 装备子菜单替换左栏内容：条目 x=4..94，从 y=60 起每行 21px；
+// 「← 返回」位于同一标题行的右侧（点击区 y=36..58）。
+const equipSub = sub => ({ x: 49, y: 60 + 21 * sub + 10 });
 const subCategories = Object.freeze({
   all: equipSub(0), hat: equipSub(1), weapon: equipSub(16)
 });
-const equipClose = Object.freeze({ x: 185, y: 96 });
+const equipClose = Object.freeze({ x: 49, y: 47 });
 
 // 选中行暖橙高亮 ≈ (0.88, 0.52, 0.16)（≈RGB 224,133,41）：整行均值应满足
 // R > G > B 且 R-B 足够大；文字为黑色只会拉低均值、不破坏色序。
-const warmRow = Object.freeze({ x0: 110, x1: 186, minRedBlueDelta: 40, minRed: 120 });
-const selectedRowBand = sub => ({ x0: warmRow.x0, x1: warmRow.x1, y0: 106 + 22 * sub + 2, y1: 106 + 22 * sub + 20 });
-// readPixels 采样区需覆盖以上所有区域（game 坐标，排他右/下边界）。
-const sampleRect = Object.freeze({ x0: 96, x1: 200, y0: 82, y1: 484 });
-// 中性点击点：浮层与分类栏之外的商品卡第 3 列空白，用于采样前挪走光标精灵。
+const warmRow = Object.freeze({ x0: 8, x1: 90, minRedBlueDelta: 40, minRed: 120 });
+const selectedRowBand = sub => ({ x0: warmRow.x0, x1: warmRow.x1, y0: 60 + 21 * sub + 2, y1: 60 + 21 * sub + 19 });
+// readPixels 采样区需覆盖左栏子菜单（game 坐标，排他右/下边界）。
+const sampleRect = Object.freeze({ x0: 0, x1: 100, y0: 34, y1: 540 });
+// 中性点击点：分类栏之外的商品卡空白，用于采样前挪走光标精灵。
 const clickAwayPoint = Object.freeze({ x: 450, y: 300 });
 
 let failed = false;
@@ -110,7 +115,7 @@ async function evaluateAwait(driver, expression) {
   return result.result.value;
 }
 
-// 采样浮层区域内若干行的均值 RGB；保持并恢复 FRAMEBUFFER 绑定。
+// 采样子菜单区域内若干行的均值 RGB；保持并恢复 FRAMEBUFFER 绑定。
 function samplerExpression(bands) {
   const config = JSON.stringify({ rect: sampleRect, bands });
   return `(() => new Promise(resolve => {
@@ -206,8 +211,13 @@ async function loginAndEnterGame(driver) {
 }
 
 async function enterCashShop(driver) {
-  await driver.click(cashShopButton.x, cashShopButton.y);
-  if (!await waitFor(uiStateIs(driver, uiState.cashShop), 30)) {
+  let active = false;
+  for (const button of cashShopButtons) {
+    await driver.click(button.x, button.y);
+    active = await waitFor(uiStateIs(driver, uiState.cashShop), 15);
+    if (active) break;
+  }
+  if (!active) {
     throw new Error('cash-shop UI did not activate');
   }
   if (!await waitFor(assetsIdle(driver), 60)) {
@@ -229,7 +239,7 @@ async function verifyEquipMenu(driver) {
   report(await probe(driver, 'mscashshop_equip_menu_open') === 0,
     'equipment menu closed initially');
 
-  // 1. 点击「装备」：选中装备类并展开浮层。
+  // 1. 点击「装备」：选中装备类并展开原位子菜单。
   await driver.click(rail.equip.x, rail.equip.y);
   await sleep(500);
   if (!await waitFor(menuStateIs(driver, { open: 1, sub: 0 }), 10)) {
@@ -253,16 +263,16 @@ async function verifyEquipMenu(driver) {
         `unselected row rgb=${JSON.stringify(openSample.rows.other)}`);
   }
 
-  // 2. 选择「武器」（最后一个子分类）：选中后浮层自动收起。
+  // 2. 选择「武器」（最后一个子分类）：选中后子菜单自动收起。
   await driver.click(subCategories.weapon.x, subCategories.weapon.y);
   await sleep(500);
   if (!await waitFor(menuStateIs(driver, { open: 0, sub: 16 }), 10)) {
-    report(false, 'weapon sub-category selected and flyout auto-closed');
+    report(false, 'weapon sub-category selected and sub-menu auto-closed');
     return;
   }
   const weaponCount = await filteredCount();
   report(weaponCount >= 0 && weaponCount <= equipAll,
-    `weapon filter applied, flyout folded (weapons=${weaponCount} <= equip-all=${equipAll})`);
+    `weapon filter applied, sub-menu folded (weapons=${weaponCount} <= equip-all=${equipAll})`);
   await driver.screenshot('12-equip-weapon-selected');
 
   // 3. 重新展开后选择「帽子」：同样自动收起。
@@ -271,15 +281,15 @@ async function verifyEquipMenu(driver) {
   await driver.click(subCategories.hat.x, subCategories.hat.y);
   await sleep(500);
   if (!await waitFor(menuStateIs(driver, { open: 0, sub: 1 }), 10)) {
-    report(false, 'hat sub-category selected and flyout auto-closed');
+    report(false, 'hat sub-category selected and sub-menu auto-closed');
     return;
   }
   const hatCount = await filteredCount();
   report(hatCount >= 0 && hatCount <= equipAll,
-    `hat filter applied, flyout folded (hats=${hatCount} <= equip-all=${equipAll})`);
+    `hat filter applied, sub-menu folded (hats=${hatCount} <= equip-all=${equipAll})`);
   await driver.screenshot('13-equip-hat-selected');
 
-  // 4. 重新展开后回到「全部装备」：数量应恢复、浮层收起。
+  // 4. 重新展开后回到「全部装备」：数量应恢复、子菜单收起。
   await driver.click(rail.equip.x, rail.equip.y);
   await sleep(400);
   await driver.click(subCategories.all.x, subCategories.all.y);
@@ -287,9 +297,9 @@ async function verifyEquipMenu(driver) {
   const restored = await filteredCount();
   report(await waitFor(menuStateIs(driver, { open: 0, sub: 0 }), 10) &&
     restored === equipAll,
-    `全部装备 restored, flyout folded (filtered=${restored} === equip-all=${equipAll})`);
+    `全部装备 restored, sub-menu folded (filtered=${restored} === equip-all=${equipAll})`);
 
-  // 5. 展开后用「×」收起：过滤保持，菜单关闭。
+  // 5. 展开后用「← 返回」收起：过滤保持，菜单关闭。
   await driver.click(rail.equip.x, rail.equip.y);
   await sleep(400);
   await driver.click(equipClose.x, equipClose.y);
@@ -309,14 +319,14 @@ async function verifyEquipMenu(driver) {
       `weapon band no longer warm-highlight when closed (rgb=${JSON.stringify(closedSample.rows.weaponBand)})`);
   }
 
-  // 6. 分类栏「装备」可重新展开，再次点击可收起（toggle）。
+  // 6. 分类栏「装备」可重新展开；原位子菜单覆盖分类栏，用「返回」收起。
   await driver.click(rail.equip.x, rail.equip.y);
   await sleep(400);
   const reopened = await waitFor(menuStateIs(driver, { open: 1, sub: 0 }), 10);
-  await driver.click(rail.equip.x, rail.equip.y);
+  await driver.click(equipClose.x, equipClose.y);
   await sleep(400);
   const collapsed = await waitFor(menuStateIs(driver, { open: 0, sub: 0 }), 10);
-  report(reopened && collapsed, 'rail 装备 toggles the menu open and closed');
+  report(reopened && collapsed, 'rail 装备 reopens; 返回 collapses the in-place menu');
 
   // 7. 切回「全部」分类：菜单收起、子分类复位、目录数量恢复初始值。
   await driver.click(rail.all.x, rail.all.y);

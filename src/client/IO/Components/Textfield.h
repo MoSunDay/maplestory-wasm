@@ -60,6 +60,9 @@ namespace jrc
         // where the caret is a UTF-16 offset).
         void set_text_with_caret(const std::string& text, size_t caret_utf16);
         void set_cryptchar(int8_t character);
+        // Move the field to a new rectangle (design-space bounds without the
+        // parent shift); a focused field re-anchors the browser IME.
+        void set_bounds(Rectangle<int16_t> bnd);
 
         void set_enter_callback(std::function<void(std::string)> onreturn);
         void set_key_callback(KeyAction::Id key, std::function<void(void)> action);
