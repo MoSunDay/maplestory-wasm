@@ -77,6 +77,8 @@ namespace jrc
         void add_effect(const std::string& path);
         size_t set_named_object_active(const std::string& name, bool active);
         size_t count_active_named_objects(const std::string& name) const;
+        // Return all named objects to their default (active) state.
+        size_t reset_named_objects();
         // Schedule a timed map-warp request used by intro scene scripts.
         void schedule_intro_warp(int32_t mapid, int32_t delay_ms);
 
