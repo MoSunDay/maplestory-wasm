@@ -52,9 +52,14 @@ namespace jrc
             BT_CHANNEL0 = 17
         };
 
+        // Cover the channel cells the window bitmap bakes as available but
+        // that the server does not open, using the bitmap's own disabled cell.
+        void draw_disabled_cells() const;
+
         uint8_t worldid;
         uint8_t channelid;
         uint8_t channelcount;
+        bool channelwindow;
         bool request_pending;
     };
 }

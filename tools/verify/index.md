@@ -18,7 +18,7 @@
 - 动画单端透明度语义：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/animation-frame-properties.cpp -o /tmp/animation-frame-properties && /tmp/animation-frame-properties`
 - 普通攻击姿态预热集合：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/regular-attack-stances.cpp -o /tmp/regular-attack-stances && /tmp/regular-attack-stances`
 - Buff 掩码位序、重复位选择与未知位拒绝：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/foreign-buff-mask.cpp -o /tmp/foreign-buff-mask && /tmp/foreign-buff-mask`
-- 世界选择单频道策略、CHARLIST 失败后的请求门闩恢复与确认按钮资源：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select UI.nx`
+- 世界选择单频道策略、CHARLIST 失败后的请求门闩恢复与确认按钮资源，及频道窗 layer:bg 前两格烘焙为可用样式时未开放的频道格（如频道 2）复用窗口位图中烘焙的禁用格区域、样式与频道 3 同源一致（校验 layer:bg 与 button:2/normal/0 的 -origin 区域落在窗口内）：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/world-select.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/world-select && /tmp/world-select assets/UI.nx`
 - 世界选择浏览器点击兼容：`node tools/verify/world-select-input.cjs`
 - 浏览器 IME 合成输入同步边界：`node tools/verify/ime-input.cjs`；真实浏览器链路：`node scripts/e2e_ime.mjs`
 - Cosmic 角色列表（UTF-8 定长名、等级字节、Evan SP 表）：`c++ -std=c++17 -Isrc/client -Isrc tools/verify/login-parser.cpp src/client/Net/InPacket.cpp src/client/Net/Handlers/Helpers/LoginParser.cpp -o /tmp/login-parser && /tmp/login-parser`

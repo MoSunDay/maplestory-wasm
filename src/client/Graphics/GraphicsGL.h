@@ -97,6 +97,11 @@ namespace jrc
         // Draw the bitmap with the given parameters.
         void draw(const nl::bitmap& bmp, const Rectangle<int16_t>& rect,
             const Color& color, float angle);
+        // Draw one region of the bitmap, given in bitmap pixels, into the
+        // destination rectangle. Lets a window reuse a region it already
+        // bakes instead of painting a lookalike over it.
+        void draw(const nl::bitmap& bmp, const Rectangle<int16_t>& rect,
+            const Rectangle<int16_t>& region, const Color& color, float angle);
 
         // Create a layout for the text with the parameters specified.
         Text::Layout createlayout(const std::string& text, Text::Font font,

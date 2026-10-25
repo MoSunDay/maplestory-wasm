@@ -647,6 +647,45 @@ namespace jrc
         quads.emplace_back(rect.l(), rect.r(), rect.t(), rect.b(), getoffset(bmp), color, angle);
     }
 
+    void GraphicsGL::draw(const nl::bitmap& bmp, const Rectangle<int16_t>& rect,
+        const Rectangle<int16_t>& region, const Color& color, float angle)
+    {
+        if (locked)
+        {
+            return;
+        }
+
+        if (color.invisible())
+        {
+            return;
+        }
+
+        if (!rect.overlaps(screen()))
+        {
+            return;
+        }
+
+        if (region.l() < 0 || region.t() < 0
+            || region.r() > bmp.width() || region.b() > bmp.height())
+        {
+            return;
+        }
+
+        if (!hasbitmap(bmp))
+        {
+            return;
+        }
+
+        const Offset& whole = getoffset(bmp);
+        const Offset sub(
+            whole.l + region.l(),
+            whole.t + region.t(),
+            region.width(),
+            region.height()
+        );
+        quads.emplace_back(rect.l(), rect.r(), rect.t(), rect.b(), sub, color, angle);
+    }
+
     void GraphicsGL::drawrectangle(int16_t x, int16_t y, int16_t w, int16_t h, float r, float g, float b, float a)
     {
         if (locked)

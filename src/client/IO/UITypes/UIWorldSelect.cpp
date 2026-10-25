@@ -21,6 +21,7 @@
 #include "WorldSelectPolicy.h"
 
 #include "../../Console.h"
+#include "../../Graphics/GraphicsGL.h"
 #include "../../Graphics/Sprite.h"
 #include "../../IO/UI.h"
 #include "../../IO/Components/MapleButton.h"
@@ -52,6 +53,10 @@ namespace jrc
         // First baked world slot inside the sidebar, matching button:10's
         // origin (-14,-14).
         constexpr Point<int16_t> POSTCH_SIDEBAR_TOP_SLOT{ 14, 14 };
+        // Post-Chaos layer:bg bakes the first two grid cells in the
+        // normal (bright) style. Cells without a live channel button
+        // must read as disabled, like the baked cells beside them.
+        constexpr uint8_t POSTCH_BAKED_NORMAL_CELLS = 2;
     }
 
     UIWorldSelect::UIWorldSelect(std::vector<World> worlds, uint8_t worldcount)
@@ -59,6 +64,7 @@ namespace jrc
           worldid(0),
           channelid(world_select::selected_channel_id()),
           channelcount(0),
+          channelwindow(false),
           request_pending(false) {
 
         nl::node back = nl::nx::map["Back"]["login.img"]["back"];
@@ -141,6 +147,7 @@ namespace jrc
         {
             sprites.emplace_back(channelsrc["layer:bg"], CHANNEL_WINDOW_CENTER);
             sprites.emplace_back(channelsrc["release"]["layer:15"], CHANNEL_WINDOW_CENTER);
+            channelwindow = true;
         }
         else
         {
@@ -178,7 +185,65 @@ namespace jrc
 
     void UIWorldSelect::draw(float alpha) const
     {
-        UIElement::draw(alpha);
+        draw_sprites(alpha);
+        draw_disabled_cells();
+        draw_buttons(alpha);
+    }
+
+    void UIWorldSelect::draw_disabled_cells() const
+    {
+        if (!channelwindow || channelcount >= POSTCH_BAKED_NORMAL_CELLS)
+        {
+            return;
+        }
+
+        const nl::node channelsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"];
+        const nl::bitmap window = channelsrc["layer:bg"];
+        if (!window)
+        {
+            return;
+        }
+
+        // The grid cell that the window bitmap already bakes in the disabled
+        // style doubles as the patch: the cell plate carries its own channel
+        // number, the baked cell does not, so only the baked pixels can make a
+        // leftover cell read exactly like the cells beside it.
+        const nl::node source_cell =
+            channelsrc["button:" + std::to_string(POSTCH_BAKED_NORMAL_CELLS)]["normal"]["0"];
+        const nl::bitmap cell = source_cell;
+        if (!cell)
+        {
+            return;
+        }
+
+        const Point<int16_t> source_origin(source_cell["origin"]);
+        const int16_t width = static_cast<int16_t>(cell.width());
+        const int16_t height = static_cast<int16_t>(cell.height());
+        // The cell origin is the offset from the bitmap top-left to the
+        // position the cell is drawn at, so it also locates the baked cell.
+        const Point<int16_t> source = -source_origin;
+        const Rectangle<int16_t> region(
+            source.x(), source.x() + width,
+            source.y(), source.y() + height
+            );
+
+        for (uint8_t i = channelcount; i < POSTCH_BAKED_NORMAL_CELLS; ++i)
+        {
+            const nl::node slot =
+                channelsrc["button:" + std::to_string(i)]["normal"]["0"];
+            if (!slot)
+            {
+                continue;
+            }
+
+            const Point<int16_t> topleft =
+                position + CHANNEL_WINDOW_CENTER - Point<int16_t>(slot["origin"]);
+            const Rectangle<int16_t> destination(
+                topleft.x(), topleft.x() + width,
+                topleft.y(), topleft.y() + height
+                );
+            GraphicsGL::get().draw(window, destination, region, Color(Color::WHITE), 0.0f);
+        }
     }
 
     void UIWorldSelect::update_screen(int16_t, int16_t)
