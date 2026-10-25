@@ -21,6 +21,8 @@
 #include "../../Data/SkillData.h"
 #include "../../Util/Misc.h"
 
+#include "MagicDamage.h"
+
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
 
@@ -266,7 +268,11 @@ namespace jrc
         }
         else if (stats.matk)
         {
+            // Magic skills scale the base range by "mad" (server getMatk())
+            // and never by the "damage" percent, matching the server.
             attack.matk += stats.matk;
+            attack.mindamage = magic_damage::apply(attack.mindamage, stats.matk);
+            attack.maxdamage = magic_damage::apply(attack.maxdamage, stats.matk);
             attack.damagetype = Attack::DMG_MAGIC;
         }
         else

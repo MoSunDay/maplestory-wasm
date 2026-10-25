@@ -48,14 +48,35 @@ namespace
         return value;
     }
 
-    bool numeric_sequence(const std::vector<nl::node>& variants)
+    // Hit children must be named as the set {0..N-1}. 079MAX4 iterates them in
+    // lexicographic order (0, 1, 10, 2), so order is not part of the contract;
+    // gaps, non-numeric names, padded names and repeated names still fail.
+    bool numeric_set(const std::vector<nl::node>& variants)
     {
-        for (size_t index = 0; index < variants.size(); ++index)
+        std::set<size_t> indices;
+        for (const nl::node& variant : variants)
         {
-            if (variants[index].name() != std::to_string(index))
+            const std::string name = variant.name();
+            if (name.empty()
+                || (name.size() > 1 && name[0] == '0')
+                || name.find_first_not_of("0123456789") != std::string::npos)
+            {
+                return false;
+            }
+
+            size_t index = 0;
+            for (char digit : name)
+            {
+                // Bail out before the accumulator can get anywhere near an
+                // overflow; names at or above the variant count are invalid.
+                index = index * 10 + static_cast<size_t>(digit - '0');
+                if (index >= variants.size())
+                    return false;
+            }
+            if (!indices.insert(index).second)
                 return false;
         }
-        return true;
+        return indices.size() == variants.size();
     }
 }
 
@@ -85,17 +106,14 @@ int main(int argc, char** argv)
                     continue;
 
                 ++character_level_hit_groups;
-                if (!numeric_sequence(nested))
+                if (!numeric_set(nested))
                 {
                     failures.push_back(
                         skill.name() + "/CharLevel/" + character_level.name()
-                        + ": hit branches are not contiguous from zero");
+                        + ": hit branch names are not the set 0..N-1");
                 }
-                if (nested_variant_count != 0 && nested_variant_count != nested.size())
-                {
-                    failures.push_back(
-                        skill.name() + ": CharLevel hit branch counts differ");
-                }
+                // Early 079MAX4 bands legitimately declare fewer branches; the
+                // client takes the maximum count and bounds per-level selection.
                 nested_variant_count = std::max(nested_variant_count, nested.size());
             }
 
@@ -103,8 +121,8 @@ int main(int argc, char** argv)
                 continue;
 
             ++skills_with_hits;
-            if (!variants.empty() && !numeric_sequence(variants))
-                failures.push_back(skill.name() + ": hit branches are not contiguous from zero");
+            if (!variants.empty() && !numeric_set(variants))
+                failures.push_back(skill.name() + ": hit branch names are not the set 0..N-1");
 
             uint8_t attack_count = std::max(
                 maximum(skill["level"], "attackCount"),
@@ -128,7 +146,8 @@ int main(int argc, char** argv)
             {
                 int position = static_cast<int>(variant["pos"].get_integer(0));
                 positions.insert(position);
-                if (position < 0 || position > 4)
+                // 079MAX4 uses pos=5; the client only special-cases 0.
+                if (position < 0 || position > 5)
                 {
                     failures.push_back(
                         skill.name() + "/hit/" + variant.name()

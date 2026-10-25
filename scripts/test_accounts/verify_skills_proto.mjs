@@ -5,7 +5,9 @@
 // byte-for-byte; mob oid offsets mirror MapObjectHandlers.cpp; wire/crypto
 // stack lives in ./maple_wire.mjs.
 // Skills flagged serverBuff in the manifest (SkillFactory.isBuff switch,
-// parsed by attack_skills.py) are skipped: "skipped: server-buff".
+// parsed by attack_skills.py) are skipped by this harness: "skipped:
+// server-buff". Several of them are buff/charge skills that do not take a
+// plain damage packet; the flag alone does not block damage settlement.
 // Two exotic attacks are supported: Meso Explosion (4211006, kind "meso")
 // uses its own meso-id layout (buildMesoAttack); Snipe (3221007) fires a
 // normal ranged packet — the server's SNIPE branch overrides the damage.
@@ -60,10 +62,10 @@ const u16 = (p, o) => (p.length >= o + 2 ? p.readUInt16LE(o) : null);
 const HOLD_RANGED = new Set([3121004, 3221001, 5221004, 13121004]);
 
 // Skills whose manifest entry carries serverBuff:true (attack_skills.py
-// parses SkillFactory's isBuff switch at manifest build time): an "attack"
-// packet for them never reaches damage settlement, and charges
-// additionally poison later attacks (verified live: Blast/Rush settle
-// again on a fresh session).
+// parses SkillFactory's isBuff switch at manifest build time). This is a
+// harness exclusion only: several of them are buff/charge skills (Blast,
+// Rush) where the charge int and buff shape make a plain damage row hard
+// to assert, but the flag alone does not block damage settlement.
 const isServerBuff = (skill) => skill.serverBuff === true;
 
 function buildAttack({ kind, skillid, hitcount, charge, oid, damage }) {
@@ -383,8 +385,9 @@ async function main() {
   // 5) Fire every attack skill once.
   let failed = 0;
   for (const skill of job.skills) {
-    // serverBuff:true ⇒ SkillFactory.isBuff() forces the effect to load as
-    // a buff on the server; an attack packet for it can never settle.
+    // serverBuff:true ⇒ the server loads the effect as an overTime
+    // buff/charge. Skipped as a harness exclusion: several of these do not
+    // take a plain damage row, though the flag alone does not block it.
     if (isServerBuff(skill)) {
       report.skipped.push({ id: skill.id, name: skill.name, reason: 'skipped: server-buff (SkillFactory.isBuff)' });
       console.log(`[SKIPPED] ${skill.id} ${skill.name} → skipped: server-buff`);

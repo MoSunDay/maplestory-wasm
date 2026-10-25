@@ -36,9 +36,10 @@ one skill id from landing on a character holding the wrong weapon type.
 
 Every entry also carries "serverBuff": true when the server's own
 SkillFactory isBuff switch (link_repos/MapleStory-Server/src/client/
-SkillFactory.java, ids resolved from src/constants/skills/*.java) forces
-the skill to load as a buff - parsed at runtime via server_buff_ids(),
-never hardcoded here.
+SkillFactory.java, ids resolved from src/constants/skills/*.java) loads
+the skill as an overTime effect - parsed at runtime via server_buff_ids(),
+never hardcoded here. The flag only marks that buff/charge shape: it does
+NOT by itself prevent an attack packet from settling damage.
 
 Skill names: Skill.wz carries no <string name="name"> in this dump, so the
 String.wz/Skill.img.xml table is used as fallback. Output is written to
@@ -170,8 +171,10 @@ def _isbuff_switch_groups():
 def server_buff_ids():
     """Skill ids the server's SkillFactory isBuff switch forces to true.
 
-    MapleStatEffects of these skills are loaded as buffs, so an "attack"
-    packet for them never settles damage on the server.
+    The server loads these MapleStatEffects as overTime effects (buffs,
+    charge skills), so the manifest flags them as "serverBuff". The flag
+    alone does not block damage settlement; the protocol harness merely
+    excludes these skills from its attack run.
     """
     return _isbuff_switch_groups()[0]
 
@@ -294,11 +297,11 @@ def attack_record(sid, name, level, kv, kind, default_kind, buff_ids, summon_set
         "mobCount": _to_int(kv.get("mobCount"), 1),
         "attackCount": _to_int(kv.get("attackCount"), 1),
         "mpCon": _to_int(kv.get("mpCon"), 0),
-        "cooldown": _to_int(kv.get("cooldown") or kv.get("time"), 0),
+        "cooldown": _to_int(kv.get("cooldown") or kv.get("time") or kv.get("cooltime"), 0),
         "charge": sid in CHARGE_SKILLS,
         "special": special,
-        # SkillFactory.isBuff()==true: server loads the effect as a buff,
-        # so an attack packet for it cannot settle damage.
+        # SkillFactory.isBuff()==true: the server loads the effect as an
+        # overTime buff/charge; that alone does not block damage rows.
         "serverBuff": sid in buff_ids,
         # MapleStatEffect adds a MapleBuffStat.SUMMON statup: the damage
         # comes from the summon's own attacks, not the player's packet.
