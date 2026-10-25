@@ -1,0 +1,32 @@
+# 服务端源码补丁：修复圣甲术（Iron Body）技能常量
+# 背景：link_repos/MapleStory-Server 是无版本控制的 linked checkout，
+# 重新 checkout/同步后以下修复会丢失，须重放本补丁。
+# 详情：features/changelog/2026-10-25/iron-body-buff-skill-id-fix.md
+#
+# 应用（在 link_repos/MapleStory-Server 目录内）：
+#   patch -p1 < ../../../scripts/server-patches/0001-fix-iron-body-skill-id-constants.patch
+# 验证：
+#   grep -n "IRON_BODY" src/constants/skills/Swordsman.java   # 期望 1001003
+#   grep -n "NIMBLE_BODY" src/constants/skills/Rogue.java     # 期望 4000000
+#   bash posix-compile.sh && javap -constants -cp dist constants.skills.Swordsman | grep IRON_BODY
+--- a/src/constants/skills/Swordsman.java
++++ b/src/constants/skills/Swordsman.java
+@@ -27,5 +27,5 @@
+  */
+ public class Swordsman {
+     public static final int IMPROVED_MAX_HP_INCREASE = 1000001;
+-    public static final int IRON_BODY = 1000003;
++    public static final int IRON_BODY = 1001003;
+ }
+\ 文件末尾没有换行符
+--- a/src/constants/skills/Rogue.java
++++ b/src/constants/skills/Rogue.java
+@@ -26,7 +26,7 @@
+  * @author BubblesDev
+  */
+ public class Rogue {
+-    public static final int NIMBLE_BODY = 4001000;
++    public static final int NIMBLE_BODY = 4000000;
+     public static final int DARK_SIGHT = 4001003;
+     public static final int DISORDER = 4001002;
+     public static final int DOUBLE_STAB = 4001334;

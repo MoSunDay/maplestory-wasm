@@ -75,6 +75,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **紧凑技能窗口**: 四行技能布局使用匹配尺寸的紧凑面板，不显示无功能的空白扩展区域
 - **技能冷却**: 冷却计时
 - **被动技能**: 被动效果计算
+- **[圣甲术 buff 修复](changelog/2026-10-25/iron-body-buff-skill-id-fix.md)**: 服务端技能常量 1000003→1001003，圣甲术正确下发 WDEF 增益（GIVE_BUFF、图标、属性面板与到期移除）
 
 相关模块: [角色系统](../agents/client/Character/index.md)
 

@@ -304,3 +304,18 @@ node tools/verify/maplestory-webui/questlog-flow.mjs
 test2/test2、卡 0、本地 8000、9257）；产物在
 `/tmp/maplestory-webui-*/`（questlog-open、questlog-closed 截图 +
 browser-console.log）。
+
+## 圣甲术客户端生效流程
+
+`iron-body-client-flow.mjs` 验证圣甲术（1001003）在真实 WASM 客户端内的完整生效链：登录 test1 账号 card0（test1Hero，战士系）→ 进图 → 按 I 键施放 → 右上角 buff 图标槽（`UIBuffList` 绘制于 `{width-50,40}`，32×32）出现新像素。判定带前置自检：施放前对图标槽连拍两帧必须逐字节一致（背景静态），否则判 INCONCLUSIVE（exit 3）退出，避免背景动画误报；施放后区域变化即 PASS（exit 0）。截图裁剪按 canvas `getBoundingClientRect` 做游戏坐标→CSS 坐标映射，适配页面缩放。
+
+前置（一次性 SQL，角色迁至静态室内图 910000000 并绑键）：
+
+```sql
+INSERT INTO keymap (characterid, `key`, type, action)
+  SELECT id, 23, 1, 1001003 FROM characters WHERE name='test1Hero';  -- key 23 = I
+UPDATE characters SET map=910000000 WHERE name='test1Hero';
+UPDATE accounts SET loggedin=0 WHERE name='test1';
+```
+
+注意：`skill-keymap-prep.py` 重跑会整表重建 keymap 并把角色迁回 40001，届时需重新执行上述绑定。与其它驱动共用 test1 账号，勿与其它 E2E 并发运行（服务端重复登录接管会踢掉旧会话）。协议层（伪客户端）回归见 `scripts/test_accounts/iron_body_buff_proto.mjs`（已挂入 `verify_all.sh` proto 阶段）。

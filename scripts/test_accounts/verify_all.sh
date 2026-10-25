@@ -29,6 +29,12 @@ phase_proto() {
       timeout 180 node verify_skills_proto.mjs > "/tmp/skill_proto_${acct}_${sfx}.log" 2>&1
     echo "proto ${acct}/${sfx} rc=$? : $(grep -oE '[0-9]+ fired, [0-9]+ skipped, [0-9]+ not settled' "/tmp/skill_proto_${acct}_${sfx}.log" | tail -1)"
   done
+  # Iron Body (圣甲术 1001003) buff 回包回归：test1Hero 上断言 GIVE_BUFF
+  # 形状（WDEF second mask 0x2_0000_0000）。需 setup 阶段建好的 Hero 角色。
+  reset_login
+  WIRE_USER=test1 WIRE_WORLD=$WORLD CHAR_SUFFIX=Hero \
+    timeout 120 node iron_body_buff_proto.mjs > /tmp/iron_body_proto.log 2>&1
+  echo "proto iron-body rc=$? : $(grep -oE 'PASS.*' /tmp/iron_body_proto.log | tail -1)"
   reset_login
   echo "PROTO DONE"
 }
