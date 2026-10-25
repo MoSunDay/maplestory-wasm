@@ -494,6 +494,12 @@ namespace jrc
         return slot_by_position(cursorpos - position);
     }
 
+    int32_t UIItemInventory::item_id_at(int16_t slot) const
+    {
+        auto icon = icons.find(slot);
+        return icon != icons.end() ? icon->second->get_item_id() : 0;
+    }
+
     int16_t UIItemInventory::slot_by_position(Point<int16_t> cursorpos) const
     {
         // Socket hit test against the generation's grid geometry (see
@@ -586,6 +592,11 @@ namespace jrc
             return;
 
         MoveItemPacket(tab, source, slot, 1).dispatch();
+    }
+
+    int32_t UIItemInventory::ItemIcon::get_item_id() const
+    {
+        return item_id;
     }
 
     void UIItemInventory::ItemIcon::drop_on_bindings(Point<int16_t> cursorposition, bool remove) const

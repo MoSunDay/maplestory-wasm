@@ -180,6 +180,11 @@ namespace jrc
         cursor.set_position(cursorpos);
     }
 
+    void UI::set_cursor_position(Point<int16_t> pos)
+    {
+        cursor.set_position(pos);
+    }
+
     void UI::send_cursor(bool pressed)
     {
         if (!enabled || asset_loading_blocks_input())
@@ -480,6 +485,17 @@ namespace jrc
         const std::string& description, int32_t mapid, bool bolded, bool portal) {
 
         state->show_map(parent, title, description, mapid, bolded, portal);
+    }
+
+    UIElement::Type UI::front_type_at(Point<int16_t> pos)
+    {
+        UIElement* front = state->get_front(pos);
+        return front ? front->get_type() : UIElement::NONE;
+    }
+
+    Point<int16_t> UI::cursor_position() const
+    {
+        return cursor.get_position();
     }
 
     void UI::remove(UIElement::Type type)

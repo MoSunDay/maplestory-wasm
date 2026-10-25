@@ -62,6 +62,7 @@ namespace jrc
 
         void send_cursor(Point<int16_t> pos);
         void send_cursor(bool pressed);
+        void set_cursor_position(Point<int16_t> pos);
         void send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate);
         void send_focus(int focused);
         void send_scroll(double yoffset);
@@ -104,6 +105,8 @@ namespace jrc
         bool has_focused_textfield() const;
         bool has_element(UIElement::Type type);
         bool is_element_active(UIElement::Type type);
+        UIElement::Type front_type_at(Point<int16_t> pos);
+        Point<int16_t> cursor_position() const;
         void remove(UIElement::Type type);
 
     private:

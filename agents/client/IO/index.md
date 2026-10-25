@@ -20,6 +20,7 @@ UI 框架单例。核心职责:
 - `enter_cash_shop(model, female)`: 使用服务端会话快照和本地商品目录进入现金商城状态
 - `update()` / `draw()`: 更新和渲染当前状态的 UI 元素
 - 输入分发: `send_cursor()`, `send_key()`, `send_scroll()`, `doubleclick()`
+- 鼠标落点: `Window.cpp` 在左键按下/释放、右键按下时用 `glfwGetCursorPos()` 同步 `UI` 光标后再分发，避免浏览器按键事件先于 cursor callback 时拖放使用上一点坐标
 - `emplace<T>()`: 动态创建 UI 元素
 - `get_element<T>()`: 获取 UI 元素引用
 - `has_element(type)` / `is_element_active(type)`: 分别查询缓存对象是否存在、界面是否实际显示；WASM 验收通过 active 状态将登录、世界、人物、建角、游戏和商城映射为稳定状态码，商城另以只读探针暴露 NX Credit、仓库数量、角色现金栏数量和请求中状态
@@ -66,7 +67,7 @@ UI 状态接口。三个具体实现:
 ### 游戏内 UI (`UITypes/`)
 | 文件 | 职责 |
 |------|------|
-| `UIStatusBar` | 底部状态栏；持有好友与队伍状态并向窗口、聊天及验收探针提供统一读写入口；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用；游戏内无其他窗口时 Escape 打开 System 并默认选中退出，Enter 发送标准登出、重连登录服并回到账号登录页；v83 `StatusBar.img/base/quickSlot` 快捷栏可从技能簿点击或拖拽绑定已学习的非被动技能，点击已绑定槽位经 `Combat::use_move` 释放，服务端下发冷却后按槽位在技能图标上覆盖黑色遮罩并显示剩余秒数，悬停显示技能 tooltip，右键清空；绑定仅存客户端内存，重登清空；v83 HP/MP/EXP gauge 按 `gauge/bar` 实测内框（HP `{3,106,16,29}`、MP `{111,214,16,29}`、EXP `{224,337,16,29}`）以满条加黑色 cover 遮盖表达进度（cover 同时刷新宽高），数值用根节点 `StatusBar.img/number` charset 按节点名组串（`L<cur>s<max>R`、`<exp>L<pct>pR`）动态绘制 |
+| `UIStatusBar` | 底部状态栏；持有好友与队伍状态并向窗口、聊天及验收探针提供统一读写入口；Menu/System 使用 `StatusBar2.img/mainBar` 原生弹层，可用项派发到现有窗口，缺失能力保持禁用；游戏内无其他窗口时 Escape 打开 System 并默认选中退出，Enter 发送标准登出、重连登录服并回到账号登录页；两代快捷栏（post-Chaos `mainBar/quickSlot` 145×93 / v83 `base/quickSlot` 151×80，随 UI.nx 世代自动选择，组合包优先新版；post-Chaos 面板偏移 `{143,-152}`，底边停在快捷图标行上方 2px，v83 仍为 `{143,-143}`）可从技能簿点击或拖拽绑定已学习的非被动技能，也可从物品栏拖入物品（左键经 `Player::use_item`，USE 消耗品/SETUP 椅子生效；与技能互斥占用同一槽）；服务端下发冷却后按槽位在技能图标上覆盖黑色遮罩并显示剩余秒数；post-Chaos 在 16px 顶带/14px 底带用 `StatusBar.img/key/<i>` 原生键帽常显键名（v83 仅空槽显示），悬停显示技能/物品 tooltip，右键清空；绑定仅存客户端内存，重登清空；HP/MP/EXP：新版走 `mainBar/gauge` 三段式 Gauge + `gauge/number` charset（分隔字形节点名为 `\`，Charset 加载时重映射为 `/` 查找键）；v83 按 `gauge/bar` 实测内框（HP `{3,106,16,29}`、MP `{111,214,16,29}`、EXP `{224,337,16,29}`）以满条加黑色 cover 遮盖表达进度（cover 同时刷新宽高），数值用根节点 `StatusBar.img/number` charset 按节点名组串（`L<cur>s<max>R`、`<exp>L<pct>pR`）动态绘制；新版底条贴图拆出 `StatusBar/UIStatusBarPostChaosDraw.cpp`：backgrnd 全宽铺底（视宽 ≤1366 贴左缘裁右、更宽则拉伸），左簇（等级块/量条/名字职业/聊天行）锚定 `postchaos_left_anchor()` 固定 512 左锚，右簇控制按钮随视图右缘停靠，`is_in_range` 为全宽条带，HP/MP 组串分隔符用 `/`（Charset 把 `\` 节点重映射为 `/` 查找键） |
 | `UIStatsInfo` | 角色属性窗口；加点按钮直接采用 NX 内置 origin 定位，使可见加号与鼠标命中区域落在对应属性行 |
 | `UISkillBook` | 技能书窗口；使用与四行技能布局匹配的 175×289 紧凑 NX 面板，并按 Explorer/Cygnus/Aran 的实际转职阶段开放可切换页签 |
 | `UIEquipInventory` | 装备栏窗口；宠物页显示已选择的 HP/MP 药水，并从 `Stage` 当前已召唤宠物与已装备能力解析启用项；现金栏仅持有未召唤宠物不会误显示为已启用，窗口接受 USE 药水拖放 |

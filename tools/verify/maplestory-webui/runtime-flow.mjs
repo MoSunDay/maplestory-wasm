@@ -30,6 +30,8 @@ export function createRuntimeProbes(driver) {
     driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', [], [])`);
   const numberArgument = (name, value) =>
     driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', ['number'], [${Number(value)}])`);
+  const pointArgument = (name, x, y) =>
+    driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', ['number','number'], [${Number(x)},${Number(y)}])`);
   return {
     currentUiState: () => number('msui_state'),
     playerId: () => number('msplayer_id'),
@@ -95,6 +97,29 @@ export function createRuntimeProbes(driver) {
     shopBuyY: row => numberArgument('msshop_buy_y', row),
     inventoryQuantity: itemId => numberArgument('msinventory_quantity', itemId),
     inventorySlot: itemId => numberArgument('msinventory_slot', itemId),
+    itemInventoryActive: () => number('msiteminventory_active'),
+    itemInventoryX: () => number('msiteminventory_x'),
+    itemInventoryY: () => number('msiteminventory_y'),
+    itemInventoryTab: () => number('msiteminventory_tab'),
+    itemInventoryFirstSlot: () => number('msiteminventory_first_slot'),
+    itemInventoryLastSlot: () => number('msiteminventory_last_slot'),
+    itemInventorySlotAt: (x, y) => pointArgument('msiteminventory_slot_at', x, y),
+    itemInventoryIconItemId: slot => numberArgument('msiteminventory_icon_item_id', slot),
+    quickslotSkill: index => numberArgument('msquickslot_skill', index),
+    quickslotItem: index => numberArgument('msquickslot_item', index),
+    quickslotCenterX: index => numberArgument('msquickslot_center_x', index),
+    quickslotCenterY: index => numberArgument('msquickslot_center_y', index),
+    quickslotPanel: async () => Object.freeze({
+      left: await number('msquickslot_panel_left'),
+      top: await number('msquickslot_panel_top'),
+      right: await number('msquickslot_panel_right'),
+      bottom: await number('msquickslot_panel_bottom')
+    }),
+    quickslotCooldown: index => numberArgument('msquickslot_cooldown', index),
+    quickslotCooldownLabel: index => numberArgument('msquickslot_cooldown_label', index),
+    quickslotHovered: () => number('msquickslot_hovered'),
+    skillbookSelected: () => number('msskillbook_selected'),
+    skillbookActive: () => number('msskillbook_active'),
     cashShopProbe: name => number(name)
   };
 }

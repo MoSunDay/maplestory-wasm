@@ -81,6 +81,11 @@ namespace jrc
         return type->get_skill_id();
     }
 
+    int32_t Icon::get_item_id() const
+    {
+        return type->get_item_id();
+    }
+
     bool Icon::drop_on_pet_potion(bool hp) const
     {
         return type->drop_on_pet_potion(hp);

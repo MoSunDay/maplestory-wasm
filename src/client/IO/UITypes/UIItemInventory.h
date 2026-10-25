@@ -56,6 +56,8 @@ namespace jrc
         int16_t visible_first_slot() const { return slotrange.first; }
         int16_t visible_last_slot() const { return slotrange.second; }
         int16_t hit_test(Point<int16_t> cursorpos) const;
+        /// Item id represented by the icon in visible slot `slot` (0 if empty).
+        int32_t item_id_at(int16_t slot) const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
@@ -82,6 +84,7 @@ namespace jrc
             void drop_on_equips(Equipslot::Id eqslot) const override;
             void drop_on_items(InventoryType::Id tab, Equipslot::Id, int16_t slot, bool) const override;
             void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override;
+            int32_t get_item_id() const override;
             bool drop_on_pet_potion(bool hp) const override;
             void drop_on_trade() const override;
 

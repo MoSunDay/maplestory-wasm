@@ -164,7 +164,7 @@ namespace jrc
         if (statusbar_element && statusbar_element->is_active())
         {
             auto* statusbar = static_cast<UIStatusbar*>(statusbar_element.get());
-            if (icon.get_skill_id() > 0 &&
+            if ((icon.get_skill_id() > 0 || icon.get_item_id() > 0) &&
                 statusbar->is_quickslot_in_range(pos))
             {
                 statusbar->send_icon(icon, pos);

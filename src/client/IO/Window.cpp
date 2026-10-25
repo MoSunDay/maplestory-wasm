@@ -113,23 +113,33 @@ namespace jrc
         UI::get().send_key(key, action != GLFW_RELEASE);
     }
 
+    namespace
+    {
+        Point<int16_t> event_cursor_position(GLFWwindow* window)
+        {
+            // Browser mouse events can outrun the GLFW cursor callback, so
+            // refresh the UI cursor from the button event's position. Without
+            // this, a press/drop can be routed to the previous cursor cell.
+            double xpos = 0.0;
+            double ypos = 0.0;
+            glfwGetCursorPos(window, &xpos, &ypos);
+            return Point<int16_t>(
+                static_cast<int16_t>(xpos),
+                static_cast<int16_t>(ypos)
+            );
+        }
+    }
+
     void mousekey_callback(GLFWwindow* window, int button, int action, int)
     {
+        const Point<int16_t> position = event_cursor_position(window);
         switch (button)
         {
         case GLFW_MOUSE_BUTTON_LEFT:
             switch (action)
             {
             case GLFW_PRESS:
-            {
-                double xpos = 0.0;
-                double ypos = 0.0;
-                glfwGetCursorPos(window, &xpos, &ypos);
-                Point<int16_t> position(
-                    static_cast<int16_t>(xpos),
-                    static_cast<int16_t>(ypos)
-                );
-
+                UI::get().set_cursor_position(position);
                 UI::get().send_cursor(true);
                 if (is_doubleclick(position))
                 {
@@ -137,8 +147,8 @@ namespace jrc
                     UI::get().doubleclick();
                 }
                 break;
-            }
             case GLFW_RELEASE:
+                UI::get().set_cursor_position(position);
                 UI::get().send_cursor(false);
                 break;
             default:
@@ -149,6 +159,7 @@ namespace jrc
             switch (action)
             {
             case GLFW_PRESS:
+                UI::get().set_cursor_position(position);
                 UI::get().rightclick();
                 break;
             default:
