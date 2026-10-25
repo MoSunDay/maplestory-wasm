@@ -693,10 +693,21 @@ try {
     }
 
     if (verifyCashShop) {
-      // StatusBar2 BtCashShop occupies x=569..625, y=554..589 at 800x600.
+      // The cash-shop entry moves with the HUD generation: StatusBar2
+      // BtCashShop occupies x=569..625, y=554..589 at 800x600, while the
+      // legacy v83 bar right-anchors BtShop at x=535..589, y=566..600.
       // Use the visible button because account keymaps may rebind the shortcut.
-      await driver.click(597, 571);
-      await requireUiState('cash-shop UI active', uiState.cashShop, 30);
+      let cashShopEntered = false;
+      for (const [x, y] of [[597, 571], [562, 583]]) {
+        await driver.click(x, y);
+        for (let second = 0; second < 15 && !cashShopEntered; second += 1) {
+          cashShopEntered = await currentUiState() === uiState.cashShop;
+          if (!cashShopEntered) await sleep(1000);
+        }
+        if (cashShopEntered) break;
+      }
+      if (!cashShopEntered) throw new Error('cash-shop UI did not activate');
+      console.log('PASS  cash-shop UI active');
       await requireAssetIdle('cash-shop assets ready');
       const initial = {
         locker: await cashShopProbe('mscashshop_locker_count'),

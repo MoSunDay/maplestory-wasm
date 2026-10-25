@@ -20,6 +20,9 @@
 #include "UIStateLogin.h"
 #include "UIStateGame.h"
 #include "CashShop/UIStateCashShop.h"
+#include "Display/Resolution.h"
+#include "Display/ResolutionStore.h"
+#include "Display/Viewport.h"
 #include "UITypes/UIWorldMap.h"
 #include "Window.h"
 #include "../Audio/Audio.h"
@@ -121,9 +124,15 @@ namespace jrc
         switch (id)
         {
         case LOGIN:
+            // Pre-game screens are laid out for the default resolution.
+            viewport::apply_runtime(display::default_resolution());
             state = std::make_unique<UIStateLogin>();
             break;
         case GAME:
+            // Gameplay uses the persisted display setting.
+            viewport::apply_runtime(
+                display::preset(display_store::load_index())
+            );
             state = std::make_unique<UIStateGame>();
             break;
         case CASHSHOP: break;

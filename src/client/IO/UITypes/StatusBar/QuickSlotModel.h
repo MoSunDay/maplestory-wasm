@@ -15,9 +15,11 @@
 // You should have received a copy of the GNU Affero General Public License //
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
-// Pure model of the pre-Chaos (v83) quickslot display
-// (StatusBar.img/base/quickSlot, 151x80, eight fixed slots). Deliberately
-// free of graphics so hit-testing and assignment can be tested standalone.
+// Pure model of the quickslot display: eight fixed slots in a 4x2 grid.
+// Two asset generations ship different panels, so the measured geometry
+// lives in Layout values (V83_LAYOUT / CHAOS_LAYOUT) and every helper
+// takes the active layout as an argument. Deliberately free of graphics
+// so hit-testing and assignment can be tested standalone.
 #pragma once
 #include "../../../Template/Point.h"
 
@@ -30,18 +32,60 @@ namespace jrc::quickslot
     /// Number of fixed slots in the v83 quickslot panel.
     constexpr int16_t COUNT = 8;
 
-    /// Slot hit bands measured from base/quickSlot (151x80), local to the
-    /// panel: four columns and two rows. Low edges are inclusive, high edges
-    /// exclusive, and the bands sit inside the visible keycaps.
-    constexpr std::array<int16_t, 4> COLUMN_LEFT  = {   3,  37,  71, 105 };
-    constexpr std::array<int16_t, 4> COLUMN_RIGHT = {  37,  71, 105, 141 };
-    constexpr std::array<int16_t, 2> ROW_TOP      = {   7,  42 };
-    constexpr std::array<int16_t, 2> ROW_BOTTOM   = {  42,  77 };
+    /// Measured panel geometry of one asset generation. Low edges are
+    /// inclusive, high edges exclusive, and the hit bands sit inside the
+    /// visible slot boxes (separator gaps count towards the slot on their
+    /// left so adjacent slots share edges without holes).
+    struct Layout
+    {
+        /// Panel size in pixels (v83: 151x80, post-Chaos: 145x93).
+        Point<int16_t> dimension;
+        /// Inclusive/exclusive hit bands, local to the panel.
+        std::array<int16_t, 4> column_left;
+        std::array<int16_t, 4> column_right;
+        std::array<int16_t, 2> row_top;
+        std::array<int16_t, 2> row_bottom;
+        /// X center of each slot column, local to the panel.
+        std::array<int16_t, 4> column_center;
+        /// Y center of each slot row, local to the panel.
+        std::array<int16_t, 2> row_center;
+        /// Side length of the square cooldown cover, matched to the slots.
+        int16_t cover_size;
+        /// Keycap label center Y per row when the labels sit in panel chrome
+        /// above/below the slot grid instead of inside empty slots.
+        std::array<int16_t, 2> key_label_y;
+        /// Whether keycap labels are always drawn at `key_label_y` (the
+        /// post-Chaos panel has header/base bands for them). When false the
+        /// labels are drawn only on empty slots at `row_center`.
+        bool labels_outside_slots;
+    };
+
+    /// v83 panel (StatusBar.img/base/quickSlot, 151x80).
+    constexpr Layout V83_LAYOUT = {
+        { 151, 80 },
+        {   3,  37,  71, 105 }, {  37,  71, 105, 141 },
+        {   7,  42 },            {  42,  77 },
+        {  20,  54,  87, 124 },  {  24,  59 },
+        32,                      {   0,   0 }, false
+    };
+
+    /// Post-Chaos panel (StatusBar2.img/mainBar/quickSlot/quickSlot,
+    /// 145x93: 16px header band, two 30px slot rows, 14px base band).
+    constexpr Layout CHAOS_LAYOUT = {
+        { 145, 93 },
+        {   8,  38,  71, 104 }, {  38,  71, 104, 138 },
+        {  16,  46 },            {  46,  79 },
+        {  23,  56,  89, 122 },  {  31,  64 },
+        30,                      {   8,  86 }, true
+    };
 
     struct State
     {
-        /// Skill id per slot, 0 for an empty slot (key label shown).
+        /// Skill id per slot, 0 when empty or holding an item.
         std::array<int32_t, COUNT> skills{};
+        /// Item id per slot, 0 when empty or holding a skill. At most one
+        /// of `skills[i]` / `items[i]` is non-zero.
+        std::array<int32_t, COUNT> items{};
         /// Slot under the cursor, -1 when outside the panel.
         int16_t hovered = -1;
         /// Cursor press id of the last handled press, so one click (or a
@@ -74,21 +118,34 @@ namespace jrc::quickslot
     }
 
     /// Slot index for a cursor position local to the panel, -1 if outside.
-    inline int16_t index_at(Point<int16_t> local_cursor)
+    inline int16_t index_at(const Layout& layout, Point<int16_t> local_cursor)
     {
-        const int16_t column = band_index(local_cursor.x(), COLUMN_LEFT, COLUMN_RIGHT);
+        const int16_t column = band_index(local_cursor.x(), layout.column_left, layout.column_right);
         if (column < 0)
         {
             return -1;
         }
 
-        const int16_t row = band_index(local_cursor.y(), ROW_TOP, ROW_BOTTOM);
+        const int16_t row = band_index(local_cursor.y(), layout.row_top, layout.row_bottom);
         if (row < 0)
         {
             return -1;
         }
 
         return static_cast<int16_t>(row * 4 + column);
+    }
+
+    /// Center of slot `index` (0..7), local to the panel.
+    inline Point<int16_t> key_center(const Layout& layout, int16_t index)
+    {
+        if (!valid_index(index))
+        {
+            return {};
+        }
+        return {
+            layout.column_center[static_cast<size_t>(index % 4)],
+            layout.row_center[static_cast<size_t>(index / 4)]
+        };
     }
 
     /// Assigned skill id of a slot, 0 when empty or out of range.
@@ -101,6 +158,16 @@ namespace jrc::quickslot
         return state.skills[static_cast<size_t>(index)];
     }
 
+    /// Assigned item id of a slot, 0 when empty or out of range.
+    inline int32_t item_at(const State& state, int16_t index)
+    {
+        if (!valid_index(index))
+        {
+            return 0;
+        }
+        return state.items[static_cast<size_t>(index)];
+    }
+
     /// Assign a skill to a slot; false for a bad index or skill id.
     inline bool assign(State& state, int16_t index, int32_t skill_id)
     {
@@ -108,7 +175,22 @@ namespace jrc::quickslot
         {
             return false;
         }
-        state.skills[static_cast<size_t>(index)] = skill_id;
+        const size_t slot = static_cast<size_t>(index);
+        state.skills[slot] = skill_id;
+        state.items[slot] = 0;
+        return true;
+    }
+
+    /// Assign a use/setup item to a slot; false for a bad index or item id.
+    inline bool assign_item(State& state, int16_t index, int32_t item_id)
+    {
+        if (!valid_index(index) || item_id <= 0)
+        {
+            return false;
+        }
+        const size_t slot = static_cast<size_t>(index);
+        state.skills[slot] = 0;
+        state.items[slot] = item_id;
         return true;
     }
 
@@ -117,7 +199,9 @@ namespace jrc::quickslot
     {
         if (valid_index(index))
         {
-            state.skills[static_cast<size_t>(index)] = 0;
+            const size_t slot = static_cast<size_t>(index);
+            state.skills[slot] = 0;
+            state.items[slot] = 0;
         }
     }
 }

@@ -19,17 +19,13 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
-#include "Pet/UIPetOptions.h"
-#include "Settings/UIGameOptions.h"
 #include "UISkillBook.h"
 
 #include "../../Character/ExpTable.h"
-#include "../../Console.h"
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/CashShopPackets.h"
 #include "../../Net/Packets/LoginPackets.h"
-#include "../../Net/Session.h"
 
 #include "nlnx/nx.hpp"
 
@@ -61,11 +57,11 @@ namespace jrc
     {
         nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 
-        sprites.emplace_back(mainbar["backgrnd"]);
-        sprites.emplace_back(mainbar["gaugeBackgrd"]);
-        sprites.emplace_back(mainbar["notice"]);
-        sprites.emplace_back(mainbar["lvBacktrnd"]);
-        sprites.emplace_back(mainbar["lvCover"]);
+        postchaos_backgrnd    = mainbar["backgrnd"];
+        postchaos_gauge_frame = mainbar["gaugeBackgrd"];
+        postchaos_notice      = mainbar["notice"];
+        postchaos_lv_backgrnd = mainbar["lvBacktrnd"];
+        postchaos_lv_cover    = mainbar["lvCover"];
 
         expbar = {
             mainbar.resolve("gauge/exp/0"),
@@ -106,6 +102,18 @@ namespace jrc
         buttons[BT_INVENTORY] = std::make_unique<MapleButton>(mainbar["BtInven"]);
         buttons[BT_EQUIPS]    = std::make_unique<MapleButton>(mainbar["BtEquip"]);
         buttons[BT_SKILL]     = std::make_unique<MapleButton>(mainbar["BtSkill"]);
+
+        // The post-Chaos panel ships its own dock bitmap; the keycap
+        // sprites of the retained v83 StatusBar.img label the empty slots.
+        quickslot_panel = mainbar["quickSlot"]["quickSlot"];
+        nl::node keyset = nl::nx::ui["StatusBar.img"]["key"];
+        for (int16_t i = 0; i < 8; ++i)
+        {
+            quickslot_keys[i] = keyset[std::to_string(i)];
+            quickslot_cooldowns[i] = Text(
+                Text::A11B, Text::CENTER, Text::WHITE, "", 32
+            );
+        }
     }
 
     void UIStatusbar::initialize_prechaos(nl::node statusbar)
@@ -174,8 +182,8 @@ namespace jrc
     void UIStatusbar::ensure_stat_labels(bool prechaos) const
     {
         int16_t level = stats.get_stat(Maplestat::LEVEL);
-        int16_t hp    = stats.get_stat(Maplestat::HP);
-        int16_t mp    = stats.get_stat(Maplestat::MP);
+        int32_t hp    = stats.get_stat(Maplestat::HP);
+        int32_t mp    = stats.get_stat(Maplestat::MP);
         int32_t maxhp = stats.get_total(Equipstat::HP);
         int32_t maxmp = stats.get_total(Equipstat::MP);
         int64_t exp   = stats.get_exp();
@@ -208,6 +216,9 @@ namespace jrc
         }
         else
         {
+            // The post-Chaos gauge charset names its cur/max divider node
+            // "\", and Charset remaps that node to the '/' lookup key at
+            // load time, so the composed strings use '/' to hit the glyph.
             std::string expstring = std::to_string(100 * getexppercent());
             exp_label = std::to_string(exp) + "[" + expstring.substr(0, expstring.find('.') + 3) + "%]";
             hp_label  = "[" + std::to_string(hp) + "/" + std::to_string(maxhp) + "]";
@@ -217,31 +228,37 @@ namespace jrc
         level_label = std::to_string(level);
     }
 
+    const char* UIStatusbar::get_stat_label(int16_t which) const
+    {
+        switch (which)
+        {
+        case 0:  return hp_label.c_str();
+        case 1:  return mp_label.c_str();
+        case 2:  return exp_label.c_str();
+        case 3:  return level_label.c_str();
+        default: return "";
+        }
+    }
+
     void UIStatusbar::draw(float alpha) const
     {
-        UIElement::draw(alpha);
-
         if (statusbar::prechaos())
         {
+            UIElement::draw(alpha);
             draw_prechaos();
+            draw_quickslot_dock();
             chatbar.draw(alpha);
             popup.draw(alpha);
             return;
         }
 
-        expbar.draw(position + Point<int16_t>(-261, -15));
-        hpbar.draw(position + Point<int16_t>(-261, -31));
-        mpbar.draw(position + Point<int16_t>(-90, -31));
+        draw_postchaos();
 
-        ensure_stat_labels(statusbar::prechaos());
+        // Right-docked control cluster plus the chat row buttons (which
+        // update_layout_position shifts onto the left anchor).
+        UIElement::draw(alpha);
 
-        statset.draw(exp_label, position + Point<int16_t>(47, -13));
-        statset.draw(hp_label, position + Point<int16_t>(-124, -29));
-        statset.draw(mp_label, position + Point<int16_t>(47, -29));
-        levelset.draw(level_label, position + Point<int16_t>(-480, -24));
-
-        joblabel.draw(position + Point<int16_t>(-435, -21));
-        namelabel.draw(position + Point<int16_t>(-435, -36));
+        draw_quickslot_dock();
 
         chatbar.draw(alpha);
         popup.draw(alpha);
@@ -256,29 +273,30 @@ namespace jrc
         quickslots.hovered = index;
 
         const int32_t skill_id = quickslot::skill_at(quickslots, index);
-        if (skill_id <= 0)
+        if (skill_id > 0)
         {
-            UI::get().clear_tooltip(Tooltip::NONE);
+            const Skillbook& skills = Stage::get().get_player().get_skills();
+            UI::get().show_skill(
+                Tooltip::NONE,
+                skill_id,
+                skills.get_level(skill_id),
+                skills.get_masterlevel(skill_id),
+                skills.get_expiration(skill_id)
+            );
             return;
         }
 
-        const Skillbook& skills = Stage::get().get_player().get_skills();
-        UI::get().show_skill(
-            Tooltip::NONE,
-            skill_id,
-            skills.get_level(skill_id),
-            skills.get_masterlevel(skill_id),
-            skills.get_expiration(skill_id)
-        );
+        if (const int32_t item_id = quickslot::item_at(quickslots, index))
+        {
+            UI::get().show_item(Tooltip::NONE, item_id);
+            return;
+        }
+
+        UI::get().clear_tooltip(Tooltip::NONE);
     }
 
     void UIStatusbar::update_quickslot_cooldowns()
     {
-        if (!statusbar::prechaos())
-        {
-            return;
-        }
-
         const Player& player = Stage::get().get_player();
         for (int16_t i = 0; i < quickslot::COUNT; ++i)
         {
@@ -343,11 +361,25 @@ namespace jrc
             return;
         }
 
-        position = {
-            POSITION.x(),
-            static_cast<int16_t>(Constants::viewheight() - Constants::VIEWYOFFSET)
+        position = statusbar::postchaos_bar_position();
+        dimension = {
+            static_cast<int16_t>(Constants::viewwidth()),
+            statusbar::CHAOS_BAR_HEIGHT
         };
-        chatbar.set_position(position);
+
+        // The chat row belongs to the left content column, and its two
+        // bar buttons were created relative to the element anchor: shift
+        // them by the anchor difference (zero at the 800px default view).
+        const Point<int16_t> left = statusbar::postchaos_left_anchor();
+        chatbar.set_position(left);
+        for (const uint16_t id : { BT_WHISPER, BT_CALLGM })
+        {
+            auto iter = buttons.find(id);
+            if (iter != buttons.end() && iter->second)
+            {
+                iter->second->set_position(left - position);
+            }
+        }
 
         auto menu = buttons.find(BT_MENU);
         auto options = buttons.find(BT_OPTIONS);
@@ -426,6 +458,10 @@ namespace jrc
             popup.close();
             UI::get().send_menu(KeyAction::SKILLBOOK);
             return Button::NORMAL;
+        case BT_QUEST:
+            popup.close();
+            UI::get().send_menu(KeyAction::QUESTLOG);
+            return Button::NORMAL;
         case BT_CASHSHOP:
             request_cash_shop();
             return Button::NORMAL;
@@ -445,18 +481,23 @@ namespace jrc
         }
 
         Rectangle<int16_t> bounds(
-            position - Point<int16_t>(512, 84),
-            position - Point<int16_t>(512, 84) + dimension
+            Point<int16_t>(0, statusbar::postchaos_bar_top()),
+            Point<int16_t>(
+                Constants::viewwidth(),
+                static_cast<int16_t>(
+                    Constants::viewheight() - Constants::VIEWYOFFSET)
+            )
         );
 
-        return bounds.contains(cursorpos) || chatbar.is_in_range(cursorpos) ||
-            popup.contains(cursorpos);
+        return bounds.contains(cursorpos)
+            || statusbar::quickslot_dock_range(position).contains(cursorpos)
+            || chatbar.is_in_range(cursorpos)
+            || popup.contains(cursorpos);
     }
 
     bool UIStatusbar::is_quickslot_in_range(Point<int16_t> cursorpos) const
     {
-        return statusbar::prechaos()
-            && statusbar::quickslot_range(position).contains(cursorpos);
+        return statusbar::quickslot_dock_range(position).contains(cursorpos);
     }
 
     int16_t UIStatusbar::button_at(Point<int16_t> cursorpos) const
@@ -473,11 +514,8 @@ namespace jrc
 
     bool UIStatusbar::remove_cursor(bool clicked, Point<int16_t> cursorpos)
     {
-        if (statusbar::prechaos())
-        {
-            // Leaving the HUD drops the quickslot tooltip with it.
-            update_quickslot_tooltip(-1);
-        }
+        // Leaving the HUD drops the quickslot tooltip with it.
+        update_quickslot_tooltip(-1);
 
         popup.remove_cursor();
         if (clicked && !popup.contains(cursorpos))
@@ -507,11 +545,11 @@ namespace jrc
             return { result.state, true };
         }
 
-        if (statusbar::prechaos())
         {
             const Point<int16_t> local =
-                cursorpos - (position + statusbar::quickslot_pos());
-            const int16_t index = quickslot::index_at(local);
+                cursorpos - statusbar::quickslot_panel_pos(position);
+            const int16_t index = quickslot::index_at(
+                statusbar::quickslot_layout(), local);
             update_quickslot_tooltip(index);
 
             if (index >= 0)
@@ -537,6 +575,10 @@ namespace jrc
                     else if (const int32_t skill_id = quickslot::skill_at(quickslots, index))
                     {
                         Stage::get().get_combat().use_move(skill_id);
+                    }
+                    else if (const int32_t item_id = quickslot::item_at(quickslots, index))
+                    {
+                        Stage::get().get_player().use_item(item_id);
                     }
                 }
 
@@ -572,21 +614,21 @@ namespace jrc
 
     void UIStatusbar::send_icon(const Icon& icon, Point<int16_t> cursorpos)
     {
-        if (!statusbar::prechaos())
-        {
-            return;
-        }
-
         const int32_t skill_id = icon.get_skill_id();
-        if (skill_id <= 0)
+        const int32_t item_id = icon.get_item_id();
+        if (skill_id <= 0 && item_id <= 0)
         {
             return;
         }
 
         const Point<int16_t> local =
-            cursorpos - (position + statusbar::quickslot_pos());
-        const int16_t index = quickslot::index_at(local);
-        if (!quickslot::assign(quickslots, index, skill_id))
+            cursorpos - statusbar::quickslot_panel_pos(position);
+        const int16_t index = quickslot::index_at(
+            statusbar::quickslot_layout(), local);
+        const bool assigned = skill_id > 0
+            ? quickslot::assign(quickslots, index, skill_id)
+            : quickslot::assign_item(quickslots, index, item_id);
+        if (!assigned)
         {
             return;
         }
@@ -603,16 +645,14 @@ namespace jrc
     {
         rightclick_debug_x = cursorpos.x();
         rightclick_debug_y = cursorpos.y();
-        if (!statusbar::prechaos())
-        {
-            return;
-        }
 
         const Point<int16_t> local =
-            cursorpos - (position + statusbar::quickslot_pos());
-        const int16_t index = quickslot::index_at(local);
+            cursorpos - statusbar::quickslot_panel_pos(position);
+        const int16_t index = quickslot::index_at(
+            statusbar::quickslot_layout(), local);
         rightclick_debug_index = index;
-        if (quickslot::skill_at(quickslots, index) == 0)
+        if (quickslot::skill_at(quickslots, index) == 0
+            && quickslot::item_at(quickslots, index) == 0)
         {
             return;
         }
@@ -664,51 +704,6 @@ namespace jrc
         EnterCashShopPacket().dispatch();
     }
 
-    void UIStatusbar::dispatch_popup_action(StatusBarPopup::Action action)
-    {
-        popup.close();
-        switch (action)
-        {
-        case StatusBarPopup::Action::STATS:
-            UI::get().send_menu(KeyAction::CHARSTATS);
-            break;
-        case StatusBarPopup::Action::EQUIPS:
-            UI::get().send_menu(KeyAction::EQUIPS);
-            break;
-        case StatusBarPopup::Action::ITEMS:
-            UI::get().send_menu(KeyAction::INVENTORY);
-            break;
-        case StatusBarPopup::Action::SKILLS:
-            UI::get().send_menu(KeyAction::SKILLBOOK);
-            break;
-        case StatusBarPopup::Action::KEY_CONFIG:
-            UI::get().send_menu(KeyAction::KEYCONFIG);
-            break;
-        case StatusBarPopup::Action::PET_OPTIONS:
-            UI::get().emplace<UIPetOptions>();
-            break;
-        case StatusBarPopup::Action::GAME_OPTIONS:
-            UI::get().emplace<UIGameOptions>();
-            break;
-        case StatusBarPopup::Action::LOGOUT:
-        {
-            PlayerDisconnectPacket().dispatch();
-            Session::get().disconnect();
-            const Error reconnect_error = Session::get().init();
-            Stage::get().clear();
-            UI::get().change_state(UI::LOGIN);
-            UI::get().enable();
-            if (reconnect_error != Error::NONE)
-            {
-                Console::get().print("Failed to reconnect to the login server after logout");
-            }
-            return;
-        }
-        case StatusBarPopup::Action::NONE:
-            break;
-        }
-    }
-
     void UIStatusbar::display_message(Messages::Type line, UIChatbar::LineType type)
     {
         if (message_cooldowns[line] > 0)
@@ -725,6 +720,26 @@ namespace jrc
     int32_t UIStatusbar::get_quickslot_skill(int16_t index) const
     {
         return quickslot::skill_at(quickslots, index);
+    }
+
+    int32_t UIStatusbar::get_quickslot_item(int16_t index) const
+    {
+        return quickslot::item_at(quickslots, index);
+    }
+
+    Point<int16_t> UIStatusbar::get_quickslot_center(int16_t index) const
+    {
+        if (!quickslot::valid_index(index))
+        {
+            return {};
+        }
+        return statusbar::quickslot_panel_pos(position)
+            + quickslot::key_center(statusbar::quickslot_layout(), index);
+    }
+
+    Rectangle<int16_t> UIStatusbar::get_quickslot_panel_bounds() const
+    {
+        return statusbar::quickslot_dock_range(position);
     }
 
     int16_t UIStatusbar::get_quickslot_cooldown_length(int16_t index) const
@@ -758,7 +773,7 @@ namespace jrc
 
     float UIStatusbar::gethppercent() const
     {
-        int16_t hp = stats.get_stat(Maplestat::HP);
+        int32_t hp = stats.get_stat(Maplestat::HP);
         int32_t maxhp = stats.get_total(Equipstat::HP);
 
         return static_cast<float>(hp) / maxhp;
@@ -766,7 +781,7 @@ namespace jrc
 
     float UIStatusbar::getmppercent() const
     {
-        int16_t mp = stats.get_stat(Maplestat::MP);
+        int32_t mp = stats.get_stat(Maplestat::MP);
         int32_t maxmp = stats.get_total(Equipstat::MP);
 
         return static_cast<float>(mp) / maxmp;

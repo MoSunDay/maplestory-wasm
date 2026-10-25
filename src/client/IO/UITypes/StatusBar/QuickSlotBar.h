@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU Affero General Public License //
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
-// Drawing of the pre-Chaos (v83) quickslot display; the model itself lives
-// in QuickSlotModel.h.
+// Drawing of the v83 and post-Chaos quickslot displays; the model itself
+// lives in QuickSlotModel.h.
 #pragma once
 #include "QuickSlotModel.h"
 #include "../../../Graphics/Text.h"
@@ -26,9 +26,11 @@
 
 namespace jrc::quickslot
 {
-    /// Draw the panel and its eight slots at `origin` (absolute panel
-    /// top-left). `cooldown_labels` holds the remaining seconds per slot.
-    void draw(const State& state, const Texture& panel,
+    /// Draw the panel, its eight slots (skills/items) and keycap labels at
+    /// `origin` (absolute panel top-left). `layout` supplies the
+    /// generation's measured geometry, `cooldown_labels` the remaining
+    /// seconds per skill slot.
+    void draw(const Layout& layout, const State& state, const Texture& panel,
         const Texture (&keys)[COUNT],
         const std::array<Text, COUNT>& cooldown_labels,
         Point<int16_t> origin);

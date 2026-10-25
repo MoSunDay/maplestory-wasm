@@ -23,7 +23,7 @@ namespace jrc
 {
     namespace viewport
     {
-        // Apply the persisted resolution before the GL window exists.
+        // Apply the boot resolution before the GL window exists.
         // Updates engine constants and the browser canvas; does not touch
         // GL resources (they are created afterwards).
         void apply_boot(display::Resolution resolution);

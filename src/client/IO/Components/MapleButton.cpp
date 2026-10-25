@@ -67,14 +67,21 @@ namespace jrc
         }
 
         // Named states take precedence so post-Chaos files resolve exactly
-        // as before; numbered states are the pre-Chaos fallback.
+        // as before; numbered states are the pre-Chaos fallback. Some
+        // post-Chaos buttons (mainBar icon row) ship no state children at
+        // all, only an "ani" animation - use its first frame for every
+        // state so the button stays visible and hit-testable.
         nl::node find_state(nl::node src, Button::State state)
         {
             nl::node named = src[named_state(state)];
             if (named)
                 return state_frame(named);
 
-            return state_frame(src[numbered_state(state)]);
+            nl::node numbered = src[numbered_state(state)];
+            if (numbered)
+                return state_frame(numbered);
+
+            return state_frame(src["ani"]);
         }
     }
 

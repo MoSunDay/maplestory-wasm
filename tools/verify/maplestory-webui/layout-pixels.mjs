@@ -33,7 +33,10 @@ async function evaluateAwait(driver, expression) {
 // the 800x600 space and resolve to mean luminance (0-255). Coverage is
 // exact for top-based rows y0..y1 inclusive, so the readPixels y origin is
 // canvas.height - 1 - y1 (not canvas.height - y1, which reads one row high).
-function samplerExpression(rects) {
+// view 默认 800x600（登录链各屏的固定布局）；游戏内分辨率不同的调用方
+// （如 quickslot-flow 的 1280x720 档）传入实际 view 尺寸，缩放映射才会
+// 落到正确的 backing-buffer 像素。
+function samplerExpression(rects, view = { width: 800, height: 600 }) {
   const config = JSON.stringify({ rects });
   return `(() => new Promise(resolve => {
     requestAnimationFrame(() => {
@@ -42,7 +45,8 @@ function samplerExpression(rects) {
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
         || canvas.getContext('experimental-webgl');
       if (!gl) { resolve({ error: 'game canvas exposes no WebGL context' }); return; }
-      const scaleX = canvas.width / 800, scaleY = canvas.height / 600;
+      const scaleX = canvas.width / ${view.width};
+      const scaleY = canvas.height / ${view.height};
       const mapX = value => Math.round(value * scaleX);
       const mapY = value => Math.round(value * scaleY);
       const x0 = Math.min(...config.rects.map(rect => mapX(rect.x0)));
@@ -80,8 +84,8 @@ function samplerExpression(rects) {
 
 // Generic sampler: evaluates the in-page expression for a list of game-coord
 // rects and returns a map name -> mean luminance (0-255).
-export async function sampleLuminance(driver, rects) {
-  const sample = await evaluateAwait(driver, samplerExpression(rects));
+export async function sampleLuminance(driver, rects, view) {
+  const sample = await evaluateAwait(driver, samplerExpression(rects, view));
   if (!sample || !sample.means) {
     throw new Error(`layout pixel sampling failed: ${JSON.stringify(sample)}`);
   }

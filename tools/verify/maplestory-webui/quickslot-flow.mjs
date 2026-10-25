@@ -1,8 +1,9 @@
-// 浏览器 E2E：状态栏快捷栏（v83 quickSlot）技能绑定全流程。
+// 浏览器 E2E：状态栏快捷栏（post-Chaos mainBar/quickSlot）技能与物品绑定全流程。
 //
 // 覆盖链路：登录 → 进入角色 → 打开技能书 → 选中任意已学习非被动技能 →
 // slot0 绑定/悬停/点击使用/右键清空 → slot7 拖拽绑定/右键清空 →
-// Hero's Will 施法后的冷却倒计时显示。
+// Hero's Will 施法后的冷却倒计时显示 → 物品栏拖入 USE 物品、点击消耗、
+// 右键清空。
 // 两档分辨率均需通过：QS_PRESET=0（800x600，默认）与 QS_PRESET=1（1280x720）。
 //
 // 关键语义：每次 use/assign 之后、rightclick 之前必须等待
@@ -22,11 +23,16 @@
 //   QS_ARTIFACT_DIR      截图/日志目录（默认 /tmp/qs-flow-<preset>）
 //   QS_PLAYER_ID         登录角色 ID（默认 215，即 test1Hero）
 //   QS_PLAYER_LEVEL      登录角色等级（默认 200）
+//   QS_ITEM_ID           物品绑定用例的 USE 物品（默认 2000005 超级药水）
+//   QS_SKIP_SKILLS=1     跳过前面的技能绑定段（用于独立跑冷却/物品段，避免
+//                        SwiftShader 在多次技能书开关后偶发挂起）
+//   QS_SKIP_COOLDOWN=1   跳过冷却段（用于独立验证物品绑定）
 //   CHROME_BIN           Chromium 路径（默认 /usr/bin/chromium-browser）
 
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
 import { resolvePageUrl, createRuntimeProbes } from './runtime-flow.mjs';
+import { sampleLuminance } from './layout-pixels.mjs';
 
 const preset = Number(process.env.QS_PRESET || 0);
 if (preset !== 0 && preset !== 1) {
@@ -40,6 +46,9 @@ if (!password) {
 }
 const expectedPlayerId = Number(process.env.QS_PLAYER_ID || 215);
 const expectedPlayerLevel = Number(process.env.QS_PLAYER_LEVEL || 200);
+const bindItemId = Number(process.env.QS_ITEM_ID || 2000005);
+const skipSkills = process.env.QS_SKIP_SKILLS === '1';
+const skipCooldown = process.env.QS_SKIP_COOLDOWN === '1';
 const artifactDir = process.env.QS_ARTIFACT_DIR || `/tmp/qs-flow-${preset}`;
 
 const driver = new BrowserDriver({
@@ -99,14 +108,19 @@ async function hover(x, y) {
   });
 }
 
-// v83 底部 HUD 布局（StatusBarPreChaos.h）：151x80 面板右锚在视口右下，
-// 顶边高出状态栏 9px。技能书窗口是视口内固定坐标，与分辨率无关；
-// 状态栏技能按钮随 HUD 右锚。
-const panelX = viewW - 151;
-const panelY = viewH - 90;
+// post-Chaos 底部 HUD 布局（StatusBarPostChaos.h / QuickSlotModel.h）：
+// StatusBar2.img mainBar，145x93 快捷栏面板右锚视口右下。NX origin
+// (-143,143) 会让面板底边压住 21px 快捷图标行（图标顶边在
+// viewH - 67），因此 CHAOS_QUICKSLOT_OFFSET_Y 再上提 9px，令面板
+// 顶边在 viewH - 162、底边在 viewH - 69，与图标行留 2px 间隙。
+// 技能书窗口是视口内固定坐标，与分辨率无关；状态栏技能按钮
+//（mainBar/BtSkill，origin (-254,57)）随 HUD 右锚。
+const panelX = viewW - 145;
+const panelY = viewH - 162;
+const shortcutRowTop = viewH - 67;
 const slotCenter = index => ({
-  x: panelX + [20, 54, 87, 124][index % 4],
-  y: panelY + (index < 4 ? 24 : 59)
+  x: panelX + [23, 56, 89, 122][index % 4],
+  y: panelY + (index < 4 ? 31 : 64)
 });
 const skillbookOrigin = { x: 50, y: 150 };
 const tabCenters = [13, 23, 34, 49, 66];
@@ -114,9 +128,107 @@ const skillIconCenter = row => ({
   x: skillbookOrigin.x + 29,
   y: skillbookOrigin.y + 110 + row * 40
 });
-// 状态栏技能按钮：取按钮中心偏左的稳定点（viewW - 217 + 14），
-// 避免 canvas 缩放把截断的点击点算到相邻按钮上。
-const skillbookButton = { x: viewW - 217 + 14, y: viewH - 66 };
+// 状态栏技能按钮（mainBar/BtSkill 30x18，中心 x = viewW - 19）：
+// 取按钮中心略偏左的稳定点，避免 canvas 缩放截断点击点。
+const skillbookButton = { x: viewW - 24, y: viewH - 58 };
+
+// Open the item inventory through the status bar Menu popup. The menu
+// button is part of the right-anchored control cluster, so its viewport
+// point follows the live resolution (711,574 at 800x600).
+async function openItemInventory() {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await probes.itemInventoryActive() === 1) return;
+    await waitAssetsIdle('items menu assets idle');
+    if (await probes.itemsMenuX() < 0) {
+      await driver.click(viewW - 89, viewH - 26);
+      await waitFor('items menu popup', async () => await probes.itemsMenuX() > 0, 8);
+    }
+    const menuX = await probes.itemsMenuX();
+    const menuY = await probes.itemsMenuY();
+    await driver.click(menuX, menuY);
+    await sleep(500);
+  }
+  if (await probes.itemInventoryActive() !== 1) {
+    throw new Error('item inventory did not open from the status bar menu');
+  }
+}
+
+// Drag the configured USE item into quick slot 1, click it to consume one,
+// then right-click to clear. The item grid origin/pitch is the post-Chaos
+// UIWindow2 item inventory geometry (11,51) + 36x35.
+async function verifyItemBinding() {
+  await openItemInventory();
+  const originX = await probes.itemInventoryX();
+  const originY = await probes.itemInventoryY();
+  await driver.click(originX + 42, originY + 28);  // USE tab
+  await waitFor('item inventory USE tab', async () => await probes.itemInventoryTab() === 2, 10);
+  await waitAssetsIdle('use inventory assets idle');
+
+  const itemSlot = await probes.inventorySlot(bindItemId);
+  if (itemSlot <= 0) {
+    throw new Error(`item ${bindItemId} is missing from the USE inventory`);
+  }
+  console.log(`INFO  item icon id=${await probes.itemInventoryIconItemId(itemSlot)}`);
+  const first = await probes.itemInventoryFirstSlot();
+  const last = await probes.itemInventoryLastSlot();
+  if (itemSlot < first || itemSlot > last) {
+    throw new Error(`item slot ${itemSlot} is outside the visible page [${first}..${last}]`);
+  }
+  const column = (itemSlot - first) % 4;
+  const row = Math.floor((itemSlot - first) / 4);
+  const itemX = originX + 29 + column * 36;
+  const itemY = originY + 68 + row * 35;
+  console.log(`INFO  item inventory origin=${originX},${originY} slot=${itemSlot} page=[${first}..${last}] point=${itemX},${itemY}`);
+  equal('item grid hit test', await probes.itemInventorySlotAt(itemX, itemY), itemSlot);
+
+  const target = slotCenter(1);
+  await driver.drag(itemX, itemY, target.x, target.y);
+  await sleep(700);
+  await driver.screenshot('slot1-item-drop');
+  equal('slot 1 item assigned', await probes.quickslotItem(1), bindItemId);
+  equal('slot 1 skill replaced', await probes.quickslotSkill(1), 0);
+  await waitAssetsIdle('item assign assets idle');
+  await driver.screenshot('slot1-item-assigned');
+
+  const before = await probes.inventoryQuantity(bindItemId);
+  await driver.click(target.x, target.y);
+  await sleep(700);
+  await waitFor('quick slot consumes item', async () =>
+    await probes.inventoryQuantity(bindItemId) < before, 15);
+  await waitAssetsIdle('item use assets idle');
+  await driver.screenshot('slot1-item-used');
+
+  await driver.rightClick(target.x, target.y);
+  await sleep(500);
+  equal('right click clears item slot', await probes.quickslotItem(1), 0);
+  equal('item slot skill remains empty', await probes.quickslotSkill(1), 0);
+  await driver.screenshot('slot1-item-cleared');
+}
+
+async function verifyQuickslotLayout() {
+  const panel = await probes.quickslotPanel();
+  equal('quickslot panel bounds', panel, {
+    left: panelX,
+    top: panelY,
+    right: panelX + 145,
+    bottom: panelY + 93
+  });
+  if (panel.bottom >= shortcutRowTop) {
+    throw new Error(`quickslot panel overlaps shortcut row:`
+      + ` panel bottom=${panel.bottom}, shortcut top=${shortcutRowTop}`);
+  }
+  for (let index = 0; index < 8; index += 1) {
+    const expected = slotCenter(index);
+    const actual = {
+      x: await probes.quickslotCenterX(index),
+      y: await probes.quickslotCenterY(index)
+    };
+    if (actual.x !== expected.x || actual.y !== expected.y) {
+      throw new Error(`quickslot ${index} center: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    }
+  }
+  console.log(`PASS  quickslot panel clears shortcut row by ${shortcutRowTop - panel.bottom}px`);
+}
 
 async function login() {
   await driver.clickField(340, 260);
@@ -154,6 +266,56 @@ async function enterGame() {
   await waitFor('map loaded', async () => await probes.mapId() > 0, 90);
   await waitFor('map assets idle', async () =>
     await probes.mapAssetLoading() === 0 && await probes.assetBlocking() === 0, 120);
+}
+
+// 底部状态栏回归断言（本轮两个修复点）：
+//   1) 全宽覆盖 —— backgrnd 左缘贴 x=0，任意分辨率下底条左段都是条带
+//      像素而非地图（旧实现 1280 下左缘从 viewW-800 起画，左侧漏地图）。
+//      采样行 y=viewH-45..-42 在条带内部（条带 [viewH-95, viewH-10]）且
+//      高于量条框架（viewH-43 起）、低于右侧图标行（viewH-46 起）之外
+//      的纯 backgrnd 区域；参考段 x=100..160 在新旧实现里都是条带。
+//   2) HP/MP 分隔符 —— 组串用 '/'（Charset 把 '\' 节点重映射为 '/' 查
+//      找键），标签必须形如 [cur/max]。
+async function verifyStatusBarChrome() {
+  const hpLabel = await driver.evaluate(
+    `Module.ccall('msstatusbar_stat_label', 'string', ['number'], [0])`);
+  const mpLabel = await driver.evaluate(
+    `Module.ccall('msstatusbar_stat_label', 'string', ['number'], [1])`);
+  if (!/^\[\d+\/\d+\]$/.test(hpLabel) || !/^\[\d+\/\d+\]$/.test(mpLabel)) {
+    throw new Error(`stat labels missing cur/max divider: hp="${hpLabel}" mp="${mpLabel}"`);
+  }
+  console.log(`PASS  stat divider hp=${hpLabel} mp=${mpLabel}`);
+
+  // 输入区探针：条带覆盖区域 [0, viewW] x [viewH-95, viewH-10] 内任意点
+  // 命中（bit1），条带上方一点不命中；修复前 1280 下左缘点 (4, viewH-45)
+  // 落在旧 bounds [viewW-800, viewW] 之外。
+  const hitBits = async (x, y) => Number(await driver.evaluate(
+    `Module.ccall('msstatusbar_hit', 'number', ['number', 'number'], [${x}, ${y}])`));
+  for (const [x, y] of [[4, viewH - 45], [viewW / 2, viewH - 45], [viewW - 4, viewH - 45], [4, viewH - 12]]) {
+    const bits = await hitBits(x, y);
+    if ((bits & 3) !== 3) {
+      throw new Error(`strip point (${x}, ${y}) not in statusbar range: bits=${bits}`);
+    }
+  }
+  // 避开聊天日志悬停列（x<500）与右侧快捷栏坞（x>viewW-145）。
+  const above = await hitBits(viewW - 200, viewH - 105);
+  if ((above & 2) !== 0) {
+    throw new Error(`point above strip (${viewW - 200}, ${viewH - 105}) wrongly in range: bits=${above}`);
+  }
+  console.log('PASS  statusbar input range covers full view width');
+
+  // 像素佐证：左段与正上方地图行亮度差 —— 修复前左段漏地图（两行同为
+  // 地图、亮度接近），修复后左段是条带内容（等级块/渐变），差异显著。
+  const means = await sampleLuminance(driver, [
+    { name: 'stripLeft', x0: 2, y0: viewH - 48, x1: 62, y1: viewH - 42 },
+    { name: 'stripMid', x0: viewW / 2 - 30, y0: viewH - 48, x1: viewW / 2 + 30, y1: viewH - 42 },
+    { name: 'mapAbove', x0: 2, y0: viewH - 130, x1: 62, y1: viewH - 124 }
+  ], { width: viewW, height: viewH });
+  console.log(`INFO  strip means ${JSON.stringify(means)}`);
+  if (Math.abs(means.stripLeft - means.mapAbove) < 35) {
+    throw new Error(`bar left edge looks like map, not strip (left=${means.stripLeft} map=${means.mapAbove})`);
+  }
+  console.log('PASS  statusbar strip pixels cover left edge');
 }
 
 // 重试打开技能书：每次尝试前等 blocking 清零，失败时输出命中诊断
@@ -236,6 +398,8 @@ try {
 
   await login();
   await enterGame();
+  await verifyStatusBarChrome();
+  await verifyQuickslotLayout();
 
   equal('player id', await probes.playerId(), expectedPlayerId);
   equal('player level', await driver.evaluate(
@@ -251,90 +415,100 @@ try {
   await sleep(300);
   equal('initial hovered', await probes.quickslotHovered(), -1);
 
-  await driver.screenshot('initial-hud');
-  await openSkillbook('initial');
-  await driver.screenshot('skillbook');
+  if (skipSkills) {
+    console.log('SKIP  skill binding section (QS_SKIP_SKILLS=1)');
+  } else {
+    await driver.screenshot('initial-hud');
+    await openSkillbook('initial');
+    await driver.screenshot('skillbook');
 
-  const firstSkill = await selectAnySkill();
-  equal('selected before assign', await probes.skillbookSelected(), firstSkill.id);
+    const firstSkill = await selectAnySkill();
+    equal('selected before assign', await probes.skillbookSelected(), firstSkill.id);
 
-  const first = slotCenter(0);
-  await hover(first.x, first.y);
-  await sleep(300);
-  equal('hover slot 0', await probes.quickslotHovered(), 0);
-  await driver.click(first.x, first.y);
-  await sleep(600);
-  equal('slot 0 assigned', (await quickslots())[0], firstSkill.id);
-  equal('other slots empty', (await quickslots()).slice(1), EMPTY_SLOTS.slice(1));
-  equal('selection cleared after assign', await probes.skillbookSelected(), 0);
-  equal('hover owns assigned slot', await probes.quickslotHovered(), 0);
-  await waitAssetsIdle('slot 0 assign assets idle');
-  await driver.screenshot('slot0-assigned');
+    const first = slotCenter(0);
+    await hover(first.x, first.y);
+    await sleep(300);
+    equal('hover slot 0', await probes.quickslotHovered(), 0);
+    await driver.click(first.x, first.y);
+    await sleep(600);
+    equal('slot 0 assigned', (await quickslots())[0], firstSkill.id);
+    equal('other slots empty', (await quickslots()).slice(1), EMPTY_SLOTS.slice(1));
+    equal('selection cleared after assign', await probes.skillbookSelected(), 0);
+    equal('hover owns assigned slot', await probes.quickslotHovered(), 0);
+    await waitAssetsIdle('slot 0 assign assets idle');
+    await driver.screenshot('slot0-assigned');
 
-  await hover(400, 300);
-  await sleep(300);
-  equal('hover leaves quickslot', await probes.quickslotHovered(), -1);
-  await hover(first.x, first.y);
-  await sleep(300);
-  equal('hover returns to assigned slot', await probes.quickslotHovered(), 0);
-  await driver.screenshot('slot0-tooltip');
+    await hover(400, 300);
+    await sleep(300);
+    equal('hover leaves quickslot', await probes.quickslotHovered(), -1);
+    await hover(first.x, first.y);
+    await sleep(300);
+    equal('hover returns to assigned slot', await probes.quickslotHovered(), 0);
+    await driver.screenshot('slot0-tooltip');
 
-  // 点击已绑定槽位经 Combat::use_move 施法；施法后的 LazyFS 加载期间
-  // 不能派发右键，故先等 blocking 清零。
-  await driver.click(first.x, first.y);
-  await sleep(500);
-  equal('use keeps slot 0', (await quickslots())[0], firstSkill.id);
-  equal('use keeps selection cleared', await probes.skillbookSelected(), 0);
-  equal('state healthy after use', await state(), uiState.game);
-  await waitAssetsIdle('slot 0 use assets idle');
-  await driver.rightClick(first.x, first.y);
-  await sleep(500);
-  equal('right click clears slot 0', await quickslots(), EMPTY_SLOTS);
-  await driver.screenshot('slot0-cleared');
+    // 点击已绑定槽位经 Combat::use_move 施法；施法后的 LazyFS 加载期间
+    // 不能派发右键，故先等 blocking 清零。
+    await driver.click(first.x, first.y);
+    await sleep(500);
+    equal('use keeps slot 0', (await quickslots())[0], firstSkill.id);
+    equal('use keeps selection cleared', await probes.skillbookSelected(), 0);
+    equal('state healthy after use', await state(), uiState.game);
+    await waitAssetsIdle('slot 0 use assets idle');
+    await driver.rightClick(first.x, first.y);
+    await sleep(500);
+    equal('right click clears slot 0', await quickslots(), EMPTY_SLOTS);
+    await driver.screenshot('slot0-cleared');
 
-  await openSkillbook('second');
-  const secondSkill = await selectAnySkill();
-  const secondIcon = skillIconCenter(secondSkill.row);
-  const last = slotCenter(7);
-  await driver.drag(secondIcon.x, secondIcon.y, last.x, last.y);
-  await sleep(600);
-  equal('slot 7 drag assigned', (await quickslots())[7], secondSkill.id);
-  equal('slot 7 selection cleared', await probes.skillbookSelected(), 0);
-  await waitAssetsIdle('slot 7 assign assets idle');
-  await driver.screenshot('slot7-assigned');
-  await driver.rightClick(last.x, last.y);
-  await sleep(500);
-  equal('right click clears slot 7', await quickslots(), EMPTY_SLOTS);
-  await driver.screenshot('slot7-cleared');
-
-  // Hero's Will (1121011) starts a server-driven cooldown. The quickslot
-  // panel must render the remaining seconds over the skill icon.
-  await openSkillbook('cooldown');
-  await selectFourthJobSkill(1121011);
-
-  const cooldownSlot = slotCenter(0);
-  await driver.click(cooldownSlot.x, cooldownSlot.y);
-  await sleep(600);
-  equal('cooldown skill assigned', (await quickslots())[0], 1121011);
-  await driver.screenshot('slot0-cooldown-assigned');
-  await driver.click(cooldownSlot.x, cooldownSlot.y);
-  await sleep(500);
-  await waitAssetsIdle('cooldown use assets idle');
-  await waitFor('quickslot cooldown active',
-    async () => await probes.quickslotCooldown(0) > 0, 20);
-  const cooldownSeconds = await probes.quickslotCooldown(0);
-  const cooldownLabelLength = await probes.quickslotCooldownLabel(0);
-  console.log(`INFO  quickslot cooldown ${cooldownSeconds}s label=${cooldownLabelLength}`);
-  if (cooldownLabelLength <= 0) {
-    throw new Error('quickslot cooldown label was not populated');
+    await openSkillbook('second');
+    const secondSkill = await selectAnySkill();
+    const secondIcon = skillIconCenter(secondSkill.row);
+    const last = slotCenter(7);
+    await driver.drag(secondIcon.x, secondIcon.y, last.x, last.y);
+    await sleep(600);
+    equal('slot 7 drag assigned', (await quickslots())[7], secondSkill.id);
+    equal('slot 7 selection cleared', await probes.skillbookSelected(), 0);
+    await waitAssetsIdle('slot 7 assign assets idle');
+    await driver.screenshot('slot7-assigned');
+    await driver.rightClick(last.x, last.y);
+    await sleep(500);
+    equal('right click clears slot 7', await quickslots(), EMPTY_SLOTS);
+    await driver.screenshot('slot7-cleared');
   }
-  // Move off the slot so the skill tooltip does not overlap the count.
-  await hover(400, 300);
-  await sleep(350);
-  await driver.screenshot('slot0-cooldown');
-  await driver.rightClick(cooldownSlot.x, cooldownSlot.y);
-  await sleep(500);
-  equal('right click clears cooldown slot', await quickslots(), EMPTY_SLOTS);
+
+  if (skipCooldown) {
+    console.log('SKIP  cooldown section (QS_SKIP_COOLDOWN=1)');
+  } else {
+    // Hero's Will (1121011) starts a server-driven cooldown. The quickslot
+    // panel must render the remaining seconds over the skill icon.
+    await openSkillbook('cooldown');
+    await selectFourthJobSkill(1121011);
+
+    const cooldownSlot = slotCenter(0);
+    await driver.click(cooldownSlot.x, cooldownSlot.y);
+    await sleep(600);
+    equal('cooldown skill assigned', (await quickslots())[0], 1121011);
+    await driver.screenshot('slot0-cooldown-assigned');
+    await driver.click(cooldownSlot.x, cooldownSlot.y);
+    await sleep(500);
+    await waitAssetsIdle('cooldown use assets idle');
+    await waitFor('quickslot cooldown active',
+      async () => await probes.quickslotCooldown(0) > 0, 20);
+    const cooldownSeconds = await probes.quickslotCooldown(0);
+    const cooldownLabelLength = await probes.quickslotCooldownLabel(0);
+    console.log(`INFO  quickslot cooldown ${cooldownSeconds}s label=${cooldownLabelLength}`);
+    if (cooldownLabelLength <= 0) {
+      throw new Error('quickslot cooldown label was not populated');
+    }
+    // Move off the slot so the skill tooltip does not overlap the count.
+    await hover(400, 300);
+    await sleep(350);
+    await driver.screenshot('slot0-cooldown');
+    await driver.rightClick(cooldownSlot.x, cooldownSlot.y);
+    await sleep(500);
+    equal('right click clears cooldown slot', await quickslots(), EMPTY_SLOTS);
+  }
+
+  await verifyItemBinding();
 
   equal('state final', await state(), uiState.game);
   if (driver.errors.length) throw new Error(`browser errors: ${driver.errors.join('\n')}`);

@@ -46,14 +46,15 @@ namespace jrc
         // Generation detection (same marker convention as UiAssetVersion.h)
         // ------------------------------------------------------------------
 
-        /// True when the loaded UI.nx carries the v83 status bar chrome.
-        /// Some combined asset packs ship both generations; in that case the
-        /// legacy bar is preferred because it is the one with the quickslot
-        /// panel that this HUD exposes.
+        /// True when the loaded UI.nx carries ONLY the v83 status bar
+        /// chrome. Combined asset packs ship both generations; the
+        /// post-Chaos bar (StatusBar2.img, the README asset recipe) is
+        /// preferred whenever it is present, so the legacy strip only wins
+        /// on a pure v83 UI.nx.
         inline bool prechaos()
         {
-            static const bool legacy_bar = static_cast<bool>(
-                nl::nx::ui["StatusBar.img"]["base"]["quickSlot"]);
+            static const bool legacy_bar = !static_cast<bool>(
+                nl::nx::ui["StatusBar2.img"]["mainBar"]["backgrnd"]);
             return legacy_bar;
         }
 

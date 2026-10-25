@@ -23,6 +23,7 @@
 #include "../Messages.h"
 
 #include "StatusBar/StatusBarPreChaos.h"
+#include "StatusBar/StatusBarPostChaos.h"
 #include "StatusBar/QuickSlotBar.h"
 
 #include "../Components/Charset.h"
@@ -90,6 +91,13 @@ namespace jrc
         void record_multi_chat(uint8_t type);
         uint32_t get_party_message_count() const;
         int32_t get_quickslot_skill(int16_t index) const;
+        int32_t get_quickslot_item(int16_t index) const;
+        Point<int16_t> get_quickslot_center(int16_t index) const;
+        Rectangle<int16_t> get_quickslot_panel_bounds() const;
+        /// Composed stat label for probes: 0 = hp, 1 = mp, 2 = exp,
+        /// 3 = level. Points into the mutable label cache, so it stays
+        /// valid until the next label rebuild.
+        const char* get_stat_label(int16_t which) const;
         int16_t get_quickslot_cooldown_length(int16_t index) const;
         int16_t get_quickslot_hovered() const;
         bool is_quickslot_in_range(Point<int16_t> cursorpos) const;
@@ -116,6 +124,8 @@ namespace jrc
         void initialize_postchaos();
         void initialize_prechaos(nl::node statusbar);
         void draw_prechaos() const;
+        void draw_postchaos() const;
+        void draw_quickslot_dock() const;
         void update_quickslot_tooltip(int16_t index);
         void update_quickslot_cooldowns();
         void ensure_stat_labels(bool prechaos) const;
@@ -169,6 +179,17 @@ namespace jrc
         StatusBarPopup popup;
         int32_t cashshop_request_cooldown = 0;
 
+        // Post-Chaos (StatusBar2.img/mainBar) chrome. The backgrnd is
+        // drawn separately from the sprites so it can cover the full view
+        // width, and the left-column frames anchor to
+        // statusbar::postchaos_left_anchor() instead of the element
+        // position (the right-docked control cluster).
+        Texture postchaos_backgrnd;
+        Texture postchaos_gauge_frame;
+        Texture postchaos_lv_backgrnd;
+        Texture postchaos_lv_cover;
+        Texture postchaos_notice;
+
         // Pre-Chaos (v83 StatusBar.img) drawing state. The post-Chaos
         // branch keeps the gauge sprites above and ignores these.
         Texture gauge_graduation;
@@ -187,8 +208,8 @@ namespace jrc
         mutable std::string level_label;
         mutable int8_t label_format = -1;
         mutable int16_t cached_level = -1;
-        mutable int16_t cached_hp = -1;
-        mutable int16_t cached_mp = -1;
+        mutable int32_t cached_hp = -1;
+        mutable int32_t cached_mp = -1;
         mutable int32_t cached_maxhp = -1;
         mutable int32_t cached_maxmp = -1;
         mutable int64_t cached_exp = -1;

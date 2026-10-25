@@ -15,7 +15,8 @@
 // You should have received a copy of the GNU Affero General Public License //
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
-// v83 StatusBar.img drawing: gauges, stat labels and the quickslot dock.
+// Status bar drawing helpers: the v83 StatusBar.img gauges/labels and the
+// generation-shared quickslot dock.
 #include "../UIStatusBar.h"
 
 namespace jrc
@@ -83,13 +84,19 @@ namespace jrc
         namelabel.draw(position + statusbar::name_pos());
         joblabel.draw(position + statusbar::job_pos());
 
-        // Quickslot display (base/quickSlot + assigned skill icons/key caps).
+    }
+
+    void UIStatusbar::draw_quickslot_dock() const
+    {
+        // Panel bitmap of the active generation (base/quickSlot or
+        // mainBar/quickSlot) plus assigned skill icons / v83 key caps.
         quickslot::draw(
+            statusbar::quickslot_layout(),
             quickslots,
             quickslot_panel,
             quickslot_keys,
             quickslot_cooldowns,
-            position + statusbar::quickslot_pos()
+            statusbar::quickslot_panel_pos(position)
         );
     }
 }

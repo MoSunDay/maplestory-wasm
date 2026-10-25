@@ -28,7 +28,7 @@
 #include "Gameplay/Combat/DamageNumber.h"
 #include "Gameplay/Stage.h"
 #include "Graphics/GraphicsGL.h"
-#include "IO/Display/ResolutionStore.h"
+#include "IO/Display/Resolution.h"
 #include "IO/Display/Viewport.h"
 #include "IO/UI.h"
 #include "IO/Window.h"
@@ -125,10 +125,10 @@ namespace jrc
         loadConfigString("AssetsServerProtocol", Setting<AssetsServerProtocol>::get());
 #endif
 
-        const display::Resolution boot_resolution = display::preset(
-            display_store::load_index()
-        );
-        viewport::apply_boot(boot_resolution);
+        // Pre-game screens (login, world select, character select) are laid
+        // out for the default 800x600 canvas. The persisted setting is
+        // applied when the game state is entered (see UI::change_state).
+        viewport::apply_boot(display::default_resolution());
 
         if (Error error = Session::get().init())
         {

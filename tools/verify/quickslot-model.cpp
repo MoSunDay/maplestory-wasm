@@ -8,34 +8,67 @@ namespace
 {
     using jrc::Point;
     using jrc::quickslot::COUNT;
+    using jrc::quickslot::Layout;
     using jrc::quickslot::State;
 
-    int16_t at(int16_t x, int16_t y)
+    int16_t at(const Layout& layout, int16_t x, int16_t y)
     {
-        return jrc::quickslot::index_at(Point<int16_t>(x, y));
+        return jrc::quickslot::index_at(layout, Point<int16_t>(x, y));
     }
 
-    void verify_centers()
+    void verify_centers(const Layout& layout)
     {
-        constexpr int16_t CENTER_X[4] = { 20, 54, 87, 124 };
         for (int16_t i = 0; i < COUNT; ++i)
         {
-            const int16_t y = static_cast<int16_t>(i < 4 ? 24 : 59);
-            assert(at(CENTER_X[i % 4], y) == i);
+            const Point<int16_t> center =
+                jrc::quickslot::key_center(layout, i);
+            assert(at(layout, center.x(), center.y()) == i);
         }
+
+        // Out-of-range indices have no center.
+        assert(jrc::quickslot::key_center(layout, -1) == Point<int16_t>());
+        assert(jrc::quickslot::key_center(layout, COUNT) == Point<int16_t>());
     }
 
-    void verify_boundaries()
+    void verify_boundaries(const Layout& layout)
     {
+        const int16_t x0 = layout.column_left.front();
+        const int16_t x1 = layout.column_right.back();
+        const int16_t y0 = layout.row_top.front();
+        const int16_t y1 = layout.row_bottom.back();
+
         // Low edges are inside, high edges and one pixel beyond are not.
-        assert(at(3, 7) == 0);
-        assert(at(36, 41) == 0);
-        assert(at(37, 7) == 1);
-        assert(at(140, 76) == 7);
-        assert(at(2, 7) == -1);
-        assert(at(141, 7) == -1);
-        assert(at(20, 6) == -1);
-        assert(at(20, 77) == -1);
+        assert(at(layout, x0, y0) == 0);
+        assert(at(layout, x0, layout.row_top[1] - 1) == 0);
+        assert(at(layout, layout.column_left[1], y0) == 1);
+        assert(at(layout, x1 - 1, y1 - 1) == COUNT - 1);
+        assert(at(layout, x0 - 1, y0) == -1);
+        assert(at(layout, x1, y0) == -1);
+        assert(at(layout, x0, y0 - 1) == -1);
+        assert(at(layout, x0, y1) == -1);
+    }
+
+    void verify_layouts()
+    {
+        using jrc::quickslot::CHAOS_LAYOUT;
+        using jrc::quickslot::V83_LAYOUT;
+
+        // Measured panels: v83 151x80, post-Chaos 145x93.
+        assert(V83_LAYOUT.dimension == Point<int16_t>(151, 80));
+        assert(CHAOS_LAYOUT.dimension == Point<int16_t>(145, 93));
+        assert(!V83_LAYOUT.labels_outside_slots);
+        assert(CHAOS_LAYOUT.labels_outside_slots);
+
+        // Post-Chaos keycaps live in the 16px header and 14px base bands,
+        // clear of both slot rows.
+        assert(CHAOS_LAYOUT.key_label_y[0] < CHAOS_LAYOUT.row_top[0]);
+        assert(CHAOS_LAYOUT.key_label_y[1] > CHAOS_LAYOUT.row_bottom[1]);
+
+        // The post-Chaos slot grid is shifted by the 16px header band and
+        // the wider separators; its hit bands must not alias onto v83's.
+        assert(CHAOS_LAYOUT.row_top[0] == 16);
+        assert(CHAOS_LAYOUT.row_top[1] == 46);
+        assert(at(CHAOS_LAYOUT, 3, 7) == -1);
     }
 
     void verify_invalid_indices()
@@ -52,6 +85,7 @@ namespace
         for (int16_t i = 0; i < COUNT; ++i)
         {
             assert(jrc::quickslot::skill_at(state, i) == 0);
+            assert(jrc::quickslot::item_at(state, i) == 0);
         }
     }
 
@@ -82,15 +116,46 @@ namespace
         jrc::quickslot::clear(state, 5);
         assert(jrc::quickslot::skill_at(state, 5) == 0);
     }
+
+    void verify_item_bindings()
+    {
+        State state;
+        assert(jrc::quickslot::item_at(state, -1) == 0);
+        assert(jrc::quickslot::item_at(state, COUNT) == 0);
+        assert(!jrc::quickslot::assign_item(state, -1, 2000000));
+        assert(!jrc::quickslot::assign_item(state, 2, 0));
+
+        assert(jrc::quickslot::assign_item(state, 2, 2000000));
+        assert(jrc::quickslot::item_at(state, 2) == 2000000);
+        assert(jrc::quickslot::skill_at(state, 2) == 0);
+
+        // Skills and items share one slot: assigning either clears the
+        // other content kind.
+        assert(jrc::quickslot::assign(state, 2, 1001004));
+        assert(jrc::quickslot::skill_at(state, 2) == 1001004);
+        assert(jrc::quickslot::item_at(state, 2) == 0);
+
+        assert(jrc::quickslot::assign_item(state, 2, 2000000));
+        assert(jrc::quickslot::item_at(state, 2) == 2000000);
+        assert(jrc::quickslot::skill_at(state, 2) == 0);
+
+        jrc::quickslot::clear(state, 2);
+        assert(jrc::quickslot::item_at(state, 2) == 0);
+    }
 }
 
 int main()
 {
-    verify_centers();
-    verify_boundaries();
+    verify_layouts();
+    verify_centers(jrc::quickslot::V83_LAYOUT);
+    verify_centers(jrc::quickslot::CHAOS_LAYOUT);
+    verify_boundaries(jrc::quickslot::V83_LAYOUT);
+    verify_boundaries(jrc::quickslot::CHAOS_LAYOUT);
     verify_invalid_indices();
     verify_assign_and_clear();
+    verify_item_bindings();
 
-    std::cout << "PASS quickslot model (hit bands, assign, clear)\n";
+    std::cout << "PASS quickslot model (both layouts: hit bands, centers,"
+        " key labels, skill/item assign, clear)\n";
     return 0;
 }
