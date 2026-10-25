@@ -88,7 +88,9 @@ namespace jrc
 
         // Draw inline-image sprites for one text block. Sprites sit with
         // their bottom edge on the line baseline, horizontally at the space
-        // placeholder that `extract_embed_sprites` left in the text.
+        // placeholder that `extract_embed_sprites` left in the text. The
+        // stored display size (capped for item/skill icons, native for `#f`
+        // path embeds) is applied as a scale around the draw position.
         void draw_embed_sprites(
             const std::vector<npctalk_images::NpcEmbedSprite>& sprites,
             const Text& label,
@@ -104,15 +106,42 @@ namespace jrc
             const Text::Layout& layout = label.get_layout();
             for (const npctalk_images::NpcEmbedSprite& sprite : sprites)
             {
+                const int16_t native_width = sprite.texture.width();
+                const int16_t native_height = sprite.texture.height();
+                if (native_width <= 0 || native_height <= 0)
+                {
+                    continue;
+                }
+
+                // Older/sparse sprites may carry no display size: fall back
+                // to the native texture size instead of skipping the draw.
+                const int16_t width =
+                    sprite.width > 0 ? sprite.width : native_width;
+                const int16_t height =
+                    sprite.height > 0 ? sprite.height : native_height;
+
                 const int16_t x = static_cast<int16_t>(
                     DIALOG_TEXT_X + label.advance(sprite.byte_pos) + sprite.x_offset
                 );
+                // Anchor the visual bottom of the sprite on the text baseline;
+                // the texture origin can sit anywhere inside the icon.
                 const int16_t y = static_cast<int16_t>(
                     text_y +
-                    embed_line_baseline(layout, sprite.byte_pos) -
-                    sprite.texture.height()
+                    npctalk_images::embed_sprite_y(
+                        embed_line_baseline(layout, sprite.byte_pos),
+                        native_height,
+                        sprite.texture.get_origin().y(),
+                        height
+                    )
                 );
-                sprite.texture.draw(dialog_position + Point<int16_t>(x, y));
+                const float xscale =
+                    static_cast<float>(width) / static_cast<float>(native_width);
+                const float yscale =
+                    static_cast<float>(height) / static_cast<float>(native_height);
+
+                sprite.texture.draw(DrawArgument(
+                    dialog_position + Point<int16_t>(x, y), xscale, yscale, 1.0f
+                ));
             }
         }
     }
