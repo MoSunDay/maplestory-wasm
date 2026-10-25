@@ -109,10 +109,15 @@ int main()
     using jrc::pet_follow::Action;
     using jrc::pet_follow::Inputs;
     using jrc::pet_follow::JumpInputs;
-    ok &= expect(jrc::pet_follow::GROUND_WALK_FORCE == 0.16,
-        "ground pet matches normal walk force");
-    ok &= expect(jrc::pet_follow::JUMP_HORIZONTAL_SPEED == 1.25,
-        "stalled jump retains normal horizontal travel speed");
+    ok &= expect(jrc::pet_follow::BASE_MOVEMENT.walk_force == 0.16,
+        "base pet profile matches normal walk force");
+    ok &= expect(jrc::pet_follow::BASE_MOVEMENT.jump_force == 4.5,
+        "base pet profile matches normal jump force");
+    ok &= expect(jrc::pet_follow::jump_reach_height(4.5, 0.14) == 72,
+        "jump reach height follows the shared gravity");
+    ok &= expect(jrc::pet_follow::pursuit_height_limit(
+        jrc::pet_follow::BASE_MOVEMENT) == 88,
+        "pursuit height limit is the owner jump reach plus tolerance");
     ok &= expect(jrc::pet_follow::decide(Inputs{
         { 0, 0 }, { 50, 0 }, { 50, 0 }, false, false, 0}) ==
         Action::IDLE, "follow start deadzone");
@@ -123,8 +128,19 @@ int main()
         { 0, 0 }, { -80, 0 }, { -80, 0 }, false, false, 0}) ==
         Action::MOVE_LEFT, "follow direction");
     ok &= expect(jrc::pet_follow::decide(Inputs{
-        { 0, 0 }, { 0, 0 }, { 10, 151 }, true, true, 0}) ==
-        Action::ABANDON_LOOT, "unreachable loot is abandoned without teleporting");
+        { 0, 0 }, { 0, 0 }, { 10, -88 }, true, true, 0}) == Action::IDLE,
+        "loot within the owner jump reach is pursued");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 10, -89 }, true, true, 0}) ==
+        Action::ABANDON_LOOT,
+        "loot above the owner jump reach is abandoned");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 10, 240 }, true, true, 0}) == Action::IDLE,
+        "loot below within the fall guard is pursued");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 10, 241 }, true, true, 0}) ==
+        Action::ABANDON_LOOT,
+        "loot below beyond the fall guard is abandoned");
     ok &= expect(jrc::pet_follow::decide(Inputs{
         { 0, 0 }, { 0, 0 }, { 40, 0 }, true, true, 3}) ==
         Action::ABANDON_LOOT, "three failed loot jumps abandon the target");
@@ -193,6 +209,13 @@ int main()
         "out-of-range pet cannot request pickup");
     ok &= expect(jrc::pet_loot::attempts_exhausted(3),
         "failed target is eventually abandoned");
+    ok &= expect(jrc::pet_loot::BATCH_RANGE == 50,
+        "pet pickup sweep stays inside the server range check");
+    ok &= expect(jrc::pet_loot::batch_count(0) == 0 &&
+        jrc::pet_loot::batch_count(2) == 2 &&
+        jrc::pet_loot::batch_count(9) ==
+            jrc::pet_loot::BATCH_LIMIT,
+        "pickup sweeps cap the batch size but keep small clusters whole");
 
     if (ok)
         std::cout << "PASS pet capabilities, automation, pickup, and leash rules\n";

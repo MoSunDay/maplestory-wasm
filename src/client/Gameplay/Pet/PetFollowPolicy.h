@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../Template/Point.h"
+#include "../Physics/Physics.h"
 
 #include <cstdint>
 
@@ -15,11 +16,29 @@ namespace jrc::pet_follow
         ABANDON_LOOT
     };
 
-    constexpr double GROUND_WALK_FORCE = 0.16;
-    constexpr double JUMP_HORIZONTAL_SPEED = 1.25;
+    // Mirrors Player::get_walkforce / get_jumpforce, so pet ground movement
+    // matches the owner exactly.
+    struct MovementProfile
+    {
+        double walk_force = 0.16;
+        double jump_force = 4.5;
+    };
+
+    constexpr MovementProfile BASE_MOVEMENT = {};
+
+    // The drop icon center sits this far below its foothold.
+    constexpr int32_t HEIGHT_TOLERANCE = 16;
+    // Loot deeper below than this is not pursued; falling normally reaches it.
+    constexpr int32_t FALL_HEIGHT_LIMIT = 240;
+
     constexpr int32_t OWNER_LEASH_DISTANCE = 300;
-    constexpr int32_t PATH_HEIGHT_LIMIT = 150;
     constexpr uint8_t MAX_FAILED_LOOT_JUMPS = 3;
+
+    // Apex height in pixels a takeoff speed of jump_force reaches under gravity.
+    int32_t jump_reach_height(double jump_force, double gravity);
+    // Ledge height the owner itself clears with one jump, plus the drop-center
+    // tolerance. Loot above it is not pursued.
+    int32_t pursuit_height_limit(const MovementProfile& profile);
 
     struct Inputs
     {
@@ -29,6 +48,7 @@ namespace jrc::pet_follow
         bool pursuing_loot = false;
         bool moving = false;
         uint8_t failed_jumps = 0;
+        int32_t height_limit = pursuit_height_limit(BASE_MOVEMENT);
     };
 
     struct JumpInputs

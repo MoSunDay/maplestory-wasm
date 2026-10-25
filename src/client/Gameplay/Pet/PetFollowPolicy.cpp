@@ -7,6 +7,19 @@
 
 namespace jrc::pet_follow
 {
+    int32_t jump_reach_height(double jump_force, double gravity)
+    {
+        if (gravity <= 0.0)
+            return 0;
+        return static_cast<int32_t>(jump_force * jump_force / (2.0 * gravity));
+    }
+
+    int32_t pursuit_height_limit(const MovementProfile& profile)
+    {
+        return jump_reach_height(profile.jump_force, Physics::GRAVITY) +
+            HEIGHT_TOLERANCE;
+    }
+
     int32_t distance_between(Point<int16_t> first, Point<int16_t> second)
     {
         const int64_t dx = static_cast<int32_t>(first.x()) - second.x();
@@ -59,8 +72,11 @@ namespace jrc::pet_follow
             return Action::WARP_TO_OWNER;
         }
 
+        // Y grows downward: loot higher than the owner's own jump reach, or deeper
+        // than the fall guard, is somewhere the owner cannot go either.
         if (inputs.pursuing_loot &&
-            (std::abs(target_dy) > PATH_HEIGHT_LIMIT ||
+            (-target_dy > inputs.height_limit ||
+                target_dy > FALL_HEIGHT_LIMIT ||
                 inputs.failed_jumps >= MAX_FAILED_LOOT_JUMPS))
         {
             return Action::ABANDON_LOOT;

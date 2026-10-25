@@ -22,6 +22,7 @@
 #include "DropLifecycle/RemovalPolicy.h"
 
 #include "../Spawn.h"
+#include "../Pet/PetFollowPolicy.h"
 #include "../../Graphics/Animation.h"
 #include "../../Template/Rectangle.h"
 
@@ -74,6 +75,10 @@ namespace jrc
             bool meso_magnet = false;
             bool item_pouch = false;
             bool magic_scales = false;
+            // Loot higher than this above the query origin is not targeted; the
+            // owner cannot reach it with a single jump either.
+            int32_t max_height_above = pet_follow::pursuit_height_limit(
+                pet_follow::BASE_MOVEMENT);
         };
 
         struct PetLootTarget
@@ -83,6 +88,10 @@ namespace jrc
         };
 
         PetLootTarget find_pet_loot(const PetLootQuery& query) const;
+        // All pet-eligible loot within range of origin, nearest first. Loot
+        // higher than the query's height limit above origin is skipped.
+        std::vector<int32_t> find_pet_loot_batch(const PetLootQuery& query,
+            Point<int16_t> origin, int16_t range) const;
         // Icon center of the lootable drop nearest to `origin`, or nullopt
         // when no drop is lootable. Pure read; changes no state.
         std::optional<Point<int16_t>> find_nearest_lootable_center(

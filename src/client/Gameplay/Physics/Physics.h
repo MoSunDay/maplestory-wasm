@@ -24,6 +24,9 @@ namespace jrc
     class Physics
     {
     public:
+        // Shared downward acceleration for NORMAL physics, in pixels per frame^2.
+        static constexpr double GRAVITY = 0.14;
+
         struct MoveResult
         {
             double start_x = 0.0;

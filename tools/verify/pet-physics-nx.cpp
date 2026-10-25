@@ -60,8 +60,8 @@ namespace
         {
             const auto movement = right ? jrc::pet_follow::Action::MOVE_RIGHT :
                 jrc::pet_follow::Action::MOVE_LEFT;
-            object.hforce = right ? jrc::pet_follow::GROUND_WALK_FORCE :
-                -jrc::pet_follow::GROUND_WALK_FORCE;
+            object.hforce = right ? jrc::pet_follow::BASE_MOVEMENT.walk_force :
+                -jrc::pet_follow::BASE_MOVEMENT.walk_force;
             const jrc::Physics::MoveResult result = physics.move_object(object);
             const bool wall = result.horizontal_collision ==
                 jrc::Footholdtree::HorizontalCollision::WALL;
@@ -95,7 +95,7 @@ namespace
         bool saw_jump_request = false;
         for (int frame = 0; frame < 180; ++frame)
         {
-            object.hforce = jrc::pet_follow::GROUND_WALK_FORCE;
+            object.hforce = jrc::pet_follow::BASE_MOVEMENT.walk_force;
             const jrc::Physics::MoveResult result = physics.move_object(object);
             const bool wall = result.horizontal_collision ==
                 jrc::Footholdtree::HorizontalCollision::WALL;
@@ -122,7 +122,7 @@ namespace
         bool ok = true;
         for (int frame = 0; frame < 180; ++frame)
         {
-            object.hforce = jrc::pet_follow::GROUND_WALK_FORCE;
+            object.hforce = jrc::pet_follow::BASE_MOVEMENT.walk_force;
             const jrc::Physics::MoveResult result = physics.move_object(object);
             const bool wall = result.horizontal_collision ==
                 jrc::Footholdtree::HorizontalCollision::WALL;

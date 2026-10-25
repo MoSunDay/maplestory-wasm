@@ -112,7 +112,8 @@ namespace jrc
         }
     }
 
-    bool Char::update(const Physics& physics, float speed)
+    bool Char::update(const Physics& physics, float speed,
+        const pet_follow::MovementProfile& pet_movement)
     {
         damagenumbers.remove_if([](DamageNumber& number) {
             return number.update();
@@ -141,7 +142,7 @@ namespace jrc
                     if (pet.get_stance() == PetLook::HANG || pet.get_stance() == PetLook::FLY)
                         pet.set_stance(PetLook::STAND);
                 }
-                pet.update(physics, get_position());
+                pet.update(physics, get_position(), pet_movement);
             }
         }
 

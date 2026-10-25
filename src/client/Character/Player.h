@@ -135,6 +135,8 @@ namespace jrc
         float get_walkforce() const;
         /// Returns the current jumping force, calculated from the total ES_JUMP stat.
         float get_jumpforce() const;
+        /// Movement profile handed to the pet, so it moves like the owner.
+        pet_follow::MovementProfile get_pet_movement_profile() const;
         /// Returns the climbing force, calculated from the total ES_SPEED stat.
         float get_climbforce() const;
         /// Returns the flying force.

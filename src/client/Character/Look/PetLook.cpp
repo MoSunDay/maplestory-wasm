@@ -72,10 +72,10 @@ namespace jrc
         namelabel.draw(absp);
     }
 
-    void PetLook::update(const Physics& physics, Point<int16_t> charpos)
+    void PetLook::update(const Physics& physics, Point<int16_t> charpos,
+        const pet_follow::MovementProfile& movement)
     {
         static const double PETFLYFORCE = 0.2;
-        static const double PETJUMPFORCE = 4.5;
 
         Point<int16_t> curpos = phobj.get_position();
         if (stance == WARP)
@@ -108,7 +108,8 @@ namespace jrc
 
             pet_follow::Action action = pet_follow::decide({
                 curpos, charpos, followpos, loot_target.has_value(),
-                stance == MOVE, failed_loot_jumps
+                stance == MOVE, failed_loot_jumps,
+                pet_follow::pursuit_height_limit(movement)
             });
             if (action == pet_follow::Action::WARP_TO_OWNER)
             {
@@ -135,9 +136,8 @@ namespace jrc
                 action == pet_follow::Action::MOVE_LEFT)
             {
                 bool right = action == pet_follow::Action::MOVE_RIGHT;
-                phobj.hforce = right
-                    ? pet_follow::GROUND_WALK_FORCE
-                    : -pet_follow::GROUND_WALK_FORCE;
+                phobj.hforce = right ? movement.walk_force
+                    : -movement.walk_force;
                 flip = right;
                 set_stance(MOVE);
                 last_move_intent = action;
@@ -161,8 +161,7 @@ namespace jrc
             if (pet_follow::should_jump({ action, result.grounded,
                 blocked_by_wall, result.start_x, result.end_x }))
             {
-                begin_jump(action, follow_distance);
-                phobj.vforce = -PETJUMPFORCE;
+                begin_jump(action, follow_distance, movement.jump_force);
                 ++jump_trigger_count;
             }
             animations[stance].update();
@@ -171,9 +170,7 @@ namespace jrc
         case JUMP:
         {
             const Point<int16_t> followpos = loot_target.value_or(charpos);
-            if (jump_direction != 0)
-                phobj.hspeed = jump_direction *
-                    pet_follow::JUMP_HORIZONTAL_SPEED;
+            // Air travel keeps the takeoff momentum, exactly like the owner.
             phobj.type = PhysicsObject::NORMAL;
             phobj.clear_flag(PhysicsObject::NOGRAVITY);
             const Physics::MoveResult result = physics.move_object(phobj);
@@ -370,13 +367,16 @@ namespace jrc
         set_stance(WARP);
     }
 
-    void PetLook::begin_jump(pet_follow::Action action, int32_t target_distance)
+    void PetLook::begin_jump(pet_follow::Action action, int32_t target_distance,
+        double jump_force)
     {
         jump_direction = action == pet_follow::Action::MOVE_LEFT ? -1 : 1;
         flip = jump_direction > 0;
         phobj.hforce = 0.0;
         phobj.hacc = 0.0;
-        phobj.hspeed = jump_direction * pet_follow::JUMP_HORIZONTAL_SPEED;
+        // Same takeoff as the owner: one vertical impulse, horizontal travel
+        // keeps the walking momentum built before the jump.
+        phobj.vforce = -jump_force;
         jump_start_distance = target_distance;
         jump_airborne = false;
         phobj.clear_flag(PhysicsObject::TURNATEDGES);

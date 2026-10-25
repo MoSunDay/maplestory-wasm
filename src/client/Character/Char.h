@@ -158,7 +158,9 @@ namespace jrc
         Char(int32_t oid, const CharLook& look, const std::string& name);
 
         /// Update the character's animation with the given speed.
-        bool update(const Physics& physics, float speed);
+        bool update(const Physics& physics, float speed,
+            const pet_follow::MovementProfile& pet_movement =
+                pet_follow::BASE_MOVEMENT);
         /// Get a speed modifier for the current stance.
         float get_stancespeed() const;
         /// Return whether the death tomb landed during the latest update.

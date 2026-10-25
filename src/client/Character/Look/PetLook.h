@@ -59,7 +59,9 @@ namespace jrc
         PetLook();
 
         void draw(double viewx, double viewy, float alpha) const;
-        void update(const Physics& physics, Point<int16_t> charpos);
+        void update(const Physics& physics, Point<int16_t> charpos,
+            const pet_follow::MovementProfile& movement =
+                pet_follow::BASE_MOVEMENT);
 
         void set_position(int16_t xpos, int16_t ypos);
         void set_stance(Stance stance);
@@ -85,7 +87,8 @@ namespace jrc
     private:
         void reset_motion();
         void warp_to(Point<int16_t> position);
-        void begin_jump(pet_follow::Action action, int32_t target_distance);
+        void begin_jump(pet_follow::Action action, int32_t target_distance,
+            double jump_force);
         void finish_jump(Point<int16_t> target_position);
 
         int32_t itemid = 0;

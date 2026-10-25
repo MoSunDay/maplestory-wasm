@@ -52,7 +52,11 @@ async function ensurePetSummoned(driver, probes, requireState) {
     await driver.evaluate("document.getElementById('asset-loading-screen').classList.contains('is-hidden')"),
     45);
   await sleep(500);
-  await driver.click(438, 178);
+  const originX = await probes.itemInventoryX();
+  const originY = await probes.itemInventoryY();
+  await driver.click(originX + 138, originY + 28);
+  await requireState('cash inventory tab selected', async () =>
+    await probes.itemInventoryTab() === 5, 10);
   await sleep(500);
   await requireState('cash inventory assets ready', async () =>
     await probes.assetBlocking() === 0 &&
@@ -60,9 +64,20 @@ async function ensurePetSummoned(driver, probes, requireState) {
     45);
   await sleep(500);
   await driver.screenshot('08f-pet-cash-inventory');
-  const column = (puppySlot - 1) % 4;
-  const row = Math.floor((puppySlot - 1) / 4);
-  await driver.doubleClick(329 + column * 36, 218 + row * 35);
+  const first = await probes.itemInventoryFirstSlot();
+  const last = await probes.itemInventoryLastSlot();
+  if (puppySlot < first || puppySlot > last)
+    throw new Error(`Starter puppy slot ${puppySlot} is outside visible cash page [${first}..${last}]`);
+  const offset = puppySlot - first;
+  let point = null;
+  for (const [dx, dy, rowPitch] of [[29, 68, 35], [26, 67, 34]]) {
+    const x = originX + dx + (offset % 4) * 36;
+    const y = originY + dy + Math.floor(offset / 4) * rowPitch;
+    if (await probes.itemInventorySlotAt(x, y) === puppySlot) { point = { x, y }; break; }
+  }
+  if (!point) throw new Error(`Could not resolve cash slot ${puppySlot} center via hit test`);
+  console.log(`INFO  pet cash inventory origin=${originX},${originY} slot=${puppySlot} page=[${first}..${last}] point=${point.x},${point.y}`);
+  await driver.doubleClick(point.x, point.y);
   await requireState('starter puppy summoned', async () =>
     await probes.petActive() === 1 && await probes.petItemId() === STARTER_PUPPY);
   await driver.key('i', 'KeyI', 73, 'i');

@@ -27,6 +27,8 @@
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
 
+#include <algorithm>
+
 namespace jrc
 {
     namespace
@@ -37,6 +39,12 @@ namespace jrc
             const int64_t dy = static_cast<int32_t>(first.y()) - second.y();
             return dx * dx + dy * dy;
         }
+
+        struct PetLootCandidate
+        {
+            int32_t oid;
+            int64_t distance_sq;
+        };
     }
 
     MapDrops::MapDrops()
@@ -203,6 +211,11 @@ namespace jrc
                 continue;
 
             Point<int16_t> position = drop->get_position() + Point<int16_t>(16, 16);
+            if (static_cast<int32_t>(query.origin.y()) - position.y() >
+                query.max_height_above)
+            {
+                continue;
+            }
             const int64_t distance_sq = squared_distance(position, query.origin);
             if (distance_sq < closest_distance_sq)
             {
@@ -211,6 +224,43 @@ namespace jrc
             }
         }
         return target;
+    }
+
+    std::vector<int32_t> MapDrops::find_pet_loot_batch(
+        const PetLootQuery& query, Point<int16_t> origin, int16_t range) const
+    {
+        std::vector<PetLootCandidate> candidates;
+        const int64_t range_sq = static_cast<int64_t>(range) * range;
+        for (const auto& entry : drops)
+        {
+            Optional<const Drop> drop = entry.second.get();
+            if (!drop || !drop->is_lootable() || !pet_can_target(*drop, query))
+                continue;
+
+            Point<int16_t> position = drop->get_position() +
+                Point<int16_t>(16, 16);
+            if (static_cast<int32_t>(origin.y()) - position.y() >
+                query.max_height_above)
+            {
+                continue;
+            }
+
+            const int64_t distance_sq = squared_distance(position, origin);
+            if (distance_sq <= range_sq)
+                candidates.push_back({ entry.first, distance_sq });
+        }
+
+        std::sort(candidates.begin(), candidates.end(),
+            [](const PetLootCandidate& left, const PetLootCandidate& right)
+            {
+                return left.distance_sq < right.distance_sq;
+            });
+
+        std::vector<int32_t> oids;
+        oids.reserve(candidates.size());
+        for (const PetLootCandidate& candidate : candidates)
+            oids.push_back(candidate.oid);
+        return oids;
     }
 
     bool MapDrops::has_drop(int32_t oid) const

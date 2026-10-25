@@ -234,7 +234,7 @@ namespace jrc
 
         if (state == DIED)
         {
-            Char::update(physics, 1.0f);
+            Char::update(physics, 1.0f, get_pet_movement_profile());
             if (death_tomb_landed())
             {
                 UI::get().emplace<UIOk>(
@@ -255,7 +255,8 @@ namespace jrc
                 pst->update(*this);
                 physics.move_object(phobj);
 
-                bool aniend = Char::update(physics, get_stancespeed());
+                bool aniend = Char::update(physics, get_stancespeed(),
+                    get_pet_movement_profile());
                 if (aniend && attacking)
                 {
                     attacking = false;
@@ -701,6 +702,11 @@ namespace jrc
     float Player::get_jumpforce() const
     {
         return 1.0f + 3.5f * static_cast<float>(stats.get_total(Equipstat::JUMP)) / 100;
+    }
+
+    pet_follow::MovementProfile Player::get_pet_movement_profile() const
+    {
+        return { get_walkforce(), get_jumpforce() };
     }
 
     float Player::get_climbforce() const
