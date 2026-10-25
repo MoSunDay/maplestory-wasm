@@ -93,6 +93,8 @@ namespace jrc
         int32_t get_quickslot_skill(int16_t index) const;
         int32_t get_quickslot_item(int16_t index) const;
         Point<int16_t> get_quickslot_center(int16_t index) const;
+        /// Actual last-frame screen destination of the quickslot panel,
+        /// captured by quickslot::draw (not a re-derived hit box).
         Rectangle<int16_t> get_quickslot_panel_bounds() const;
         /// Composed stat label for probes: 0 = hp, 1 = mp, 2 = exp,
         /// 3 = level. Points into the mutable label cache, so it stays
@@ -203,6 +205,10 @@ namespace jrc
         quickslot::State quickslots;
         std::array<Text, quickslot::COUNT> quickslot_cooldowns;
         mutable ColorBox gauge_covers[3];
+
+        // Exact screen destination of the last panel draw, captured by
+        // quickslot::draw so probes read the rendered rectangle.
+        mutable Rectangle<int16_t> quickslot_panel_draw_bounds;
 
         // Stat label cache, rebuilt only when the displayed values or the
         // label format change; draw() is const, hence the mutables.

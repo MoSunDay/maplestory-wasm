@@ -211,10 +211,14 @@ async function verifyItemBinding() {
   await driver.screenshot('slot1-item-cleared');
 }
 
-// UIStatusbar::Buttons 枚举值：Menu/System 弹层按钮与快捷图标行共用同一
-// 张 post-Chaos mainBar 贴图，右边距固定，因此真实矩形随视宽右锚。
+// UIStatusbar::Buttons 全量枚举（0..11）：聊天/商城/交易/弹层按钮与快捷图标行
+// 共用同一张 post-Chaos mainBar 贴图，右边距固定，因此真实矩形随视宽右锚。
 const statusbarControls = Object.freeze({
-  menu: 4,        // BT_MENU
+  whisper: 0,     // BT_WHISPER（mainBar/BtChat）
+  callgm: 1,      // BT_CALLGM（mainBar/BtClaim）
+  cashshop: 2,    // BT_CASHSHOP
+  trade: 3,       // BT_TRADE（mainBar/BtMTS）
+  menu: 4,        // BT_MENU（mainBar/BtMenu）
   system: 5,      // BT_OPTIONS（mainBar/BtSystem）
   character: 6,   // BT_CHARACTER
   stats: 7,       // BT_STATS
@@ -247,12 +251,26 @@ async function controlBounds(name) {
 
 async function verifyQuickslotLayout() {
   const panel = await probes.quickslotPanel();
+  // 面板期望值即真实绘制矩形：探针读取 quickslot::draw 里同一次
+  // Texture::draw_bounds 的返回值，也就是 Texture::draw 使用的 destination。
+  // 因此把 QuickSlotBar.cpp 改回 `panel.draw(origin)`（少一次原点补偿）
+  // 会让这里的断言立即失败，而不是继续通过。
   equal('quickslot panel bounds', panel, {
     left: panelX,
     top: panelY,
     right: panelX + 145,
     bottom: panelY + 93
   });
+
+  // 0) 探针越界 id 回归：65540 若未做范围校验会按 uint16_t 回绕成
+  //    BT_MENU(4) 而返回真实矩形。四个边界都必须报缺失。
+  const wrappedId = 65540;
+  const wrapped = await probes.statusbarControlBounds(wrappedId);
+  if (!Object.values(wrapped).every(value => value === MISSING_COORDINATE)) {
+    throw new Error(`statusbar control id ${wrappedId} must be rejected, got`
+      + ` ${showBounds(wrapped)} (out-of-range id wrapped to a real button)`);
+  }
+  console.log(`PASS  out-of-range control id ${wrappedId} rejected`);
 
   // 1) 快捷栏面板不得与任何真实状态栏控件矩形重叠（不使用硬编码矩形）。
   const controls = {};
@@ -263,6 +281,7 @@ async function verifyQuickslotLayout() {
         + ` ${name} ${showBounds(controls[name])}`);
     }
   }
+  console.log(`INFO  statusbar controls ${JSON.stringify(controls)}`);
 
   // 2) 快捷图标行与 SYSTEM/MENU 两行控件互不重叠。
   const shortcuts = shortcutControlNames.map(name => ({
@@ -277,27 +296,25 @@ async function verifyQuickslotLayout() {
     }
   }
 
-  // 3) 面板底边到图标行顶边的实测间隙：2px。
+  // 3) 面板底边到图标行顶边的实测间隙：必须是 2px（硬断言，不是 INFO）。
   const earliestShortcutTop = Math.min(...shortcuts.map(entry => entry.bounds.top));
   const latestShortcutBottom = Math.max(...shortcuts.map(entry => entry.bounds.bottom));
   const gap = earliestShortcutTop - panel.bottom;
-  if (gap < 2) {
-    throw new Error(`quickslot panel ${showBounds(panel)} clears shortcut row by`
-      + ` ${gap}px (<2): shortcut top=${earliestShortcutTop}`);
-  }
   if (earliestShortcutTop !== shortcutRowTop) {
-    console.log(`INFO  shortcut row top measured ${earliestShortcutTop},`
-      + ` constant ${shortcutRowTop}`);
+    throw new Error(`shortcut row top measured ${earliestShortcutTop},`
+      + ` expected ${shortcutRowTop} (viewH-68)`);
   }
   if (gap !== 2) {
-    console.log(`INFO  quickslot panel gap measured ${gap}px, expected 2px`);
+    throw new Error(`quickslot panel ${showBounds(panel)} must clear the`
+      + ` shortcut row by exactly 2px, measured ${gap}px`
+      + ` (shortcut top=${earliestShortcutTop})`);
   }
 
-  // 4) SYSTEM/MENU 必须在快捷图标行下方（图标 bottom < 按钮 top）。
+  // 4) SYSTEM/MENU 必须严格位于快捷图标行下方（不共用图标行底边）。
   for (const name of ['system', 'menu']) {
-    if (controls[name].top < latestShortcutBottom) {
-      throw new Error(`${name} ${showBounds(controls[name])} is not below the`
-        + ` shortcut row (latest bottom=${latestShortcutBottom})`);
+    if (controls[name].top <= latestShortcutBottom) {
+      throw new Error(`${name} ${showBounds(controls[name])} must be strictly`
+        + ` below the shortcut icon row (latest bottom=${latestShortcutBottom})`);
     }
   }
 

@@ -739,7 +739,7 @@ namespace jrc
 
     Rectangle<int16_t> UIStatusbar::get_quickslot_panel_bounds() const
     {
-        return statusbar::quickslot_dock_range(position);
+        return quickslot_panel_draw_bounds;
     }
 
     int16_t UIStatusbar::get_quickslot_cooldown_length(int16_t index) const

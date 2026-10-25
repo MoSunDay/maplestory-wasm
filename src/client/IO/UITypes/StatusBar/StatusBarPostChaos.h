@@ -79,8 +79,8 @@ namespace jrc
 
         static_assert(
             CHAOS_QUICKSLOT_OFFSET_Y + quickslot::CHAOS_LAYOUT.dimension.y()
-                <= CHAOS_SHORTCUT_ICON_TOP,
-            "quickslot panel must not overlap the shortcut icon row"
+                == CHAOS_SHORTCUT_ICON_TOP - 2,
+            "quickslot panel must leave exactly 2px above the shortcut row"
         );
 
         // ------------------------------------------------------------------

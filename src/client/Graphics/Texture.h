@@ -38,6 +38,9 @@ namespace jrc
         ~Texture();
 
         void draw(const DrawArgument& args) const;
+        /// Draw the texture and return the exact destination rectangle
+        /// (pre-clip) used by that same draw call.
+        Rectangle<int16_t> draw_bounds(const DrawArgument& args) const;
         bool draw_effect(const DrawArgument& args) const;
         void prepare_visible() const;
         void prepare_background() const;
@@ -59,7 +62,8 @@ namespace jrc
             TRANSIENT_EFFECT
         };
 
-        bool draw_with_load_class(const DrawArgument& args, DrawLoadClass load_class) const;
+        bool draw_with_load_class(const DrawArgument& args, DrawLoadClass load_class,
+            Rectangle<int16_t>* bounds = nullptr) const;
 
         nl::bitmap bitmap;
         Point<int16_t> origin;

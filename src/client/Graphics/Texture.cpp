@@ -63,7 +63,14 @@ namespace jrc
 
     void Texture::draw(const DrawArgument& args) const
     {
-        draw_with_load_class(args, DrawLoadClass::BLOCKING_VISIBLE);
+        draw_with_load_class(args, DrawLoadClass::BLOCKING_VISIBLE, nullptr);
+    }
+
+    Rectangle<int16_t> Texture::draw_bounds(const DrawArgument& args) const
+    {
+        Rectangle<int16_t> bounds;
+        draw_with_load_class(args, DrawLoadClass::BLOCKING_VISIBLE, &bounds);
+        return bounds;
     }
 
     bool Texture::draw_effect(const DrawArgument& args) const
@@ -73,14 +80,22 @@ namespace jrc
 
     bool Texture::draw_with_load_class(
         const DrawArgument& args,
-        DrawLoadClass load_class
+        DrawLoadClass load_class,
+        Rectangle<int16_t>* bounds
     ) const
     {
+        // Resolve the destination before the id/alpha/cull early returns so
+        // callers always see the rectangle this draw would use.
+        const Rectangle<int16_t> destination = args.get_rectangle(origin, dimensions);
+        if (bounds)
+        {
+            *bounds = destination;
+        }
+
         size_t id = bitmap.id();
         if (id == 0 || args.get_color().a() <= 0.0f)
             return false;
 
-        const Rectangle<int16_t> destination = args.get_rectangle(origin, dimensions);
         if (!GraphicsGL::get().isonscreen(destination))
         {
             return false;

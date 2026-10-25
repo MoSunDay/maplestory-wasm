@@ -18,7 +18,8 @@ post-Chaos 状态栏的快捷栏面板使用 `StatusBar2.img/mainBar/quickSlot/q
   （`-58 - 93 - 2 = -153`），`CHAOS_QUICKSLOT_OFFSET` 由 `{143,-143}`
   改为 `{143,-153}`。
 - 面板顶边 = `viewH-163`、底边 = `viewH-70`，图标行顶边 = `viewH-68`，
-  两者留 2px 间隙；`static_assert` 保证面板底边不越过图标行顶。
+  两者留 2px 间隙；`static_assert` 保证面板底边恰好落在图标行顶边上方 2px
+  （不重叠且间隙不会漂移）。
   v83 的 `{143,-143}` 不变。
 
 ### 面板贴图原点回归
@@ -73,10 +74,15 @@ post-Chaos 状态栏的快捷栏面板使用 `StatusBar2.img/mainBar/quickSlot/q
 - `Gameplay/Probes/QuickslotProbes.cpp`（从 `GameplayProbes.cpp` 拆出）
   新增 `msquickslot_item`、`msquickslot_center_x/y`、
   `msquickslot_panel_left/top/right/bottom`；冷却与悬停探针一并迁入。
+  `msquickslot_panel_*` 读取 `Texture::draw_bounds` 在
+  `quickslot::draw` 里同一次面板绘制捕获到的 destination（上一帧实际
+  绘制矩形），不再是另算的命中框，因此探针断言与渲染路径强绑定。
 - `UIStatusbar::get_control_bounds(uint16_t id)` 暴露按钮真实矩形
   （找不到时返回零尺寸 `Rectangle<int16_t>()`）；
   `GameplayProbes.cpp` 新增 `msstatusbar_control_bounds(id, edge)`
-  （edge：0=left、1=top、2=right、3=bottom，缺失返回 `MISSING_COORDINATE`）。
+  （edge：0=left、1=top、2=right、3=bottom，缺失返回 `MISSING_COORDINATE`）；
+  `id` 超出 `0..0xFFFF`（如 65540）直接返回 `MISSING_COORDINATE`，
+  不会按 `uint16_t` 回绕成真实按钮。
 - `CMakeLists.txt` 的 `-sEXPORTED_FUNCTIONS` 同步导出全部新探针；
   `tools/verify/maplestory-webui/runtime-flow.mjs` 增
   `quickslotItem`、`quickslotCenterX/Y`、`quickslotPanel`、
@@ -98,13 +104,18 @@ post-Chaos 状态栏的快捷栏面板使用 `StatusBar2.img/mainBar/quickSlot/q
   通过（冷却是 60s、标签长度 2），物品段沿用上一提交已通过的同一流程
   （SwiftShader 在单进程连续打开多次技能书/物品栏时偶发挂起，分段运行
   可避开该环境问题）。`verifyQuickslotLayout` 断言：
-  - 面板 bounds：800 宽 `{655,437,800,530}`，1280 宽 `{1135,557,1280,650}`；
+  - 面板 bounds 是**实际绘制矩形**（`Texture::draw_bounds`，非命中框）：
+    800 宽 `{655,437,800,530}`，1280 宽 `{1135,557,1280,650}`；
   - 8 个槽位中心分别落在 `panel + {23,56,89,122} × {31,64}`；
-  - 经 `msstatusbar_control_bounds` 读取真实按钮矩形（不使用硬编码期望值）：
-    面板不与 BtMenu(4)/BtSystem(5) 及快捷图标行 BtCharacter..BtSkill(6..11)
-    任一方形重叠，快捷图标行也不与 BtSystem/BtMenu 重叠；
-  - 图标行顶边实测 `viewH-68`，`earliestShortcutTop - panel.bottom` 的间隙
-    为 2px，且 BtSystem/BtMenu 顶边低于所有快捷图标底边。
+  - 经 `msstatusbar_control_bounds` 读取 **UIStatusbar::Buttons 全部 12 个**
+    真实按钮矩形（BtChat/BtClaim/BtCashShop/BtMTS/BtMenu/BtSystem 与
+    BtCharacter..BtSkill，不使用硬编码期望值）：面板不与任一方形重叠，
+    快捷图标行也不与 BtSystem/BtMenu 重叠；
+  - 越界控制 id 65540（未校验会回绕成 BtMenu）四个边界都必须返回
+    `MISSING_COORDINATE`，覆盖探针范围校验；
+  - 图标行顶边实测 `viewH-68` 与 `earliestShortcutTop - panel.bottom == 2`
+    均为**硬断言**（偏差 1px 即失败，不再是 INFO），且 BtSystem/BtMenu
+    顶边严格低于所有快捷图标底边（不共用底边）。
 - 同一 E2E 在两档分辨率下还覆盖状态栏整体 chrome；冷却 60s 标签在
   800×600 的独立冷却段验证。
 - WASM 重建成功（`scripts/build_wasm.sh`，产物

@@ -41,13 +41,17 @@ namespace jrc
 
     namespace quickslot
     {
-        void draw(const Layout& layout, const State& state,
+        Rectangle<int16_t> draw(const Layout& layout, const State& state,
             const Texture& panel,
             const Texture (&keys)[COUNT],
             const std::array<Text, COUNT>& cooldown_labels,
             Point<int16_t> origin)
         {
-            panel.draw(quickslot::texture_draw_position(origin, panel.get_origin()));
+            // One draw call both paints the panel and reports its exact
+            // destination, so probes cannot drift from what is rendered.
+            const Rectangle<int16_t> panel_bounds = panel.draw_bounds(
+                quickslot::texture_draw_position(origin, panel.get_origin())
+            );
 
             for (int16_t i = 0; i < COUNT; ++i)
             {
@@ -116,6 +120,8 @@ namespace jrc
                         { 1.0f, 1.0f, 1.0f, 1.0f });
                 }
             }
+
+            return panel_bounds;
         }
     }
 }

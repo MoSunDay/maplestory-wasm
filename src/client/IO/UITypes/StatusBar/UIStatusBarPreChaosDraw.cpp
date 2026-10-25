@@ -89,8 +89,9 @@ namespace jrc
     void UIStatusbar::draw_quickslot_dock() const
     {
         // Panel bitmap of the active generation (base/quickSlot or
-        // mainBar/quickSlot) plus assigned skill icons / v83 key caps.
-        quickslot::draw(
+        // mainBar/quickSlot) plus assigned skill icons / v83 key caps. The
+        // returned rectangle is the panel's real draw destination.
+        quickslot_panel_draw_bounds = quickslot::draw(
             statusbar::quickslot_layout(),
             quickslots,
             quickslot_panel,

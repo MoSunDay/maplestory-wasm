@@ -707,7 +707,9 @@ extern "C"
     int msstatusbar_control_bounds(int id, int edge)
     {
         auto statusbar = jrc::UI::get().get_element<jrc::UIStatusbar>();
-        if (!statusbar || edge < 0 || edge > 3)
+        // Reject ids outside the uint16_t button range so the cast below
+        // cannot wrap onto a real button (e.g. 65540 -> BT_MENU).
+        if (!statusbar || id < 0 || id > 0xFFFF || edge < 0 || edge > 3)
         {
             return MISSING_COORDINATE;
         }

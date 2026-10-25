@@ -29,8 +29,9 @@ namespace jrc::quickslot
     /// Draw the panel, its eight slots (skills/items) and keycap labels at
     /// `origin` (absolute panel top-left). `layout` supplies the
     /// generation's measured geometry, `cooldown_labels` the remaining
-    /// seconds per skill slot.
-    void draw(const Layout& layout, const State& state, const Texture& panel,
+    /// seconds per skill slot. Returns the panel's exact screen destination
+    /// rectangle captured from that same panel draw call.
+    Rectangle<int16_t> draw(const Layout& layout, const State& state, const Texture& panel,
         const Texture (&keys)[COUNT],
         const std::array<Text, COUNT>& cooldown_labels,
         Point<int16_t> origin);
