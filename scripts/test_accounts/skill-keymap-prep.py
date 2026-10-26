@@ -205,7 +205,7 @@ def quoted(names):
     return ",".join("'%s'" % name for name in names)
 
 
-def restore_levels(cfg, roster, floor_level):
+def restore_levels(cfg, roster, floor_level, world):
     """Raise roster characters back to the setup level (never lowers).
 
     Concurrent FM/PQ flows retune shared characters (a level-60 NL fails
@@ -215,14 +215,15 @@ def restore_levels(cfg, roster, floor_level):
     names = quoted(c["name"] for c in roster)
     rows = mysql_rows(
         cfg,
-        "UPDATE characters SET level=%d WHERE name IN (%s) AND level < %d;"
-        " SELECT ROW_COUNT();" % (floor_level, names, floor_level))
+        "UPDATE characters SET level=%d WHERE name IN (%s) AND world = %d"
+        " AND level < %d; SELECT ROW_COUNT();"
+        % (floor_level, names, world, floor_level))
     raised = int(rows[0][0]) if rows else 0
     print("restore-levels: %d character(s) raised to %d%s"
           % (raised, floor_level, "" if raised else " (already at/above)"))
 
 
-def topup_ammo(cfg, roster):
+def topup_ammo(cfg, roster, world):
     """Refill drained thrower ammo (NightLord stars / Corsair bullets).
 
     Every fired ranged attack consumes one projectile; an emptied stack row
@@ -243,7 +244,8 @@ def topup_ammo(cfg, roster):
             ammo.append((2070000, 800))
         for itemid, quantity in ammo:
             rows = mysql_rows(cfg, "SELECT id, accountid FROM characters"
-                              " WHERE name='%s';" % character["name"])
+                              " WHERE name='%s' AND world = %d;"
+                              % (character["name"], world))
             if not rows:
                 continue
             cid, accountid = int(rows[0][0]), int(rows[0][1])
@@ -411,14 +413,14 @@ def main():
         if args.dry_run:
             print("dry-run restore-levels (would raise chars to %d)" % args.restore_levels)
         else:
-            restore_levels(cfg, roster, args.restore_levels)
+            restore_levels(cfg, roster, args.restore_levels, args.world)
         if args.warp_map is None and not args.topup_ammo:
             return
     if args.topup_ammo:
         if args.dry_run:
             print("dry-run ammo top-up (would refill stars/bullets)")
         else:
-            topup_ammo(cfg, roster)
+            topup_ammo(cfg, roster, args.world)
         if args.warp_map is None:
             return
 
@@ -430,8 +432,8 @@ def main():
         else:
             rows = mysql_rows(
                 cfg,
-                "UPDATE characters SET map=%d WHERE name IN (%s);"
-                " SELECT ROW_COUNT();" % (args.warp_map, names))
+                "UPDATE characters SET map=%d WHERE name IN (%s) AND world = %d;"
+                " SELECT ROW_COUNT();" % (args.warp_map, names, args.world))
             print("warped %s character(s) to map %d (keymap untouched)"
                   % (rows[0][0] if rows else 0, args.warp_map))
         return
