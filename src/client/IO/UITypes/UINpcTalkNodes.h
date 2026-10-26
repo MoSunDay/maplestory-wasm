@@ -9,18 +9,18 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "UIAssetVersion.h"
+
 #include "nlnx/nx.hpp"
 
 namespace jrc
 {
     namespace npctalk_nodes
     {
-        // Generation marker shared with UiAssetVersion.h: post-Chaos UI.nx
-        // ships Login.img/WorldSelect/BtChannel, pre-Chaos does not.
+        // Global generation marker; probe lives in UIAssetVersion.h.
         inline bool post_chaos()
         {
-            const nl::node marker = nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"];
-            return static_cast<bool>(marker);
+            return ui_assets::post_chaos_global();
         }
 
         inline nl::node src()

@@ -39,6 +39,7 @@
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../Template/Point.h"
 #include "../../Template/Range.h"
+#include "UIAssetVersion.h"
 
 #include "nlnx/nx.hpp"
 
@@ -46,13 +47,10 @@ namespace jrc
 {
     namespace iteminv_nodes
     {
-        // Generation marker shared with UiAssetVersion.h: post-Chaos UI.nx
-        // ships Login.img/WorldSelect/BtChannel, pre-Chaos (v83) does not.
+        // Global generation marker; probe lives in UIAssetVersion.h.
         inline bool post_chaos()
         {
-            const nl::node marker =
-                nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"];
-            return static_cast<bool>(marker);
+            return ui_assets::post_chaos_global();
         }
 
         // Window root: UIWindow2.img/Item post-Chaos, UIWindow.img/Item in

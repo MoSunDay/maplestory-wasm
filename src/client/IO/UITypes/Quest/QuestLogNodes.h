@@ -10,6 +10,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "../UIAssetVersion.h"
+
 #include "nlnx/nx.hpp"
 
 #include <cstdint>
@@ -18,13 +20,10 @@ namespace jrc
 {
     namespace questlog_nodes
     {
-        // Generation marker shared with UINpcTalkNodes.h: post-Chaos UI.nx
-        // ships Login.img/WorldSelect/BtChannel, pre-Chaos does not.
+        // Global generation marker; probe lives in UIAssetVersion.h.
         inline bool post_chaos()
         {
-            const nl::node marker =
-                nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"];
-            return static_cast<bool>(marker);
+            return ui_assets::post_chaos_global();
         }
 
         // Left pane: the quest list with its tabs.

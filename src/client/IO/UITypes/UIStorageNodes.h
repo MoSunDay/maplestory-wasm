@@ -69,7 +69,9 @@ namespace jrc
         // Trunk art generation: the dump marker reports post-Chaos, but
         // the shipped UI.nx still carries the legacy list-style Trunk
         // window (UIWindow.img/Trunk with the `en` row art, 463x318),
-        // which wins whenever its art is present.
+        // which wins whenever its art is present. Probe strategy: see
+        // the UIAssetVersion.h header note (window-local probe, do not
+        // switch to the global marker).
         inline bool legacy()
         {
             const nl::node row_art = nl::nx::ui["UIWindow.img"]["Trunk"]["en"];
