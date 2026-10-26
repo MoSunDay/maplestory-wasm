@@ -18,15 +18,47 @@ Amoria(40-255)、CWKPQ(90-255)、Treasure(140-255)、BossRush(1-255)。
 - `fm-pq-teleports.mjs`：登录→FM 向导 9010000→逐个传送→断言落点地图
   ID。结果：**13/13 PASS**。
 - `fm-pq-solo-flow.mjs`：每 PQ 独立会话（SQL 预置 test3 回 FM、等级按
-  段设置）→ 走到招募 NPC → Space 开对话 → 悬停扫描选「我想参加组队
-  任务」（CWKPQ 两段式远征流程）→ 单人模式 sendYesNo 点 YES → 断言
-  进入入场图 + `msother_character_count` 读取 NPC 队友数。结果：
-  **13/13 PASS**（证据：`/tmp/fm-pq-solo-flow/<NN>-PQ>/summary.txt`，
-  含每人入口图截图）。
-- 支撑 harness（新增/增强）：`pq-harness.mjs`（登录/对话/走位/DB 预置
-  通用层，凭据运行时解析 configuration.ini）、`fm-pq-nav.mjs`
-  （LudiMaze 跳跃滞空按↑乘隐藏门、Amoria/CWK/Henesys/Ludi 攀爬路线）、
-  `png-probe.mjs`（纯像素解码定位 YES/NO 按钮）、`cdp.mjs` move()。
+  段设置）→ 走到招募 NPC（Pirate/Treasure 配近门 spawn 省长距走位）
+  → Space 开对话 → 悬停扫描选「我想参加组队任务」（CWKPQ 两段式
+  远征流程）→ 单人模式 sendYesNo 点 YES → 断言进入入场图。NPC 队友
+  补位证据以服务端 `[SoloPQ] ... spawned N NPC teammates` 日志为准
+  （`msother_character_count` 仅辅助——客户端角色计数不能区分补位
+  召唤与同图玩家）。
+- 结果：**13/13 终态 PASS**（Kerning soloNpc=2、Ludi 2、Orbis 2、
+  Pirate 2、Henesys 2、Ellin 2、MagatiaA/Z 3、Treasure 3、Amoria 5、
+  CWKPQ 5（lazy）、LudiMaze/BossRush soloOptional 入场 PASS）。
+  早前 6/13 时曾归因宿主高负载，续跑后其余 7 个陆续终态；最后一个
+  OrbisPQ 卡在招募 NPC 2013000 对 Space 完全无响应，根因见下节
+  「NPC 生成坐标高于所在斜面 foothold」。
+- 支撑 harness（新增/增强）：`pq-harness.mjs` 桶文件 + 五模块
+  `pq-harness-{login,db,dialog,game,move}.mjs`（凭据运行时解析
+  configuration.ini；对话按钮定位=客户端探针优先→视觉→网格三级）、
+  `fm-pq-nav.mjs`（LudiMaze 跳跃滞空按↑乘隐藏门、Amoria/CWK/
+  Henesys/Ludi 攀爬路线）、`png-probe.mjs`（纯像素解码定位 YES/NO
+  按钮，计数阈值法替代已证伪的成对启发）、`cdp.mjs` move()。
+
+## 验证过程中的缺陷修复（本批次）
+
+- **minPlayers=1 致补位静默失败**：Ludi/Orbis/Pirate/Ellin 事件脚本
+  minPlayers 曾为 1，`fill = min(5, minPlayers-1) = 0` → 入场后无
+  NPC 队友且无任何日志。已改 3，契约测试补数值断言防回归。
+- **YES/NO 按钮定位偏移**：纯像素探针曾按 v83 宽度 529 计算对话框
+  几何，实际 UI.nx 为 post-Chaos 519，整体偏 ~88px；右下角 HUD 曾致
+  假阳性。改为客户端探针（`msnpctalk_button_field` 导出
+  UINpcTalk 按钮真实坐标）优先，视觉/网格仅兜底。
+- **走位提速**：长距 hold 500→1100ms、菜单扫描步长 5→7、
+  Pirate/Treasure 近门 spawn，压缩单轮时长以贴近 115s 上限。
+- **NPC 生成坐标高于所在斜面 foothold（OrbisPQ Space 无响应根因）**：
+  200080101 招募 NPC 2013000 的 wz life cy=-41，而其所在 fh14 斜面
+  (138,-36)→(231,-45) 在 x=198 处插值 y=-41.8。客户端
+  `Footholdtree::get_fhid_below` 仅接受 `ycomp >= fy` 的 foothold，
+  -41 高于 -41.8 → NPC 对象被吸附到下层 fh26（y≈168），与爬绳到达
+  上层的玩家层差 215px，超出 `talk_to_nearest` 的 |dy|<=80 判定 →
+  Space 不发 NPC_TALK（服务端零收包，非脚本/造型/账号问题）。修复：
+  life y/cy 改 -50（低于斜面最低点 -45 必命中 fh14），重启后 Space
+  即开对话并单人入场 PASS。排查链：msnpc_active/位置探针 + Npc.nx
+  chunk 懒加载日志证明客户端已建 NPC 对象并渲染，最终由
+  `MapNpcs::talk_to_nearest` 距离窗口 + `get_y_below` 方向性锁定。
 
 ## 已知非阻塞问题（既有，非本次范围）
 

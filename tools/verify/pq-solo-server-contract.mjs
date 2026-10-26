@@ -118,6 +118,18 @@ function verifyEventScripts() {
     const setupBody = extractFunction(source, 'setup');
     assertMatch(setupBody, /setProperty\("minPlayers"/, `${eventName} setup declares minPlayers`);
 
+    // fill = min(MAX_TEAMMATES, minPlayers-1)：minPlayers=1 会静默得到 0
+    // 补位（Ludi/Orbis/Pirate/Ellin 曾因此 spawned=0 且无 [SoloPQ] 日志）。
+    // 天然可单刷的副本（LudiMaze/BossRush）保持 1，e2e 以 soloOptional 豁免。
+    const minMatch = source.match(/var\s+minPlayers\s*=\s*(\d+)/);
+    assertTrue(minMatch !== null, `${eventName} declares a minPlayers constant`);
+    const minPlayers = minMatch ? Number(minMatch[1]) : 0;
+    const soloCapable = eventName === 'LudiMazePQ' || eventName === 'BossRushPQ';
+    assertTrue(
+      soloCapable ? minPlayers === 1 : minPlayers >= 2,
+      `${eventName} minPlayers=${minPlayers} ${soloCapable ? 'must stay 1 (solo-capable)' : 'must be >=2 so solo fill spawns teammates'}`
+    );
+
     const afterSetupBody = extractFunction(source, 'afterSetup');
     assertMatch(afterSetupBody, /eim\.setupSoloTeammates\(\)/, `${eventName} afterSetup attaches solo teammates`);
 

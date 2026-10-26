@@ -166,9 +166,16 @@ export function findDialogButtons(img) {
         if (isGlyph(cr, cg, cb)) glyph++;
         if (isBlue(cr, cg, cb)) blue++;
       }
-    const sampleY = box
-      ? Math.min(bk.bottom + 6, boxBottom - 2)
-      : Math.min(bk.bottom + 6, img.height - 1);
+    // 采样行：块在盒内时取块底下方（按钮脸与正文之间的浅色带）；块整体
+    // 位于盒底之下（sendYesNo 的 是/否 落在检出盒外，实测 KPQ y470~494）
+    // 时改采块内中线行——按钮脸自身是浅色，原钳位 boxBottom-2 会落到
+    // 盒内正文行上，lightRatio 恒低导致按钮被滤掉。
+    const belowBox = box ? bk.top > boxBottom - 2 : false;
+    const sampleY = belowBox
+      ? ((bk.top + bk.bottom) >> 1)
+      : box
+        ? Math.min(bk.bottom + 6, boxBottom - 2)
+        : Math.min(bk.bottom + 6, img.height - 1);
     for (let x = left; x <= right; x++) {
       const [cr, cg, cb] = pixelAt(img, x, sampleY);
       if (isLight(cr, cg, cb)) light++;
@@ -184,13 +191,18 @@ export function findDialogButtons(img) {
   // 字素列占空拆分；有蓝底的宽块维持整块丢弃（蓝底文本带会被拆成多个
   // 带 blue 的小假钮，必须整体拒绝）。
   const splitWideBlock = bk => {
+    // 列占空用「字素像素计数 ≥ 块高 1/3（下限 4）」而非「任意像素」：
+    // 实测 KPQ 是/否 合并块顶部有一条横贯全宽的按钮边线（y467），底部
+    // 还有散点阴影，间隙列恒有 2-7 个字素像素；而按钮体核心列计数 12-25，
+    // 计数阈值可稳定分离（任意像素判定则永远连成一体）。
+    const need = Math.max(4, Math.ceil((bk.bottom - bk.top + 1) / 3));
     const cols = [];
     for (let x = bk.left; x <= bk.right; x++) {
-      let any = false;
+      let cnt = 0;
       for (let y = bk.top; y <= bk.bottom; y++) {
-        if (isGlyph(...pixelAt(img, x, y))) { any = true; break; }
+        if (isGlyph(...pixelAt(img, x, y))) cnt++;
       }
-      cols.push({ x, any });
+      cols.push({ x, any: cnt >= need });
     }
     const parts = [];
     for (const c of cols) {
@@ -202,6 +214,10 @@ export function findDialogButtons(img) {
       .filter(p => p.right - p.left >= 8)
       .map(p => ({ top: bk.top, bottom: bk.bottom, left: p.left, right: p.right }));
   };
+  // 注：曾尝试「盒底之下并排成对」第三判据，但实测截图右下角 HUD 固定
+  // 元素（无对话框时逐像素相同）会被误判为按钮对；对话按钮定位已改为
+  // 客户端探针直读（pq-harness-dialog.mjs probeDialogButton），此处仅保留
+  // 蓝底/浅底两条视觉通道作兜底。
   return blocks
     .filter(bk => bk.bottom - bk.top >= 8)
     .map(describeBlock)

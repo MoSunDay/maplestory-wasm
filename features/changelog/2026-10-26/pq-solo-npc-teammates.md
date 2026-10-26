@@ -2,8 +2,9 @@
 
 ## 背景
 
-本服 13 个组队任务（PQ）均要求 3-6 人组队才能进入，单人玩家无法体验
-副本内容。目标：单人报名时由 5 名 NPC 队友（特工 M/C/E/S/O，
+本服 13 个组队任务（PQ）中 11 个要求 3-6 人组队才能进入，单人玩家
+无法体验副本内容（例外：LudiMaze 与 BossRush 的 minPlayers=1，天然
+可单刷，不触发补位）。目标：单人报名时由 NPC 队友（特工 M/C/E/S/O，
 NPC ID 9000061-9000065）补位协同进行副本，包括跟随走位、平台站位、
 计数达标与协同攻击。
 
@@ -58,6 +59,15 @@ NPC 队友选型依据：有客户端与服务端 wz 造型（可正常渲染/�
 ## 验证
 
 - `posix-compile` 通过；`node tools/verify/pq-solo-server-contract.mjs`
-  PASS（结构契约，已登记 tools/verify/index.md）。
+  PASS（结构契约 + minPlayers 数值断言，已登记 tools/verify/index.md；
+  LudiMaze/BossRush 断言为 1，其余 11 个为 3-6）。
+- 浏览器 e2e 的补位证据口径为服务端 `[SoloPQ] ... spawned N NPC
+  teammates` 日志（N=minPlayers-1，与 `SoloPqTeammates` 展开规则
+  互证）；soloOptional 副本无此日志属预期。
 - 浏览器全链路见同日
   [fm-pq-teleport-and-solo-verification.md](fm-pq-teleport-and-solo-verification.md)。
+- e2e 收官状态 **13/13 终态 PASS**（OrbisPQ 最后通关；其招募 NPC
+  空间坐标缺陷与修复见上文的传送验证文档）。wz 数据修复落在
+  link_repos/MapleStory-Server（非 git 仓）：Ellin 300030100 NPC
+  挪地面、Pirate 251010404 fh 吸附、Orbis 200080101 life y/cy
+  -47/-41 → -50（cy 须不高于所在斜面 foothold 插值）。

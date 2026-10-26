@@ -235,6 +235,22 @@ export async function climbStairs(driver, pq, label, stops) {
   console.log(`INFO  ${label} 登顶 x=${p.x} y=${p.y}`);
 }
 
+// Orbis 200080101：地面 x=30 有直通 NPC 层的长绳（y2=172→y1=-39，WZ
+// ladderRope #2；绳底贴地面站立按住 ↑ 即挂绳）。分段爬到 y<-20 出绳，
+// 平台沿 fh13/14 右行到 NPC 198。
+export async function climbOrbisRope(driver, pq) {
+  await walkTowards(driver, 30, 40).catch(() => {});
+  let y = await probe(driver, 'msplayer_y');
+  for (let r = 0; r < 8 && y > -20; r += 1) {
+    await driver.keyHold('ArrowUp', 'ArrowUp', 38, 700);
+    await sleep(350);
+    y = await probe(driver, 'msplayer_y');
+    console.log(`INFO  Orbis 绳第 ${r + 1} 段 y=${y}`);
+  }
+  if (y > -20) throw new Error(`OrbisPQ: 绳索攀爬未到 NPC 层（y=${y}）`);
+  await walkTowards(driver, pq.npcX, 40).catch(() => {});
+}
+
 export const climbLudiStairs = (driver, pq) =>
   climbStairs(driver, pq, 'Ludi 楼梯', LUDI_STAIR_STOPS);
 // Henesys 出生点可能在左端 454 长步道（x[-128,848]）：skip 逻辑会因
@@ -306,10 +322,15 @@ export async function joinExpeditionPq(driver, pq, rows) {
     await openNpcAt(driver, pq.npcX, pq.npcY, `${pq.name} 招募 NPC ${pq.npcId}`);
     // 全量扫描：管理菜单上方的说明文字会形成假行带，stopAfterRows=4
     // 会恰好停在假行带上（同 fm-pq-solo-flow 招募菜单的经验）。
-    rows = await mapOptionRows(driver);
+    // 链接带实测在 y∈[230,290]，窄窗 step=5 扫 ~28 次即可，省出的时间
+    // 是 CWKPQ 三段链（爬升+创建+重开）能否挤进 115s 的关键。
+    rows = await mapOptionRows(driver, { fromY: 200, toY: 340, step: 5 });
+    if (rows.length === 0) rows = await mapOptionRows(driver);
     const managePrompt = await promptText(driver);
     console.log(`INFO  ${pq.name} 重开后 rows=${rows.length} prompt=${JSON.stringify(managePrompt.slice(0, 60))}`);
-    if (rows.length <= 2 && !managePrompt.includes('开始战斗'))
+    // msnpc_prompt 只返回首行，管理菜单首行「你想做什么？」即判据；
+    // 创建菜单首行是「你想组建一支队伍……」，可区分。
+    if (!managePrompt.startsWith('你想做什么') && !managePrompt.includes('开始战斗'))
       throw new Error(`创建远征后未见管理菜单（rows=${rows.length}，prompt=${JSON.stringify(managePrompt.slice(0, 80))}）`);
   }
   await clickOptionRow(driver, rows, 1, `${pq.name} 开始战斗`);
@@ -324,5 +345,5 @@ export async function joinExpeditionPq(driver, pq, rows) {
 // 各导航配方（const 箭头函数不提升，集中在文件末尾汇总导出，避免 TDZ）
 export const navRecipes = {
   climbCwkValley, climbLudiStairs, climbHenesysRoof, climbAmoriaSteps,
-  leapMagatiaShelf, rideLudiMazePortal, joinExpeditionPq,
+  climbOrbisRope, leapMagatiaShelf, rideLudiMazePortal, joinExpeditionPq,
 };
