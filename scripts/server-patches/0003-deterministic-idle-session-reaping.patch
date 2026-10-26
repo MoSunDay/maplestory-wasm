@@ -1,0 +1,56 @@
+# 服务端源码补丁：修复空闲会话收割失效（manageIdleSessions 无条件 clear）
+# 背景：MINA BOTH_IDLE(30s)（登录服 Server.java:1081 / 频道服 Channel.java:160）
+# 触发 sessionIdle → registerIdleSession 登记时间戳并下发 PING；看门狗
+# manageIdleSessions 每 10000ms（TimerManager.register）对登记满 15000ms 的
+# 连接调 MapleClient.testPing（lastPong 过期 → closeSession + loggedin 清零）。
+# 设计上无响应连接应在 ~45-75s（30s idle 登记 + ≥15s 阈值 + ≤10s tick）被关闭。
+# 缺陷：tick 末尾无条件 idleSessions.clear()，而登记仅发生在 30s 一次的 idle
+# 事件 → 条目在首个 tick（年龄 0-10s < 15s）即被未检测清除，testPing 对
+# idleSessions 永不生效；仅剩 registerIdleSession tryLock 失败落入
+# tempIdleSessions、经下个 tick 合并后才可能存活的侥幸路径（实测 2-3 分钟）。
+# 修复：迭代中"年龄 ≥15000ms → testPing 并移除；session 已断开 → 直接移除；
+# 未达阈值保留到下个 tick"；tempIdleSessions 合并逻辑不变。锁序（idleLock →
+# tempLock）与原实现一致，testPing 关闭路径不回取 idleLock，无新增死锁面。
+# 纵深防御：ws-proxy liveness 已上线；本补丁让服务端自身设计值确定性生效。
+# 详情：features/changelog/2026-10-26/deterministic-idle-session-reaping.md
+#
+# 应用（在 link_repos/MapleStory-Server 目录内）：
+#   patch -p1 < ../../../scripts/server-patches/0003-deterministic-idle-session-reaping.patch
+# 验证：
+#   javap -p -c -classpath dist net.MapleServerHandler | grep -A2 testPing   # 应见 Iterator.remove
+#   bash posix-compile.sh && bash scripts/game_server_restart.sh
+#   python3 裸 socket 连 127.0.0.1:8484 后不读写：t≈30s 收到 PING，t≈45-75s recv EOF
+#   node tools/verify/maplestory-webui/storage-flow.mjs                      # 回归 8 项
+--- a/src/net/MapleServerHandler.java
++++ b/src/net/MapleServerHandler.java
+@@ -25,6 +25,7 @@
+ import java.text.SimpleDateFormat;
+ import java.util.Calendar;
+ import java.util.HashMap;
++import java.util.Iterator;
+ import java.util.Map;
+ import java.util.Map.Entry;
+ import java.util.concurrent.ScheduledFuture;
+@@ -274,14 +275,19 @@
+         idleLock.lock();
+ 
+         try {
+-            for (Entry<MapleClient, Long> mc : idleSessions.entrySet()) {
++            Iterator<Entry<MapleClient, Long>> idleIterator = idleSessions.entrySet().iterator();
++
++            while (idleIterator.hasNext()) {
++                Entry<MapleClient, Long> mc = idleIterator.next();
++
+                 if (timeNow - mc.getValue() >= 15000) {
+                     mc.getKey().testPing(timeThen);
++                    idleIterator.remove();
++                } else if (mc.getKey().getSession() == null || !mc.getKey().getSession().isConnected()) {
++                    idleIterator.remove();
+                 }
+             }
+ 
+-            idleSessions.clear();
+-
+             if (!tempIdleSessions.isEmpty()) {
+                 tempLock.lock();
+ 
