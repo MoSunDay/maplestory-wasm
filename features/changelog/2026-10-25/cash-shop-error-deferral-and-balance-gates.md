@@ -1,5 +1,7 @@
 # 现金商城错误弹窗延迟化与余额就绪门禁
 
+> 后续演进：本文的余额推送计数与帧数看门狗已由 [现金商城结算存活、操作码关联与超时](cash-shop-settlement-followup.md) 中的 `steady_clock` 期限、操作码关联和重新进入状态取代；以下保留为当轮实现记录。
+
 ## 背景
 
 购买/转移路径上有三个相互独立的缺陷：
@@ -56,9 +58,9 @@
 - 同头文件新增 `bool pending_watch`（初值 false）与 `int pending_frames`
   （初值 0）；`set_pending()` 在设值的同时 arm/disarm 看门狗并清零计数。
 - `UICashShop.cpp::update()`：`pending_watch` 时逐帧自增，达到
-  `PENDING_TIMEOUT_FRAMES = 1800`（60fps 下约 30 秒，文件内匿名命名空间
-  常量）调用 `show_error("商城操作超时，请重试。")`，由既有的延迟弹窗在
-  下一帧显示，不递归、不引入定时器或线程。
+  `PENDING_TIMEOUT_FRAMES = 1800`（按引擎 8ms 更新步长约 14.4 秒；原文误写
+  为 60fps 下约 30 秒）调用 `show_error("商城操作超时，请重试。")`，由既有
+  的延迟弹窗在下一帧显示，不递归、不引入定时器或线程。
 - `UICashShop.cpp::button_pressed(BT_EXIT)`：直接置 `pending = true` 的
   分支同时 `pending_watch = false`、`pending_frames = 0`，退出不是交易，
   不参与超时，也不会因为退出时的 `showCash` 弹错误。

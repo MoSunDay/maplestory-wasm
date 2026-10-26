@@ -14,14 +14,15 @@
 //     （右列按非空槽顺序排列，取回的 4000001 前移行0）、左列行0 出现该物品（0x0D）；
 //     现金商城存档 → DB 断言：仓库 4000000 x3、背包归零。
 //  5. 再开仓：左列行0 仍可见（0x16）、右列仅剩取回物品。finally 恢复 SQL。
-// 前置：build/ 最新；java 服务端在跑且 configuration.ini 可读；杀浏览器后 ws-proxy
-// 会话残留数分钟，连续运行需间隔或 docker restart ms-ws-proxy。
+// 前置：build/ 最新；java 服务端在跑且 configuration.ini 可读；收尾为游戏内干净登出
+// （logout.mjs：PLAYER_DC+WS Close → 服务端清 loggedin），可背靠背连跑，无需重启 ws-proxy。
 // 运行：CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/storage-deposit-flow.mjs
 // 产物：/tmp/storage-deposit-flow（截图）；exit 0 仅当全部检查通过。
 
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { logoutToLogin, waitForAccountLoggedOut } from './logout.mjs';
 
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
 const debugPort = Number(process.env.STORAGE_DEPOSIT_DEBUG_PORT || 9333);
@@ -390,6 +391,23 @@ async function main() {
       fs.writeFileSync(`${artifactDir}/browser-errors.log`, `${driver.errors.join('\n')}\n`);
     }
     console.log(`INFO  产物目录 ${artifactDir}`);
+    // 干净登出（ESC 预选 Quit Game → Enter 发 PLAYER_DC+WS Close，见 logout.mjs 头注）
+    // 替代"杀浏览器+重启 ws-proxy"；失败仅告警，保底仍杀浏览器 + 恢复 SQL 置 loggedin=0。
+    try {
+      const logoutState = await logoutToLogin(driver, {
+        timeoutMs: 30000,
+        log: message => console.log(`INFO  [logout] ${message}`),
+      });
+      console.log(logoutState === uiState.login
+        ? `PASS  游戏内干净登出（msui_state=${logoutState}）`
+        : `WARN  登出后停在 msui_state=${logoutState}（已离开游戏态，WS 已关）`);
+      const freed = await waitForAccountLoggedOut(account, { timeoutMs: 15000, db });
+      console.log(freed.ok
+        ? `PASS  登出后 DB loggedin=0（耗时 ${(freed.waitedMs / 1000).toFixed(1)}s）`
+        : `WARN  登出后 15s 内 loggedin 未归零（last=${freed.lastValue}），下轮登录可能需重试`);
+    } catch (error) {
+      console.log(`WARN  干净登出失败：${error.message}（保底杀浏览器）`);
+    }
     await driver.stop();
     restoreDatabase(db, ids);
   }

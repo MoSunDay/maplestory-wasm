@@ -23,21 +23,16 @@ namespace jrc
     using cash_shop_draw::outline_rect;
     using cash_shop_draw::currency_label_position;
 
-    namespace
-    {
-        // ~30 s at 60 fps. Long enough for a slow purchase/transfer reply,
-        // short enough that a dropped reply cannot lock the shop forever.
-        constexpr int PENDING_TIMEOUT_FRAMES = 1800;
-    }
-
     UICashShop::UICashShop(std::shared_ptr<CashShopModel> value, bool is_female)
         : model(std::move(value)), female(is_female),
           right_pane(view::RightPane::LOCKER),
           currency(CashCurrency::NX_CREDIT), category(0),
           equip_sub(0), equip_menu_open(false), left_page(0),
-          right_page(0), pending(false), balance_requested(false),
-          pending_watch(false), pending_frames(0), balance_expected(1),
-          balance_received(0), preview_dirty(true), pending_cash_id(0),
+          right_page(0), pending_kind_(cash_shop_settlement::PendingKind::NONE),
+          balances_loaded_(false), balance_failed_(false),
+          require_reenter_(false), deferred_balance_error_(false),
+          balance_deadline_(), pending_deadline_(), preview_dirty(true),
+          pending_cash_id(0),
           last_cursor_position(),
           skin(cash_shop_skin::load_cash_shop_skin()),
           search(Text::A11M, Text::LEFT, Text::WHITE,
@@ -527,15 +522,38 @@ namespace jrc
             preview_dirty = false;
             refresh_preview();
         }
-        if (pending_watch && ++pending_frames >= PENDING_TIMEOUT_FRAMES)
-            show_error("商城操作超时，请重试。");
-        // One query at most, and not when the entry showCash already made us
-        // ready. The reply is a second expected push.
-        if (!balance_requested && !balances_ready())
+        const auto now = cash_shop_settlement::Clock::now();
+        // showCash pushes the balances exactly once, so arm the deadline the
+        // first time update() runs. A lost push must not lock the shop
+        // forever; it only shows a retry hint and keeps browsing alive.
+        if (!balances_loaded_ && !balance_failed_ && !balance_deadline_)
+            balance_deadline_ = now +
+                cash_shop_settlement::BALANCE_TIMEOUT +
+                cash_shop_settlement::SETTLE_GRACE;
+        if (balance_deadline_ && cash_shop_settlement::deadline_reached(
+                now, *balance_deadline_))
         {
-            balance_requested = true;
-            ++balance_expected;
-            CheckCashPacket().dispatch();
+            balance_deadline_.reset();
+            balance_failed_ = true;
+            deferred_balance_error_ = true;
+            deferred_error = "商城余额加载超时，请重试。";
+            refresh();
+        }
+        if (pending_deadline_ && cash_shop_settlement::deadline_reached(
+                now, *pending_deadline_))
+        {
+            const bool exiting =
+                pending_kind_ == cash_shop_settlement::PendingKind::EXIT;
+            clear_pending();
+            require_reenter_ = true;
+            // The exit path disabled the UI; a timed-out exit must hand it
+            // back or the frozen screen could never be left.
+            if (exiting)
+                UI::get().enable();
+            deferred_balance_error_ = false;
+            deferred_error = exiting ? "退出商城超时，请重试。" :
+                "商城操作超时，请重试。";
+            refresh();
         }
     }
 
@@ -617,24 +635,22 @@ namespace jrc
 
     void UICashShop::send_key(int32_t keycode, bool pressed, bool escape)
     {
-        if (pressed && escape && !pending)
+        if (pressed && escape && can_exit())
             button_pressed(BT_EXIT);
-        else if (pressed && keycode == KeyAction::RETURN &&
-            left_selection_visible() && !pending)
+        else if (pressed && keycode == KeyAction::RETURN && can_mutate() &&
+            left_selection_visible())
             request_purchase(*selected_left);
     }
 
     Button::State UICashShop::button_pressed(uint16_t id)
     {
-        if (pending)
+        if (is_pending())
             return Button::DISABLED;
         if (id == BT_EXIT)
         {
-            pending = true;
-            // Leaving is not a purchase/transfer: it is never timed out, and
-            // the showCash the server pushes with the exit is not an error.
-            pending_watch = false;
-            pending_frames = 0;
+            // Leaving is tracked as a pending operation so a lost SetField
+            // reply is recoverable, but its reply is not an error.
+            begin_pending(cash_shop_settlement::PendingKind::EXIT, 0);
             UI::get().disable();
             LeaveCashShopPacket().dispatch();
         }
@@ -644,9 +660,9 @@ namespace jrc
         }
         else if (id == BT_RESET) clear_tryon();
         else if (id == BT_SEARCH_CLEAR) clear_search();
-        else if (id == BT_BUY && left_selection_visible())
+        else if (id == BT_BUY && can_mutate() && left_selection_visible())
             request_purchase(*selected_left);
-        else if (id == BT_TRANSFER && selected_right)
+        else if (id == BT_TRANSFER && can_mutate() && selected_right)
             request_transfer(*selected_right);
         else if (id >= BT_TAB_FIRST && id < BT_TAB_LAST)
         {

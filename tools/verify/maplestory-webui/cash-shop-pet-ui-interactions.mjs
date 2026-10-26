@@ -1,5 +1,6 @@
 // 商城「宠物分类 + 宠物自动补给面板」UI 交互专项浏览器验收。
-// 覆盖：宠物分类过滤计数(自 CSV 推算)与翻页连点边界；装备子菜单(武器)交叉切换不泄漏
+// 覆盖：宠物分类过滤计数(自 CSV 推算)与翻页连点边界；背靠背翻页连点后加载层/
+// 余额态不残留；装备子菜单(武器)交叉切换不泄漏
 // equip_sub；「全部」含宠物(>1500)；宠物卡不进试穿集合；SN 搜索 + 购买确认
 // Escape 取消不落账；UIPetOptions CANCEL 不落盘 / OK 保存阈值 30/40 / reload
 // 后 localStorage 持久化 / HP 药水槽箭头切换候选 / 收尾复位 50/50；召唤态掩码 31。
@@ -120,6 +121,7 @@ async function loginAndEnterGame(driver, probes) {
   await requireState('WASM module initialized', () => driver.evaluate(
     "typeof Module !== 'undefined' && Module.calledRun === true && typeof Module.ccall === 'function'"), 90);
   await requireState('login UI active', uiStateIs(driver, probes, uiState.login), 30);
+  await requireState('login assets ready', assetsIdle(driver, probes), 60);
   let advanced = false;
   for (let attempt = 0; attempt < 4 && !advanced; attempt += 1) {
     await driver.clickField(340, 260);
@@ -203,6 +205,26 @@ async function catalogStable(cash, label) {
     pending: await cash('mscashshop_pending'), notice: await cash('msui_notice_active') };
   report(state.filtered === PET_COMMODITIES && state.pending === 0 && state.notice === 0,
     `${label}: filtered=${state.filtered} pending=${state.pending} notice=${state.notice}`);
+}
+// 连点回归：两次翻页点击背靠背发出，中间不 sleep、不等资源层。结算后不允许残留
+// 加载遮罩、失败余额态或未清空的 pending/notice。落点页码不校验（连点会被钳制/合并）。
+async function verifyRapidClicks(driver, probes, cash) {
+  await clickPt(driver, pager.next);
+  await clickPt(driver, pager.prev);
+  await requireState('rapid pager clicks settle', async () =>
+    await cash('mscashshop_pending') === 0 && await cash('msui_notice_active') === 0, 30);
+  await requireState('rapid clicks assets ready', assetsIdle(driver, probes), 45);
+  const state = { blocking: await probes.assetBlocking(),
+    balanceFailed: await cash('mscashshop_balance_failed'),
+    balancesReady: await cash('mscashshop_balances_ready'),
+    pending: await cash('mscashshop_pending'), notice: await cash('msui_notice_active') };
+  report(state.blocking === 0, `rapid clicks leave no asset blocking layer (blocking=${state.blocking})`);
+  report(state.balanceFailed === 0, `rapid clicks keep balance live (balance_failed=${state.balanceFailed})`);
+  report(state.balancesReady === 1, `balance refresh completes after rapid clicks (balances_ready=${state.balancesReady})`);
+  report(state.pending === 0 && state.notice === 0,
+    `rapid clicks settle (pending=${state.pending} notice=${state.notice})`);
+  await driver.screenshot('02b-rapid-clicks');
+  markPhase('连点/加载层');
 }
 async function verifyPagination(driver, probes, cash) {
   for (let i = 0; i < 5; i += 1) {  // 12 件/页，连点越界只应被钳制
@@ -395,6 +417,7 @@ async function main() {
     await loginAndEnterGame(driver, probes);
     await enterCashShop(driver, probes);
     await verifyPetCategory(driver, probes, cash);
+    await verifyRapidClicks(driver, probes, cash);
     await verifyPagination(driver, probes, cash);
     await verifyEquipCrossSwitch(driver, probes, cash);
     await verifyAllIncludesPets(driver, probes, cash);

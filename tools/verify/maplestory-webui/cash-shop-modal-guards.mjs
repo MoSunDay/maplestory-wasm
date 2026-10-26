@@ -101,6 +101,7 @@ async function loginAndEnterGame(driver, probes) {
   await requireState('WASM module initialized', () => driver.evaluate(
     "typeof Module !== 'undefined' && Module.calledRun === true && typeof Module.ccall === 'function'"), 90);
   await requireState('login UI active', uiStateIs(driver, probes, uiState.login), 30);
+  await requireState('login assets ready', assetsIdle(driver, probes), 60);
   let advanced = false;
   for (let attempt = 0; attempt < 4 && !advanced; attempt += 1) {
     await driver.clickField(340, 260); await driver.typeAscii(account);

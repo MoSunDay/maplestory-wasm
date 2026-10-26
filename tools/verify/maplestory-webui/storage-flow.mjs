@@ -14,14 +14,16 @@
 //   update accounts set loggedin=0 where name='test2';
 //   update characters set map=130000200, spawnpoint=0 where id=219;
 //   test2 的 card0 是 test2ILA（character id=219, level 200 满足储物等级门槛）。
-//   注意：上一次测试杀浏览器后 ws-proxy 会话残留约 2-3 分钟，连续运行需间隔
-//   或先重启 ws-proxy，否则登录会卡在 world-select（账号仍被占用）。
+//   注意：收尾已改为游戏内干净登出（logout.mjs：ESC 预选 Quit Game → Enter 发
+//   PLAYER_DC+WS Close），服务端 sessionClosed 即清 loggedin，可背靠背连跑，
+//   无需再等 2-3 分钟或重启 ws-proxy。
 // 运行：
 //   STORAGE_ACCOUNT=test2 STORAGE_PASSWORD=test2 STORAGE_CARD=0 \
 //   CHROME_BIN=/usr/bin/chromium-browser \
 //   node tools/verify/maplestory-webui/storage-flow.mjs
 
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { logoutToLogin, waitForAccountLoggedOut } from './logout.mjs';
 
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
 const debugPort = Number(process.env.STORAGE_DEBUG_PORT || 9296);
@@ -210,6 +212,23 @@ try {
   failed = true;
   console.log(`FAIL  ${error.message}`);
 } finally {
+  // 干净登出（ESC 预选 Quit Game → Enter 发 PLAYER_DC+WS Close，见 logout.mjs 头注）
+  // 替代"杀浏览器+等 ws-proxy 残留 2-3 分钟"；失败仅告警，保底仍杀浏览器。
+  try {
+    const logoutState = await logoutToLogin(driver, {
+      timeoutMs: 30000,
+      log: message => console.log(`INFO  [logout] ${message}`),
+    });
+    console.log(logoutState === uiState.login
+      ? `PASS  游戏内干净登出（msui_state=${logoutState}）`
+      : `WARN  登出后停在 msui_state=${logoutState}（已离开游戏态，WS 已关）`);
+    const freed = await waitForAccountLoggedOut(account, { timeoutMs: 15000 });
+    console.log(freed.ok
+      ? `PASS  登出后 DB loggedin=0（耗时 ${(freed.waitedMs / 1000).toFixed(1)}s）`
+      : `WARN  登出后 15s 内 loggedin 未归零（last=${freed.lastValue}），下轮登录可能需重试`);
+  } catch (error) {
+    console.log(`WARN  干净登出失败：${error.message}（保底杀浏览器）`);
+  }
   await driver.stop();
 }
 console.log(failed ? 'FAILED' : 'ALL CHECKS PASSED');

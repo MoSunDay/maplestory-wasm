@@ -103,6 +103,7 @@ async function loginAndEnterGame(driver, probes) {
   await requireState('WASM module initialized', () => driver.evaluate(
     "typeof Module !== 'undefined' && Module.calledRun === true && typeof Module.ccall === 'function'"), 90);
   await requireState('login UI active', uiStateIs(driver, probes, uiState.login), 30);
+  await requireState('login assets ready', assetsIdle(driver, probes), 60);
   let advanced = false;
   for (let attempt = 0; attempt < 4 && !advanced; attempt += 1) {
     await driver.clickField(340, 260);
@@ -209,24 +210,32 @@ async function buyPet(driver, probes, cash, initial) {
 async function takePet(driver, probes, cash, initial) {
   const row = await cash('mscashshop_selected_right_row');
   report(row >= 0, `purchased pet selected in locker (row=${row})`);
+  // 先记下仓库里那件宠物的 cash id：取出后按 cash id 查现金栏槽位，
+  // 避免按 itemId 首匹配命中身上已召唤过的另一只同名宠物。
+  const cashId = await cash('mscashshop_selected_right_cash_id');
+  if (!Number.isInteger(cashId) || cashId <= 0)
+    throw new Error(`selected locker pet has no cash id (cash_id=${cashId}); ` +
+      'WASM 可能仍是旧构建，等 mscashshop_selected_right_cash_id 探针就绪后重试');
+  report(true, `selected locker pet cash id ${cashId}`);
   const slot = lockerSlot(row);
   await driver.doubleClick(slot.x, slot.y);
   await requireState('double-click takes pet exactly once', async () =>
     await cash('mscashshop_pending') === 0 &&
     await cash('mscashshop_locker_count') === initial.locker &&
     await cash('mscashshop_inventory_count') === initial.inventory + 1, 30);
-  const cashSlot = await probes.inventorySlot(PET_ITEM);
-  report(cashSlot >= 1 && cashSlot <= 24, `pet reached character cash inventory (slot=${cashSlot})`);
+  const cashSlot = await probes.inventoryCashSlot(cashId);
+  report(cashSlot >= 1 && cashSlot <= 24,
+    `pet (cash id ${cashId}) reached character cash inventory (slot=${cashSlot})`);
   await driver.screenshot('05-pet-taken');
   markPhase('取出');
+  return cashSlot;
 }
 
 // ---- 召唤（pet-automation ensurePetSummoned 序列） ----
-async function summonPet(driver, probes) {
+async function summonPet(driver, probes, cashSlot) {
+  if (!Number.isInteger(cashSlot) || cashSlot < 1 || cashSlot > 24)
+    throw new Error(`pet unavailable in visible cash inventory: slot=${cashSlot}`);
   if (await probes.petActive() !== 1) {
-    const cashSlot = await probes.inventorySlot(PET_ITEM);
-    if (cashSlot < 1 || cashSlot > 24)
-      throw new Error(`pet unavailable in visible cash inventory: slot=${cashSlot}`);
     if (await probes.itemInventoryActive() !== 1) {
       await driver.click(711, 574);
       await sleep(400);
@@ -403,13 +412,13 @@ async function main() {
       inventory: await cash('mscashshop_inventory_count'), nx: await cash('mscashshop_nx_credit') };
     report(initial.nx === 100000, `initial NX credit is ${initial.nx}`);
     await buyPet(driver, probes, cash, initial);
-    await takePet(driver, probes, cash, initial);
+    const petCashSlot = await takePet(driver, probes, cash, initial);
     await driver.key('Escape', 'Escape', 27);
     await requireState('cash shop exits back to game', uiStateIs(driver, probes, uiState.game), 30);
     await requireState('returned map assets ready', assetsIdle(driver, probes), 60);
     await requireState('game UI enabled', async () => await cash('msui_enabled') === 1, 60);
     report(await probes.mapId() === HUNT_MAP, `hunting map is ${await probes.mapId()}`);
-    await summonPet(driver, probes);
+    await summonPet(driver, probes, petCashSlot);
     await verifyPickup(driver, probes);
     await verifyAutoPotion(driver, probes, prep.db, prep.characterId);
     for (const phase of phases) console.log(`PASS  cash-shop pet flow: ${phase}`);
