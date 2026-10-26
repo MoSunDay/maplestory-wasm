@@ -1,0 +1,135 @@
+## CMake file for the JourneyClient from-scratch Maplestory client ##
+cmake_minimum_required (VERSION 3.8)
+project (JourneyClient)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(DEBUG_SYMBOLS "Enable debug symbols (-g)" OFF)
+option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+option(ERROR_ON_UNUSED_VARIABLES "Fail the build on unused variable warnings" ON)
+option(ENFORCE_UNUSED_INCLUDES "Run include-what-you-use to catch unused includes" ON)
+
+if(EMSCRIPTEN)
+    add_compile_definitions(MS_PLATFORM_WASM=1)
+    add_compile_options("-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=/")
+    add_compile_options(
+        --use-port=freetype
+        -Wno-c++11-narrowing
+        -Wno-deprecated-declarations
+        -fexceptions
+    )
+    # Emscripten -s flags are linker settings; passing them at compile time emits warnings.
+    add_link_options(
+        -sUSE_GLFW=3 
+        -sUSE_WEBGL2=1 
+        -sFULL_ES3=1
+        -sWASM=1 
+        -sALLOW_MEMORY_GROWTH=1
+        -sFORCE_FILESYSTEM=1
+        -fexceptions
+        -sUSE_ZLIB=1
+        --use-port=freetype
+        -lwebsocket.js 
+        -sASYNCIFY=1
+        -sASYNCIFY_IMPORTS=['emscripten_asm_const_int','emscripten_asm_const_double','emscripten_sleep']
+        -sASYNCIFY_STACK_SIZE=16777216
+        -sSTACK_SIZE=16777216
+        -sINITIAL_MEMORY=268435456  
+        -sEXPORTED_RUNTIME_METHODS=FS,ccall,cwrap,setCanvasSize
+        -sEXPORTED_FUNCTIONS=_main,_msime_input,_msime_key,_msime_field_focused,_msui_state,_msui_enabled,_mscharlist_phase,_mscharlist_character_index,_mscharlist_equip_id,_mscharlist_remaining_bytes,_mscharlist_preview_ready,_mscharlist_preview_total,_msui_login_notice_active,_msui_login_notice_message,_msui_character_creation_customizing,_msui_notice_active,_msworldselect_enter,_msmap_retry,_msstage_loading,_msasset_blocking,_msattack_stance,_msattack_frame,_msattack_afterimage_presented,_mscashshop_locker_count,_mscashshop_inventory_count,_mscashshop_nx_credit,_mscashshop_selected_right_row,_mscashshop_pending,_msplayer_id,_msplayer_level,_msbuddy_count,_msbuddy_window_active,_msbuddy_window_x,_msbuddy_window_y,_msbuddy_online_count,_msbuddy_pending_id,_msbuddy_contains,_msbuddy_message_count,_msparty_id,_msparty_leader_id,_msparty_member_count,_msparty_pending_id,_msparty_has_member,_msparty_member_hp,_msparty_message_count,_msmap_id,_msplayer_x,_msplayer_y,_msplayer_screen_x,_msplayer_screen_y,_msplayer_hp,_msplayer_max_hp,_msplayer_mp,_msplayer_max_mp,_msplayer_meso,_msother_character_count,_mschar_visible,_mschar_x,_mschar_y,_mschar_screen_x,_mschar_screen_y,_msmob_count,_msnearest_mob_x,_msnearest_mob_y,_msdrop_count,_msdrop_has,_mspet_active,_mspet_item_id,_mspet_capability_mask,_mspet_x,_mspet_y,_mspet_stance,_mspet_foothold_id,_mspet_onground,_mspet_move_intent,_mspet_horizontal_collision,_mspet_jump_trigger_count,_mspet_has_loot_target,_mspet_loot_target_oid,_mspet_last_warp_distance,_mspet_confirmed_pickups,_mspet_auto_hp_item,_mspet_auto_mp_item,_mspet_auto_hp_threshold,_mspet_auto_mp_threshold,_mspet_options_active,_mspet_options_hp_item,_mspet_options_mp_item,_mspet_options_menu_x,_mspet_options_menu_y,_msuserinfo_active,_msuserinfo_target_id,_msuserinfo_loaded,_msuserinfo_pet_count,_msuserinfo_pet_expanded,_msuserinfo_x,_msuserinfo_y,_msuserinfo_width,_msuserinfo_height,_msplayer_context_active,_msitems_menu_x,_msitems_menu_y,_msshop_active,_msshop_buy_item,_msshop_buy_x,_msshop_buy_y,_msshop_sell_item,_msshop_sell_x,_msshop_sell_y,_msshop_selected,_msshop_button_x,_msshop_button_y,_msinventory_quantity,_msinventory_slot,_msinventory_equipped,_msinventory_equipped_marker,_msiteminventory_active,_msiteminventory_x,_msiteminventory_y,_msiteminventory_tab,_msiteminventory_first_slot,_msiteminventory_last_slot,_msiteminventory_slot_at,_msiteminventory_icon_item_id,_msiteminventory_tab_x,_msiteminventory_tab_y,_msnpc_active,_msnpc_prompt,_msfield_clock_seconds,_msfield_clock_active,_msfield_object_active,_msframe_avg_us,_msui_resolution_width,_msui_resolution_height,_msgame_options_active,_msgame_options_index,_msgame_options_next_x,_msgame_options_next_y,_msgame_options_ok_x,_msgame_options_ok_y,_msgame_options_menu_x,_msgame_options_menu_y,_msquickslot_skill,_msquickslot_item,_msquickslot_center_x,_msquickslot_center_y,_msquickslot_panel_left,_msquickslot_panel_top,_msquickslot_panel_right,_msquickslot_panel_bottom,_msquickslot_cooldown,_msquickslot_cooldown_label,_msquickslot_hovered,_msstatusbar_hit,_msstatusbar_stat_label,_msstatusbar_button_at,_msstatusbar_press_count,_msstatusbar_last_button,_msstatusbar_cursor_x,_msstatusbar_cursor_y,_msstatusbar_rightclick_index,_msstatusbar_control_bounds,_msui_front_at,_msui_cursor_x,_msui_cursor_y,_msskillbook_exists,_msskillbook_selected,_msskillbook_active,_msui_questlog_active,_msui_progressbanner_active,_msui_questlog_rows,_msdrop_nearest_x,_msdrop_nearest_y
+        "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial.ttf@fonts/Arial/Arial.ttf"
+        "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/Arial/Arial-Bold.ttf@fonts/Arial/Arial-Bold.ttf"
+        "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/fonts/DroidSansFallback/DroidSansFallbackFull.ttf@fonts/DroidSansFallback/DroidSansFallbackFull.ttf"
+        "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/data/cash-shop-v83.csv@data/cash-shop-v83.csv"
+        "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs_connection.js"
+        "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs.js"
+    )
+
+    # Emscripten runtime assertions add per-call overhead and extra JS glue;
+    # keep them for debug builds only.
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_link_options(-sASSERTIONS=1)
+    endif()
+
+    # Link-time optimization lets the wasm optimizer see across translation
+    # units (inlining + dead-code elimination on top of -O3).
+    option(WASM_LTO "Enable link-time optimization for the WASM build" ON)
+    if(WASM_LTO)
+        add_compile_options(-flto)
+        add_link_options(-flto)
+    endif()
+    
+    if(DEBUG_SYMBOLS)
+        add_compile_options(-g)
+        add_link_options(-g3 -gsource-map)
+    endif()
+else()
+    # Native Linux flags
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O -g -DASIO_STANDALONE -DGLEW_NO_GLU -lglut -lGL -ldl -lXinerama -lXext -lXrandr -lXi -lXcursor -lX11 -lXxf86vm -pthread -ftrapv -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Werror-implicit-function-declaration -Wformat=2 -Wnull-dereference -Wstrict-overflow=5 -Wno-unused-private-field -Wno-unused-command-line-argument -Wno-narrowing -Wno-sign-compare")
+endif()
+
+file(GLOB_RECURSE SOURCES
+    "Audio/*.cpp" "Audio/*.c"
+    "Character/*.cpp" "Character/*.c"
+    "Data/*.cpp" "Data/*.c"
+    "Gameplay/*.cpp" "Gameplay/*.c"
+    "Graphics/*.cpp" "Graphics/*.c"
+    "IO/*.cpp" "IO/*.c"
+    "LazyFS/*.cpp" "LazyFS/*.c"
+    "Net/*.cpp" "Net/*.c"
+    "Template/*.cpp" "Template/*.c"
+    "Util/*.cpp" "Util/*.c"
+)
+
+list(APPEND SOURCES
+    "Configuration.cpp"
+    "Journey.cpp"
+    "includes/lz4.c"
+    "includes/stb/stb_vorbis.c"
+    "../nlnx/bitmap.cpp"
+    "../nlnx/node.cpp"
+    "../nlnx/audio.cpp"
+    "../nlnx/file.cpp"
+    "../nlnx/nx.cpp"
+)
+
+add_executable(JourneyClient ${SOURCES})
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    if(WARNINGS_AS_ERRORS)
+        target_compile_options(JourneyClient PRIVATE
+            $<$<COMPILE_LANGUAGE:C>:-Werror>
+            $<$<COMPILE_LANGUAGE:CXX>:-Werror>
+        )
+    endif()
+
+    if(ERROR_ON_UNUSED_VARIABLES)
+        target_compile_options(JourneyClient PRIVATE
+            $<$<COMPILE_LANGUAGE:C>:-Werror=unused-variable>
+            $<$<COMPILE_LANGUAGE:CXX>:-Werror=unused-variable>
+            $<$<COMPILE_LANGUAGE:C>:-Werror=unused-but-set-variable>
+            $<$<COMPILE_LANGUAGE:CXX>:-Werror=unused-but-set-variable>
+            $<$<COMPILE_LANGUAGE:CXX>:-Werror=unused-const-variable>
+        )
+    endif()
+endif()
+
+if(ENFORCE_UNUSED_INCLUDES)
+    find_program(IWYU_EXECUTABLE NAMES include-what-you-use iwyu)
+    if(IWYU_EXECUTABLE)
+        set_target_properties(JourneyClient PROPERTIES
+            CXX_INCLUDE_WHAT_YOU_USE "${IWYU_EXECUTABLE};-Xiwyu;--error=1"
+        )
+    else()
+        message(STATUS "ENFORCE_UNUSED_INCLUDES is ON, but include-what-you-use is not installed. Unused include checks are skipped.")
+    endif()
+endif()
+
+# Include directories
+include_directories(".")
+include_directories("..")
+include_directories("../nlnx")
+include_directories("includes")
+include_directories("includes/stb")
+include_directories("includes/GL")
