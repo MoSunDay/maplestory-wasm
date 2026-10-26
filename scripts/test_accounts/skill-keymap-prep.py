@@ -247,12 +247,14 @@ def topup_ammo(cfg, roster):
             if not rows:
                 continue
             cid, accountid = int(rows[0][0]), int(rows[0][1])
-            upd = mysql_rows(
-                cfg,
-                "UPDATE inventoryitems SET quantity=%d WHERE characterid=%d"
-                " AND itemid=%d; SELECT ROW_COUNT();" % (quantity, cid, itemid))
+            # stars/bullets are unmergeable: each stack is its own row, so a
+            # naive INSERT-per-run proliferates stacks. Keep exactly ONE stack
+            # per ammo id: refill the first, drop the surplus.
+            stacks = mysql_rows(
+                cfg, "SELECT position FROM inventoryitems WHERE characterid=%d"
+                " AND itemid=%d ORDER BY position;" % (cid, itemid))
             action = "refilled"
-            if not upd or int(upd[0][0]) == 0:
+            if not stacks:
                 nxt = mysql_rows(
                     cfg, "SELECT IFNULL(MAX(position),0)+1 FROM inventoryitems"
                     " WHERE characterid=%d AND inventorytype=2;" % cid)
@@ -264,6 +266,17 @@ def topup_ammo(cfg, roster):
                     " (1, %d, %d, %d, 2, %d, %d, '', -1, 0, -1, '');"
                     % (cid, accountid, itemid, int(nxt[0][0]), quantity))
                 action = "inserted"
+            else:
+                mysql_run(
+                    cfg, "UPDATE inventoryitems SET quantity=%d WHERE"
+                    " characterid=%d AND itemid=%d AND position=%d;"
+                    % (quantity, cid, itemid, int(stacks[0][0])))
+                if len(stacks) > 1:
+                    mysql_run(
+                        cfg, "DELETE FROM inventoryitems WHERE characterid=%d"
+                        " AND itemid=%d AND position != %d;"
+                        % (cid, itemid, int(stacks[0][0])))
+                    action += ",%d dup stacks removed" % (len(stacks) - 1)
             healed.append("%s %dx%d(%s)" % (character["name"], itemid, quantity, action))
     print("ammo top-up: %s" % ("; ".join(healed) if healed else "no ammo chars"))
 

@@ -36,3 +36,7 @@
 - 服务端日志见 `CloseRangeDamageHandler` 抛 `IndexOutOfBoundsException: Index -1, length 30`（两次），与本次 NL 问题无关，待单独排查。
 - Hero 斧系 2 fail 与 Pala 旧 visual 2 fail 仍为已知基线，建议后续：manifest 给斧系变体加 skip 标注或配斧；Pala visual 待空闲窗口刷新。
 - 若并发流程再次压低等级，Subi 备用星标兜底；收尾自愈会在下一轮 phase 前恢复 200。
+
+## 追记：飞标堆去重（幂等修正）
+
+首版 `--topup-ammo` 缺行即 INSERT——但**飞标/子弹不可叠加合并，每一堆是独立物品行**，每轮跑都新增一堆（3 轮后 NL 出现 2×2070018 + 3×2070000）。修正为「每种弹药恰好一堆」：补满 position 最小的一堆，删除同 itemid 多余堆。连续两轮管线输出全部 `refilled`（无 inserted / 无 dup removed），幂等成立；CS 的子弹重复堆同步清理。
