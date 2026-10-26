@@ -98,6 +98,8 @@ export class BrowserDriver {
     if (!this.socket) throw new Error('Chromium DevTools endpoint did not start');
 
     this.socket.addEventListener('message', event => this.onMessage(JSON.parse(event.data)));
+    this.socket.addEventListener('close', () => this.rejectPending('[cdp] socket closed'));
+    this.socket.addEventListener('error', () => this.rejectPending('[cdp] socket closed'));
     if (this.socket.readyState !== WebSocket.OPEN) {
       await new Promise((resolve, reject) => {
         this.socket.addEventListener('open', resolve, { once: true });
@@ -149,9 +151,33 @@ export class BrowserDriver {
   send(method, params = {}) {
     return new Promise((resolve, reject) => {
       const id = ++this.nextId;
-      this.pending.set(id, { resolve, reject });
-      this.socket.send(JSON.stringify({ id, method, params }));
+      // 共享环境：ws-proxy 被外部重建或页面主线程卡死时，CDP 回包可能永远
+      // 不来（此前会让流程无限挂起）。给每条命令加硬超时，让上层能用
+      // /timed out|socket closed/ 识别会话死亡并重启浏览器后重试。
+      const timer = setTimeout(() => {
+        if (this.pending.delete(id)) {
+          this.dead = true;
+          reject(new Error(`[cdp] command timed out: ${method}`));
+        }
+      }, 45000);
+      this.pending.set(id, {
+        resolve: value => { clearTimeout(timer); resolve(value); },
+        reject: error => { clearTimeout(timer); reject(error); },
+      });
+      try {
+        this.socket.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        this.dead = true;
+        reject(new Error(`[cdp] socket closed: ${method}`));
+      }
     });
+  }
+
+  rejectPending(reason) {
+    for (const callback of this.pending.values()) callback.reject(new Error(reason));
+    this.pending.clear();
   }
 
   async evaluate(expression) {
@@ -199,6 +225,24 @@ export class BrowserDriver {
     await this.send('Input.dispatchMouseEvent', {
       type: 'mouseReleased', x: point.x, y: point.y, button: 'left',
       buttons: 0, clickCount: 1
+    });
+  }
+
+  // Hover-only dispatch (no press): UINpcTalk option rows recolor the row
+  // under the cursor on mousemove alone, and the verify flows detect those
+  // hover repaints through the in-page WebGL sampler. Uses the same
+  // game-coords -> canvas mapping as click().
+  async move(gameX, gameY) {
+    const point = await this.evaluate(`(() => {
+      const canvas = document.getElementById('canvas');
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        x: bounds.left + ${gameX} * bounds.width / canvas.width,
+        y: bounds.top + ${gameY} * bounds.height / canvas.height
+      };
+    })()`);
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', x: point.x, y: point.y, button: 'none'
     });
   }
 
@@ -335,10 +379,13 @@ export class BrowserDriver {
     return await predicate();
   }
 
-  async typeAscii(value) {
+  async typeAscii(value, charDelayMs = 40) {
+    // 逐字符输入之间留出间隙：共享环境下连续无间隔的 key 分发会被繁忙的
+    // 渲染进程随机丢弃（实测登录密码少字符 → 服务端回 WRONG_PASSWORD）。
     for (const character of value) {
       const upper = character.toUpperCase();
       await this.key(character, `Key${upper}`, upper.charCodeAt(0), character);
+      if (charDelayMs > 0) await sleep(charDelayMs);
     }
   }
 
@@ -403,6 +450,12 @@ export class BrowserDriver {
   async screenshot(name) {
     const result = await this.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(path.join(this.artifactDir, `${name}.png`), Buffer.from(result.data, 'base64'));
+  }
+
+  // 截图原始 PNG（供 png-probe 视觉分析，不落盘）
+  async capture() {
+    const result = await this.send('Page.captureScreenshot', { format: 'png' });
+    return Buffer.from(result.data, 'base64');
   }
 
   async startScreencast(prefix) {

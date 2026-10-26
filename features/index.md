@@ -32,6 +32,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **[角色自然恢复](character-recovery/)**: 按 v83 站立、攀爬、技能、地图倍率和椅子规则恢复 HP/MP，并与 linked server 的恢复校验及椅子状态同步
 - **传送门**: 地图间瞬移
 - **NPC 交互**: 对话、商店、仓库等
+- **[自由市场地图名恢复](changelog/2026-10-26/fm-map-name-restore.md)**: 910000000 街道名/地图名恢复原版「自由市场/自由市场入口」，注入管线加覆盖防回归，小地图实显取证通过
 - **[自由市场玩法向导 NPC](changelog/2026-10-25/fm-gameplay-guide-npcs.md)**: 910000000 内的 PQ 招募/BOSS 入口向导（9010000/9010005），一键传送到 13 个组队任务招募点与 12 个 BOSS 入口，危险地图先二次确认
 - **[自由市场科皮药水价格](changelog/2026-10-25/fm-kopee-potion-prices.md)**: 超级药水 5 万、特殊药水 2 万（shopid 1339 shopitems，重启生效）
 - **[场景机关/进度横幅/BGM 切换](changelog/2026-10-25/field-obstacles-progress-banner.md)**: 服务端可开/关/批量/重置具名地图机关对象（OrbisPQ 陷阱、CWKPQ 石阵等），下发 PQ 进度横幅并运行时切换 BGM
@@ -83,6 +84,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 - **[好友与组队](social/)**: 独立好友窗口、好友请求/接受/拒绝/删除、上下线同步与好友聊天；队伍创建、邀请、拒绝、加入、成员/HP 同步、队聊、转让队长、踢人、退出与解散
 - **聊天系统**: 全局、私聊、频道消息，以及好友/队伍目标聊天
+- **[组队任务与单人模式](changelog/2026-10-26/pq-solo-npc-teammates.md)**: 自由市场玩法向导可传送 13 个组队任务（废弃小组/露台迷宫/天空/海盗/月妙/艾琳/玛加提亚A·Z/结婚/CWK/宝物/BOSS冲锋，13/13 传送验证通过）；无队伍时 NPC 队友（特工小队）补位协同进行副本——跟随走位、平台站位计数、协同攻击，全 13 本单人进图流程 PASS（[验证记录](changelog/2026-10-26/fm-pq-teleport-and-solo-verification.md)）
 
 相关模块: [UI 系统](../agents/client/IO/index.md), [网络层](../agents/client/Net/index.md)
 

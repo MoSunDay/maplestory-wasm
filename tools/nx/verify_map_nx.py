@@ -311,7 +311,11 @@ def check_string_nx(sx, map079, base):
             if not check(got == want, 'etc/%d %s: %r != %r' % (mapid, field, got, want)):
                 bad += 1
     print('  Map.img/etc/910000000..022 names: %d/23 entries match' % (23 - bad))
-    compare_children(sx, 0, base['string_root'], 'String.nx root', skip=('Map.img',))
+    # Skill.img is owned by the wide-attack String injections (another
+    # pipeline mutates it after this baseline was recorded), so it is not
+    # part of the FM name checks either.
+    compare_children(sx, 0, base['string_root'], 'String.nx root',
+                     skip=('Map.img', 'Skill.img'))
     compare_children(sx, require_path(sx, [b'Map.img']), base['string_Mapimg'],
                      'String.nx Map.img', skip=('etc',))
     compare_children(sx, etc, base['string_etc'], 'String.nx Map.img/etc',

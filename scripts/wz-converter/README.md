@@ -55,7 +55,10 @@ python3 tools/nx/verify_npc_nx.py --npc-id 9270052
 - `Map.nx`：`Obj/chewchewIsland.img`、`Back/chewchewIsland.img` 两个物件/背景库，
   以及整棵替换的 `Map/Map9/910000000.img`（v83 子树留作不可达孤儿节点）；
 - `String.nx`：`Map.img/etc/910000000` 与 `910000001..022` 的 streetName/mapName
-  079 原文地图名（910000023/024 无 079 数据，未动）。
+  079 原文地图名（910000023/024 无 079 数据，未动）。例外：`910000000`
+  保持 `自由市场/自由市场入口`（079 树的品牌名 `怀旧岛079MAX4年度版/
+  主城区域` 不再回灌，见 `inject_map_nx.py` 的 `FM_NAME_OVERRIDES` 与
+  2026-10-21 地图名回退记录）。
 
 若重跑本管线并把 `nxFiles/*.nx` 拷回 `assets/`，必须随后重新注入并校验：
 

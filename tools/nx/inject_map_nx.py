@@ -43,6 +43,10 @@ from merge_skill_nx import build, intern, parse_nx  # noqa: E402
 
 FM_IDS = tuple(range(910000000, 910000023))
 NAME_FIELDS = ('streetName', 'mapName')
+# The 079 tree brands 910000000 as the server name (怀旧岛079MAX4年度版/
+# 主城区域); the hub keeps the Free Market name restored in the
+# 2026-10-21 follow-up instead of re-importing the brand.
+FM_NAME_OVERRIDES = {910000000: ('自由市场', '自由市场入口')}
 
 
 def fail(msg):
@@ -128,7 +132,7 @@ def map079_names(map079_dir):
     missing = [i for i in FM_IDS if i not in names]
     if missing:
         fail('Map.json: no 079 names for %s' % missing)
-    return names
+    return {**names, **FM_NAME_OVERRIDES}
 
 
 # --------------------------------------------------------------------- main

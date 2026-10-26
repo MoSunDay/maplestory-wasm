@@ -118,7 +118,7 @@ PET_FLOW_ACCOUNT=test1 PET_FLOW_PASSWORD=test1 PET_FLOW_CARD=0 CHROME_BIN=/usr/b
 
 ## 现金商城宠物 UI 交互缺陷猎手流程
 
-`cash-shop-pet-ui-interactions.mjs` 专项目检宠物功能的 UI 交互边界（不做购买正向流，购买/取出/召唤/自动化由 `cash-shop-pet-flow.mjs` 覆盖）：宠物分类过滤计数**从内嵌 `cash-shop-v83.csv` 按客户端同口径动态推算**（在售 ∧ 性别 ∧ 宠物 5000xxx+能力装备 1812000-07+宠物穿戴 1802xxx，目录数据被并行任务扩充时自动跟随，实测 87 件）；翻页连点越界只钳制不崩溃（filtered/pending/notice 不漂移）；「装备」子菜单(武器)选中后切「宠物」子菜单状态复位不泄漏；「全部」分类含宠物商品；点宠物卡不进试穿集、预览面板回退图标；SN 搜索 → 二次点击弹购买确认 → **Escape 取消**路径不扣款不动仓库；搜索框「×」按钮清空恢复列表；宠物自动补给面板 CANCEL 丢弃滑条编辑、OK 保存 30/40 阈值（±2 容差）、`location.reload()` 重登后 localStorage 持久化、药水槽左右箭头切换候选（含 OFF）并落盘、收尾复位 50/50；召唤态断言能力掩码 31（未召唤则跳过）。注意：翻页/切分类后必须等 assetsIdle（图标按需流式加载会吞点击）。产物写 `/tmp/cash-shop-pet-ui`。
+`cash-shop-pet-ui-interactions.mjs` 专项目检宠物功能的 UI 交互边界（不做购买正向流，购买/取出/召唤/自动化由 `cash-shop-pet-flow.mjs` 覆盖）：宠物分类过滤计数**从内嵌 `cash-shop-v83.csv` 按客户端同口径动态推算**（在售 ∧ 性别 ∧ 宠物 5000xxx+能力装备 1812000-07+宠物穿戴 1802xxx，目录数据被并行任务扩充时自动跟随，实测 87 件）；翻页连点越界只钳制不崩溃（filtered/pending/notice 不漂移）；「装备」子菜单(武器)选中后切「宠物」子菜单状态复位不泄漏；「全部」分类含宠物商品；点宠物卡不进试穿集、预览面板回退图标；SN 搜索 → 二次点击弹购买确认 → **Escape 取消**路径不扣款不动仓库；搜索框「×」按钮清空恢复列表；宠物自动补给面板 CANCEL 丢弃滑条编辑、OK 保存 30/40 阈值（±2 容差）、`location.reload()` 重登后 localStorage 持久化、药水槽左右箭头切换候选（含 OFF）并落盘、收尾复位 50/50；召唤态断言能力掩码 31（未召唤则跳过）。注意：商品图标已改用 `draw_effect` 非阻塞加载，不再进入 blocking 队列吞点击；`assetsIdle` 仍用于截图/静态素材稳定。产物写 `/tmp/cash-shop-pet-ui`。
 
 ```bash
 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-pet-ui-interactions.mjs
@@ -362,3 +362,36 @@ E2E_KILL_SECONDS/E2E_DIAG_SECONDS/E2E_ARTIFACT_DIR/E2E_DEBUG_PORT`（默认
 本地 8000、test1、不预击杀、30s、/tmp/drop-reach、9330）；产物在
 `/tmp/drop-reach/`（样本 JSON + 截图）。与拾取压测同样依赖
 `skill-keymap-prep.py` 准备键位，勿与其它 test1 E2E 并发。
+
+## 自由市场组队任务传送冒烟（fm-pq-teleports）
+
+登录→走到 FM 玩法向导 9010000→逐个点 13 个 PQ 标签传送→断言落点
+地图 ID（招募图→入场图随机段按前缀断言）。13/13 PASS 为通过标准。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/fm-pq-teleports.mjs
+```
+
+产物在 `/tmp/fm-pq-teleports/`。依赖 `pq-harness.mjs`（登录/对话/
+DB 预置通用层，MySQL 凭据运行时从服务端 configuration.ini 解析）。
+
+## 组队任务单人模式全链路（fm-pq-solo-flow）
+
+每 PQ 独立会话：SQL 预置 test3（charId 223）回 910000000 并按等级段
+set level→walkTowards 到招募 NPC→Space 开对话→悬停扫描点「我想参加
+组队任务」（CWKPQ 9201113 两段式远征：先创建远征再开始战斗）→单人
+模式 sendYesNo 截图后点 YES→断言进入入场图+`msother_character_count`
+NPC 队友数。13/13 PASS 为通过标准。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/fm-pq-solo-flow.mjs
+# 调试只跑部分：FM_PQ_SOLO_ONLY=CWKPQ,OrbisPQ node ...
+```
+
+产物在 `/tmp/fm-pq-solo-flow/<NN>-PQ>/`（summary.txt+截图+console/
+docker 日志）。辅助层：`fm-pq-nav.mjs`（各 PQ 攀爬/隐藏门路线）、
+`png-probe.mjs`（纯像素解码定位 YES/NO 按钮）、`cdp.mjs` 的 move()。
+服务端结构契约另见 `tools/verify/pq-solo-server-contract.mjs`
+（已登记 tools/verify/index.md）。
