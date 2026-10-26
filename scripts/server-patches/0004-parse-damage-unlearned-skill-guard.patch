@@ -1,0 +1,21 @@
+# 服务端源码补丁：parseDamage 对未学习技能的越界崩溃守卫
+# 背景：link_repos/MapleStory-Server 是无版本控制的 linked checkout，
+# 重新 checkout/同步后以下修复会丢失，须重放本补丁。
+# 根因：AttackInfo.parseDamage 用 chr.getSkillLevel(ret.skill)（可能为 0）
+#       直接调 Skill.getEffect(level)=effects.get(level-1) → IndexOutOfBounds
+#       （Index -1，length=技能 max level），异常被 MapleServerHandler 吞掉后
+#       客户端零响应。触发：test1Hero 发 1111004/1111006（斧系变体，
+#       2026-10-20 才加入 wz，角色 skills 表无行）。
+# 修复：skilllevel<=0 时把 ret.skill 降级为 0（普攻路径），风格对齐同块
+#       PQ 技能 fallback；details: features/changelog/2026-10-26/unlearned-skill-attack-crash.md
+# 重放：cd link_repos/MapleStory-Server && patch -p1 < 本文件
+--- a/src/net/server/channel/handlers/AbstractDealDamageHandler.java
++++ b/src/net/server/channel/handlers/AbstractDealDamageHandler.java
+@@ -577,6 +577,7 @@
+         if (ret.skill > 0) {
+             ret.skilllevel = chr.getSkillLevel(ret.skill);
+             if(ret.skilllevel == 0 && GameConstants.isPqSkillMap(chr.getMapId()) && GameConstants.isPqSkill(ret.skill)) ret.skilllevel = 1;
++            if(ret.skilllevel <= 0) ret.skill = 0;    // unlearned ids (crafted packets only): degrade to a plain attack, not effects.get(-1)
+         }
+         
+         if (ret.skill == Evan.ICE_BREATH || ret.skill == Evan.FIRE_BREATH || ret.skill == FPArchMage.BIG_BANG || ret.skill == ILArchMage.BIG_BANG || ret.skill == Bishop.BIG_BANG || ret.skill == Gunslinger.GRENADE || ret.skill == Brawler.CORKSCREW_BLOW || ret.skill == ThunderBreaker.CORKSCREW_BLOW || ret.skill == NightWalker.POISON_BOMB) {

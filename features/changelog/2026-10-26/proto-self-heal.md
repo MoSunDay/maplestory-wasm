@@ -34,7 +34,7 @@
 ## 残留与后续
 
 - 服务端日志见 `CloseRangeDamageHandler` 抛 `IndexOutOfBoundsException: Index -1, length 30`（两次），与本次 NL 问题无关，待单独排查。
-- Hero 斧系 2 fail 与 Pala 旧 visual 2 fail 仍为已知基线，建议后续：manifest 给斧系变体加 skip 标注或配斧；Pala visual 待空闲窗口刷新。
+- ~~Hero 斧系 2 fail~~ 已修复（真根因是 skills 表缺行打崩 parseDamage，见 `unlearned-skill-attack-crash.md`，非「需配斧」）；Pala 旧 visual 2 fail 仍待空闲窗口刷新。
 - 若并发流程再次压低等级，Subi 备用星标兜底；收尾自愈会在下一轮 phase 前恢复 200。
 
 ## 追记：飞标堆去重（幂等修正）

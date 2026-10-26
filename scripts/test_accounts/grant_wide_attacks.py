@@ -24,6 +24,7 @@ import sys
 
 from create_accounts import mysql_run, read_db_config
 from plans import JOBS
+from wzdata import load_job_line_skills
 
 DEFAULT_CONFIG = "/data/maplestory-wasm/link_repos/MapleStory-Server/configuration.ini"
 CHARS_PER_ACCOUNT = 4   # same grouping as create_accounts.py's --chars-per-account
@@ -174,6 +175,57 @@ def apply_grants(cfg, targets, ids):
     print("applied: %d character(s) granted and verified" % len(targets))
 
 
+def existing_skill_ids(cfg, character_id):
+    """{skillid} already granted to the character."""
+    rows = parse_rows(mysql_run(
+        cfg, "SELECT skillid FROM skills WHERE characterid=%d;" % character_id,
+        flags=("-N", "-B")))
+    return {row[0] for row in rows}
+
+
+def sync_job_line(cfg, world, prefix, apply):
+    """Grant wz job-line skills the characters are missing (wz drift repair).
+
+    create_accounts grants the whole job line at creation time; skills added
+    to the wz set later (e.g. 1111004/1111006 on 2026-10-20) never reach
+    characters created before the change - their attack packets then crash
+    parseDamage (Skill.getEffect(0) -> effects.get(-1)). Idempotent: only
+    missing rows are inserted, existing rows are never touched."""
+    changed = []
+    for index, job in enumerate(JOBS):
+        name = "%s%d%s" % (prefix, index // CHARS_PER_ACCOUNT + 1, job[-1])
+        ids = fetch_character_ids(cfg, world, [name])
+        if name not in ids:
+            continue
+        character_id = ids[name]
+        have = existing_skill_ids(cfg, character_id)
+        missing = [(sid, lv) for sid, lv in load_job_line_skills(job[2])
+                   if sid not in have]
+        if not missing:
+            continue
+        detail = "%s (id %d) +%d: %s" % (
+            name, character_id, len(missing),
+            ",".join("%d@%d" % pair for pair in missing))
+        if apply:
+            values = ",".join("(%d, %d, %d, %d, %d)" % (sid, character_id, lv, lv, EXPIRATION)
+                              for sid, lv in missing)
+            try:
+                mysql_run(cfg, "INSERT INTO skills (skillid, characterid,"
+                               " skilllevel, masterlevel, expiration)"
+                               " VALUES %s;" % values)
+            except RuntimeError as error:
+                fail("sync failed for %s: %s" % (name, error))
+            granted = existing_skill_ids(cfg, character_id)
+            still = [sid for sid, _ in missing if sid not in granted]
+            if still:
+                fail("sync verify failed for %s, still missing: %s" % (name, still))
+        changed.append(("applied " if apply else "dry-run ") + detail)
+    for line in changed:
+        print(line)
+    print("sync-job-line: %d character(s) %s" % (
+        len(changed), "updated" if apply else "would be updated (dry-run)"))
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Grant the 12 wide attack skills to the test characters"
@@ -186,11 +238,19 @@ def build_parser():
                         help="game server configuration.ini path")
     parser.add_argument("--apply", action="store_true",
                         help="write the skills rows (default: dry-run)")
+    parser.add_argument("--sync-job-line", action="store_true",
+                        help="grant wz job-line skills missing from the test"
+                             " characters (idempotent drift repair; ignores"
+                             " the wide-attack table)")
     return parser
 
 
 def main():
     args = build_parser().parse_args()
+    if args.sync_job_line:
+        cfg = read_db_config(args.config)
+        sync_job_line(cfg, args.world, args.prefix, args.apply)
+        return
     targets = build_targets(args.prefix)
     if not targets:
         fail("plans.JOBS is empty; nothing to grant")

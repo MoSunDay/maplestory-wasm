@@ -16,6 +16,9 @@ reset_login() { mysql -uroot -p"$DB_PASS" -e "UPDATE maplestory.accounts SET log
 
 phase_setup() {
   python3 create_accounts.py --count 3 --world "$WORLD" || return 1
+  # wz 后补技能的幂等补发：角色创建早于 wz 更新时 skills 表缺行
+  #（缺行技能的攻击包会打崩 parseDamage，见 server-patches/0004）
+  python3 grant_wide_attacks.py --sync-job-line --apply || return 1
   python3 attack_skills.py || return 1
   python3 skill-keymap-prep.py --json attack_skills.json --world "$WORLD" || return 1
   echo "SETUP OK"
