@@ -23,6 +23,13 @@ phase_setup() {
 
 phase_proto() {
   local list=("$@"); [ $# -eq 0 ] && list=("${SUFFIXES[@]}")
+  # 自愈：FM/PQ 流程可能把共享角色搬离练级图，统一复位到 40001（不动 keymap）；
+  # 投掷职业的飞标/子弹按发消耗、耗尽删行后服务端会静默丢弃攻击，同步补满
+  self_heal() {
+    python3 skill-keymap-prep.py --warp-map 40001 2>&1 | tail -1
+    python3 skill-keymap-prep.py --restore-levels 200 --topup-ammo 2>&1 | tail -2
+  }
+  self_heal
   for sfx in "${list[@]}"; do
     acct=${ACC[$sfx]}
     reset_login
@@ -39,6 +46,7 @@ phase_proto() {
   echo "$ib_rc" > /tmp/iron_body_proto.rc   # report 阶段折入总 verdict
   echo "proto iron-body rc=$ib_rc : $(grep -oE 'PASS.*' /tmp/iron_body_proto.log | tail -1)"
   reset_login
+  self_heal   # 收尾再自愈一次：本轮被搬走/被并发会话写回的角色，下次跑前已复位
   echo "PROTO DONE"
 }
 

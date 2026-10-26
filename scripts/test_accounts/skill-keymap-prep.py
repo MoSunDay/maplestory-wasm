@@ -50,7 +50,7 @@ import os
 import subprocess
 
 from create_accounts import mysql_run, read_db_config
-from plans import JOBS
+from plans import JOBS, plan_use_items
 
 SNAIL_MAP = 40001        # snail hunting ground used as the skill test range
 FREE_MARKET_MAP = 910000000
@@ -205,6 +205,69 @@ def quoted(names):
     return ",".join("'%s'" % name for name in names)
 
 
+def restore_levels(cfg, roster, floor_level):
+    """Raise roster characters back to the setup level (never lowers).
+
+    Concurrent FM/PQ flows retune shared characters (a level-60 NL fails
+    RangedAttackHandler's star gate: 2070018 requires level>=70, leaving
+    projectile=0 and the attack silently dropped). Only levels BELOW the
+    floor are touched."""
+    names = quoted(c["name"] for c in roster)
+    rows = mysql_rows(
+        cfg,
+        "UPDATE characters SET level=%d WHERE name IN (%s) AND level < %d;"
+        " SELECT ROW_COUNT();" % (floor_level, names, floor_level))
+    raised = int(rows[0][0]) if rows else 0
+    print("restore-levels: %d character(s) raised to %d%s"
+          % (raised, floor_level, "" if raised else " (already at/above)"))
+
+
+def topup_ammo(cfg, roster):
+    """Refill drained thrower ammo (NightLord stars / Corsair bullets).
+
+    Every fired ranged attack consumes one projectile; an emptied stack row
+    is deleted, after which the server's ranged handler silently drops all
+    attacks (verify_skills_proto.mjs logs 'no response'). Restores the
+    plan_use_items stack so the proto phase self-heals like --warp-map."""
+    by_job = {job[1]: job for job in JOBS}
+    healed = []
+    for character in roster:
+        job = by_job.get(character["job"])
+        if job is None:
+            continue
+        ammo = [t for t in plan_use_items(job)
+                if 2070000 <= t[0] < 2080000 or 2330000 <= t[0] < 2340000]
+        if job[0] == "NightLord":
+            # fallback star with no level gate: RangedAttackHandler skips
+            # 2070018 below level 70, an empty scan silently drops attacks
+            ammo.append((2070000, 800))
+        for itemid, quantity in ammo:
+            rows = mysql_rows(cfg, "SELECT id, accountid FROM characters"
+                              " WHERE name='%s';" % character["name"])
+            if not rows:
+                continue
+            cid, accountid = int(rows[0][0]), int(rows[0][1])
+            upd = mysql_rows(
+                cfg,
+                "UPDATE inventoryitems SET quantity=%d WHERE characterid=%d"
+                " AND itemid=%d; SELECT ROW_COUNT();" % (quantity, cid, itemid))
+            action = "refilled"
+            if not upd or int(upd[0][0]) == 0:
+                nxt = mysql_rows(
+                    cfg, "SELECT IFNULL(MAX(position),0)+1 FROM inventoryitems"
+                    " WHERE characterid=%d AND inventorytype=2;" % cid)
+                mysql_run(
+                    cfg,
+                    "INSERT INTO inventoryitems (type, characterid, accountid,"
+                    " itemid, inventorytype, position, quantity, owner, petid,"
+                    " flag, expiration, giftFrom) VALUES"
+                    " (1, %d, %d, %d, 2, %d, %d, '', -1, 0, -1, '');"
+                    % (cid, accountid, itemid, int(nxt[0][0]), quantity))
+                action = "inserted"
+            healed.append("%s %dx%d(%s)" % (character["name"], itemid, quantity, action))
+    print("ammo top-up: %s" % ("; ".join(healed) if healed else "no ammo chars"))
+
+
 def restore(cfg, roster):
     """Undo mode: characters back to the Free Market, keymap rows stay."""
     names = quoted(character["name"] for character in roster)
@@ -314,11 +377,51 @@ def main():
                         help="browser-side key roster written for skill-anim-flow.mjs")
     parser.add_argument("--restore", action="store_true",
                         help="undo: move characters back to the Free Market")
+    parser.add_argument("--restore-levels", type=int, metavar="LVL", default=None,
+                        help="raise roster characters below LVL back to LVL"
+                             " (never lowers; concurrent flows retune levels)")
+    parser.add_argument("--topup-ammo", action="store_true",
+                        help="refill NightLord star / Corsair bullet stacks"
+                             " (firing consumes them; emptied rows are deleted"
+                             " and ranged attacks then get dropped)")
+    parser.add_argument("--warp-map", type=int, metavar="MAP", default=None,
+                        help="only move roster characters to MAP (keymap untouched);"
+                             " used by verify_all.sh proto to self-heal displacement"
+                             " caused by FM/PQ flows")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     roster = list(character_roster(args.prefix, args.chars_per_account))
     cfg = read_db_config(args.config)
+
+    if args.restore_levels is not None:
+        if args.dry_run:
+            print("dry-run restore-levels (would raise chars to %d)" % args.restore_levels)
+        else:
+            restore_levels(cfg, roster, args.restore_levels)
+        if args.warp_map is None and not args.topup_ammo:
+            return
+    if args.topup_ammo:
+        if args.dry_run:
+            print("dry-run ammo top-up (would refill stars/bullets)")
+        else:
+            topup_ammo(cfg, roster)
+        if args.warp_map is None:
+            return
+
+    if args.warp_map is not None:
+        names = quoted(c["name"] for c in roster)
+        if args.dry_run:
+            print("dry-run warp: %s -> map %d (keymap untouched)"
+                  % (names, args.warp_map))
+        else:
+            rows = mysql_rows(
+                cfg,
+                "UPDATE characters SET map=%d WHERE name IN (%s);"
+                " SELECT ROW_COUNT();" % (args.warp_map, names))
+            print("warped %s character(s) to map %d (keymap untouched)"
+                  % (rows[0][0] if rows else 0, args.warp_map))
+        return
 
     if args.restore:
         if not args.dry_run:
