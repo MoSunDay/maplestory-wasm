@@ -402,5 +402,5 @@ docker 日志）。辅助层：`pq-harness-{login,db,dialog,game,move}.mjs`
 `msnpctalk_button_field` 优先→png-probe 视觉→网格三级回退，兼容
 post-Chaos 519px 对话框几何）、`fm-pq-nav.mjs`（各 PQ 攀爬/隐藏门
 路线）、`cdp.mjs` 的 move()。服务端契约另见
-`tools/verify/pq-solo-server-contract.mjs`（含 minPlayers 数值断言
-与招募图 life cy≤fh 斜面落点断言，已登记 tools/verify/index.md）。
+`tools/verify/pq-solo-server-contract.mjs`（含 minPlayers 数值断言与 E 节 wz 招募图 life cy≤fh 斜面落点断言，
+已登记 tools/verify/index.md）。
