@@ -60,6 +60,20 @@ Amoria(40-255)、CWKPQ(90-255)、Treasure(140-255)、BossRush(1-255)。
   chunk 懒加载日志证明客户端已建 NPC 对象并渲染，最终由
   `MapNpcs::talk_to_nearest` 距离窗口 + `get_y_below` 方向性锁定。
 
+  wz 补丁全文（`wz/Map.wz/Map/Map2/200080101.img.xml` life 段）：
+
+  ```diff
+  -      <int name="y" value="-47"/>
+  +      <int name="y" value="-50"/>
+  -      <int name="cy" value="-41"/>
+  +      <int name="cy" value="-50"/>
+  ```
+
+  防回归：`tools/verify/pq-solo-server-contract.mjs` 新增 E 节，解析
+  13 张招募图 XML，断言每个招募 NPC life 的 `cy ≤ 所在 fh 在 x 处的
+  斜面插值`（OrbisPQ 原缺陷值 cy=-41 会以精确坐标差直接 FAIL）；
+  服务端 checkout 经 `link_repos/MapleStory-Server` 符号链接读取。
+
 ## 已知非阻塞问题（既有，非本次范围）
 
 - MySQL `rank = 1, rankMove = 0` 保存语法错误（服务端既有 bug）。

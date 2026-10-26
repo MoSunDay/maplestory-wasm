@@ -66,6 +66,8 @@ NPC 队友选型依据：有客户端与服务端 wz 造型（可正常渲染/�
   互证）；soloOptional 副本无此日志属预期。
 - 浏览器全链路见同日
   [fm-pq-teleport-and-solo-verification.md](fm-pq-teleport-and-solo-verification.md)。
+- 招募图 wz 落点断言（life cy ≤ 所在 fh 斜面插值，OrbisPQ 缺陷的
+  防回归门）已入 `pq-solo-server-contract.mjs` E 节，13 图全 PASS。
 - e2e 收官状态 **13/13 终态 PASS**（OrbisPQ 最后通关；其招募 NPC
   空间坐标缺陷与修复见上文的传送验证文档）。wz 数据修复落在
   link_repos/MapleStory-Server（非 git 仓）：Ellin 300030100 NPC

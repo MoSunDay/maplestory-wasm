@@ -9,6 +9,9 @@
 //   C. recruitment NPC scripts (solo entry + 单人模式 prompt),
 //   D. in-run mechanics (stage NPC trio, CWKPQ relic auto-grant, FM guide
 //      labels with corrected level ranges and no forbidden macro letters).
+//   E. wz recruit-map life placement (NPC cy must not sit above its
+//      foothold surface, else the client drops the NPC to a lower
+//      platform and keyboard talk silently fails).
 
 import fs from 'fs';
 import path from 'path';
@@ -218,8 +221,91 @@ function verifyInRunMechanics() {
   console.log('PASS solo PQ in-run mechanics (stage trio, CWKPQ relics, FM guide labels)');
 }
 
+// ----------------------------------------- E. wz recruit-map life placement
+// The client places NPCs from the spawn packet via get_y_below, and
+// Footholdtree::get_fhid_below only accepts footholds whose surface at x
+// satisfies ycomp >= cy. A life cy ABOVE the intended foothold surface
+// (OrbisPQ 2013000 once had cy=-41 vs fh14 surface -41.8 at x=198) snaps
+// the NPC to a lower platform, so |dy| > 80 in MapNpcs::talk_to_nearest
+// and Space never sends NPC_TALK. Guard every recruit-map NPC life entry.
+const RECRUIT_MAP_LIFE = [
+  ['KerningPQ', 103000000, 9020000],
+  ['LudiPQ', 221024500, 2040034],
+  ['LudiMazePQ', 220000000, 9103001],
+  ['OrbisPQ', 200080101, 2013000],
+  ['PiratePQ', 251010404, 2094000],
+  ['HenesysPQ', 100000200, 1012112],
+  ['EllinPQ', 300030100, 2133000],
+  ['MagatiaPQ_A', 261000021, 2112003],
+  ['MagatiaPQ_Z', 261000011, 2112004],
+  ['AmoriaPQ', 670010100, 9201048],
+  ['CWKPQ', 610030020, 9201113],
+  ['TreasurePQ', 674030100, 9220018],
+  ['BossRushPQ', 970030000, 9000037],
+];
+
+function mapXmlPath(mapId) {
+  return `wz/Map.wz/Map/Map${Math.floor(mapId / 100000000)}/${String(mapId).padStart(9, '0')}.img.xml`;
+}
+
+function xmlInt(block, name) {
+  const m = block.match(new RegExp(`name="${name}" value="(-?\\d+)"`));
+  return m ? Number(m[1]) : null;
+}
+
+function verifyRecruitMapLife() {
+  for (const [eventName, mapId, npcId] of RECRUIT_MAP_LIFE) {
+    const xml = read(mapXmlPath(mapId));
+
+    // Foothold table: innermost imgdirs that open with an x1 int.
+    const footholds = new Map();
+    for (const m of xml.matchAll(/<imgdir name="(\d+)">\s*<int name="x1"/g)) {
+      const block = xml.slice(m.index, xml.indexOf('</imgdir>', m.index));
+      const coords = ['x1', 'y1', 'x2', 'y2'].map(f => xmlInt(block, f));
+      if (coords.every(v => v !== null)) {
+        footholds.set(Number(m[1]), { x1: coords[0], y1: coords[1], x2: coords[2], y2: coords[3] });
+      }
+    }
+
+    // NPC life entries: imgdir bodies carrying a type="n" string.
+    const lifeEntries = [];
+    for (const m of xml.matchAll(/<imgdir name="\d+">/g)) {
+      const block = xml.slice(m.index, xml.indexOf('</imgdir>', m.index));
+      if (/<string name="type" value="n"\/>/.test(block)) lifeEntries.push(block);
+    }
+    assertTrue(lifeEntries.length > 0, `${eventName} map ${mapId} declares at least one npc life entry`);
+
+    const entry = lifeEntries.find(
+      b => (b.match(/name="id" value="(\d+)"/) || [])[1] === String(npcId)
+    );
+    assertTrue(entry !== undefined, `${eventName} map ${mapId} life contains recruiter npc ${npcId}`);
+
+    const x = xmlInt(entry, 'x');
+    const cy = xmlInt(entry, 'cy');
+    const fh = xmlInt(entry, 'fh');
+    assertTrue(x !== null && cy !== null && fh !== null, `${eventName} npc ${npcId} life entry has x/cy/fh`);
+
+    const foot = footholds.get(fh);
+    assertTrue(foot !== undefined, `${eventName} npc ${npcId} life fh=${fh} exists in map footholds`);
+    assertTrue(foot.x1 !== foot.x2, `${eventName} npc ${npcId} life fh=${fh} is a floor, not a wall`);
+
+    const lo = Math.min(foot.x1, foot.x2);
+    const hi = Math.max(foot.x1, foot.x2);
+    assertTrue(x >= lo - 2 && x <= hi + 2,
+      `${eventName} npc ${npcId} life x=${x} lies within fh=${fh} span [${lo},${hi}]`);
+
+    const t = (Math.min(Math.max(x, lo), hi) - foot.x1) / (foot.x2 - foot.x1);
+    const surface = foot.y1 + t * (foot.y2 - foot.y1);
+    assertTrue(cy <= surface + 0.25,
+      `${eventName} npc ${npcId} life cy=${cy} sits above fh=${fh} surface ${surface.toFixed(1)} at x=${x}: `
+      + 'client get_fhid_below (ycomp >= fy) drops the NPC onto a lower platform and keyboard talk silently fails');
+  }
+  console.log(`PASS solo PQ recruit-map life placement (${RECRUIT_MAP_LIFE.length} maps, cy <= fh surface)`);
+}
+
 verifyJavaContract();
 verifyEventScripts();
 verifyRecruitmentNpcs();
 verifyInRunMechanics();
+verifyRecruitMapLife();
 console.log('PASS solo PQ (NPC teammates) server contract');

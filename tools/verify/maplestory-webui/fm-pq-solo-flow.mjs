@@ -64,7 +64,7 @@ const PQS = [
   // soloOptional：天然可单刷的副本（LudiMaze 迷宫无人数机关、BossRush
   // NPC 文案明示「独自一人挑战」），minPlayers=1 → fill=0 无补位属预期。
   { name: 'LudiMazePQ', option: 2, level: 60, recruitMap: 220000000, npcX: 76, npcY: -712, npcId: 9103001, entryPrefix: '8090500', soloOptional: true },
-  { name: 'OrbisPQ', option: 3, level: 60, recruitMap: 200080101, npcX: 198, npcY: -47, npcId: 2013000, entry: '920010000' },
+  { name: 'OrbisPQ', option: 3, level: 60, recruitMap: 200080101, npcX: 198, npcY: -50, npcId: 2013000, entry: '920010000' },
   // spawn=2（next00 门 1490,80）：与 NPC 同层，2767px 纯平走 ~25s；
   // 默认 sp(-1717,151) 距 NPC 440px 且低 123px，棘轮爬层在负载下 >100s。
   { name: 'PiratePQ', option: 4, level: 75, recruitMap: 251010404, npcX: -1277, npcY: 242, npcId: 2094000, entry: '925100000', spawn: 0 },
