@@ -99,6 +99,7 @@ export function createRuntimeProbes(driver) {
     shopBuyY: row => numberArgument('msshop_buy_y', row),
     inventoryQuantity: itemId => numberArgument('msinventory_quantity', itemId),
     inventorySlot: itemId => numberArgument('msinventory_slot', itemId),
+    inventoryCashSlot: cashId => numberArgument('msinventory_cash_slot', cashId),
     itemInventoryActive: () => number('msiteminventory_active'),
     itemInventoryX: () => number('msiteminventory_x'),
     itemInventoryY: () => number('msiteminventory_y'),

@@ -24,11 +24,13 @@
 #include "../Spawn.h"
 #include "../Pet/PetFollowPolicy.h"
 #include "../../Graphics/Animation.h"
+#include "../../Graphics/Sprite.h"
 #include "../../Template/Rectangle.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <list>
 #include <optional>
 #include <queue>
 #include <unordered_set>
@@ -48,6 +50,8 @@ namespace jrc
 
         // Draw all drops on a layer.
         void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
+        // Draw meso explosion animations above every layer.
+        void draw_explosions(double viewx, double viewy, float alpha) const;
         // Update all drops.
         void update(const Physics& physics);
         void instantiate_spawns();
@@ -79,6 +83,9 @@ namespace jrc
             // owner cannot reach it with a single jump either.
             int32_t max_height_above = pet_follow::pursuit_height_limit(
                 pet_follow::BASE_MOVEMENT);
+            // Drop oid the pet recently gave up on as unreachable; targeting
+            // skips it until it disappears so reachable loot is not starved.
+            int32_t exclude_oid = 0;
         };
 
         struct PetLootTarget
@@ -88,10 +95,13 @@ namespace jrc
         };
 
         PetLootTarget find_pet_loot(const PetLootQuery& query) const;
-        // All pet-eligible loot within range of origin, nearest first. Loot
-        // higher than the query's height limit above origin is skipped.
+        // All pet-eligible loot inside the pet loot reach window of origin,
+        // nearest first.
         std::vector<int32_t> find_pet_loot_batch(const PetLootQuery& query,
-            Point<int16_t> origin, int16_t range) const;
+            Point<int16_t> origin) const;
+        // Live icon center of the lootable drop with the given oid, or
+        // nullopt when it is gone or no longer lootable. Pure read.
+        std::optional<Point<int16_t>> pet_loot_position(int32_t oid) const;
         // Icon center of the lootable drop nearest to `origin`, or nullopt
         // when no drop is lootable. Pure read; changes no state.
         std::optional<Point<int16_t>> find_nearest_lootable_center(
@@ -140,6 +150,10 @@ namespace jrc
         bool lootenabled;
         int32_t last_loot_oid;
         uint32_t confirmed_pet_pickups;
+
+        // Coin-burst animations for meso piles detonated by Meso
+        // Explosion; anchored in world coordinates.
+        std::list<Sprite> explosions;
 
         std::queue<DropSpawn> spawns;
         // Removals that arrived before their queued spawn was instantiated.

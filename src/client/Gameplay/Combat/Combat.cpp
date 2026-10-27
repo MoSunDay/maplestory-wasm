@@ -38,6 +38,12 @@ namespace jrc
     {
         // Teleport cooldown in update ticks (~44 * 8ms ≈ 350ms).
         constexpr int16_t TELEPORT_COOLDOWN_TICKS = 44;
+        // Flash Jump dash speed (px per update tick). With the low lift-off
+        // below this covers roughly 390px, matching the official skill.
+        constexpr double FLASH_JUMP_HSPEED = 9.0;
+        // Flash Jump lifts off with about two thirds of a regular jump so
+        // the dash carries the character instead of shooting it upward.
+        constexpr double FLASH_JUMP_LIFT_RATIO = 1.5;
         // Default teleport range when skill data has no hrange.
         constexpr int16_t TELEPORT_DEFAULT_RANGE = 130;
         // Step size (px) for horizontal sweep collision checks.
@@ -134,6 +140,9 @@ namespace jrc
         if (teleport_cooldown > 0)
             teleport_cooldown--;
 
+        if (flashjump_spent && player.get_phobj().onground)
+            flashjump_spent = false;
+
         attackresults.update();
         bulleteffects.update();
         damageeffects.update();
@@ -167,6 +176,7 @@ namespace jrc
     void Combat::clear()
     {
         teleport_cooldown = 0;
+        flashjump_spent = false;
         final_attack_pending = 0;
         final_attack_targets.clear();
     }
@@ -178,6 +188,13 @@ namespace jrc
 
         if (is_teleport_skill(move_id) && teleport_cooldown > 0)
             return false;
+
+        // Officially Flash Jump may be used only once per airborne period.
+        if (is_flash_jump(move_id) && flashjump_spent
+            && !player.get_phobj().onground)
+        {
+            return false;
+        }
 
         const SpecialMove& move = get_move(move_id);
 
@@ -319,8 +336,38 @@ namespace jrc
         switch (move.get_id())
         {
         case SkillId::FLASH_JUMP:
+            apply_flash_jump();
             break;
         }
+    }
+
+    bool Combat::is_flash_jump(int32_t skillid)
+    {
+        return skillid == SkillId::FLASH_JUMP;
+    }
+
+    void Combat::apply_flash_jump()
+    {
+        PhysicsObject& phobj = player.get_phobj();
+
+        // From the ground, Flash Jump leaves it with a low forward hop;
+        // mid-air casts keep the current vertical motion and only dash.
+        if (phobj.onground)
+            phobj.vforce = -player.get_jumpforce() / FLASH_JUMP_LIFT_RATIO;
+
+        // Held direction keys take priority over the facing, matching
+        // find_teleport_target_horizontal().
+        int16_t direction = player.getflip() ? 1 : -1;
+        if (player.is_key_down(KeyAction::LEFT))
+            direction = -1;
+        else if (player.is_key_down(KeyAction::RIGHT))
+            direction = 1;
+
+        // The falling state preserves hspeed (it only brakes against the
+        // opposite direction key), so a single impulse carries the dash.
+        phobj.hspeed = direction * FLASH_JUMP_HSPEED;
+
+        flashjump_spent = true;
     }
 
     bool Combat::is_teleport_skill(int32_t skillid)

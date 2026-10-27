@@ -6,6 +6,7 @@
 #include "../../Console.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../../IO/CashShop/CashShopSettlement.h"
 #include "../../IO/CashShop/UICashShop.h"
 #include "../../IO/UITypes/UIEquipInventory.h"
 #include "../../IO/UITypes/UIItemInventory.h"
@@ -18,9 +19,19 @@ namespace jrc
 {
     namespace
     {
+        namespace settlement = cash_shop_settlement;
+
         UICashShop* cash_shop_ui()
         {
             return UI::get().get_element<UICashShop>().get();
+        }
+
+        // A reply whose operation does not match the pending one must not
+        // settle the shop: it belongs to an earlier or rejected request.
+        void warn_unexpected(const char* what)
+        {
+            Console::get().print(std::string(
+                "商城响应与当前操作不匹配，已忽略：") + what);
         }
     }
 
@@ -141,8 +152,10 @@ namespace jrc
         case 0x57:
         {
             CashLockerItem item = parse_locker_item(recv, false);
-            if (shop)
+            if (shop && shop->expects(settlement::PendingKind::BUY))
                 shop->purchase_succeeded(std::move(item));
+            else
+                warn_unexpected("0x57");
             return;
         }
         case 0x89:
@@ -153,8 +166,10 @@ namespace jrc
             for (uint8_t index = 0; index < count; ++index)
                 items.push_back(parse_locker_item(recv, false));
             recv.read_short();
-            if (shop)
+            if (shop && shop->expects(settlement::PendingKind::BUY))
                 shop->package_purchase_succeeded(std::move(items));
+            else
+                warn_unexpected("0x89");
             return;
         }
         case 0x5C:
@@ -166,8 +181,10 @@ namespace jrc
         }
         case 0x68:
         {
-            int16_t slot = recv.read_short();
+            // Captured before parsing/applying: the reply itself carries no
+            // cash id, and the pending state is cleared on success.
             const int64_t cash_id = shop ? shop->transfer_cash_id() : 0;
+            int16_t slot = recv.read_short();
             Player& player = Stage::get().get_player();
             Inventory& inventory = player.get_inventory();
             const InventoryType::Id type = ItemParser::parse_item_auto(
@@ -192,15 +209,20 @@ namespace jrc
                     items->modify(type, slot, Inventory::ADD, 0);
             }
 
-            if (shop)
-                shop->take_succeeded();
+            if (shop && shop->expects(settlement::PendingKind::TAKE))
+                shop->take_succeeded(cash_id);
+            else
+                warn_unexpected("0x68");
             return;
         }
         case 0x6A:
         {
+            const int64_t cash_id = shop ? shop->transfer_cash_id() : 0;
             CashLockerItem item = parse_locker_item(recv, false);
-            if (shop)
-                shop->put_succeeded(std::move(item));
+            if (shop && shop->expects(settlement::PendingKind::PUT))
+                shop->put_succeeded(std::move(item), cash_id);
+            else
+                warn_unexpected("0x6A");
             return;
         }
         default:

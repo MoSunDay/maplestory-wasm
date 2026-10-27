@@ -63,6 +63,13 @@ namespace jrc
         {
             useeffect = std::make_unique<ChargedBlowUseEffect>(src);
         }
+        else if (skillid == SkillId::MESO_EXPLOSION)
+        {
+            // The 4211006 "effect" frames are the coin burst played at
+            // each detonated meso pile (MapDrops); the caster only shows
+            // the attack stance, like the official client.
+            useeffect = std::make_unique<NoUseEffect>();
+        }
         else if (byleveleffect)
         {
             useeffect = std::make_unique<ByLevelUseEffect>(src);

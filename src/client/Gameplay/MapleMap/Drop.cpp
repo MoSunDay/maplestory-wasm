@@ -128,6 +128,9 @@ namespace jrc
             phobj.type = PhysicsObject::NORMAL;
             break;
         case drop_removal::Effect::IMMEDIATE_ERASE:
+        // Meso Explosion erases the pile instantly; the coin burst is
+        // played by MapDrops at the removal site.
+        case drop_removal::Effect::MESO_EXPLOSION:
             break;
         }
     }

@@ -172,6 +172,7 @@ namespace jrc
         uint16_t pet_loot_target_frames;
         uint16_t pet_loot_cooldown;
         uint8_t pet_loot_attempts;
+        int32_t pet_loot_blocked_oid;
         uint8_t pet_movement_sync_frames;
 
         MapInfo mapinfo;

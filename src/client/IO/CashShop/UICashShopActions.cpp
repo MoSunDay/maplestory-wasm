@@ -50,27 +50,25 @@ namespace jrc
 
     void UICashShop::set_balances(CashBalances balances)
     {
+        // Balance data only: 0x144 can arrive late (after a pending operation
+        // already settled or timed out) and must never unlock, clear or fail
+        // an operation on its own.
         model->set_balances(balances);
-        // Every push counts towards the expected total, but never past it: a
-        // late duplicate must not make later queries wait for more replies.
-        if (balance_received < balance_expected)
-            ++balance_received;
-        // Only a purchase/transfer is watchable here. An exit pending flag is
-        // not an operation reply, so its showCash is not an error.
-        if (pending_watch)
+        balances_loaded_ = true;
+        balance_failed_ = false;
+        balance_deadline_.reset();
+        if (deferred_balance_error_)
         {
-            // The server rejects a purchase/transfer by only resending showCash
-            // (enableCSActions) without a 0x57/0x68 reply, so the pending flag
-            // has to be released here or the shop would stay locked.
-            show_error("商城操作未完成，请重试。");
-            return;
+            // The only text this push owns is the balance timeout hint.
+            deferred_error.clear();
+            deferred_balance_error_ = false;
         }
         refresh();
     }
 
     bool UICashShop::balances_ready() const
     {
-        return balance_received >= balance_expected;
+        return balances_loaded_ && !balance_failed_;
     }
 
     void UICashShop::replace_locker(std::vector<CashLockerItem> items)
@@ -84,9 +82,11 @@ namespace jrc
 
     void UICashShop::purchase_succeeded(CashLockerItem item)
     {
+        // Capture the id before the move: finish_pending() resets the stored
+        // transfer id, so the row selection needs the item's own cash id.
         const int64_t cash_id = item.cash_id;
         model->add_locker(std::move(item));
-        set_pending(false);
+        finish_pending();
         select_new_locker_item(cash_id);
     }
 
@@ -98,29 +98,29 @@ namespace jrc
             last_cash_id = item.cash_id;
             model->add_locker(std::move(item));
         }
-        set_pending(false);
+        finish_pending();
         select_new_locker_item(last_cash_id);
     }
 
-    void UICashShop::take_succeeded()
+    void UICashShop::take_succeeded(int64_t cash_id)
     {
-        model->remove_locker(pending_cash_id);
-        set_pending(false);
-        select_inventory_item(pending_cash_id);
+        model->remove_locker(cash_id);
+        finish_pending();
+        select_inventory_item(cash_id);
     }
 
-    void UICashShop::put_succeeded(CashLockerItem item)
+    void UICashShop::put_succeeded(CashLockerItem item, int64_t cash_id)
     {
-        const int64_t cash_id = item.cash_id;
-        Stage::get().get_player().get_inventory().remove_cash_item(pending_cash_id);
+        const int64_t locker_cash_id = item.cash_id;
+        Stage::get().get_player().get_inventory().remove_cash_item(cash_id);
         model->add_locker(std::move(item));
-        set_pending(false);
-        select_new_locker_item(cash_id);
+        finish_pending();
+        select_new_locker_item(locker_cash_id);
     }
 
     void UICashShop::doubleclick(Point<int16_t> cursorpos)
     {
-        if (pending)
+        if (!can_mutate())
             return;
         for (uint16_t id = BT_SLOT_FIRST; id < BT_SLOT_LAST; ++id)
         {
@@ -138,11 +138,31 @@ namespace jrc
 
     void UICashShop::show_error(const std::string& message)
     {
-        set_pending(false);
+        // Server-side rejections (0x5C, unknown opcode), the client-side
+        // balance check and the reconnect path all land here: the operation
+        // is over, so drop the pending state before queueing the text.
+        clear_pending();
         // Deferred: callers include the UIYesNo yes-handler, and an immediate
         // emplace<UIOk> would free that still-running element (both live in
         // the shared NOTICE slot). update() shows the text on the next tick.
         deferred_error = message;
+        deferred_balance_error_ = false;
+    }
+
+    void UICashShop::leave_succeeded()
+    {
+        // clear_pending() also drops the stored cash id; the ack itself is
+        // not an error and the shop stays usable when it is entered again.
+        clear_pending();
+        require_reenter_ = false;
+        refresh();
+    }
+
+    void UICashShop::leave_failed()
+    {
+        require_reenter_ = true;
+        UI::get().enable();
+        show_error("返回游戏角色不匹配，请重试。");
     }
 
     void UICashShop::reconnect_failed(const std::string& address)
@@ -330,7 +350,7 @@ namespace jrc
         {
             const size_t index = left_range.first + card;
             const bool active = index < left_range.second;
-            buttons[BT_CARD_FIRST + card]->set_active(!pending && active);
+            buttons[BT_CARD_FIRST + card]->set_active(!is_pending() && active);
             std::string name, meta;
             if (active)
             {
@@ -349,17 +369,17 @@ namespace jrc
         {
             const size_t index = right_range.first + slot;
             const bool active = index < right_range.second;
-            buttons[BT_SLOT_FIRST + slot]->set_active(!pending && active);
+            buttons[BT_SLOT_FIRST + slot]->set_active(!is_pending() && active);
             const int16_t count = active ? right_item_count(index) : 0;
             slot_counts[slot].change_text(
                 count > 1 ? std::to_string(count) : "");
         }
-        const bool equip_menu_active = !pending && equip_menu_open &&
+        const bool equip_menu_active = !is_pending() && equip_menu_open &&
             category == view::EQUIP_CATEGORY;
         for (int8_t entry = 0; entry < view::CATEGORY_COUNT; ++entry)
         {
             buttons[BT_TAB_FIRST + entry]->set_active(
-                !pending && !equip_menu_active);
+                !is_pending() && !equip_menu_active);
             const size_t count = view::filter_catalog(model->catalog(),
                 { female, entry, applied_query }).size();
             category_counts[entry].change_text(std::to_string(count));
@@ -376,17 +396,16 @@ namespace jrc
                     .size()));
         }
         for (size_t choice = 0; choice < CURRENCY_CHOICES; ++choice)
-            buttons[BT_CURRENCY_FIRST + choice]->set_active(!pending);
-        const bool buy_visible = left_selection_visible();
+            buttons[BT_CURRENCY_FIRST + choice]->set_active(!is_pending());
         // A price-0 item must also wait for the balances to load, otherwise
         // the confirmation could pass the (not yet received) balance check.
-        const bool buy_ready = buy_visible && balances_ready();
-        buttons[BT_SEARCH_CLEAR]->set_active(!pending &&
+        const bool buy_ready = left_selection_visible() && can_mutate();
+        buttons[BT_SEARCH_CLEAR]->set_active(!is_pending() &&
             !applied_query.empty());
-        buttons[BT_BUY]->set_active(!pending && buy_ready &&
+        buttons[BT_BUY]->set_active(buy_ready &&
             !(equip_menu_open && category == view::EQUIP_CATEGORY));
         buttons[BT_RESET]->set_active(!tryon_items.empty());
-        buttons[BT_FEATURED]->set_active(!pending && !filtered.empty());
+        buttons[BT_FEATURED]->set_active(!is_pending() && !filtered.empty());
         position_buy_button();
         const bool details_visible = selected_right &&
             *selected_right / view::RIGHT_PAGE_SIZE == right_page &&
@@ -394,20 +413,22 @@ namespace jrc
         transfer_label.change_text(
             right_pane == view::RightPane::LOCKER ? "取出" : "存入");
         buy_label.change_color(
-            buy_ready && !pending ? Text::BLACK : Text::LIGHTGREY);
+            can_mutate() ? Text::BLACK : Text::LIGHTGREY);
         transfer_label.change_color(
-            details_visible && !pending ? Text::WHITE : Text::LIGHTGREY);
-        charge_label.change_color(pending ? Text::LIGHTGREY : Text::BLACK);
-        exit_label.change_color(pending ? Text::LIGHTGREY : Text::WHITE);
-        buttons[BT_TRANSFER]->set_active(!pending && details_visible);
-        buttons[BT_CHARGE]->set_active(!pending);
-        buttons[BT_EXIT]->set_active(!pending);
-        buttons[BT_LEFT_PREV]->set_active(!pending && left_page > 0);
-        buttons[BT_LEFT_NEXT]->set_active(!pending &&
+            details_visible && can_mutate() ? Text::WHITE : Text::LIGHTGREY);
+        charge_label.change_color(
+            is_pending() ? Text::LIGHTGREY : Text::BLACK);
+        exit_label.change_color(
+            can_exit() ? Text::WHITE : Text::LIGHTGREY);
+        buttons[BT_TRANSFER]->set_active(can_mutate() && details_visible);
+        buttons[BT_CHARGE]->set_active(!is_pending());
+        buttons[BT_EXIT]->set_active(can_exit());
+        buttons[BT_LEFT_PREV]->set_active(!is_pending() && left_page > 0);
+        buttons[BT_LEFT_NEXT]->set_active(!is_pending() &&
             left_page + 1 < view::page_count(filtered.size(),
                 view::CATALOG_PAGE_SIZE));
-        buttons[BT_RIGHT_PREV]->set_active(!pending && right_page > 0);
-        buttons[BT_RIGHT_NEXT]->set_active(!pending &&
+        buttons[BT_RIGHT_PREV]->set_active(!is_pending() && right_page > 0);
+        buttons[BT_RIGHT_NEXT]->set_active(!is_pending() &&
             right_page + 1 < view::page_count(right_count(),
                 view::RIGHT_PAGE_SIZE));
         const auto highlighted = highlighted_index();
@@ -470,8 +491,8 @@ namespace jrc
         details_meta.change_text(detail_meta);
         details_extra.change_text(detail_extra);
         const bool locker_tab = right_pane == view::RightPane::LOCKER;
-        buttons[BT_RIGHT_LOCKER_TAB]->set_active(!pending && !locker_tab);
-        buttons[BT_RIGHT_INVENTORY_TAB]->set_active(!pending && locker_tab);
+        buttons[BT_RIGHT_LOCKER_TAB]->set_active(!is_pending() && !locker_tab);
+        buttons[BT_RIGHT_INVENTORY_TAB]->set_active(!is_pending() && locker_tab);
     }
 
     void UICashShop::change_right_pane(view::RightPane pane)
@@ -482,11 +503,31 @@ namespace jrc
         refresh();
     }
 
-    void UICashShop::set_pending(bool value)
+    void UICashShop::begin_pending(cash_shop_settlement::PendingKind kind,
+        int64_t cash_id)
     {
-        pending = value;
-        pending_watch = value;
-        pending_frames = 0;
+        pending_kind_ = kind;
+        pending_cash_id = cash_id;
+        // Budget + grace: a slow-but-live reply must not be turned into an
+        // error by a single dropped frame or modal transition.
+        pending_deadline_ = cash_shop_settlement::Clock::now() +
+            cash_shop_settlement::timeout_for(kind) +
+            cash_shop_settlement::SETTLE_GRACE;
+        refresh();
+    }
+
+    void UICashShop::finish_pending()
+    {
+        // A matching success reply settles the operation; the selection move
+        // happens in the caller with the cash id captured before the move.
+        clear_pending();
+    }
+
+    void UICashShop::clear_pending()
+    {
+        pending_kind_ = cash_shop_settlement::PendingKind::NONE;
+        pending_deadline_.reset();
+        pending_cash_id = 0;
         refresh();
     }
 
@@ -520,7 +561,9 @@ namespace jrc
 
     void UICashShop::request_purchase(size_t filtered_index)
     {
-        if (pending || !balances_ready() || filtered_index >= filtered.size() ||
+        // The gate covers loaded balances, a failed load, a pending operation
+        // and a required re-entry; the page check rejects a stale selection.
+        if (!can_mutate() || filtered_index >= filtered.size() ||
             filtered_index / view::CATALOG_PAGE_SIZE != left_page)
             return;
         const CashCommodity item = model->catalog()[filtered[filtered_index]];
@@ -534,24 +577,26 @@ namespace jrc
                 show_error("所选支付余额不足。");
                 return;
             }
-            set_pending(true);
+            begin_pending(cash_shop_settlement::PendingKind::BUY, 0);
             BuyCashItemPacket(item.sn, currency, item.package).dispatch();
         });
     }
 
     void UICashShop::request_transfer(size_t item_index)
     {
-        if (pending || item_index >= right_count())
+        if (!can_mutate() || item_index >= right_count())
             return;
-        pending_cash_id = right_cash_id(item_index);
-        set_pending(true);
-        if (right_pane == view::RightPane::LOCKER)
-            TakeCashLockerItemPacket(pending_cash_id).dispatch();
+        const bool taking = right_pane == view::RightPane::LOCKER;
+        const int64_t cash_id = right_cash_id(item_index);
+        begin_pending(taking ? cash_shop_settlement::PendingKind::TAKE :
+            cash_shop_settlement::PendingKind::PUT, cash_id);
+        if (taking)
+            TakeCashLockerItemPacket(cash_id).dispatch();
         else
         {
             const auto items = Stage::get().get_player().get_inventory().get_cash_items();
             PutCashLockerItemPacket(
-                pending_cash_id, static_cast<int8_t>(items[item_index].type)).dispatch();
+                cash_id, static_cast<int8_t>(items[item_index].type)).dispatch();
         }
     }
 
@@ -604,6 +649,13 @@ namespace jrc
             static_cast<int32_t>(*selected_right % view::RIGHT_PAGE_SIZE) : -1;
     }
 
+    int64_t UICashShop::selected_right_cash_id() const
+    {
+        if (!selected_right || *selected_right >= right_count())
+            return 0;
+        return right_cash_id(*selected_right);
+    }
+
     int32_t UICashShop::filtered_count() const
     {
         return static_cast<int32_t>(filtered.size());
@@ -654,6 +706,38 @@ namespace jrc
 
     bool UICashShop::is_pending() const
     {
-        return pending;
+        return pending_kind_ != cash_shop_settlement::PendingKind::NONE;
+    }
+
+    cash_shop_settlement::PendingKind UICashShop::pending_kind() const
+    {
+        return pending_kind_;
+    }
+
+    bool UICashShop::balance_failed() const
+    {
+        return balance_failed_;
+    }
+
+    bool UICashShop::can_mutate() const
+    {
+        return cash_shop_settlement::can_mutate(
+            balances_ready(), balance_failed_, is_pending(), require_reenter_);
+    }
+
+    bool UICashShop::can_exit() const
+    {
+        return cash_shop_settlement::can_exit(is_pending());
+    }
+
+    bool UICashShop::require_reenter() const
+    {
+        return require_reenter_;
+    }
+
+    bool UICashShop::expects(cash_shop_settlement::PendingKind response) const
+    {
+        return pending_kind_ == response &&
+            cash_shop_settlement::is_operation(response);
     }
 }

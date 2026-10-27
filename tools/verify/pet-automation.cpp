@@ -128,15 +128,36 @@ int main()
         { 0, 0 }, { -80, 0 }, { -80, 0 }, false, false, 0}) ==
         Action::MOVE_LEFT, "follow direction");
     ok &= expect(jrc::pet_follow::decide(Inputs{
-        { 0, 0 }, { 0, 0 }, { 10, -88 }, true, true, 0}) == Action::IDLE,
-        "loot within the owner jump reach is pursued");
+        { 0, 0 }, { 0, 0 }, { 10, -88 }, true, true, 0}) ==
+        Action::IDLE,
+        "parked loot within jump reach stays pursued");
     ok &= expect(jrc::pet_follow::decide(Inputs{
         { 0, 0 }, { 0, 0 }, { 10, -89 }, true, true, 0}) ==
         Action::ABANDON_LOOT,
         "loot above the owner jump reach is abandoned");
     ok &= expect(jrc::pet_follow::decide(Inputs{
-        { 0, 0 }, { 0, 0 }, { 10, 240 }, true, true, 0}) == Action::IDLE,
-        "loot below within the fall guard is pursued");
+        { 0, 0 }, { 0, 0 }, { 10, 240 }, true, true, 0}) ==
+        Action::IDLE,
+        "parked loot within the fall guard stays pursued");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 10, 16 }, true, true, 0}) == Action::IDLE,
+        "loot inside pickup range is still pursued while parked");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 5, 100 }, true, false, 0}) ==
+        Action::IDLE,
+        "standing pet waits beside loot below");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 10, 240 }, true, true, 0, 88 }) ==
+        Action::IDLE,
+        "deep loot pursuit continues while parked");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 10, -60 }, true, true, 0, 88 }) ==
+        Action::IDLE,
+        "high loot pursuit continues while parked");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, 0 }, { 60, 16 }, true, true, 0}) ==
+        Action::MOVE_RIGHT,
+        "walking pursuit of distant loot is not interrupted");
     ok &= expect(jrc::pet_follow::decide(Inputs{
         { 0, 0 }, { 0, 0 }, { 10, 241 }, true, true, 0}) ==
         Action::ABANDON_LOOT,
@@ -216,6 +237,24 @@ int main()
         jrc::pet_loot::batch_count(9) ==
             jrc::pet_loot::BATCH_LIMIT,
         "pickup sweeps cap the batch size but keep small clusters whole");
+    ok &= expect(jrc::pet_loot::in_reach({ 0, 0 }, { 50, 16 }, 88),
+        "adjacent drop below the foothold is in reach");
+    ok &= expect(jrc::pet_loot::in_reach({ 0, 0 }, { 10, 96 }, 88),
+        "drop one ledge below the pet is in reach");
+    ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 10, 97 }, 88),
+        "drop deeper than the reach window is out of reach");
+    ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 51, 16 }, 88),
+        "horizontal reach ends at the sweep window");
+    ok &= expect(jrc::pet_loot::in_reach({ 0, 0 }, { 10, -88 }, 88),
+        "drop at the pursuit height limit is in reach");
+    ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 10, -89 }, 88),
+        "drop above the pursuit height limit is out of reach");
+    ok &= expect(!jrc::pet_loot::should_abandon(239, false),
+        "pursuit keeps trying before the abandon window");
+    ok &= expect(jrc::pet_loot::should_abandon(240, false),
+        "pursuit gives up once the abandon window passes");
+    ok &= expect(!jrc::pet_loot::should_abandon(1000, true),
+        "reached loot is never abandoned");
 
     if (ok)
         std::cout << "PASS pet capabilities, automation, pickup, and leash rules\n";

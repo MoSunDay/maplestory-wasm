@@ -56,6 +56,7 @@ namespace jrc
         , pet_loot_target_frames(0)
         , pet_loot_cooldown(0)
         , pet_loot_attempts(0)
+        , pet_loot_blocked_oid(0)
         , pet_movement_sync_frames(0)
         , pending_intro_warp_mapid(-1)
         , pending_intro_warp_delay_ms(0)
@@ -178,6 +179,7 @@ namespace jrc
             player.draw(id, viewx, viewy, alpha);
             drops.draw(id, viewx, viewy, alpha);
         }
+        drops.draw_explosions(viewx, viewy, alpha);
         combat.draw(viewx, viewy, alpha);
         portals.draw(viewpos, alpha);
         backgrounds.drawforegrounds(viewx, viewy, alpha);
@@ -299,6 +301,11 @@ namespace jrc
         pet_automation.tick();
         if (pet_loot_cooldown > 0)
             --pet_loot_cooldown;
+        if (pet_loot_blocked_oid &&
+            !drops.has_lootable_drop(pet_loot_blocked_oid))
+        {
+            pet_loot_blocked_oid = 0;
+        }
 
         PetLook* pet = player.get_pet(0);
         if (!pet)
@@ -353,18 +360,33 @@ namespace jrc
             capabilities.meso_magnet,
             capabilities.item_pouch,
             capabilities.magic_scales,
-            pet_follow::pursuit_height_limit(pet_movement)
+            pet_follow::pursuit_height_limit(pet_movement),
+            pet_loot_blocked_oid
         };
 
-        if (pet_loot_target_oid && !drops.has_lootable_drop(pet_loot_target_oid))
+        if (pet_loot_target_oid)
         {
-            clear_pet_loot_target(pet);
+            // Drops keep falling and scattering after spawn; track the live
+            // icon center so the pet never parks at a stale capture.
+            const std::optional<Point<int16_t>> live_position =
+                drops.pet_loot_position(pet_loot_target_oid);
+            if (!live_position)
+            {
+                clear_pet_loot_target(pet);
+            }
+            else if (*live_position != pet_loot_target_position)
+            {
+                pet_loot_target_position = *live_position;
+                pet->set_loot_target(*live_position);
+            }
         }
 
         if (pet_loot_target_oid && !pet->has_loot_target())
         {
-            // The pet gave the target up (out of the owner's reach); cool down so
-            // the same drop is not instantly re-targeted.
+            // The pet gave the target up (out of the owner's reach); cool down
+            // and park the oid so the unreachable drop is not instantly
+            // re-targeted.
+            pet_loot_blocked_oid = pet_loot_target_oid;
             clear_pet_loot_target(pet);
             pet_loot_cooldown = PET_LOOT_COOLDOWN_FRAMES;
         }
@@ -386,14 +408,14 @@ namespace jrc
             return;
 
         ++pet_loot_target_frames;
-        bool pet_in_range = pet_follow::distance_between(
-            pet->get_position(), pet_loot_target_position) <= pet_loot::BATCH_RANGE;
+        bool pet_in_range = pet_loot::in_reach(pet->get_position(),
+            pet_loot_target_position, query.max_height_above);
         if (pet_loot::should_attempt(pet_loot_target_frames,
             pet_loot_attempts, pet_in_range))
         {
             // One sweep picks the whole cluster around the pet, nearest first.
             const std::vector<int32_t> batch = drops.find_pet_loot_batch(
-                query, pet->get_position(), pet_loot::BATCH_RANGE);
+                query, pet->get_position());
             const uint8_t count = pet_loot::batch_count(batch.size());
             for (uint8_t i = 0; i < count; ++i)
                 PetLootPacket(pet->get_uniqueid(), batch[i]).dispatch();
@@ -403,6 +425,17 @@ namespace jrc
                 clear_pet_loot_target(pet);
                 pet_loot_cooldown = PET_LOOT_COOLDOWN_FRAMES;
             }
+        }
+
+        if (pet_loot::should_abandon(pet_loot_target_frames, pet_in_range))
+        {
+            // A walk-only pursuit that has not closed the gap by now (deep
+            // pit, unreachable ledge) never will; give the drop up and park
+            // the oid so the pet resumes following instead of standing
+            // frozen beside loot it cannot pick up.
+            pet_loot_blocked_oid = pet_loot_target_oid;
+            clear_pet_loot_target(pet);
+            pet_loot_cooldown = PET_LOOT_COOLDOWN_FRAMES;
         }
     }
 

@@ -79,7 +79,7 @@ node tools/verify/maplestory-webui/cash-shop-equip-flow.mjs
 
 ## 现金商城分辨率取证
 
-`cash-shop-resolution-shot.mjs` 分别以 `SHOP_RES=1`（1280×720）和 `SHOP_RES=none`（800×600，清除持久化设置）登录进图、打开商城并截图，输出画布 `getBoundingClientRect` JSON 与 `mscashshop_filtered_count`/`mscashshop_selected_left`/`mscashshop_locker_count`/`mscashshop_inventory_count` 探针。两种分辨率均应得到 `filtered=1984`，用于确认 800×600 设计画布在宽屏下等比缩放且左右栏不重叠。
+`cash-shop-resolution-shot.mjs` 分别以 `SHOP_RES=1`（1280×720）和 `SHOP_RES=none`（800×600，清除持久化设置）登录进图、打开商城并截图，输出画布 `getBoundingClientRect` JSON 与 `mscashshop_filtered_count`/`mscashshop_selected_left`/`mscashshop_locker_count`/`mscashshop_inventory_count` 探针。两种分辨率均应得到 `filtered=1984`，用于确认 800×600 设计画布在宽屏下等比缩放且左右栏不重叠。进图后脚本先等 `msasset_blocking=0` 且加载遮罩 `is-hidden`，避免素材流式加载期间状态栏点击被吞。
 
 ```bash
 SHOP_RES=1 node tools/verify/maplestory-webui/cash-shop-resolution-shot.mjs
@@ -108,7 +108,7 @@ TAKE_EQUIP_ACCOUNT=test1 TAKE_EQUIP_PASSWORD=test1 TAKE_EQUIP_CARD=1 CHROME_BIN=
 
 ## 现金商城宠物购买与自动化全链路流程
 
-`cash-shop-pet-flow.mjs` 验收「商城宠物」功能闭环：登录（角色需在地图 40001、USE 栏备 `2000005` 超级药水）进图后进商城，断言第 8 分类「宠物」过滤生效（在售宠物 5000000–5000999 与宠物能力装备 1812000/1802 段，当前目录 87 件），SN `60000001` 搜索唯一高亮 5000001 并购买（NX 扣 4900、入库商城仓库）；双击仓库槽取出到现金栏后通过 `ensurePetSummoned` 序列召唤，断言已召唤宠物能力掩码为 31（磁铁+物品袋+飞行靴+自动 HP/MP 药水袋内建）。回图打蜗牛掉落金币/物品，验证宠物自动捡取（meso 到账且服务端 confirmed OID 从地图对象表移除）；随后 SQL 绑定 keymap 91/92 → 2000005，把 HP/MP 压到 30% 以下断线重登，断言登录同步后 HP/MP 均恢复 ≥99% 且药水消耗 1 瓶。产物（截图 + 状态 JSON）写 `/tmp/cash-shop-pet-flow`。测试会真实消耗 NX 并修改 keymap/HP/MP，运行前需角色离线。
+`cash-shop-pet-flow.mjs` 验收「商城宠物」功能闭环：登录（角色需在地图 40001、USE 栏备 `2000005` 超级药水）进图后进商城，断言第 8 分类「宠物」过滤生效（在售宠物 5000000–5000999 与宠物能力装备 1812000/1802 段，当前目录 87 件），SN `60000001` 搜索唯一高亮 5000001 并购买（NX 扣 4900、入库商城仓库）；双击仓库槽前先读 `mscashshop_selected_right_cash_id` 记录新宠物的商城唯一 ID，取出后断言 `msinventory_cash_slot(cashId)` 落在 1..24，再按该实际现金栏槽位通过 `ensurePetSummoned` 序列召唤，避免同 item id 多只宠物取错槽，随后断言已召唤宠物能力掩码为 31（磁铁+物品袋+飞行靴+自动 HP/MP 药水袋内建）。回图打蜗牛掉落金币/物品，验证宠物自动捡取（meso 到账且服务端 confirmed OID 从地图对象表移除）；随后 SQL 绑定 keymap 91/92 → 2000005，把 HP/MP 压到 30% 以下断线重登，断言登录同步后 HP/MP 均恢复 ≥99% 且药水消耗 1 瓶。产物（截图 + 状态 JSON）写 `/tmp/cash-shop-pet-flow`。测试会真实消耗 NX 并修改 keymap/HP/MP，运行前需角色离线。
 
 ```bash
 PET_FLOW_ACCOUNT=test1 PET_FLOW_PASSWORD=test1 PET_FLOW_CARD=0 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-pet-flow.mjs
@@ -118,7 +118,7 @@ PET_FLOW_ACCOUNT=test1 PET_FLOW_PASSWORD=test1 PET_FLOW_CARD=0 CHROME_BIN=/usr/b
 
 ## 现金商城宠物 UI 交互缺陷猎手流程
 
-`cash-shop-pet-ui-interactions.mjs` 专项目检宠物功能的 UI 交互边界（不做购买正向流，购买/取出/召唤/自动化由 `cash-shop-pet-flow.mjs` 覆盖）：宠物分类过滤计数**从内嵌 `cash-shop-v83.csv` 按客户端同口径动态推算**（在售 ∧ 性别 ∧ 宠物 5000xxx+能力装备 1812000-07+宠物穿戴 1802xxx，目录数据被并行任务扩充时自动跟随，实测 87 件）；翻页连点越界只钳制不崩溃（filtered/pending/notice 不漂移）；「装备」子菜单(武器)选中后切「宠物」子菜单状态复位不泄漏；「全部」分类含宠物商品；点宠物卡不进试穿集、预览面板回退图标；SN 搜索 → 二次点击弹购买确认 → **Escape 取消**路径不扣款不动仓库；搜索框「×」按钮清空恢复列表；宠物自动补给面板 CANCEL 丢弃滑条编辑、OK 保存 30/40 阈值（±2 容差）、`location.reload()` 重登后 localStorage 持久化、药水槽左右箭头切换候选（含 OFF）并落盘、收尾复位 50/50；召唤态断言能力掩码 31（未召唤则跳过）。注意：翻页/切分类后必须等 assetsIdle（图标按需流式加载会吞点击）。产物写 `/tmp/cash-shop-pet-ui`。
+`cash-shop-pet-ui-interactions.mjs` 专项目检宠物功能的 UI 交互边界（不做购买正向流，购买/取出/召唤/自动化由 `cash-shop-pet-flow.mjs` 覆盖）：宠物分类过滤计数**从内嵌 `cash-shop-v83.csv` 按客户端同口径动态推算**（在售 ∧ 性别 ∧ 宠物 5000xxx+能力装备 1812000-07+宠物穿戴 1802xxx，目录数据被并行任务扩充时自动跟随，实测 87 件）；翻页连点越界只钳制不崩溃（filtered/pending/notice 不漂移）；背靠背翻页连点专项不等待素材，随后轮询 `pending=0`/`notice=0`/`assetBlocking=0`/`balance_failed=0`/`balances_ready=1` 并截图 `02b-rapid-clicks`，只验证加载层与余额存活、不强求页码；「装备」子菜单(武器)选中后切「宠物」子菜单状态复位不泄漏；「全部」分类含宠物商品；点宠物卡不进试穿集、预览面板回退图标；SN 搜索 → 二次点击弹购买确认 → **Escape 取消**路径不扣款不动仓库；搜索框「×」按钮清空恢复列表；宠物自动补给面板 CANCEL 丢弃滑条编辑、OK 保存 30/40 阈值（±2 容差）、`location.reload()` 重登后 localStorage 持久化、药水槽左右箭头切换候选（含 OFF）并落盘、收尾复位 50/50；召唤态断言能力掩码 31（未召唤则跳过）。注意：商品图标已改用 `draw_effect` 非阻塞加载，不再进入 blocking 队列吞点击；`assetsIdle` 仍用于截图/静态素材稳定。产物写 `/tmp/cash-shop-pet-ui`。
 
 ```bash
 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-pet-ui-interactions.mjs
@@ -128,13 +128,25 @@ CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-sho
 
 ## 现金商城确认弹窗输入隔离
 
-`cash-shop-modal-guards.mjs` 专项目检购买确认弹窗（`UIYesNo`）的模态输入隔离与失效选中守卫：A 打开确认框后双击右栏储物格，断言 `msui_notice_active` 仍为 1 且 `mscashshop_pending` 与仓库/物品栏/NX 余额快照不变；B 弹窗外左栏滚轮同样不改变快照，关闭确认后左栏页基与操作前一致（滚轮符号先用无弹窗状态标定）；C 在第 2 页选中一张卡后翻页使高亮项离开当前页，按 Enter 不弹确认、快照不变，再用可见选中做正对照——Enter 仍弹确认，Escape 取消后快照不变。A/B 都用 `msui_front_at` 断言层级：储物格与滚轮点返回 `CASHSHOP`、弹窗中心 (400,240) 返回 `NOTICE`，这是 `get_front` 前台层判定修复的回归点（修复前该点为 `CASHSHOP`，鼠标事件会穿透到底层商城）。守卫用例本身不结算交易；商城仓库为空时脚本先用 SN `80000002`（1 NX）买入一件备货，开跑前通过 DB 重置账号 loggedin，要求账号离线且 NX Credit ≥ 1。产物写 `MODAL_GUARDS_ARTIFACT_DIR`（默认 `/tmp/cash-shop-modal-guards`）：截图 `01-slot-doubleclick-guard` 至 `05-visible-enter-cancelled`、`browser-console.log`、`browser-errors.log`，失败时另有 `zz-failure.png`。固定 test1/card0。
+`cash-shop-modal-guards.mjs` 专项目检购买确认弹窗（`UIYesNo`）的模态输入隔离与失效选中守卫：A 打开确认框后双击右栏储物格，断言 `msui_notice_active` 仍为 1 且 `mscashshop_pending` 与仓库/物品栏/NX 余额快照不变；B 弹窗外左栏滚轮同样不改变快照，关闭确认后左栏页基与操作前一致（滚轮符号先用无弹窗状态标定）；C 在第 2 页选中一张卡后翻页使高亮项离开当前页，按 Enter 不弹确认、快照不变，再用可见选中做正对照——Enter 仍弹确认，Escape 取消后快照不变。A/B 都用 `msui_front_at` 断言层级：储物格与滚轮点返回 `CASHSHOP`、弹窗中心 (400,240) 返回 `NOTICE`，这是 `get_front` 前台层判定修复的回归点（修复前该点为 `CASHSHOP`，鼠标事件会穿透到底层商城）。守卫用例本身不结算交易；商城仓库为空时脚本先用 SN `80000002`（1 NX）买入一件备货，开跑前通过 DB 重置账号 loggedin，要求账号离线且 NX Credit ≥ 1。产物写 `MODAL_GUARDS_ARTIFACT_DIR`（默认 `/tmp/cash-shop-modal-guards`）：截图 `01-slot-doubleclick-guard` 至 `05-visible-enter-cancelled`、`browser-console.log`、`browser-errors.log`，失败时另有 `zz-failure.png`。固定 test1/card0。D 在 Maple Points 余额 0 时验证确认后客户端的余额不足提示、`pending=0` 与快照不变；`MODAL_GUARDS_BALANCE_ONLY=1` 只跑 D。
 
 ```bash
 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-modal-guards.mjs
 ```
 
-环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`MODAL_GUARDS_DEBUG_PORT`（默认 9269）、`MODAL_GUARDS_ACCOUNT`/`MODAL_GUARDS_PASSWORD`（默认 test1/test1）、`MODAL_GUARDS_CARD`（角色卡索引 0..3，默认 0）、`MODAL_GUARDS_ARTIFACT_DIR`（默认 /tmp/cash-shop-modal-guards）、`MODAL_GUARDS_URL`（默认 http://127.0.0.1:8000/web/index.html）、`MS_SERVER_CONFIG`（DB 凭证，默认 link_repos/MapleStory-Server/configuration.ini）、`MS_UI_ELEMENT_HEADER`（默认 src/client/IO/UIElement.h，用于解析 NOTICE/CASHSHOP 元素序号）。
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`MODAL_GUARDS_DEBUG_PORT`（默认 9269）、`MODAL_GUARDS_ACCOUNT`/`MODAL_GUARDS_PASSWORD`（默认 test1/test1）、`MODAL_GUARDS_CARD`（角色卡索引 0..3，默认 0）、`MODAL_GUARDS_ARTIFACT_DIR`（默认 /tmp/cash-shop-modal-guards）、`MODAL_GUARDS_URL`（默认 http://127.0.0.1:8000/web/index.html）、`MODAL_GUARDS_BALANCE_ONLY`（=1 只跑余额不足 D 分支）、`MS_SERVER_CONFIG`（DB 凭证，默认 link_repos/MapleStory-Server/configuration.ini）、`MS_UI_ELEMENT_HEADER`（默认 src/client/IO/UIElement.h，用于解析 NOTICE/CASHSHOP 元素序号）。
+
+## 现金商城结算状态探针
+
+`cash-shop-settlement.cpp` 是不依赖浏览器的纯状态机回归，覆盖 `can_mutate` 的 16 种余额/失败/待结算/重进组合、`can_exit`、操作与退出期限、`0x57`/`0x89`→BUY 与 `0x68`/`0x6A` 的操作码关联，以及期限边界；运行命令见 [验证工具索引](../../index.md)。
+
+浏览器专项通过以下只读探针观察商城结算：
+
+- `mscashshop_balances_ready`：余额已到且未失败为 1，否则 0；商城不在前台为 -1。
+- `mscashshop_balance_failed`、`mscashshop_can_mutate`、`mscashshop_require_reenter`：分别暴露 10.5 秒余额期限结果、购买/转移总门禁与操作超时/回服失败后的重新进入要求。
+- `mscashshop_pending_op`：0=none、1=buy、2=take、3=put、4=exit，用于确认响应关联没有错误释放或残留。
+- `mscashshop_selected_right_cash_id`：当前右栏选中项的商城唯一 ID（JS 侧截断为 32 位），用于把取出响应关联到具体槽位。
+- `msinventory_cash_slot(cash_id)`：在角色 CASH 物品中按唯一 ID 查找实际槽位，找不到返回 0；宠物等同类物品多只并存时仍能定位本次取出的那一只。
 
 ## 自由市场 910000000 079 复刻流程
 

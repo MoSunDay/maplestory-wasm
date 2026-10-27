@@ -126,8 +126,6 @@ namespace jrc::cash_shop_skin
         skin.badge_sale = require_bitmap(root, "CSEffect/sale/0", 31, 29);
         skin.badge_event = require_bitmap(root, "CSEffect/event/0", 31, 29);
         skin.badge_limited = require_bitmap(root, "CSEffect/limited/0", 31, 29);
-        skin.inventory_panel =
-            require_bitmap(root, "CSInventory/backgrnd", 380, 213);
         skin.inventory_cover =
             require_bitmap(root, "CSInventory/backgrndCover", 346, 146);
         skin.tab_enabled =

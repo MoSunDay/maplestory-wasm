@@ -1,6 +1,7 @@
 #include "PetLootPolicy.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace jrc::pet_loot
 {
@@ -24,5 +25,21 @@ namespace jrc::pet_loot
     {
         return static_cast<uint8_t>(
             std::min(available, static_cast<size_t>(BATCH_LIMIT)));
+    }
+
+    bool in_reach(Point<int16_t> pet_position, Point<int16_t> target_position,
+        int32_t up_limit)
+    {
+        const int32_t dx = std::abs(static_cast<int32_t>(pet_position.x()) -
+            target_position.x());
+        // Y grows downward: positive dy means the target rests below the pet.
+        const int32_t dy = static_cast<int32_t>(target_position.y()) -
+            pet_position.y();
+        return dx <= BATCH_RANGE && dy <= REACH_DROP_LIMIT && -dy <= up_limit;
+    }
+
+    bool should_abandon(uint16_t target_frames, bool pet_in_range)
+    {
+        return !pet_in_range && target_frames >= ABANDON_FRAMES;
     }
 }

@@ -55,6 +55,11 @@ namespace jrc
         }
 
         void set_position(Point<int16_t> position);
+        // 相对父元素的位置读取（诊断探针用；原 position 为 protected）。
+        Point<int16_t> get_position() const
+        {
+            return position;
+        }
         void set_state(State state);
         void set_active(bool active);
 

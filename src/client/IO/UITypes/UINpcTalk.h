@@ -56,6 +56,12 @@ namespace jrc
             return prompttext;
         }
 
+        // 只读诊断探针（GameplayProbes 调用）：which 0=YES 1=NO 2=END 3=OK
+        // 4=NEXT 5=PREV；field 0=x 1=y 2=w 3=h 4=active。元素级 field:
+        // 0=pos.x 1=pos.y 2=dim.x 3=dim.y 4=dialogue_mode 5=post_chaos 根。
+        int32_t probe_button(int which, int field) const;
+        int32_t probe_element(int field) const;
+
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
 

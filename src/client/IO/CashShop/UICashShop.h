@@ -2,6 +2,7 @@
 
 #include "CashShopLayout.h"
 #include "CashShopModel.h"
+#include "CashShopSettlement.h"
 #include "CashShopSkin.h"
 #include "CashShopView.h"
 #include "UICashShopButtons.h"
@@ -11,6 +12,7 @@
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Texture.h"
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -50,15 +52,21 @@ namespace jrc
         void replace_locker(std::vector<CashLockerItem> items);
         void purchase_succeeded(CashLockerItem item);
         void package_purchase_succeeded(std::vector<CashLockerItem> items);
-        void take_succeeded();
-        void put_succeeded(CashLockerItem item);
+        void take_succeeded(int64_t cash_id);
+        void put_succeeded(CashLockerItem item, int64_t cash_id);
         void show_error(const std::string& message);
         void reconnect_failed(const std::string& address);
+        // SetField that ends a cash shop session: the pending EXIT was acked
+        // (leave_succeeded) or the reply named another character, which means
+        // the shop has to be entered again (leave_failed).
+        void leave_succeeded();
+        void leave_failed();
 
         int32_t locker_count() const;
         int32_t inventory_count() const;
         int32_t nx_credit() const;
         int32_t selected_right_row() const;
+        int64_t selected_right_cash_id() const;
         int32_t filtered_count() const;
         int8_t equip_sub_index() const;
         int32_t highlighted_item_id() const;
@@ -69,6 +77,17 @@ namespace jrc
         bool is_equip_menu_open() const;
         int64_t transfer_cash_id() const;
         bool is_pending() const;
+        cash_shop_settlement::PendingKind pending_kind() const;
+        // Purchases/transfers need loaded balances, no failure, no pending
+        // operation and no required re-entry.
+        bool balances_ready() const;
+        bool balance_failed() const;
+        bool can_mutate() const;
+        bool can_exit() const;
+        bool require_reenter() const;
+        // True when the pending operation waits for this reply opcode; a reply
+        // that does not match must not touch the shop state.
+        bool expects(cash_shop_settlement::PendingKind response) const;
 
         Point<int16_t> button_center(uint16_t id) const
         {
@@ -100,10 +119,12 @@ namespace jrc
         static CashCurrency currency_choice(size_t index);
         static const char* currency_short_name(CashCurrency value);
         void change_right_pane(cash_shop_view::RightPane pane);
-        void set_pending(bool value);
-        // True once every expected balance push has arrived. Purchases stay
-        // disabled before that so no reply can race the cached balances.
-        bool balances_ready() const;
+        // One outgoing operation at a time; the deadline covers a lost reply
+        // instead of counting frames, so a stalled tab does not expire early.
+        void begin_pending(cash_shop_settlement::PendingKind kind,
+            int64_t cash_id);
+        void finish_pending();
+        void clear_pending();
         void select_new_locker_item(int64_t cash_id);
         void select_inventory_item(int64_t cash_id);
         void request_purchase(size_t filtered_index);
@@ -140,16 +161,20 @@ namespace jrc
         bool equip_menu_open;
         size_t left_page;
         size_t right_page;
-        bool pending;
-        bool balance_requested;
-        // Armed by set_pending(true); pending_frames counts update() ticks so
-        // a lost reply cannot lock the shop forever.
-        bool pending_watch;
-        int pending_frames;
-        // The entry showCash is the first expected push; the CheckCash reply
-        // is counted as a second one when it is requested.
-        size_t balance_expected;
-        size_t balance_received;
+        cash_shop_settlement::PendingKind pending_kind_;
+        // showCash only pushes the balances once; balances_loaded_ is set by
+        // that push (0x144), balance_failed_ by its deadline.
+        bool balances_loaded_;
+        bool balance_failed_;
+        // Set when a pending operation timed out or a leave reply named another
+        // character: the shop must be re-entered before anything can mutate.
+        bool require_reenter_;
+        // Lets a late balance push clear only the timeout text it owns.
+        bool deferred_balance_error_;
+        std::optional<cash_shop_settlement::Clock::time_point>
+            balance_deadline_;
+        std::optional<cash_shop_settlement::Clock::time_point>
+            pending_deadline_;
         bool preview_dirty;
         int64_t pending_cash_id;
         std::optional<size_t> selected_left;

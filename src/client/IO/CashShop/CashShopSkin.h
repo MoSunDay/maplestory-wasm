@@ -35,7 +35,6 @@ namespace jrc::cash_shop_skin
         Texture line;
         Texture sort_bar;
         Texture card;
-        Texture inventory_panel;
         Texture inventory_cover;
         Texture tab_enabled;
         Texture tab_disabled;

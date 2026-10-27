@@ -45,7 +45,13 @@ async function main() {
     }
   }
   if (!entered) throw new Error(`game never entered (state=${stateName(await state())})`);
-  await sleep(6000);
+  // The status bar only accepts input after the initial asset burst finishes;
+  // clicking during the loading overlay silently drops the event.
+  if (!await waitFor(() => driver.evaluate(
+    "Module.ccall('msasset_blocking','number',[],[]) === 0"
+    + " && document.getElementById('asset-loading-screen').classList.contains('is-hidden')"), 45))
+    throw new Error('game assets never became idle');
+  await sleep(1000);
   const wide = await driver.evaluate("Module.ccall('msui_resolution_width','number',[],[])") > 800;
   // 双候选坐标：StatusBar2 的 BtCashShop 随右锚移动。1280x720 时元素
   // 锚点 x=992、按钮相对锚点 (57..113, -46..-11)，对应中心 (1077, 691)；

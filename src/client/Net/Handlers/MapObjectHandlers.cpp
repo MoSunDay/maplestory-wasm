@@ -690,8 +690,7 @@ namespace jrc
         }
 
         if (payload.effect == drop_removal::Effect::PLAYER_PICKUP ||
-            payload.effect == drop_removal::Effect::PET_PICKUP ||
-            payload.mode == 4)
+            payload.effect == drop_removal::Effect::PET_PICKUP)
         {
             Sound(Sound::PICKUP).play();
         }

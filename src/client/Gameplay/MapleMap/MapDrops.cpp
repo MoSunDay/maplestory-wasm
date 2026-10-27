@@ -18,8 +18,10 @@
 #include "MapDrops.h"
 
 #include "Drop.h"
+#include "DropLifecycle/MesoExplosion.h"
 #include "ItemDrop.h"
 #include "MesoDrop.h"
+#include "../Pet/PetLootPolicy.h"
 
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
@@ -28,6 +30,7 @@
 #include "nlnx/nx.hpp"
 
 #include <algorithm>
+#include <optional>
 
 namespace jrc
 {
@@ -39,6 +42,11 @@ namespace jrc
             const int64_t dy = static_cast<int32_t>(first.y()) - second.y();
             return dx * dx + dy * dy;
         }
+
+        // Cap on live meso explosion sprites: they self-expire in ~0.9s,
+        // so 200 is ample for real ME piles while blunting a misbehaving
+        // server broadcasting remove mode 4 in bulk.
+        constexpr size_t MAX_EXPLOSION_SPRITES = 200;
 
         struct PetLootCandidate
         {
@@ -68,6 +76,18 @@ namespace jrc
         drops.draw(layer, viewx, viewy, alpha);
     }
 
+    void MapDrops::draw_explosions(double viewx, double viewy, float alpha) const
+    {
+        Point<int16_t> viewpos(
+            static_cast<int16_t>(viewx),
+            static_cast<int16_t>(viewy)
+        );
+        for (const Sprite& explosion : explosions)
+        {
+            explosion.draw(viewpos, alpha);
+        }
+    }
+
     void MapDrops::update(const Physics& physics)
     {
         instantiate_spawns();
@@ -78,6 +98,10 @@ namespace jrc
         }
 
         drops.update(physics);
+
+        explosions.remove_if([](Sprite& explosion) {
+            return explosion.update(Constants::TIMESTEP);
+        });
 
         lootenabled = true;
     }
@@ -134,8 +158,21 @@ namespace jrc
         {
             if (local_pet_pickup)
                 ++confirmed_pet_pickups;
-            if (effect == drop_removal::Effect::IMMEDIATE_ERASE)
+            if (effect == drop_removal::Effect::IMMEDIATE_ERASE
+                || effect == drop_removal::Effect::MESO_EXPLOSION)
             {
+                if (effect == drop_removal::Effect::MESO_EXPLOSION)
+                {
+                    // Detonate the pile with the official coin burst; past
+                    // the cap only the sprite is skipped, the sound plays
+                    // either way.
+                    if (explosions.size() < MAX_EXPLOSION_SPRITES)
+                        explosions.emplace_back(
+                            meso_explosion::explosion(),
+                            DrawArgument(drop->get_position())
+                        );
+                    meso_explosion::play_sound();
+                }
                 drops.remove(oid);
                 return;
             }
@@ -152,6 +189,7 @@ namespace jrc
     void MapDrops::clear()
     {
         drops.clear();
+        explosions.clear();
         confirmed_pet_pickups = 0;
         spawns = {};
         pending_removals.clear();
@@ -210,6 +248,9 @@ namespace jrc
             if (!drop || !drop->is_lootable() || !pet_can_target(*drop, query))
                 continue;
 
+            if (entry.first == query.exclude_oid)
+                continue;
+
             Point<int16_t> position = drop->get_position() + Point<int16_t>(16, 16);
             if (static_cast<int32_t>(query.origin.y()) - position.y() >
                 query.max_height_above)
@@ -227,10 +268,9 @@ namespace jrc
     }
 
     std::vector<int32_t> MapDrops::find_pet_loot_batch(
-        const PetLootQuery& query, Point<int16_t> origin, int16_t range) const
+        const PetLootQuery& query, Point<int16_t> origin) const
     {
         std::vector<PetLootCandidate> candidates;
-        const int64_t range_sq = static_cast<int64_t>(range) * range;
         for (const auto& entry : drops)
         {
             Optional<const Drop> drop = entry.second.get();
@@ -239,15 +279,11 @@ namespace jrc
 
             Point<int16_t> position = drop->get_position() +
                 Point<int16_t>(16, 16);
-            if (static_cast<int32_t>(origin.y()) - position.y() >
-                query.max_height_above)
-            {
+            if (!pet_loot::in_reach(origin, position, query.max_height_above))
                 continue;
-            }
 
             const int64_t distance_sq = squared_distance(position, origin);
-            if (distance_sq <= range_sq)
-                candidates.push_back({ entry.first, distance_sq });
+            candidates.push_back({ entry.first, distance_sq });
         }
 
         std::sort(candidates.begin(), candidates.end(),
@@ -261,6 +297,14 @@ namespace jrc
         for (const PetLootCandidate& candidate : candidates)
             oids.push_back(candidate.oid);
         return oids;
+    }
+
+    std::optional<Point<int16_t>> MapDrops::pet_loot_position(int32_t oid) const
+    {
+        Optional<const Drop> drop = drops.get(oid);
+        if (!drop || !drop->is_lootable())
+            return std::nullopt;
+        return drop->get_position() + Point<int16_t>(16, 16);
     }
 
     bool MapDrops::has_drop(int32_t oid) const

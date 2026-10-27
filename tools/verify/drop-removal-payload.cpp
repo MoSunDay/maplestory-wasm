@@ -65,7 +65,7 @@ namespace
         append<int32_t>(exploded, 1000002);
         const auto explosion = parse(exploded);
         assert(explosion.character_id == 1000002);
-        assert(explosion.effect == Effect::IMMEDIATE_ERASE);
+        assert(explosion.effect == Effect::MESO_EXPLOSION);
     }
 
     void verify_pet_mode()

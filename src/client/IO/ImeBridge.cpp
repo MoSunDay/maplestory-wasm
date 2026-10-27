@@ -292,6 +292,48 @@ extern "C"
         return shop && shop->is_pending() ? 1 : 0;
     }
 
+    // Settlement probes: the UI keeps purchases locked until every balance
+    // push arrives, so expose the individual gates to tell a slow balance
+    // push apart from a failed one or a lingering pending operation.
+    EMSCRIPTEN_KEEPALIVE int mscashshop_balances_ready()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? (!shop->balances_ready() ? 0 : 1) : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_balance_failed()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? (shop->balance_failed() ? 1 : 0) : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_can_mutate()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? (shop->can_mutate() ? 1 : 0) : -1;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_require_reenter()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? (shop->require_reenter() ? 1 : 0) : -1;
+    }
+
+    // PendingKind: 0=none 1=buy 2=take 3=put 4=exit.
+    EMSCRIPTEN_KEEPALIVE int mscashshop_pending_op()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? static_cast<int>(shop->pending_kind()) : -1;
+    }
+
+    // Cash ids are stored as 64-bit, but the JS bridge only carries 32-bit
+    // numbers; the truncated id is enough to match one row in a single run.
+    EMSCRIPTEN_KEEPALIVE int mscashshop_selected_right_cash_id()
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? static_cast<int>(shop->selected_right_cash_id()) : -1;
+    }
+
     EMSCRIPTEN_KEEPALIVE int mscashshop_filtered_count()
     {
         auto shop = jrc::UI::get().get_element<jrc::UICashShop>();

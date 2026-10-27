@@ -30,6 +30,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../IO/UI.h"
+#include "../../IO/CashShop/UICashShop.h"
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/Field/UIFieldClock.h"
 #include "../../IO/Window.h"
@@ -90,6 +91,8 @@ namespace jrc
 
         auto charselect = UI::get().get_element<UICharSelect>();
         bool returning_from_cash_shop = UI::get().get_state() == UI::CASHSHOP;
+        UICashShop* cash_shop = returning_from_cash_shop ?
+            UI::get().get_element<UICashShop>().get() : nullptr;
         if (!charselect && !returning_from_cash_shop)
         {
             // The character-select screen is gone (e.g. after a reconnect
@@ -113,9 +116,19 @@ namespace jrc
         else if (Stage::get().get_player().get_oid() != cid)
         {
             Console::get().print("set_field: cash shop return cid mismatch");
-            UI::get().enable();
+            // The exit reply names another character: the cash shop keeps its
+            // pending EXIT, hands the UI back and asks for a re-entry.
+            if (cash_shop)
+                cash_shop->leave_failed();
+            else
+                UI::get().enable();
             return;
         }
+
+        // The cid matches, so this SetField is the leave acknowledgement for
+        // the pending exit; settle it before the parsing/transition starts.
+        if (cash_shop)
+            cash_shop->leave_succeeded();
 
         Player& player = Stage::get().get_player();
         player.reset_progress(LoginParser::parse_stats(recv));

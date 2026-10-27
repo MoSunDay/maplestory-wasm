@@ -24,6 +24,32 @@
 #include <unordered_map>
 #include <vector>
 
+namespace
+{
+    // The magic broadcast carries a trailing charge int only for these
+    // skills. The gate is MagicDamageHandler.java, which passes
+    // attack.charge only for FPArchMage.BIG_BANG, ILArchMage.BIG_BANG,
+    // Bishop.BIG_BANG, Evan.ICE_BREATH and Evan.FIRE_BREATH (constants
+    // under src/constants/skills/), while MaplePacketCreator
+    // magicAttack() appends writeInt(charge) only when charge != -1.
+    // Keep this list in sync with those constants; other charge skills
+    // broadcast through the close/ranged paths without the extra int.
+    bool has_broadcast_charge(int32_t skillid)
+    {
+        switch (skillid)
+        {
+        case 2121001: // FPArchMage.BIG_BANG
+        case 2221001: // ILArchMage.BIG_BANG
+        case 2321001: // Bishop.BIG_BANG
+        case 22121000: // Evan.ICE_BREATH
+        case 22151001: // Evan.FIRE_BREATH
+            return true;
+        default:
+            return false;
+        }
+    }
+}
+
 namespace jrc
 {
     AttackHandler::AttackHandler(Attack::Type t)
@@ -70,6 +96,17 @@ namespace jrc
                 auto singledamage = std::make_pair(decoded.damage, decoded.critical);
                 attack.damagelines[oid].push_back(singledamage);
             }
+        }
+
+        // Trailing fields: rangedAttack() always appends one int (0) and
+        // magicAttack() appends the charge int for breath/Big Bang skills.
+        if (type == Attack::RANGED)
+        {
+            recv.skip(4);
+        }
+        else if (type == Attack::MAGIC && has_broadcast_charge(attack.skill))
+        {
+            attack.charge = recv.read_int();
         }
 
         Stage::get().get_combat().push_attack(attack);

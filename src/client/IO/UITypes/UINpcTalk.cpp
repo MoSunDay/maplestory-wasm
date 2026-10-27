@@ -567,6 +567,58 @@ namespace jrc
         position = ui_layout::centered_box(dimension.x(), dimension.y());
     }
 
+    namespace
+    {
+        // 探针选择器 → 按钮表键（与 Buttons 枚举同序，定义于类内私有区）。
+        const uint16_t PROBE_BUTTON_IDS[6] = { 4, 5, 3, 0, 1, 2 };
+    }
+
+    int32_t UINpcTalk::probe_button(int which, int field) const
+    {
+        if (which < 0 || which > 5)
+            return -9998;
+        const auto it = buttons.find(PROBE_BUTTON_IDS[which]);
+        if (it == buttons.end())
+            return -9997;
+        const Button& button = *it->second;
+        switch (field)
+        {
+        case 0:
+            return button.get_position().x();
+        case 1:
+            return button.get_position().y();
+        case 2:
+            return button.width();
+        case 3:
+            return button.height();
+        case 4:
+            return button.is_active() ? 1 : 0;
+        default:
+            return -9996;
+        }
+    }
+
+    int32_t UINpcTalk::probe_element(int field) const
+    {
+        switch (field)
+        {
+        case 0:
+            return position.x();
+        case 1:
+            return position.y();
+        case 2:
+            return dimension.x();
+        case 3:
+            return dimension.y();
+        case 4:
+            return static_cast<int32_t>(dialogue_mode);
+        case 5:
+            return npctalk_nodes::post_chaos() ? 1 : 0;
+        default:
+            return -9996;
+        }
+    }
+
     void UINpcTalk::send_key(int32_t, bool pressed, bool escape)
     {
         if (!pressed || !escape)

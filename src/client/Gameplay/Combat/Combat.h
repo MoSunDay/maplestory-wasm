@@ -89,6 +89,9 @@ namespace jrc
         const SpecialMove& get_move(int32_t move_id);
 
         static bool is_teleport_skill(int32_t skillid);
+        static bool is_flash_jump(int32_t skillid);
+        // Dash forward with Flash Jump; one use per airborne period.
+        void apply_flash_jump();
         bool apply_teleport(const SpecialMove& move);
         Point<int16_t> find_teleport_target(int16_t range);
         Point<int16_t> find_teleport_target_vertical(bool up, int16_t range);
@@ -106,6 +109,7 @@ namespace jrc
         std::unordered_map<int32_t, Skill> skills;
         RegularAttack regularattack;
         int16_t teleport_cooldown = 0;
+        bool flashjump_spent = false;
 
         // Skill id of a proc'd final attack waiting to fire, or 0.
         int32_t final_attack_pending = 0;

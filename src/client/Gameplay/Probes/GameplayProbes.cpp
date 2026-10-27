@@ -629,6 +629,19 @@ extern "C"
         return jrc::UI::get().is_element_active(jrc::UIElement::NPCTALK) ? 1 : 0;
     }
 
+    // NPC 对话框按钮/布局只读探针：返回 -9999 表示元素未激活。
+    int msnpctalk_button_field(int which, int field)
+    {
+        auto talk = jrc::UI::get().get_element<jrc::UINpcTalk>();
+        return talk && talk->is_active() ? talk->probe_button(which, field) : -9999;
+    }
+
+    int msnpctalk_element_field(int field)
+    {
+        auto talk = jrc::UI::get().get_element<jrc::UINpcTalk>();
+        return talk && talk->is_active() ? talk->probe_element(field) : -9999;
+    }
+
     int msui_questlog_rows()
     {
         auto window = jrc::UI::get().get_element<jrc::UIQuestLog>();

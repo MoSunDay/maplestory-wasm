@@ -66,6 +66,7 @@ namespace jrc::pet_follow
             inputs.pet_position.y();
         const int32_t start_distance = inputs.pursuing_loot ? 32 : 65;
         const int32_t stop_distance = inputs.pursuing_loot ? 14 : 34;
+        const int32_t threshold = inputs.moving ? stop_distance : start_distance;
 
         if (outside_owner_leash(inputs.pet_position, inputs.owner_position))
         {
@@ -82,7 +83,6 @@ namespace jrc::pet_follow
             return Action::ABANDON_LOOT;
         }
 
-        const int32_t threshold = inputs.moving ? stop_distance : start_distance;
         if (dx > threshold)
             return Action::MOVE_RIGHT;
         if (dx < -threshold)

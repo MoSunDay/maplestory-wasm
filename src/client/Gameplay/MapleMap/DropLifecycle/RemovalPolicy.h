@@ -8,6 +8,9 @@ namespace jrc::drop_removal
     {
         EXPIRY_FADE,
         IMMEDIATE_ERASE,
+        // Meso Explosion detonation (mode 4): the pile plays the coin
+        // burst animation instead of being erased silently.
+        MESO_EXPLOSION,
         PLAYER_PICKUP,
         PET_PICKUP
     };
@@ -31,7 +34,7 @@ namespace jrc::drop_removal
         case 2:
             return { Effect::PLAYER_PICKUP, true, false, true };
         case 4:
-            return { Effect::IMMEDIATE_ERASE, true, false, true };
+            return { Effect::MESO_EXPLOSION, true, false, true };
         case 5:
             return { Effect::PET_PICKUP, true, true, true };
         default:
