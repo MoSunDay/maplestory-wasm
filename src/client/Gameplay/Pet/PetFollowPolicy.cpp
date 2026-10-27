@@ -48,6 +48,18 @@ namespace jrc::pet_follow
             OWNER_LEASH_DISTANCE;
     }
 
+    void anchor_after_warp(PhysicsObject& phobj, uint16_t owner_fhid)
+    {
+        // A warped pet must be judged against the owner's foothold. Keeping
+        // the stale one makes update_fh treat the owner's platform as thin
+        // air, so the pet drops right back to the floor it left behind.
+        phobj.fhid = owner_fhid;
+        phobj.onground = true;
+        phobj.fhslope = 0.0;
+        phobj.fhlayer = 0;
+        phobj.enablejd = false;
+    }
+
     Point<int16_t> player_side_position(Point<int16_t> owner_position)
     {
         constexpr int32_t SIDE_OFFSET = 35;
@@ -69,6 +81,16 @@ namespace jrc::pet_follow
         const int32_t threshold = inputs.moving ? stop_distance : start_distance;
 
         if (outside_owner_leash(inputs.pet_position, inputs.owner_position))
+        {
+            return Action::WARP_TO_OWNER;
+        }
+
+        // An owner standing on a platform overhead can never be reached by
+        // walking: warp back immediately instead of crawling along the floor
+        // below until the leash triggers.
+        const int32_t owner_dy = static_cast<int32_t>(
+            inputs.owner_position.y()) - inputs.pet_position.y();
+        if (!inputs.pursuing_loot && owner_dy < -inputs.height_limit)
         {
             return Action::WARP_TO_OWNER;
         }

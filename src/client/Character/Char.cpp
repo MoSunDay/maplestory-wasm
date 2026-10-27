@@ -142,7 +142,7 @@ namespace jrc
                     if (pet.get_stance() == PetLook::HANG || pet.get_stance() == PetLook::FLY)
                         pet.set_stance(PetLook::STAND);
                 }
-                pet.update(physics, get_position(), pet_movement);
+                pet.update(physics, get_position(), get_fhid(), pet_movement);
             }
         }
 
@@ -521,6 +521,11 @@ namespace jrc
     PhysicsObject& Char::get_phobj()
     {
         return phobj;
+    }
+
+    uint16_t Char::get_fhid() const
+    {
+        return phobj.fhid;
     }
 
 

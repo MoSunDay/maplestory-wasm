@@ -177,6 +177,18 @@ int main()
         { 0, 0 }, { 0, 200 }, { 0, 200 }, false, false, 0}) !=
         Action::WARP_TO_OWNER,
         "vertical separation alone does not bypass the 300 pixel leash");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, -200 }, { 0, -200 }, false, false, 0}) ==
+        Action::WARP_TO_OWNER,
+        "owner 200px overhead warps back instead of crawling below");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, -88 }, { 0, -88 }, false, false, 0}) !=
+        Action::WARP_TO_OWNER,
+        "owner within the pursuit height overhead keeps walking");
+    ok &= expect(jrc::pet_follow::decide(Inputs{
+        { 0, 0 }, { 0, -200 }, { 60, 0 }, true, false, 0}) ==
+        Action::MOVE_RIGHT,
+        "loot pursuit suppresses the overhead warp");
     ok &= expect(jrc::pet_follow::decide(Inputs{{ -32768, -32768 },
         { 32767, 32767 }, { 32767, 32767 }, false, false, 0}) ==
         Action::WARP_TO_OWNER,

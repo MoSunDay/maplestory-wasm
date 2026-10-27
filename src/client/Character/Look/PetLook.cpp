@@ -73,7 +73,7 @@ namespace jrc
     }
 
     void PetLook::update(const Physics& physics, Point<int16_t> charpos,
-        const pet_follow::MovementProfile& movement)
+        uint16_t owner_fhid, const pet_follow::MovementProfile& movement)
     {
         static const double PETFLYFORCE = 0.2;
 
@@ -92,7 +92,7 @@ namespace jrc
             last_warp_owner_distance = pet_follow::distance_between(
                 curpos, charpos);
             clear_loot_target();
-            warp_to(pet_follow::player_side_position(charpos));
+            warp_to(pet_follow::player_side_position(charpos), owner_fhid);
             physics.move_object(phobj);
             return;
         }
@@ -116,7 +116,7 @@ namespace jrc
                 last_warp_owner_distance = pet_follow::distance_between(
                     curpos, charpos);
                 clear_loot_target();
-                warp_to(pet_follow::player_side_position(charpos));
+                warp_to(pet_follow::player_side_position(charpos), owner_fhid);
                 physics.move_object(phobj);
                 return;
             }
@@ -152,7 +152,17 @@ namespace jrc
             }
             phobj.type = PhysicsObject::NORMAL;
             phobj.clear_flag(PhysicsObject::NOGRAVITY);
-            phobj.clear_flag(PhysicsObject::TURNATEDGES);
+            // Follow the owner with the owner's own edge discipline: stop at
+            // platform ends instead of walking off them. Only a loot target
+            // clearly below may take the pet off a ledge, so dives (Wing
+            // Boots pickups) keep working.
+            const bool loot_below = loot_target &&
+                static_cast<int32_t>(loot_target->y()) - curpos.y() >
+                pet_follow::HEIGHT_TOLERANCE;
+            if (loot_below)
+                phobj.clear_flag(PhysicsObject::TURNATEDGES);
+            else
+                phobj.set_flag(PhysicsObject::TURNATEDGES);
 
             const Physics::MoveResult result = physics.move_object(phobj);
             last_horizontal_collision = result.horizontal_collision;
@@ -192,7 +202,7 @@ namespace jrc
                 last_warp_owner_distance = pet_follow::distance_between(
                     curpos, charpos);
                 clear_loot_target();
-                warp_to(pet_follow::player_side_position(charpos));
+                warp_to(pet_follow::player_side_position(charpos), owner_fhid);
                 break;
             }
             else
@@ -351,12 +361,13 @@ namespace jrc
         phobj.vspeed = 0.0;
     }
 
-    void PetLook::warp_to(Point<int16_t> position)
+    void PetLook::warp_to(Point<int16_t> position, uint16_t owner_fhid)
     {
         set_position(position.x(), position.y());
         reset_motion();
         phobj.type = PhysicsObject::NORMAL;
         phobj.clear_flag(PhysicsObject::NOGRAVITY);
+        pet_follow::anchor_after_warp(phobj, owner_fhid);
         failed_loot_jumps = 0;
         jump_start_distance = 0;
         jump_direction = 0;

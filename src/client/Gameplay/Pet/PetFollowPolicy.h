@@ -74,4 +74,7 @@ namespace jrc::pet_follow
     bool outside_owner_leash(Point<int16_t> pet_position,
         Point<int16_t> owner_position);
     Point<int16_t> player_side_position(Point<int16_t> owner_position);
+    // Re-anchor a warped pet to its owner's foothold, so update_fh evaluates
+    // the landing spot against the owner's platform, not the stale one.
+    void anchor_after_warp(PhysicsObject& phobj, uint16_t owner_fhid);
 }

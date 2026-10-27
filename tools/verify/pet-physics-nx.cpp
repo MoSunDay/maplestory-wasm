@@ -110,6 +110,85 @@ namespace
                 "fully blocked movement against a wall requests a jump");
     }
 
+    // Two stacked platforms: flat fh 29 (x -251..-159, y 117) with the lower
+    // slope chain (fh 15..18, y ~167..179) underneath at overlapping x.
+    bool verify_warp_anchor(const jrc::Physics& physics)
+    {
+        constexpr uint16_t UPPER_FH = 29;
+        constexpr uint16_t LOWER_FH = 18;
+        constexpr double WARP_X = -235.0;
+        constexpr double OWNER_Y = 117.0;
+        bool ok = true;
+
+        // PetLook::warp_to with the owner's fhid: the leash lands the pet on
+        // the owner's platform and it must stay there.
+        jrc::PhysicsObject anchored = grounded_object(
+            -200.0, 176.0, LOWER_FH);
+        anchored.set_x(WARP_X);
+        anchored.set_y(OWNER_Y);
+        jrc::pet_follow::anchor_after_warp(anchored, UPPER_FH);
+        for (int frame = 0; frame < 60; ++frame)
+        {
+            const jrc::Physics::MoveResult result = physics.move_object(
+                anchored);
+            ok &= expect(result.grounded,
+                "anchored warp stays grounded on the owner's platform");
+            ok &= expect(anchored.crnt_y() == OWNER_Y,
+                "anchored warp never sinks below the owner");
+        }
+
+        // Pre-fix warp_to kept the stale lower foothold: one frame of gravity
+        // puts the pet below the owner's surface, get_fhid_below skips the
+        // overhead platform and locks onto the floor below.
+        jrc::PhysicsObject stale = grounded_object(-200.0, 176.0, LOWER_FH);
+        stale.set_x(WARP_X);
+        stale.set_y(OWNER_Y);
+        for (int frame = 0; frame < 60; ++frame)
+            physics.move_object(stale);
+        ok &= expect(!stale.onground || stale.crnt_y() - OWNER_Y >
+            jrc::pet_follow::HEIGHT_TOLERANCE,
+            "stale foothold after warp drops off the owner's platform");
+        return ok;
+    }
+
+    // Follow mode re-arms TURNATEDGES every frame: the pet must stop at a
+    // terminal edge. Only a loot dive (flag cleared) may leave the platform.
+    bool verify_edge_stop(const jrc::Physics& physics)
+    {
+        jrc::PhysicsObject object = grounded_object(-200.0, 117.0, 29);
+        bool ok = true;
+        bool reached_edge = false;
+        for (int frame = 0; frame < 240; ++frame)
+        {
+            object.hforce = jrc::pet_follow::BASE_MOVEMENT.walk_force;
+            object.set_flag(jrc::PhysicsObject::TURNATEDGES);
+            const jrc::Physics::MoveResult result = physics.move_object(
+                object);
+            ok &= expect(result.grounded,
+                "edge-disciplined pet stays grounded");
+            ok &= expect(object.crnt_y() == 117.0,
+                "edge-disciplined pet keeps the platform height");
+            ok &= expect(result.horizontal_collision !=
+                jrc::Footholdtree::HorizontalCollision::WALL,
+                "terminal edge is not reported as a wall");
+            ok &= expect(object.crnt_x() <= -158.5,
+                "edge-disciplined pet stops at the terminal edge");
+            reached_edge = reached_edge || object.crnt_x() >= -159.5;
+        }
+        ok &= expect(reached_edge, "edge-disciplined pet still reaches the edge");
+
+        jrc::PhysicsObject diver = grounded_object(-200.0, 117.0, 29);
+        bool dropped = false;
+        for (int frame = 0; frame < 240 && !dropped; ++frame)
+        {
+            diver.hforce = jrc::pet_follow::BASE_MOVEMENT.walk_force;
+            dropped = !physics.move_object(diver).grounded;
+        }
+        ok &= expect(dropped,
+            "loot dive without the edge flag still leaves the platform");
+        return ok;
+    }
+
     bool verify_edge(const jrc::Physics& physics)
     {
         constexpr double X1 = -263.0;
@@ -154,8 +233,10 @@ int main(int argc, char** argv)
     const jrc::Physics physics(footholds);
     const bool ok = verify_slope(physics, true) &&
         verify_slope(physics, false) && verify_wall(physics) &&
-        verify_edge(physics);
+        verify_edge(physics) && verify_warp_anchor(physics) &&
+        verify_edge_stop(physics);
     if (ok)
-        std::cout << "PASS pet slope, wall, and terminal-edge physics\n";
+        std::cout << "PASS pet slope, wall, terminal-edge, warp-anchor, "
+            "and edge-discipline physics\n";
     return ok ? 0 : 1;
 }

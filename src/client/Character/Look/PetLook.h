@@ -60,6 +60,7 @@ namespace jrc
 
         void draw(double viewx, double viewy, float alpha) const;
         void update(const Physics& physics, Point<int16_t> charpos,
+            uint16_t owner_fhid,
             const pet_follow::MovementProfile& movement =
                 pet_follow::BASE_MOVEMENT);
 
@@ -86,7 +87,7 @@ namespace jrc
 
     private:
         void reset_motion();
-        void warp_to(Point<int16_t> position);
+        void warp_to(Point<int16_t> position, uint16_t owner_fhid);
         void begin_jump(pet_follow::Action action, int32_t target_distance,
             double jump_force);
         void finish_jump(Point<int16_t> target_position);

@@ -150,6 +150,8 @@ namespace jrc
         const CharLook& get_look() const;
         /// Return a reference to this characters's physics.
         PhysicsObject& get_phobj();
+        /// Return the foothold the character currently occupies.
+        uint16_t get_fhid() const;
 
         /// Initialize character effects.
         static void init();
