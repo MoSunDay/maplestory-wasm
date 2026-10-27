@@ -23,23 +23,23 @@ namespace jrc
 {
     void UIStatusbar::draw_postchaos() const
     {
-        // Full-width bottom strip: the 1366px bitmap anchors to the view's
-        // left edge and stretches when the view is even wider, so the bar
-        // covers the bottom 100% of the screen at every resolution.
+        // Full-width bottom strip: only the flat left part of the bitmap
+        // is drawn (its right end bakes a quickslot-cell grid that overlaps
+        // the right control cluster), and it stretches so the bar covers
+        // the bottom 100% of the screen at every resolution.
         const Point<int16_t> left = statusbar::postchaos_left_anchor();
-        if (Constants::viewwidth() > statusbar::CHAOS_BAR_WIDTH)
-        {
-            postchaos_backgrnd.draw(DrawArgument(
+        postchaos_backgrnd.draw(
+            DrawArgument(
                 left,
                 Point<int16_t>(
                     Constants::viewwidth(), statusbar::CHAOS_BAR_HEIGHT
                 )
-            ));
-        }
-        else
-        {
-            postchaos_backgrnd.draw(left);
-        }
+            ),
+            Rectangle<int16_t>(
+                0, statusbar::CHAOS_BACKGRND_FLAT_WIDTH,
+                0, statusbar::CHAOS_BAR_HEIGHT
+            )
+        );
 
         // Left content column: level block, gauge frame, notice icon.
         postchaos_lv_backgrnd.draw(left);

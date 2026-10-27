@@ -18,7 +18,6 @@
 //
 // Layout metrics below were measured from the actual UI.nx textures:
 //   base/backgrnd       800x71   light grey strip
-//   base/quickSlot      151x80   4x2 key display (9px taller than the bar)
 //   gauge/bar           340x31   "HP"/"MP"/"EXP" labels above the fills
 //   gauge/graduation    340x31   frame + ticks + translucent dark base
 //   base/chat            566x5   chat log drag strip
@@ -66,9 +65,11 @@ namespace jrc
         constexpr int16_t BAR_HEIGHT = 71;
         /// Width of the shipped v83 bottom strip.
         constexpr int16_t BAR_WIDTH = 800;
-        /// Size of the quickslot display (base/quickSlot).
-        constexpr int16_t QUICKSLOT_WIDTH = 151;
-        constexpr int16_t QUICKSLOT_HEIGHT = 80;
+        /// Width of the corner block the v83 layout reserved for the
+        /// quickslot display. The dock itself is gone; the right-docked
+        /// buttons still measure their positions from this edge so they
+        /// keep their original screen coordinates.
+        constexpr int16_t RIGHT_CORNER_WIDTH = 151;
 
         /// Element anchor of the status bar. The v83 bar hugs the bottom-left
         /// corner of the view; the post-Chaos bar keeps its centered anchor.
@@ -172,12 +173,12 @@ namespace jrc
             return { 4, 50 };
         }
 
-        /// X of the three big 54x34 buttons right of the quickslot panel.
-        /// index 0 = BtShort, 1 = BtShop, 2 = BtMenu (rightmost).
+        /// X of the three big 54x34 buttons docked to the view's right
+        /// edge. index 0 = BtShort, 1 = BtShop, 2 = BtMenu (rightmost).
         inline int16_t big_button_x(int16_t index)
         {
             return static_cast<int16_t>(
-                Constants::viewwidth() - QUICKSLOT_WIDTH - 58 - index * 56
+                Constants::viewwidth() - RIGHT_CORNER_WIDTH - 58 - index * 56
             );
         }
 
@@ -219,47 +220,17 @@ namespace jrc
         }
 
         // ------------------------------------------------------------------
-        // Right side: quickslot display and buttons (right-anchored)
+        // Right side buttons (right-anchored)
         // ------------------------------------------------------------------
 
-        /// Top-left of base/quickSlot. The panel is one pixel per side wider
-        /// than the bar at the top, hence the -9 offset.
-        inline Point<int16_t> quickslot_pos()
-        {
-            return {
-                static_cast<int16_t>(Constants::viewwidth() - QUICKSLOT_WIDTH),
-                static_cast<int16_t>(BAR_HEIGHT - QUICKSLOT_HEIGHT)
-            };
-        }
-
-        /// Hit-test bounds of base/quickSlot. The panel starts 9px above the
-        /// bar, so the bar range alone clips its top edge.
-        inline Rectangle<int16_t> quickslot_range(Point<int16_t> position)
-        {
-            return {
-                position + quickslot_pos(),
-                position + quickslot_pos()
-                    + Point<int16_t>(QUICKSLOT_WIDTH, QUICKSLOT_HEIGHT)
-            };
-        }
-
-        /// Center of keycap slot `index` (0..7), relative to the panel.
-        inline Point<int16_t> quickslot_key_center(int16_t index)
-        {
-            constexpr int16_t COLUMN_X[4] = { 20, 54, 87, 124 };
-            return {
-                COLUMN_X[index % 4],
-                static_cast<int16_t>(index < 4 ? 24 : 59)
-            };
-        }
-
         /// Top-left of the small 28x20 menu shortcut icons (StatKey & co),
-        /// laid out as a row left of the quickslot display.
+        /// laid out as a row that keeps clear of the reserved right corner.
         inline Point<int16_t> icon_button_pos(int16_t index)
         {
             const int16_t row_width = static_cast<int16_t>(6 * 28 + 5 * 2);
             const int16_t x = static_cast<int16_t>(
-                quickslot_pos().x() - 8 - row_width + index * 30
+                Constants::viewwidth()
+                    - RIGHT_CORNER_WIDTH - 8 - row_width + index * 30
             );
             return { x, 5 };
         }

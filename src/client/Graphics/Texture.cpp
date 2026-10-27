@@ -78,15 +78,32 @@ namespace jrc
         return draw_with_load_class(args, DrawLoadClass::TRANSIENT_EFFECT);
     }
 
+    void Texture::draw(
+        const DrawArgument& args,
+        const Rectangle<int16_t>& source
+    ) const
+    {
+        draw_with_load_class(
+            args, DrawLoadClass::BLOCKING_VISIBLE, nullptr, &source
+        );
+    }
+
     bool Texture::draw_with_load_class(
         const DrawArgument& args,
         DrawLoadClass load_class,
-        Rectangle<int16_t>* bounds
+        Rectangle<int16_t>* bounds,
+        const Rectangle<int16_t>* source
     ) const
     {
         // Resolve the destination before the id/alpha/cull early returns so
-        // callers always see the rectangle this draw would use.
-        const Rectangle<int16_t> destination = args.get_rectangle(origin, dimensions);
+        // callers always see the rectangle this draw would use. A source
+        // region replaces the bitmap dimensions, so the sub-rectangle is
+        // laid out like a standalone texture with the same origin.
+        const Point<int16_t> source_dims = source
+            ? Point<int16_t>(source->width(), source->height())
+            : dimensions;
+        const Rectangle<int16_t> destination =
+            args.get_rectangle(origin, source_dims);
         if (bounds)
         {
             *bounds = destination;
@@ -118,8 +135,17 @@ namespace jrc
 #endif
         }
 
-        GraphicsGL::get()
-            .draw(bitmap, destination, args.get_color(), args.get_angle());
+        if (source)
+        {
+            GraphicsGL::get().draw(
+                bitmap, destination, *source, args.get_color(), args.get_angle()
+            );
+        }
+        else
+        {
+            GraphicsGL::get()
+                .draw(bitmap, destination, args.get_color(), args.get_angle());
+        }
         return true;
     }
 

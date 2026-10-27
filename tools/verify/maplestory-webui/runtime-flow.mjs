@@ -110,19 +110,6 @@ export function createRuntimeProbes(driver) {
     itemInventoryTabX: itemId => numberArgument('msiteminventory_tab_x', itemId),
     itemInventoryTabY: itemId => numberArgument('msiteminventory_tab_y', itemId),
     itemInventoryIconItemId: slot => numberArgument('msiteminventory_icon_item_id', slot),
-    quickslotSkill: index => numberArgument('msquickslot_skill', index),
-    quickslotItem: index => numberArgument('msquickslot_item', index),
-    quickslotCenterX: index => numberArgument('msquickslot_center_x', index),
-    quickslotCenterY: index => numberArgument('msquickslot_center_y', index),
-    quickslotPanel: async () => Object.freeze({
-      left: await number('msquickslot_panel_left'),
-      top: await number('msquickslot_panel_top'),
-      right: await number('msquickslot_panel_right'),
-      bottom: await number('msquickslot_panel_bottom')
-    }),
-    quickslotCooldown: index => numberArgument('msquickslot_cooldown', index),
-    quickslotCooldownLabel: index => numberArgument('msquickslot_cooldown_label', index),
-    quickslotHovered: () => number('msquickslot_hovered'),
     statusbarControlBounds: async id => ({
       left: await numberArgument2('msstatusbar_control_bounds', id, 0),
       top: await numberArgument2('msstatusbar_control_bounds', id, 1),

@@ -24,7 +24,6 @@
 
 #include "StatusBar/StatusBarPreChaos.h"
 #include "StatusBar/StatusBarPostChaos.h"
-#include "StatusBar/QuickSlotBar.h"
 
 #include "../Components/Charset.h"
 #include "../Components/Gauge.h"
@@ -37,7 +36,6 @@
 #include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
 
-#include <array>
 #include <string>
 #include <vector>
 #include <optional>
@@ -60,7 +58,6 @@ namespace jrc
         bool is_in_range(Point<int16_t> cursorpos) const override;
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override;
         CursorResult send_cursor(bool pressed, Point<int16_t> cursorpos) override;
-        void send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
         void rightclick(Point<int16_t> cursorpos) override;
 
         void send_chatline(const std::string& line, UIChatbar::LineType type);
@@ -90,19 +87,10 @@ namespace jrc
         const social::BuddyState& get_buddy_state() const;
         void record_multi_chat(uint8_t type);
         uint32_t get_party_message_count() const;
-        int32_t get_quickslot_skill(int16_t index) const;
-        int32_t get_quickslot_item(int16_t index) const;
-        Point<int16_t> get_quickslot_center(int16_t index) const;
-        /// Actual last-frame screen destination of the quickslot panel,
-        /// captured by quickslot::draw (not a re-derived hit box).
-        Rectangle<int16_t> get_quickslot_panel_bounds() const;
         /// Composed stat label for probes: 0 = hp, 1 = mp, 2 = exp,
         /// 3 = level. Points into the mutable label cache, so it stays
         /// valid until the next label rebuild.
         const char* get_stat_label(int16_t which) const;
-        int16_t get_quickslot_cooldown_length(int16_t index) const;
-        int16_t get_quickslot_hovered() const;
-        bool is_quickslot_in_range(Point<int16_t> cursorpos) const;
         int16_t button_at(Point<int16_t> cursorpos) const;
         /// Screen bounds of the button with `id`, zero-sized when absent.
         /// Probes use this to assert real layout instead of re-deriving
@@ -131,9 +119,6 @@ namespace jrc
         void initialize_prechaos(nl::node statusbar);
         void draw_prechaos() const;
         void draw_postchaos() const;
-        void draw_quickslot_dock() const;
-        void update_quickslot_tooltip(int16_t index);
-        void update_quickslot_cooldowns();
         void ensure_stat_labels(bool prechaos) const;
         void dispatch_popup_action(StatusBarPopup::Action action);
         float getexppercent() const;
@@ -200,15 +185,7 @@ namespace jrc
         // branch keeps the gauge sprites above and ignores these.
         Texture gauge_graduation;
         Texture gauge_fill;
-        Texture quickslot_panel;
-        Texture quickslot_keys[8];
-        quickslot::State quickslots;
-        std::array<Text, quickslot::COUNT> quickslot_cooldowns;
         mutable ColorBox gauge_covers[3];
-
-        // Exact screen destination of the last panel draw, captured by
-        // quickslot::draw so probes read the rendered rectangle.
-        mutable Rectangle<int16_t> quickslot_panel_draw_bounds;
 
         // Stat label cache, rebuilt only when the displayed values or the
         // label format change; draw() is const, hence the mutables.

@@ -34,8 +34,7 @@ async function evaluateAwait(driver, expression) {
 // exact for top-based rows y0..y1 inclusive, so the readPixels y origin is
 // canvas.height - 1 - y1 (not canvas.height - y1, which reads one row high).
 // view 默认 800x600（登录链各屏的固定布局）；游戏内分辨率不同的调用方
-// （如 quickslot-flow 的 1280x720 档）传入实际 view 尺寸，缩放映射才会
-// 落到正确的 backing-buffer 像素。
+// 需传入实际 view 尺寸，缩放映射才会落到正确的 backing-buffer 像素。
 function samplerExpression(rects, view = { width: 800, height: 600 }) {
   const config = JSON.stringify({ rects });
   return `(() => new Promise(resolve => {

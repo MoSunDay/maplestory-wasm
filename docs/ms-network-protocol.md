@@ -2098,17 +2098,6 @@ movementData    byte[]  Movement fragments
 
 ---
 
-### 0x00B7 — CHANGE_QUICKSLOT
-
-**Purpose:** Client saves quick-slot key binding (CP_QuickslotKeyMappedModified).
-
-```
-Field       Type     Notes
-quickslots  int[8]   Eight quick-slot bindings (skill/item IDs, 0 = empty)
-```
-
----
-
 ### 0x00BC — MOVE_LIFE (Monster Movement)
 
 **Purpose:** Client (as monster controller) reports monster movement.

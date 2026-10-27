@@ -7,24 +7,19 @@
 // Foundation.  See the NOTICE file for details.                            //
 //////////////////////////////////////////////////////////////////////////////
 // Free-function coordinate vocabulary for the post-Chaos status bar
-// (StatusBar2.img/mainBar, 1366x85) plus the generation dispatchers shared
-// by the quickslot dock, which exists in both asset generations.
+// (StatusBar2.img/mainBar, 1366x85).
 //
 // Layout metrics below were measured from the actual UI.nx textures:
 //   mainBar/backgrnd          1366x85  origin (512,84)
-//   mainBar/quickSlot/
-//     quickSlot               145x93   origin (-143,143)
 //   mainBar/BtSystem states   55x35    origin (-230,36)
 //
-// The element anchor keeps the bar's right control cluster (quickslot,
-// BtSystem, icon row) docked to the right edge of the live view: the
-// quickslot bitmap's right edge lands exactly on P.x + 288, so the anchor
-// x is viewwidth() - 288. At the default 800px view this reproduces the
+// The element anchor keeps the bar's right control cluster (BtSystem,
+// icon row) docked to the right edge of the live view: the anchor x is
+// viewwidth() - 288, which at the default 800px view reproduces the
 // original UIStatusbar::POSITION.x of 512.
 #pragma once
 #include "../../../Constants.h"
 #include "StatusBarPreChaos.h"
-#include "QuickSlotModel.h"
 
 namespace jrc
 {
@@ -35,12 +30,20 @@ namespace jrc
         // ------------------------------------------------------------------
 
         /// Distance from the element anchor to the right edge of the bar's
-        /// control cluster (quickslot bitmap: 143px offset + 145px wide).
+        /// control cluster (BtSystem, icon row). Kept at the historic 288px
+        /// (143px offset + 145px width of the removed quickslot bitmap) so
+        /// every retained right-cluster control stays at its screen spot.
         constexpr int16_t CHAOS_RIGHT_MARGIN = 288;
 
-        /// Size of the post-Chaos bottom strip bitmap (backgrnd 1366x85).
-        constexpr int16_t CHAOS_BAR_WIDTH = 1366;
+        /// Height of the post-Chaos bottom strip bitmap (backgrnd
+        /// 1366x85).
         constexpr int16_t CHAOS_BAR_HEIGHT = 85;
+
+        /// Width of the art-free left part of the 1366px strip bitmap. The
+        /// shipped backgrnd bakes a 33px-pitch quickslot-cell grid into its
+        /// right end (first border at x=880) that overlaps the SHOP/MTS/
+        /// Menu/System cluster, so only this flat part is drawn.
+        constexpr int16_t CHAOS_BACKGRND_FLAT_WIDTH = 878;
 
         /// Top edge of the strip inside the live view.
         inline int16_t postchaos_bar_top()
@@ -63,26 +66,6 @@ namespace jrc
             };
         }
 
-        /// Top edge of the shortcut icon row relative to the element anchor
-        /// (MapleButton uses the NORMAL origin, y = 58).
-        constexpr int16_t CHAOS_SHORTCUT_ICON_TOP = -58;
-
-        /// Top-left of mainBar/quickSlot/quickSlot relative to the element
-        /// anchor. Placement leaves a 2px gap above the shortcut row: the
-        /// panel top is viewH-163, its bottom viewH-70, and the icon row
-        /// starts at viewH-68.
-        constexpr int16_t CHAOS_QUICKSLOT_OFFSET_Y =
-            CHAOS_SHORTCUT_ICON_TOP - quickslot::CHAOS_LAYOUT.dimension.y() - 2;
-        constexpr Point<int16_t> CHAOS_QUICKSLOT_OFFSET = {
-            143, CHAOS_QUICKSLOT_OFFSET_Y
-        };
-
-        static_assert(
-            CHAOS_QUICKSLOT_OFFSET_Y + quickslot::CHAOS_LAYOUT.dimension.y()
-                == CHAOS_SHORTCUT_ICON_TOP - 2,
-            "quickslot panel must leave exactly 2px above the shortcut row"
-        );
-
         // ------------------------------------------------------------------
         // Left cluster (level block, gauges, chat row)
         // ------------------------------------------------------------------
@@ -101,39 +84,6 @@ namespace jrc
                 512,
                 static_cast<int16_t>(
                     Constants::viewheight() - Constants::VIEWYOFFSET)
-            };
-        }
-
-        // ------------------------------------------------------------------
-        // Generation dispatchers (quickslot dock)
-        // ------------------------------------------------------------------
-
-        /// Quickslot layout of the loaded asset generation.
-        inline const quickslot::Layout& quickslot_layout()
-        {
-            return prechaos()
-                ? quickslot::V83_LAYOUT
-                : quickslot::CHAOS_LAYOUT;
-        }
-
-        /// Top-left of the quickslot panel for the element at `position`.
-        /// v83 docks its own bitmap at the view's right edge; post-Chaos
-        /// draws the mainBar bitmap straight at the anchor.
-        inline Point<int16_t> quickslot_panel_pos(Point<int16_t> position)
-        {
-            return prechaos()
-                ? position + quickslot_pos()
-                : position + CHAOS_QUICKSLOT_OFFSET;
-        }
-
-        /// Hit-test bounds of the quickslot panel for the element at
-        /// `position`, sized after the active generation's bitmap.
-        inline Rectangle<int16_t> quickslot_dock_range(Point<int16_t> position)
-        {
-            const Point<int16_t> pos = quickslot_panel_pos(position);
-            return {
-                pos,
-                pos + quickslot_layout().dimension
             };
         }
     }

@@ -692,8 +692,7 @@ extern "C"
         const jrc::Point<int16_t> point(
             static_cast<int16_t>(x), static_cast<int16_t>(y));
         return (statusbar->is_active() ? 1 : 0)
-            | (statusbar->is_in_range(point) ? 2 : 0)
-            | (statusbar->is_quickslot_in_range(point) ? 4 : 0);
+            | (statusbar->is_in_range(point) ? 2 : 0);
     }
 
     int msstatusbar_button_at(int x, int y)
