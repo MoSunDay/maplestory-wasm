@@ -25,6 +25,12 @@ namespace jrc
     MapInfo::MapInfo(nl::node src, Range<int16_t> walls, Range<int16_t> borders)
     {
         nl::node info = src["info"];
+        if (!info)
+        {
+            // Some injected maps (e.g. the 079 free market) store the info
+            // properties flat on the map node instead of under 'info'.
+            info = src;
+        }
         if (info["VRLeft"].data_type() == nl::node::type::integer)
         {
             mapwalls = { info["VRLeft"], info["VRRight"] };

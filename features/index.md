@@ -32,6 +32,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **[角色自然恢复](character-recovery/)**: 按 v83 站立、攀爬、技能、地图倍率和椅子规则恢复 HP/MP，并与 linked server 的恢复校验及椅子状态同步
 - **传送门**: 地图间瞬移
 - **NPC 交互**: 对话、商店、仓库等
+- **[自由市场入口 BGM 修复](changelog/2026-10-27/fm-map-info-fallback-bgm.md)**: /gohome 回自由市场后 BGM 不刷新——079 注入的 910000000.img 属性平铺无 info 包装，MapInfo 回退平铺读取，恢复 BGM/VR 边界/town 等字段
 - **[自由市场地图名恢复](changelog/2026-10-26/fm-map-name-restore.md)**: 910000000 街道名/地图名恢复原版「自由市场/自由市场入口」，注入管线加覆盖防回归，小地图实显取证通过
 - **[自由市场玩法向导 NPC](changelog/2026-10-25/fm-gameplay-guide-npcs.md)**: 910000000 内的 PQ 招募/BOSS 入口向导（9010000/9010005），一键传送到 13 个组队任务招募点与 12 个 BOSS 入口，危险地图先二次确认
 - **[自由市场科皮药水价格](changelog/2026-10-25/fm-kopee-potion-prices.md)**: 超级药水 5 万、特殊药水 2 万（shopid 1339 shopitems，重启生效）
