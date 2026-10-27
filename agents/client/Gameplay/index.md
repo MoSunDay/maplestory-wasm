@@ -70,6 +70,10 @@ Stage 内部组合了所有地图实体管理器。
 - `FootholdTree`: 地形的空间索引（四叉树）
 - `Foothold`: 单条平台/地面碰撞检测
 - 角色与平台之间的重力、移动、跳跃计算
+- 地面支撑只在 foothold 实际覆盖的 x 列内生效（`limit_movement` 不再把
+  跨段外推的斜面当幻影地板）；坠落越过地图底部时 `update_fh` 回收会重锚
+  到本列最低真实 foothold（无平台列才退回 last-known/虚拟地板），保证
+  `get_wall` 链路存活、人物不再沿图底穿墙
 
 ### Combat (`Combat/`)
 

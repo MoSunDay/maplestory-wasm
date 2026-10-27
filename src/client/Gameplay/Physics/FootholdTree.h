@@ -52,6 +52,7 @@ namespace jrc
         Range<int16_t> get_borders() const;
     private:
         uint16_t get_fhid_below(double fx, double fy) const;
+        uint16_t get_lowest_fhid(double fx) const;
         double get_wall(uint16_t fhid, bool left, double fy) const;
         double get_edge(uint16_t fhid, bool left) const;
         const Foothold& get_fh(uint16_t fhid) const;

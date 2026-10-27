@@ -153,22 +153,30 @@ namespace jrc
             double crnt_y = phobj.crnt_y();
             double next_y = phobj.next_y();
 
-            auto ground = Range<double>(
-                get_fh(phobj.fhid).ground_below(phobj.crnt_x()),
-                get_fh(phobj.fhid).ground_below(phobj.next_x())
-            );
-            bool collision = crnt_y <= ground.first() && next_y >= ground.second();
-            if (collision)
+            // Ground support only exists where the foothold actually spans
+            // the object. Past a segment end, ground_below extrapolates the
+            // slope into thin air, and treating that as a floor leaves
+            // objects hovering on phantom ground beside platforms.
+            const Foothold& support = get_fh(phobj.fhid);
+            const bool spanned =
+                support.hcontains(static_cast<int16_t>(phobj.crnt_x())) ||
+                support.hcontains(static_cast<int16_t>(phobj.next_x()));
+            if (spanned)
             {
-                phobj.limity(ground.second());
+                auto ground = Range<double>(
+                    support.ground_below(phobj.crnt_x()),
+                    support.ground_below(phobj.next_x())
+                );
+                bool collision = crnt_y <= ground.first() && next_y >= ground.second();
+                if (collision)
+                {
+                    phobj.limity(ground.second());
 
-                const HorizontalCollision landed_collision = limit_movement(phobj);
-                if (horizontal_collision == HorizontalCollision::NONE)
-                    horizontal_collision = landed_collision;
-            }
-            else
-            {
-                if (next_y < borders.first())
+                    const HorizontalCollision landed_collision = limit_movement(phobj);
+                    if (horizontal_collision == HorizontalCollision::NONE)
+                        horizontal_collision = landed_collision;
+                }
+                else if (next_y < borders.first())
                 {
                     phobj.limity(borders.first());
                 }
@@ -176,6 +184,14 @@ namespace jrc
                 {
                     phobj.limity(borders.second());
                 }
+            }
+            else if (next_y < borders.first())
+            {
+                phobj.limity(borders.first());
+            }
+            else if (next_y > borders.second())
+            {
+                phobj.limity(borders.second());
             }
         }
 
@@ -221,20 +237,33 @@ namespace jrc
 
         if (phobj.fhid == 0 && y >= borders.second())
         {
-            // Once an object falls below the last foothold, keep it recoverable by
-            // snapping it back to the closest point on the last known foothold.
-            if (curfh.id() != 0 && !curfh.is_wall())
+            // Once an object falls below the last foothold, keep it
+            // recoverable by snapping it back onto real ground. The lowest
+            // foothold of the current column comes first: it needs no
+            // horizontal teleport, and it keeps the wall chain alive. An
+            // object stranded here with fhid 0 would slide along the
+            // artificial map bottom straight through every interior wall,
+            // because get_wall only sees the empty default footholds and
+            // degenerates to the map bounds.
+            uint16_t rescueid = get_lowest_fhid(x);
+            if (rescueid == 0 && curfh.id() != 0 && !curfh.is_wall())
             {
-                double recovery_x = clamp_to_foothold(curfh, x);
-                double recovery_y = curfh.ground_below(recovery_x);
+                rescueid = curfh.id();
+            }
+
+            if (rescueid != 0)
+            {
+                const Foothold& rescuefh = get_fh(rescueid);
+                double recovery_x = clamp_to_foothold(rescuefh, x);
+                double recovery_y = rescuefh.ground_below(recovery_x);
                 phobj.limitx(recovery_x);
                 phobj.limity(recovery_y);
-                phobj.fhid = curfh.id();
-                phobj.fhslope = curfh.slope();
+                phobj.fhid = rescueid;
+                phobj.fhslope = rescuefh.slope();
                 phobj.onground = true;
                 phobj.enablejd = false;
                 phobj.groundbelow = recovery_y + 1.0;
-                phobj.fhlayer = curfh.layer();
+                phobj.fhlayer = rescuefh.layer();
                 return;
             }
 
@@ -384,6 +413,31 @@ namespace jrc
 
             return walls.second();
         }
+    }
+
+    uint16_t Footholdtree::get_lowest_fhid(double fx) const
+    {
+        uint16_t ret = 0;
+        double lowest = -30000.0;
+        auto x = static_cast<int16_t>(fx);
+        auto range = footholdsbyx.equal_range(x);
+        for (auto iter = range.first; iter != range.second; ++iter)
+        {
+            const Foothold& fh = get_fh(iter->second);
+            if (fh.id() == 0)
+            {
+                continue;
+            }
+
+            double ycomp = fh.ground_below(fx);
+            if (ycomp > lowest)
+            {
+                lowest = ycomp;
+                ret = fh.id();
+            }
+        }
+
+        return ret;
     }
 
     uint16_t Footholdtree::get_fhid_below(double fx, double fy) const
