@@ -138,16 +138,20 @@ namespace
         }
 
         // Pre-fix warp_to kept the stale lower foothold: one frame of gravity
-        // puts the pet below the owner's surface, get_fhid_below skips the
-        // overhead platform and locks onto the floor below.
+        // put the pet below the owner's surface and get_fhid_below skipped
+        // the overhead platform, dropping the pet to the floor below. The
+        // foothold grounding tolerance band now catches that near-surface
+        // case, so even a warp that kept a stale fhid lands on the owner's
+        // platform.
         jrc::PhysicsObject stale = grounded_object(-200.0, 176.0, LOWER_FH);
         stale.set_x(WARP_X);
         stale.set_y(OWNER_Y);
         for (int frame = 0; frame < 60; ++frame)
             physics.move_object(stale);
-        ok &= expect(!stale.onground || stale.crnt_y() - OWNER_Y >
-            jrc::pet_follow::HEIGHT_TOLERANCE,
-            "stale foothold after warp drops off the owner's platform");
+        ok &= expect(stale.onground,
+            "stale-fhid warp is caught by the grounding tolerance band");
+        ok &= expect(stale.crnt_y() == OWNER_Y,
+            "stale-fhid warp lands on the owner's platform");
         return ok;
     }
 

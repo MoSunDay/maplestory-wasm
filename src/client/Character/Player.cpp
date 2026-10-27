@@ -89,6 +89,12 @@ namespace jrc
         ladder = nullptr;
         phobj.type = PhysicsObject::NORMAL;
         phobj.clear_flags();
+        // Drop stale foothold state: update_fh re-acquires the ground under
+        // the respawn point (with its grounding tolerance band) instead of
+        // judging the new position against the previous map's fhid.
+        phobj.fhid = 0;
+        phobj.fhlayer = 0;
+        phobj.onground = false;
         phobj.hspeed = 0.0;
         phobj.vspeed = 0.0;
         phobj.hforce = 0.0;

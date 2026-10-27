@@ -25,6 +25,14 @@ namespace jrc
 {
     namespace
     {
+        // Grounding tolerance band (px) for re-acquiring the ground under a
+        // physics object: a surface up to this far above the object still
+        // counts as the ground beneath it. Integer spawn/warp coordinates
+        // routinely sit a fraction of a pixel below interpolated slope
+        // surfaces; without this band such objects are treated as having
+        // already fallen past every platform and drop to the map bottom.
+        constexpr double GROUND_EPS = 5.0;
+
         double clamp_to_foothold(const Foothold& foothold, double x)
         {
             return std::clamp(x, static_cast<double>(foothold.l()), static_cast<double>(foothold.r()));
@@ -223,7 +231,7 @@ namespace jrc
 
             if (phobj.fhid == 0)
             {
-                phobj.fhid = get_fhid_below(x, y);
+                phobj.fhid = get_fhid_below(x, y, GROUND_EPS);
             }
             else
             {
@@ -232,7 +240,7 @@ namespace jrc
         }
         else
         {
-            phobj.fhid = get_fhid_below(x, y);
+            phobj.fhid = get_fhid_below(x, y, GROUND_EPS);
         }
 
         if (phobj.fhid == 0 && y >= borders.second())
@@ -304,6 +312,18 @@ namespace jrc
             }
         }
 
+        // Grounding tolerance band: an object resting a few pixels below a
+        // surface is still standing on it. Only catch objects that are not
+        // rising, so jumps pass through platforms from below unaffected.
+        if (phobj.vspeed >= 0.0)
+        {
+            double sink = phobj.crnt_y() - ground;
+            if (sink > 0.0 && sink <= GROUND_EPS)
+            {
+                phobj.y = ground;
+            }
+        }
+
         phobj.onground = phobj.y == ground;
 
         if (phobj.enablejd || phobj.is_flag_set(PhysicsObject::CHECKBELOW))
@@ -313,7 +333,10 @@ namespace jrc
             {
                 double nextground = get_fh(belowid).ground_below(x);
                 phobj.enablejd = (nextground - ground) < 600.0;
-                phobj.groundbelow = ground + 1.0;
+                // Jump-down must start below the tolerance band, otherwise
+                // the snap above would pull an Alt+Down drop back onto the
+                // platform it is meant to pass through.
+                phobj.groundbelow = ground + GROUND_EPS + 1.0;
             }
             else
             {
@@ -440,10 +463,11 @@ namespace jrc
         return ret;
     }
 
-    uint16_t Footholdtree::get_fhid_below(double fx, double fy) const
+    uint16_t Footholdtree::get_fhid_below(double fx, double fy, double tolerance) const
     {
         uint16_t ret = 0;
         double comp = borders.second();
+        double lowest = fy - tolerance;
 
         auto x = static_cast<int16_t>(fx);
         auto range = footholdsbyx.equal_range(x);
@@ -451,7 +475,7 @@ namespace jrc
         {
             const Foothold& fh = get_fh(iter->second);
             double ycomp = fh.ground_below(fx);
-            if (comp >= ycomp && ycomp >= fy)
+            if (comp >= ycomp && ycomp >= lowest)
             {
                 comp = ycomp;
                 ret = fh.id();

@@ -51,7 +51,10 @@ namespace jrc
         // Returns the topmost and bottommost platform positions of the map.
         Range<int16_t> get_borders() const;
     private:
-        uint16_t get_fhid_below(double fx, double fy) const;
+        // Finds the closest surface at or below (fx, fy). 'tolerance'
+        // additionally accepts surfaces up to that many pixels above
+        // fy, so callers can treat near-surface positions as grounded.
+        uint16_t get_fhid_below(double fx, double fy, double tolerance = 0.0) const;
         uint16_t get_lowest_fhid(double fx) const;
         double get_wall(uint16_t fhid, bool left, double fy) const;
         double get_edge(uint16_t fhid, bool left) const;
