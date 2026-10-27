@@ -119,6 +119,9 @@ namespace jrc
 
     void UIBuffList::add_buff(int32_t buffid, int32_t duration)
     {
+        // Re-casting a buff must refresh its icon, so replace any
+        // existing entry instead of letting emplace silently no-op.
+        icons.erase(buffid);
         icons.emplace(
             std::piecewise_construct,
             std::forward_as_tuple(buffid),
