@@ -78,6 +78,15 @@ phase_visual() {
   echo "VISUAL CHUNK DONE ($*)"
 }
 
+phase_equip() {
+  # 装备属性 + 受击减伤 wasm 实测（SetField 解析、WDEF/MDEF 累加、Achilles 20%）
+  reset_login
+  rm -rf /tmp/equip-stat-flow
+  CHROME_BIN=/usr/bin/chromium-browser \
+    timeout 420 node "$ROOT/tools/verify/maplestory-webui/equip-stat-flow.mjs" 2>&1 | tail -3
+  reset_login
+}
+
 phase_report() {
   python3 - "$ROOT" <<'PY'
 import glob, json, os, sys, time
@@ -142,13 +151,17 @@ case "${1:-all}" in
   proto)  shift; phase_proto "$@" ;;
   visual) shift; phase_visual "$@" ;;
   report) shift; phase_report ;;
+  equip)  shift; phase_equip ;;
   all)
     shift
     phase_setup && phase_proto
     if ! printf '%s\n' "$@" | grep -q -- --skip-visual; then
       for i in 0 3 6 9; do phase_visual "${SUFFIXES[@]:$i:3}"; done
     fi
+    if ! printf '%s\n' "$@" | grep -q -- --skip-equip; then
+      phase_equip
+    fi
     phase_report ;;
   restore) shift; phase_restore ;;
-  *) echo "usage: $0 {setup|proto [<suffix...>]|visual <suffix...>|report|restore|all} [--skip-visual]"; exit 64 ;;
+  *) echo "usage: $0 {setup|proto [<suffix...>]|visual <suffix...>|equip|report|restore|all} [--skip-visual] [--skip-equip]"; exit 64 ;;
 esac

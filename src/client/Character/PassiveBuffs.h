@@ -90,4 +90,8 @@ namespace jrc
     private:
         std::unordered_map<int32_t, std::unique_ptr<PassiveBuff>> buffs;
     };
+
+    // Pure conversion: the per-mille retained-damage share stored in WZ
+    // (Achilles Lv30 x = 800) into a damage-reduction fraction in [0, 1].
+    float achilles_reduction(int32_t retained_per_mille);
 }

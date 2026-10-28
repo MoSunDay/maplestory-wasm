@@ -23,6 +23,8 @@
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
 
+#include <algorithm>
+
 namespace jrc
 {
     bool ConditionlessBuff::is_applicable(CharStats&, nl::node) const
@@ -70,10 +72,23 @@ namespace jrc
     }
 
 
+    float achilles_reduction(int32_t retained_per_mille)
+    {
+        // WZ stores the retained-damage share in per-mille: Lv30 x = 800
+        // means the hero keeps taking 80% of the hit, i.e. a 20% reduction.
+        // A missing or dirty node reads as 0 and must mean "no reduction"
+        // instead of full immunity; other out-of-range shares clamp to [0, 1].
+        if (retained_per_mille <= 0)
+            return 0.0f;
+        const float reduction =
+            (1000 - static_cast<float>(retained_per_mille)) / 1000;
+        return std::min(1.0f, std::max(0.0f, reduction));
+    }
+
     void AchillesBuff::apply_to(CharStats& stats, nl::node level) const
     {
-        float reducedamage = static_cast<float>(level["x"]) / 1000;
-        stats.set_reducedamage(reducedamage);
+        stats.set_reducedamage(
+            achilles_reduction(static_cast<int32_t>(level["x"])));
     }
 
 
