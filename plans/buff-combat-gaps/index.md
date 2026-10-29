@@ -30,3 +30,16 @@ wasm 在登录流被断开后阻塞等待封包字节，主线程冻结、CDP �
 
 ibtest 账号（ibHero，密码同 test1）为圣甲术 e2e 专用克隆，避免与其他
 会话争抢 test1 登录态。
+
+### 23:40 复查：阻塞性质已定位为协议中间态
+
+当晚 23:17 服务端重启后进入稳定但**不发 WORLD_LIST** 的状态（78 次登录全卡
+world select，含对端自己的测试循环；assets-server/ws-proxy/客户端二进制/
+探针导出均已逐一验证健康，详见
+docs/known-issues/2026-10-29-game-server-restart-client-freeze.md）。
+属对端登录协议改造的中间破损态。复跑前置判据追加：
+
+    docker logs ms-game-server --since 10m 2>&1 | grep -c "WORLD_LIST"  # 须 >0
+
+通过后依上节命令重跑；PASS 后再补 iron-body-client-flow.mjs（buff 图标）
+与 scripts/test_accounts/verify_all.sh all --skip-visual 全量回归。
