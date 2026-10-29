@@ -31,6 +31,7 @@
 #include "nlnx/nx.hpp"
 
 #include <algorithm>
+#include <chrono>
 
 namespace jrc
 {
@@ -38,6 +39,16 @@ namespace jrc
     {
         // Teleport cooldown in update ticks (~44 * 8ms ≈ 350ms).
         constexpr int16_t TELEPORT_COOLDOWN_TICKS = 44;
+        // Minimum interval between casts of the same non-attack skill.
+        constexpr uint32_t BUFF_CAST_INTERVAL_MS = 1000;
+
+        // Monotonic wall time in ms (same clock as the pickup throttle).
+        uint64_t now_millis()
+        {
+            return std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
+
         // Flash Jump dash speed (px per update tick). With the low lift-off
         // below this covers roughly 390px, matching the official skill.
         constexpr double FLASH_JUMP_HSPEED = 9.0;
@@ -177,6 +188,7 @@ namespace jrc
     {
         teleport_cooldown = 0;
         flashjump_spent = false;
+        last_buffcast_ms.clear();
         final_attack_pending = 0;
         final_attack_targets.clear();
     }
@@ -198,12 +210,31 @@ namespace jrc
 
         const SpecialMove& move = get_move(move_id);
 
+        // Buff skills without a cast action (e.g. Iron Body) never set the
+        // attacking state, so key auto-repeat would re-cast on every keydown.
+        // Limit them to one cast per second; teleport and flash jump keep
+        // their own, faster cadence.
+        const bool throttled_buff = !move.is_attack()
+            && !is_teleport_skill(move_id) && !is_flash_jump(move_id);
+        const uint64_t now_ms = now_millis();
+        if (throttled_buff)
+        {
+            auto iter = last_buffcast_ms.find(move_id);
+            if (iter != last_buffcast_ms.end()
+                && now_ms - iter->second < BUFF_CAST_INTERVAL_MS)
+            {
+                return false;
+            }
+        }
+
         SpecialMove::ForbidReason reason = player.can_use(move);
         Weapon::Type weapontype = player.get_stats().get_weapontype();
         switch (reason)
         {
         case SpecialMove::FBR_NONE:
             apply_move(move);
+            if (throttled_buff)
+                last_buffcast_ms[move_id] = now_ms;
             return true;
         default:
             ForbidSkillMessage(reason, weapontype).drop();

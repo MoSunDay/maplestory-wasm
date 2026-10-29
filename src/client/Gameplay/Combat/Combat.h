@@ -29,6 +29,8 @@
 #include "../../Character/Player.h"
 #include "../../Template/TimedQueue.h"
 
+#include <cstdint>
+
 namespace jrc
 {
     class Combat
@@ -58,6 +60,14 @@ namespace jrc
         void show_player_buff(int32_t skillid);
         // Show damage a remote source dealt to a mob (e.g. damage over time).
         void show_damage(int32_t oid, int32_t damage);
+
+        // Read-only probe access for tests: steady-clock ms of the last
+        // successful cast of a throttled buff skill, 0 if never cast.
+        uint64_t probe_last_buffcast_ms(int32_t skillid) const
+        {
+            auto iter = last_buffcast_ms.find(skillid);
+            return iter == last_buffcast_ms.end() ? 0 : iter->second;
+        }
 
     private:
         struct DamageEffect
@@ -110,6 +120,11 @@ namespace jrc
         RegularAttack regularattack;
         int16_t teleport_cooldown = 0;
         bool flashjump_spent = false;
+        // Steady-clock ms of the last successful cast per non-attack skill.
+        // Buff skills without a cast action (e.g. Iron Body) never enter the
+        // attacking state, so held or auto-repeated keydowns would re-cast on
+        // every event without this gate.
+        std::unordered_map<int32_t, uint64_t> last_buffcast_ms;
 
         // Skill id of a proc'd final attack waiting to fire, or 0.
         int32_t final_attack_pending = 0;

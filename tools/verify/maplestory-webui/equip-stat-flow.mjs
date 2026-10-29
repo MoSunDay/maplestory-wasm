@@ -69,15 +69,16 @@ try {
   if (!ok) exitCode = 1;
 
   // 真实 wasm 二进制上的公式对拍:
-  //   base = mobatk/2 + mobatk/DEF   (防御贡献)
-  //   dmg  = base * (1 - reducedamage), Achilles Lv30 x=800 => 减伤 20%。
-  // WDEF=198: (500+5)*0.8 = 404; 裸装(DEF~4) 会得到 (500+250)*0.8 = 600,
-  // 404 vs 600 的差异即防御可见贡献。旧公式(x/1000=0.8)曾把伤害压到 101。
+  //   base = (mobatk - 0.7*DEF) / 2   (v83 防御系数 + 项目 PAD/2 基线)
+  //   dmg  = base - trunc(base * reducedamage), Achilles Lv30 x=800 => 减伤 20%。
+  // WDEF=198: (1000-138)/2=431 => 345; 裸装(DEF~4) 得 (1000-2)/2=499 => 399,
+  // 345 vs 399 即防御可见贡献。旧公式 mobatk/2+mobatk/DEF 得 404 且圣甲术几乎不改数字;
+  // 上一版 mobatk/2-DEF 的 1:1 抵扣会把 PAD<=2xWDEF 的怪全部打成恒 1 伤害。
   const pdmg = await ccall2('msstat_damage', 1000, 0);
   const mdmg = await ccall2('msstat_damage', 1000, 1);
-  // C++ 侧运算顺序: base - trunc(base * reducedamage)。
+  // C++ 侧运算顺序: max(1, (mobatk - def*7/10) / 2) - trunc(base * reducedamage)。
   const dmg = (def) => {
-    const base = Math.floor(1000 / 2) + Math.floor(1000 / def);
+    const base = Math.max(1, Math.floor((1000 - Math.floor((def * 7) / 10)) / 2));
     return base - Math.trunc(base * 0.2);
   };
   const expectP = dmg(wdef);

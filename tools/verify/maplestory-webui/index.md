@@ -332,6 +332,8 @@ UPDATE accounts SET loggedin=0 WHERE name='test1';
 
 注意：`skill-keymap-prep.py` 重跑会整表重建 keymap 并把角色迁回 40001，届时需重新执行上述绑定。与其它驱动共用 test1 账号，勿与其它 E2E 并发运行（服务端重复登录接管会踢掉旧会话）。协议层（伪客户端）回归见 `scripts/test_accounts/iron_body_buff_proto.mjs`（已挂入 `verify_all.sh` proto 阶段）。
 
+施放间隔：圣甲术无 WZ `action` 节点 → `NoAction` 不进入 attacking 态，`KeyType::SKILL` 又不滤按键自动重复，曾出现按住键每 keydown 都发 `UseSkillPacket` 疯狂重施。现 `Combat::use_move` 对非攻击技能（teleport/flash jump 除外）按 `BUFF_CAST_INTERVAL_MS=1000ms` 节流（`Combat.cpp`，仅 FBR_NONE 成功施放后记录时间戳），成功施放后 1s 内同技能再按无效。
+
 ## 掉落拾取压测
 
 `pickup-stress-e2e.mjs` 复现并回归"自己击杀的掉落有概率无法捡取"：登录
