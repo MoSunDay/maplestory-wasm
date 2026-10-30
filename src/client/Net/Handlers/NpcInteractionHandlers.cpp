@@ -220,7 +220,11 @@ namespace jrc
         UI::get().enable();
 
         if (auto npctalk = UI::get().get_element<UINpcTalk>())
+        {
+            // emplace 对已存在元素是 toggle 语义，每页对话包必须确保窗口处于打开状态，否则会与服务器会话失步
+            npctalk->makeactive();
             npctalk->change_text(npcid, msgtype, style, has_navigation_flags, speaker, text);
+        }
     }
 
 

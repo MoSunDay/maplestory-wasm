@@ -335,6 +335,12 @@ namespace jrc
         case KeyType::FACE:
         case KeyType::ITEM:
         case KeyType::SKILL:
+            // 对话期间阻断游戏层输入，避免重复触发 TalkToNPC 导致会话重开
+            if (auto npctalk = get(UIElement::NPCTALK))
+            {
+                if (npctalk->is_active())
+                    break;
+            }
             Stage::get().send_key(type, action, pressed);
             break;
         default:
@@ -459,6 +465,10 @@ namespace jrc
                     }
                     if (clicked)
                         clear_pending_player_target();
+                    // 对话期间点击对话窗外不落空到游戏层，避免点 NPC 重复发起对话
+                    if (auto npctalk = get(UIElement::NPCTALK))
+                        if (npctalk->is_active())
+                            return mst;
                     return Stage::get().send_cursor(clicked, pos);
                 }
             }
