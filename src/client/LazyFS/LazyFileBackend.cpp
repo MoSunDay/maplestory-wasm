@@ -134,8 +134,19 @@ namespace LazyFS
 
 				// Sync fast-path: a fully resident range is copied into the wasm
 				// heap without suspending, so re-entrant reads can never collide
-				// inside Asyncify's single rewind buffer.
-				var hit = Module.LazyFS.readCachedSync ? Module.LazyFS.readCachedSync(path, offset, size) : null;
+				// inside Asyncify's single rewind buffer. Never take it while
+				// Asyncify is unwinding/rewinding: handleSleep suspensions replay
+				// this whole function on wake-up, so a fetch that missed on the
+				// first pass runs the EM_ASM again with the chunk now resident.
+				// Serving that replay hit would return before the recorded
+				// resume point, corrupt the rewind state machine and crash every
+				// later dynCall dispatch with "null function" (wasm OOB storms
+				// share the same failure shape). Only Normal-state executions may
+				// shortcut; replays fall through to handleSleep, which resumes
+				// with the recorded wakeUp value.
+				var asyncifyActive = typeof Asyncify !== 'undefined' && Asyncify.state;
+				var hit = (!asyncifyActive && Module.LazyFS.readCachedSync)
+					? Module.LazyFS.readCachedSync(path, offset, size) : null;
 				if (hit) { HEAPU8.set(hit, bufferPtr); return 1; }
 
 				// Use Asyncify.handleSleep directly to avoid Promise wrapper issues

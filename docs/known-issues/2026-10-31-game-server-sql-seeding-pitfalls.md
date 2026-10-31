@@ -61,6 +61,19 @@ docker restart 后 7975 可能因 TIME_WAIT 绑定失败（日志
 解法：再 restart 一次。复跑判据见
 [2026-10-29-game-server-restart-client-freeze.md](2026-10-29-game-server-restart-client-freeze.md)。
 
+## 陷阱六：人工种入带 infoNumber 的任务使角色卡在选角（2026-10-31 实证）
+
+`Check.img` 中带 `infoNumber` 的任务（20000→20022、20010→20022、
+29005→27010、29007→27012）服务端 `addQuestInfo` 会内联追加
+`short infoNumber + mapleAsciiString(data)`；客户端 `parse_questlog`
+靠 `is_started(qid)+i--` 配对且要求父任务先出现。只种父任务不种子任务
+→ 字节漂移 → `PacketError: Unsupported non-empty minigame info` →
+SET_FIELD 中断 → 双击角色卡住（e2e 症状 "game UI did not activate"）。
+
+**种子规范**：queststatus 只种无 `infoNumber` 的任务（验证集
+20001-20008）；原生任务不受影响。复盘见
+[features/changelog/2026-10-31/quest-log-usability-fix.md](../../features/changelog/2026-10-31/quest-log-usability-fix.md)。
+
 ## 其他待反馈服务端的问题（未修）
 
 - `CharSelectedHandler` 对缓存未命中走静默 closeSession，建议至少打日志；
