@@ -16,23 +16,9 @@ namespace jrc
 
     namespace
     {
-        const char* gender_name(int8_t gender)
-        {
-            return gender == 0 ? "男" : gender == 1 ? "女" :
-                gender == 2 ? "全" : "共享";
-        }
-
         std::string period_label(int32_t period)
         {
             return period > 0 ? std::to_string(period) + "天" : "永久";
-        }
-
-        const CashCommodity* find_commodity(
-            const std::vector<CashCommodity>& catalog, int32_t sn)
-        {
-            const auto found = std::find_if(catalog.begin(), catalog.end(),
-                [sn](const CashCommodity& item) { return item.sn == sn; });
-            return found != catalog.end() ? &*found : nullptr;
         }
 
         void truncate_text(Text& label, int16_t max_width)
@@ -50,9 +36,13 @@ namespace jrc
 
     void UICashShop::set_balances(CashBalances balances)
     {
-        // Balance data only: 0x144 can arrive late (after a pending operation
-        // already settled or timed out) and must never unlock, clear or fail
-        // an operation on its own.
+        // 0x144 is balance data only: it must never unlock or settle an
+        // operation, and a late push (after the operation settled or timed
+        // out) just refreshes the balances. But paired with a still-pending
+        // BUY/TAKE/PUT/SLOTS it is the server's rejection notice — the
+        // rejection paths reply with exactly this push and no operation ack —
+        // so fail fast instead of letting the operation time out. EXIT is
+        // not affected: 0x144 does not fail an exit.
         model->set_balances(balances);
         balances_loaded_ = true;
         balance_failed_ = false;
@@ -62,6 +52,15 @@ namespace jrc
             // The only text this push owns is the balance timeout hint.
             deferred_error.clear();
             deferred_balance_error_ = false;
+        }
+        if (cash_shop_settlement::is_operation(pending_kind_))
+        {
+            // Success paths always ack the operation first, so a pending
+            // operation here means this push is the whole rejection reply.
+            // show_error drops the pending state, queues the text and
+            // refreshes through clear_pending().
+            show_error("商城操作未完成，请重试。");
+            return;
         }
         refresh();
     }
@@ -407,7 +406,10 @@ namespace jrc
         buttons[BT_RESET]->set_active(!tryon_items.empty());
         buttons[BT_FEATURED]->set_active(!is_pending() && !filtered.empty());
         position_buy_button();
-        const bool details_visible = selected_right &&
+        // A right selection is only actionable while it is still on the
+        // visible page; the details card that used this flag is gone, but
+        // the transfer button keeps the same visibility rule.
+        const bool selection_visible = selected_right &&
             *selected_right / view::RIGHT_PAGE_SIZE == right_page &&
             *selected_right < right_count();
         transfer_label.change_text(
@@ -415,12 +417,12 @@ namespace jrc
         buy_label.change_color(
             can_mutate() ? Text::BLACK : Text::LIGHTGREY);
         transfer_label.change_color(
-            details_visible && can_mutate() ? Text::WHITE : Text::LIGHTGREY);
+            selection_visible && can_mutate() ? Text::WHITE : Text::LIGHTGREY);
         charge_label.change_color(
             is_pending() ? Text::LIGHTGREY : Text::BLACK);
         exit_label.change_color(
             can_exit() ? Text::WHITE : Text::LIGHTGREY);
-        buttons[BT_TRANSFER]->set_active(can_mutate() && details_visible);
+        buttons[BT_TRANSFER]->set_active(can_mutate() && selection_visible);
         buttons[BT_CHARGE]->set_active(!is_pending());
         buttons[BT_EXIT]->set_active(can_exit());
         buttons[BT_LEFT_PREV]->set_active(!is_pending() && left_page > 0);
@@ -462,37 +464,10 @@ namespace jrc
                 featured_hint.change_text(selected ?
                     "该商品暂不可试穿 · 仅展示图标" : "点击卡片选中查看");
         }
-        details_hint.change_text(details_visible ? "" : "选择物品查看详情");
-        std::string detail_name, detail_count, detail_meta, detail_extra;
-        if (details_visible)
-        {
-            if (const ItemData& data = ItemData::get(
-                    right_item_id(*selected_right)))
-                detail_name = data.get_name();
-            detail_count = "数量 " +
-                std::to_string(right_item_count(*selected_right));
-            const CashLockerItem* locker = nullptr;
-            if (right_pane == view::RightPane::LOCKER &&
-                *selected_right < model->locker().size())
-                locker = &model->locker()[*selected_right];
-            const int32_t sn = locker ? locker->sn : 0;
-            detail_meta = sn > 0 ? "SN " + std::to_string(sn) : "";
-            const CashCommodity* commodity = find_commodity(model->catalog(), sn);
-            if (locker && !locker->gift_from.empty())
-                detail_extra = "赠送 " + locker->gift_from;
-            else if (commodity)
-                detail_extra = period_label(commodity->period) + " · " +
-                    gender_name(commodity->gender);
-            else if (locker && locker->expiration > 0)
-                detail_extra = "有期限";
-        }
-        details_name.change_text(detail_name);
-        details_count.change_text(detail_count);
-        details_meta.change_text(detail_meta);
-        details_extra.change_text(detail_extra);
         const bool locker_tab = right_pane == view::RightPane::LOCKER;
         buttons[BT_RIGHT_LOCKER_TAB]->set_active(!is_pending() && !locker_tab);
         buttons[BT_RIGHT_INVENTORY_TAB]->set_active(!is_pending() && locker_tab);
+        refresh_slotbuy();
     }
 
     void UICashShop::change_right_pane(view::RightPane pane)

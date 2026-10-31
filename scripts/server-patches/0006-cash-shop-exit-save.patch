@@ -1,0 +1,34 @@
+# 服务端源码补丁：现金商城退出分支补 saveCharToDB（修复退出丢档）
+# 背景：link_repos/MapleStory-Server 是无版本控制的 linked checkout，
+# 重新 checkout/同步后以下改动会丢失，须重放本补丁。
+# 症状：商城内取出（take）/放回（put）/购买（buy）在退出商城回游戏后全部
+#       丢失，重进商城看到进店前的旧数据。
+# 根因：ChangeMapHandler 空包分支（CS 退出）只做 getCashShop().open(false)
+#       + channel change；随后下发的换线封包让客户端重连、从数据库整建角色
+#       （readFromDB 重建 CashShop 并按 type=3 AND accountid 重载 locker）。
+#       进入商城时 EnterCashShopHandler 末尾有 mc.saveCharToDB()，退出分支
+#       漏了 save——商城内内存变更从未落盘，重连即回滚。
+# 修复：open(false) 后补 chr.saveCharToDB(false)。saveCharToDB 内
+#       cashshop.save(con)（无 isOpen 守卫）随该 save 落盘 locker 的
+#       DELETE+INSERT、CASH 余额与 wishlist。
+# 应用：cd link_repos/MapleStory-Server && patch -p1 < 本文件
+#       然后重编该类并入 dist 并重启 ms-game-server：
+#       javac -d dist -cp "dist:$(echo cores/* | tr ' ' ':')" \
+#         src/net/server/channel/handlers/ChangeMapHandler.java
+#       bash ../../scripts/game_server_restart.sh（等端口释放）
+# 验证：tools/verify/maplestory-webui/cash-shop-take-reject-retry.mjs
+#       phase D（退出→!clearslot cash→重进→locker 保持、重试取出成功）；
+#       changelog features/changelog/2026-10-30/cash-shop-exit-save.md。
+--- a/src/net/server/channel/handlers/ChangeMapHandler.java
++++ b/src/net/server/channel/handlers/ChangeMapHandler.java
+@@ -61,6 +61,10 @@
+ 			}
+ 			String[] socket = c.getChannelServer().getIP().split(":");
+ 			chr.getCashShop().open(false);
++			// The channel change below makes the client reconnect, which
++			// reloads this character from the database: flush in-shop
++			// mutations (locker take/put/buy) first or they are lost.
++			chr.saveCharToDB(false);
+ 			c.updateLoginState(MapleClient.LOGIN_SERVER_TRANSITION);
+ 			try {
+ 				c.announce(MaplePacketCreator.getChannelChange(InetAddress.getByName(socket[0]), Integer.parseInt(socket[1])));

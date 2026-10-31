@@ -34,6 +34,7 @@ namespace jrc
             };
             append(BT_CARD_FIRST, BT_CARD_LAST);
             append(BT_SLOT_FIRST, BT_SLOT_LAST);
+            append(BT_SLOTBUY_FIRST, BT_SLOTBUY_LAST);
             append(BT_TAB_FIRST, BT_TAB_LAST);
             append(BT_EQSUB_FIRST, BT_EQSUB_LAST);
             append(BT_CURRENCY_FIRST, BT_CURRENCY_LAST);
@@ -95,6 +96,10 @@ namespace jrc
                 return place(layout::slot_position(
                     static_cast<size_t>(id - BT_SLOT_FIRST)),
                     layout::SLOT_SIZE);
+            if (id >= BT_SLOTBUY_FIRST && id < BT_SLOTBUY_LAST)
+                return place(layout::slotbuy_pill_position(
+                    static_cast<size_t>(id - BT_SLOTBUY_FIRST)),
+                    layout::SLOTBUY_PILL_SIZE);
             if (id >= BT_TAB_FIRST && id < BT_TAB_LAST)
                 return place(layout::category_position(
                     static_cast<int8_t>(id - BT_TAB_FIRST)),

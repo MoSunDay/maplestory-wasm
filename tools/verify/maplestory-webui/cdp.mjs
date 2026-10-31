@@ -78,7 +78,14 @@ export class BrowserDriver {
       ...extraArgs, ...this.extraArgs, 'about:blank'
     ];
     if (this.headed !== true && process.env.E2E_HEADED !== '1') browserArgs.unshift('--headless=new');
-    this.process = spawn(this.binary, browserArgs, { stdio: 'ignore' });
+    // Native renderer crashes (e.g. SwiftShader) are otherwise silent;
+    // keep chromium's stderr for the artifact dump.
+    this.browserStderr = [];
+    this.process = spawn(this.binary, browserArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+    this.process.stderr?.on('data', chunk => {
+      if (this.browserStderr.length < 500)
+        this.browserStderr.push(...String(chunk).trimEnd().split('\n'));
+    });
 
     // Large Chromium test bundles can take more than 15 seconds to page in on
     // a busy build host. Keep polling the exact debug endpoint long enough to
@@ -159,7 +166,7 @@ export class BrowserDriver {
           this.dead = true;
           reject(new Error(`[cdp] command timed out: ${method}`));
         }
-      }, 45000);
+      }, Number(process.env.E2E_CDP_TIMEOUT_MS || 45000));
       this.pending.set(id, {
         resolve: value => { clearTimeout(timer); resolve(value); },
         reject: error => { clearTimeout(timer); reject(error); },

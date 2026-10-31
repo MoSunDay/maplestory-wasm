@@ -125,6 +125,10 @@ namespace jrc
         int64_t get_cash_id(InventoryType::Id type, int16_t slot) const;
         bool has_equipped_item(int32_t item_id) const;
 
+        // Return the pet stats for the pet with the specified cash id.
+        // Returns nullptr if no such pet is stored.
+        const Pet* get_pet_by_cash_id(int64_t cash_id) const;
+
         // Return a pointer to an equip.
         Optional<const Equip> get_equip(InventoryType::Id type, int16_t slot) const;
 

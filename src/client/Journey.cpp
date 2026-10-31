@@ -288,6 +288,25 @@ namespace jrc
 
     void main_tick()
     {
+        // Asyncify keeps a single rewind buffer, so two concurrently suspended
+        // wasm stacks corrupt it: a tick that suspends (LazyFS chunk fetch or
+        // the emscripten_sleep polls in the socket layer) unwinds to JS, and
+        // the browser then fires the next RAF tick into wasm. Re-entering the
+        // tick here would start a second suspension while the first is still
+        // parked, which has historically surfaced as the per-frame wasm OOB
+        // storm and, more rarely, a wedged main thread executing corrupted
+        // rewind state. Skip the frame instead: the parked tick wakes within
+        // milliseconds and resumes normal pacing, while a dropped frame is
+        // harmless.
+        static bool tick_in_flight = false;
+        if (tick_in_flight)
+            return;
+        tick_in_flight = true;
+        struct TickGuard
+        {
+            ~TickGuard() { tick_in_flight = false; }
+        } tick_guard{};
+
         const bool connection_lost = browser_connection_lost();
         if (connection_lost || !running())
         {

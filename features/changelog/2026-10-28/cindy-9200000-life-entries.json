@@ -1,0 +1,499 @@
+{
+ "100000000": {
+  "__entry_name": "11",
+  "cy": {
+   "type": "int",
+   "value": 274
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 134
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 374
+  },
+  "rx1": {
+   "type": "int",
+   "value": 474
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 424
+  },
+  "y": {
+   "type": "int",
+   "value": 259
+  }
+ },
+ "101000000": {
+  "__entry_name": "15",
+  "cy": {
+   "type": "int",
+   "value": -2568
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 410
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": -175
+  },
+  "rx1": {
+   "type": "int",
+   "value": -75
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": -125
+  },
+  "y": {
+   "type": "int",
+   "value": -2580
+  }
+ },
+ "102000000": {
+  "__entry_name": "13",
+  "cy": {
+   "type": "int",
+   "value": 1935
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 423
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 2299
+  },
+  "rx1": {
+   "type": "int",
+   "value": 2399
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 2349
+  },
+  "y": {
+   "type": "int",
+   "value": 1926
+  }
+ },
+ "103000000": {
+  "__entry_name": "13",
+  "cy": {
+   "type": "int",
+   "value": 156
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 238
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 237
+  },
+  "rx1": {
+   "type": "int",
+   "value": 337
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 287
+  },
+  "y": {
+   "type": "int",
+   "value": 146
+  }
+ },
+ "104000000": {
+  "__entry_name": "15",
+  "cy": {
+   "type": "int",
+   "value": 647
+  },
+  "f": {
+   "type": "int",
+   "value": 1
+  },
+  "fh": {
+   "type": "int",
+   "value": 433
+  },
+  "hide": {
+   "type": "int",
+   "value": 0
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 1188
+  },
+  "rx1": {
+   "type": "int",
+   "value": 1288
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 1238
+  },
+  "y": {
+   "type": "int",
+   "value": 633
+  }
+ },
+ "200000000": {
+  "__entry_name": "11",
+  "cy": {
+   "type": "int",
+   "value": -125
+  },
+  "f": {
+   "type": "int",
+   "value": 1
+  },
+  "fh": {
+   "type": "int",
+   "value": 33
+  },
+  "hide": {
+   "type": "int",
+   "value": 0
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 186
+  },
+  "rx1": {
+   "type": "int",
+   "value": 244
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 218
+  },
+  "y": {
+   "type": "int",
+   "value": -134
+  }
+ },
+ "211000000": {
+  "__entry_name": "8",
+  "cy": {
+   "type": "int",
+   "value": -517
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 26
+  },
+  "hide": {
+   "type": "int",
+   "value": 0
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 297
+  },
+  "rx1": {
+   "type": "int",
+   "value": 397
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 347
+  },
+  "y": {
+   "type": "int",
+   "value": -528
+  }
+ },
+ "220000000": {
+  "__entry_name": "17",
+  "cy": {
+   "type": "int",
+   "value": -211
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 150
+  },
+  "hide": {
+   "type": "int",
+   "value": 0
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 299
+  },
+  "rx1": {
+   "type": "int",
+   "value": 399
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 349
+  },
+  "y": {
+   "type": "int",
+   "value": -223
+  }
+ },
+ "240000000": {
+  "__entry_name": "3",
+  "cy": {
+   "type": "int",
+   "value": -173
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 222
+  },
+  "hide": {
+   "type": "int",
+   "value": 0
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 125
+  },
+  "rx1": {
+   "type": "int",
+   "value": 204
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 175
+  },
+  "y": {
+   "type": "int",
+   "value": -180
+  }
+ },
+ "680000000": {
+  "__entry_name": "15",
+  "cy": {
+   "type": "int",
+   "value": 244
+  },
+  "f": {
+   "type": "int",
+   "value": 1
+  },
+  "fh": {
+   "type": "int",
+   "value": 29
+  },
+  "hide": {
+   "type": "int",
+   "value": 0
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 2356
+  },
+  "rx1": {
+   "type": "int",
+   "value": 2456
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 2406
+  },
+  "y": {
+   "type": "int",
+   "value": 225
+  }
+ },
+ "777777777": {
+  "__entry_name": "0",
+  "cy": {
+   "type": "int",
+   "value": -129
+  },
+  "f": {
+   "type": "int",
+   "value": 0
+  },
+  "fh": {
+   "type": "int",
+   "value": 42
+  },
+  "id": {
+   "type": "string",
+   "value": "9200000"
+  },
+  "mobTime": {
+   "type": "int",
+   "value": 0
+  },
+  "rx0": {
+   "type": "int",
+   "value": 438
+  },
+  "rx1": {
+   "type": "int",
+   "value": 478
+  },
+  "type": {
+   "type": "string",
+   "value": "n"
+  },
+  "x": {
+   "type": "int",
+   "value": 458
+  },
+  "y": {
+   "type": "int",
+   "value": -137
+  }
+ }
+}

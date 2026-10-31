@@ -106,23 +106,55 @@ namespace jrc
         }
     }
 
-    void UICashShop::draw_details_text() const
+    void UICashShop::draw_slot_panel() const
     {
-        const bool visible = selected_right &&
-            *selected_right / view::RIGHT_PAGE_SIZE == right_page &&
-            *selected_right < right_count();
-        if (!visible)
+        // Flat panel in the style of the former details card: header band
+        // with accent notch and separator, then a 2x2 grid of pills. The
+        // labels and enabled states are maintained by refresh_slotbuy().
+        fill_rect(layout::SLOTBUY_PANEL_POS, layout::SLOTBUY_PANEL_SIZE,
+            0.06f, 0.07f, 0.09f, 0.90f);
+        outline_rect(layout::SLOTBUY_PANEL_POS, layout::SLOTBUY_PANEL_SIZE,
+            0.25f, 0.28f, 0.34f, 1.0f);
+        fill_rect(layout::SLOTBUY_PANEL_POS, { 64, 2 },
+            0.88f, 0.52f, 0.16f, 1.0f);
+        fill_rect(layout::SLOTBUY_PANEL_POS,
+            { layout::SLOTBUY_PANEL_SIZE.x(), 22 },
+            0.04f, 0.05f, 0.07f, 0.94f);
+        fill_rect(layout::SLOTBUY_HEADER_LINE_POS,
+            layout::SLOTBUY_HEADER_LINE_SIZE, 0.25f, 0.28f, 0.34f, 1.0f);
+        slotbuy_title.draw(draw_position(layout::SLOTBUY_TITLE_POS));
+        slotbuy_info.draw(draw_position(layout::SLOTBUY_INFO_RIGHT));
+
+        for (size_t pill = 0; pill < cash_shop_buttons::SLOTBUY_CHOICES;
+            ++pill)
         {
-            details_hint.draw(draw_position(layout::DETAILS_HINT_CENTER));
-            return;
+            const auto found = buttons.find(BT_SLOTBUY_FIRST + pill);
+            const bool active = found != buttons.end() &&
+                found->second->is_active();
+            const Point<int16_t> base = layout::slotbuy_pill_position(pill);
+            if (!active)
+            {
+                fill_rect(base, layout::SLOTBUY_PILL_SIZE,
+                    0.14f, 0.15f, 0.18f, 0.96f);
+                outline_rect(base, layout::SLOTBUY_PILL_SIZE,
+                    0.25f, 0.28f, 0.34f, 1.0f);
+            }
+            else
+            {
+                const Button::State state = found->second->get_state();
+                const float shade = state == Button::PRESSED ? 0.82f :
+                    state == Button::MOUSEOVER ? 1.16f : 1.0f;
+                const float r = std::min(1.0f, 0.88f * shade);
+                const float g = std::min(1.0f, 0.52f * shade);
+                const float b = std::min(1.0f, 0.16f * shade);
+                fill_rect(base, layout::SLOTBUY_PILL_SIZE, r, g, b, 0.98f);
+                outline_rect(base, layout::SLOTBUY_PILL_SIZE,
+                    std::min(1.0f, r + 0.10f), std::min(1.0f, g + 0.10f),
+                    std::min(1.0f, b + 0.10f), 1.0f);
+            }
+            slotbuy_labels[pill].draw(draw_position(
+                layout::pill_label(base, layout::SLOTBUY_PILL_SIZE)));
         }
-        details_name.draw(draw_position(layout::DETAILS_TEXT_CENTER));
-        details_count.draw(draw_position(
-            { layout::DETAILS_TEXT_CENTER.x(), layout::DETAILS_COUNT_Y }));
-        details_meta.draw(draw_position(
-            { layout::DETAILS_TEXT_CENTER.x(), layout::DETAILS_META_Y }));
-        details_extra.draw(draw_position(
-            { layout::DETAILS_TEXT_CENTER.x(), layout::DETAILS_EXTRA_Y }));
     }
 
     void UICashShop::draw_right_pane() const

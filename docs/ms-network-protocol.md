@@ -1316,14 +1316,16 @@ itemId   int     Item ID
 
 ### 0x004C — PET_FOOD
 
-**Purpose:** Client feeds their pet.
+**Purpose:** Client feeds their pet by using a pet food item (212 item group, ids 2120000-2129999) from the USE inventory.
 
 ```
-Field    Type    Notes
-petSlot  short   Pet slot index (0, 1, or 2)
-itemSlot short   Inventory slot of the food item
-itemId   int     Item ID of the food
+Field      Type    Notes
+timestamp  int     Client timestamp (ignored by server)
+itemSlot   short   Inventory slot of the food item (USE inventory)
+itemId     int     Item ID of the food (212 item group)
 ```
+
+There is no pet slot field in this packet: the server itself selects the summoned pet with the lowest fullness and feeds it. Feeding raises that pet's fullness and may trigger a closeness gain / level up.
 
 ---
 

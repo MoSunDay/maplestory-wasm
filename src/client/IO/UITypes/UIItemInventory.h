@@ -72,6 +72,7 @@ namespace jrc
         void update_slot(int16_t slot);
         bool is_visible(int16_t slot) const;
         bool is_not_visible(int16_t slot) const;
+        bool is_hungry_pet_slot(int16_t slot) const;
         int16_t slot_by_position(Point<int16_t> position) const;
         uint16_t button_by_tab(InventoryType::Id tab) const;
         Point<int16_t> get_slotpos(int16_t slot) const;
@@ -122,6 +123,7 @@ namespace jrc
         Animation newitemtab;
         Texture projectile;
         Text mesolabel;
+        Text hungry_badge;
         Slider slider;
 
         std::map<int16_t, std::unique_ptr<Icon>> icons;

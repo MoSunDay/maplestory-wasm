@@ -655,6 +655,8 @@ var LazyFS = {
 			return null;
 		}
 
+		// Asyncify: one rewind buffer, reject + warm cache while another chain is parked.
+		if (typeof Asyncify !== 'undefined' && (Asyncify.currData || Asyncify.state)) return null;
 		// Initialize DB if needed
 		if (!this.dbReady && !this.dbInitPromise) {
 			await this.initDB();

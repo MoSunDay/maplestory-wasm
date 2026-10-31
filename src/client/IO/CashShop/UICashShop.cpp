@@ -47,12 +47,6 @@ namespace jrc
           search_clear_label(Text::A11M, Text::CENTER, Text::BLACK, "×"),
           transfer_hint(Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
               layout::TRANSFER_HINT_WIDTH),
-          details_hint(Text::A11M, Text::CENTER, Text::LIGHTGREY,
-              "选择物品查看详情", layout::DETAILS_HINT_WIDTH),
-          details_name(Text::A11B, Text::CENTER, Text::WHITE, "",
-              layout::DETAILS_TEXT_WIDTH),
-          details_count(Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
-              layout::DETAILS_TEXT_WIDTH),
           buy_label(Text::A11M, Text::CENTER, Text::BLACK, "购买"),
           reset_label(Text::A11M, Text::CENTER, Text::BLACK, "重置"),
           transfer_label(Text::A11M, Text::CENTER, Text::WHITE, "存入"),
@@ -133,17 +127,21 @@ namespace jrc
         rail_status = Text(
             Text::A11M, Text::LEFT, Text::DARKGREY, "",
             layout::EQSUB_STATUS_WIDTH);
-        details_title = Text(
-            Text::A11B, Text::LEFT, Text::WHITE, "物品详情");
         empty_catalog_text = Text(
             Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
             layout::EMPTY_CATALOG_LABEL_WIDTH);
-        details_meta = Text(
-            Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
-            layout::DETAILS_TEXT_WIDTH);
-        details_extra = Text(
-            Text::A11M, Text::CENTER, Text::LIGHTGREY, "",
-            layout::DETAILS_TEXT_WIDTH);
+        slotbuy_title = Text(
+            Text::A11B, Text::LEFT, Text::WHITE, "背包扩格");
+        slotbuy_info = Text(
+            Text::A11M, Text::RIGHT, Text::LIGHTGREY,
+            "4000 NX / +4格", layout::SLOTBUY_INFO_WIDTH);
+        for (size_t pill = 0; pill < cash_shop_buttons::SLOTBUY_CHOICES;
+            ++pill)
+        {
+            slotbuy_labels[pill] = Text(
+                Text::A11M, Text::CENTER, Text::BLACK, "",
+                layout::SLOTBUY_PILL_SIZE.x());
+        }
         featured_title = Text(
             Text::A11B, Text::LEFT, Text::WHITE, "本期推荐");
         featured_name = Text(
@@ -423,30 +421,8 @@ namespace jrc
 
         draw_right_pane();
 
-        // Selected item details.
-        fill_rect(layout::DETAILS_PANEL_POS, layout::DETAILS_PANEL_SIZE,
-            0.06f, 0.07f, 0.09f, 0.90f);
-        outline_rect(layout::DETAILS_PANEL_POS, layout::DETAILS_PANEL_SIZE,
-            0.25f, 0.28f, 0.34f, 1.0f);
-        fill_rect(layout::DETAILS_PANEL_POS, { 64, 2 },
-            0.88f, 0.52f, 0.16f, 1.0f);
-        fill_rect(layout::DETAILS_PANEL_POS,
-            { layout::DETAILS_PANEL_SIZE.x(), 22 },
-            0.04f, 0.05f, 0.07f, 0.94f);
-        fill_rect(layout::DETAILS_HEADER_LINE_POS,
-            layout::DETAILS_HEADER_LINE_SIZE, 0.25f, 0.28f, 0.34f, 1.0f);
-        details_title.draw(draw_position(layout::DETAILS_TITLE_POS));
-        const bool details_visible = selected_right &&
-            *selected_right / view::RIGHT_PAGE_SIZE == right_page &&
-            *selected_right < right_count();
-        if (details_visible)
-        {
-            if (const ItemData& data = ItemData::get(
-                    right_item_id(*selected_right)))
-                draw_icon(data.get_icon(false), layout::DETAILS_ICON_CENTER,
-                    layout::DETAILS_ICON_MAX);
-        }
-        draw_details_text();
+        // Inventory slot expansion pills in the old details slot.
+        draw_slot_panel();
         draw_feature_panel();
 
         // Flat action buttons drawn on top of the (unused) native art.
@@ -545,11 +521,16 @@ namespace jrc
             const bool exiting =
                 pending_kind_ == cash_shop_settlement::PendingKind::EXIT;
             clear_pending();
-            require_reenter_ = true;
-            // The exit path disabled the UI; a timed-out exit must hand it
-            // back or the frozen screen could never be left.
+            // A lost operation reply must not brick the shop: only the exit
+            // path keeps the lockout, because it disabled the UI and must
+            // hand it back or the frozen screen could never be left. Buy,
+            // take, put and slot purchases stay live so the player can
+            // simply retry.
             if (exiting)
+            {
+                require_reenter_ = true;
                 UI::get().enable();
+            }
             deferred_balance_error_ = false;
             deferred_error = exiting ? "退出商城超时，请重试。" :
                 "商城操作超时，请重试。";
@@ -663,7 +644,9 @@ namespace jrc
         else if (id == BT_BUY && can_mutate() && left_selection_visible())
             request_purchase(*selected_left);
         else if (id == BT_TRANSFER && can_mutate() && selected_right)
+        {
             request_transfer(*selected_right);
+        }
         else if (id >= BT_TAB_FIRST && id < BT_TAB_LAST)
         {
             const int8_t entry = static_cast<int8_t>(id - BT_TAB_FIRST);
@@ -737,6 +720,9 @@ namespace jrc
             if (index < right_count())
                 selected_right = index;
         }
+        else if (id >= BT_SLOTBUY_FIRST && id < BT_SLOTBUY_LAST)
+            request_slot_expansion(
+                static_cast<size_t>(id - BT_SLOTBUY_FIRST));
         refresh();
         return Button::NORMAL;
     }

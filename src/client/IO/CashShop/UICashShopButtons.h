@@ -16,6 +16,8 @@ namespace jrc
     namespace cash_shop_buttons
     {
         constexpr size_t CURRENCY_CHOICES = 3;
+        // One pill per expandable inventory tab (EQUIP, USE, SETUP, ETC).
+        constexpr size_t SLOTBUY_CHOICES = 4;
 
         // Creates missing AreaButtons and re-anchors existing ones onto the
         // scaled 800x600 design canvas.
@@ -37,6 +39,9 @@ namespace jrc
         BT_CARD_LAST = BT_CARD_FIRST + cash_shop_view::CATALOG_PAGE_SIZE,
         BT_SLOT_FIRST,
         BT_SLOT_LAST = BT_SLOT_FIRST + cash_shop_view::RIGHT_PAGE_SIZE,
+        BT_SLOTBUY_FIRST,
+        BT_SLOTBUY_LAST =
+            BT_SLOTBUY_FIRST + cash_shop_buttons::SLOTBUY_CHOICES,
         BT_TAB_FIRST,
         BT_TAB_LAST = BT_TAB_FIRST + cash_shop_view::CATEGORY_COUNT,
         BT_CURRENCY_FIRST,

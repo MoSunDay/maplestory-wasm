@@ -1,7 +1,11 @@
 #pragma once
 
 #include <LazyFS/LazyFileBackend.h>
+#include <deque>
+#include <map>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace LazyFS
@@ -36,7 +40,8 @@ namespace LazyFS
 		/**
 		 * Get a pointer to data at the specified offset.
 		 * This ensures the relevant chunk is loaded in memory.
-		 * Note: The pointer is valid only until the chunk is evicted from cache.
+		 * Note: single-chunk pointers live until LRU eviction; cross-chunk
+		 * ranges are pinned in stitch_cache_ and stay valid indefinitely.
 		 *
 		 * @param offset Byte offset in the file
 		 * @return Pointer to data, or nullptr if failed
@@ -78,8 +83,11 @@ namespace LazyFS
 		static void free_file(void* handle);
 
 	  private:
-		// Maximum chunks to keep in memory (160 * 64KB = ~10MB per file)
+		// Maximum chunks to keep in memory (160 * 2MB = ~320MB per file)
 		static constexpr size_t CACHE_SIZE = 160;
+		// Hard ceiling for pinned cross-chunk stitch buffers. Eviction only
+		// kicks in far above any realistic working set; see stitch_cache_.
+		static constexpr size_t STITCH_CACHE_CAP_BYTES = 384u * 1024u * 1024u;
 		static constexpr size_t CHUNK_SIZE = LazyFileBackend::CHUNK_SIZE;
 
 		struct Chunk
@@ -97,7 +105,16 @@ namespace LazyFS
 		std::vector<Chunk*> chunk_slots_;
 		uint64_t access_counter_ = 0;
 
-		std::vector<uint8_t> stitch_buffer_;
+		// Stable per-range buffers for cross-chunk reads. The previous single
+		// shared scratch buffer was overwritten by every subsequent spanning
+		// read while callers (node tables, parsed audio lengths) still held
+		// pointers into it, corrupting the nx tree and trapping wasm with
+		// out-of-bounds accesses. Each distinct range is stitched once and
+		// pinned; FIFO eviction guards against runaway growth.
+		std::map<std::pair<size_t, size_t>,
+		         std::unique_ptr<std::vector<uint8_t>>> stitch_cache_;
+		std::deque<std::pair<size_t, size_t>> stitch_cache_order_;
+		size_t stitch_cache_bytes_ = 0;
 
 		// const void* get_chunk_data(size_t offset, size_t size); // Replaced by get_contiguous_data implementation
 		Chunk* get_or_load_chunk(size_t chunk_index);

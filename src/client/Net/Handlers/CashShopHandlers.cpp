@@ -172,6 +172,23 @@ namespace jrc
                 warn_unexpected("0x89");
             return;
         }
+        case 0x60:
+        {
+            // Inventory slot expansion reply: the tab and its new slot
+            // maximum. The balances follow as a separate 0x144 push, so the
+            // tab must be raised before the pending operation settles.
+            const uint8_t type = static_cast<uint8_t>(recv.read_byte());
+            const int16_t slots = recv.read_short();
+            if (type >= InventoryType::EQUIP && type <= InventoryType::ETC)
+                Stage::get().get_player().get_inventory().set_slotmax(
+                    static_cast<InventoryType::Id>(type),
+                    static_cast<uint8_t>(slots));
+            if (shop && shop->expects(settlement::PendingKind::SLOTS))
+                shop->slots_purchase_succeeded();
+            else
+                warn_unexpected("0x60");
+            return;
+        }
         case 0x5C:
         {
             std::string message = error_message(static_cast<uint8_t>(recv.read_byte()));
@@ -187,8 +204,10 @@ namespace jrc
             int16_t slot = recv.read_short();
             Player& player = Stage::get().get_player();
             Inventory& inventory = player.get_inventory();
+            // Locker withdrawals are cabinet items: equips land on the CASH
+            // tab and are worn through the cash cover path, never EQUIP.
             const InventoryType::Id type = ItemParser::parse_item_auto(
-                recv, slot, inventory, cash_id);
+                recv, slot, inventory, cash_id, true);
 
             if (slot < 0)
             {

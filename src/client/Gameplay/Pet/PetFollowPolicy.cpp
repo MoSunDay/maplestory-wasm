@@ -36,7 +36,7 @@ namespace jrc::pet_follow
     }
 
     bool outside_owner_leash(Point<int16_t> pet_position,
-        Point<int16_t> owner_position)
+        Point<int16_t> owner_position, int32_t limit)
     {
         const int32_t dx = static_cast<int32_t>(owner_position.x()) -
             pet_position.x();
@@ -44,8 +44,7 @@ namespace jrc::pet_follow
             pet_position.y();
         const int64_t distance_sq = static_cast<int64_t>(dx) * dx +
             static_cast<int64_t>(dy) * dy;
-        return distance_sq > static_cast<int64_t>(OWNER_LEASH_DISTANCE) *
-            OWNER_LEASH_DISTANCE;
+        return distance_sq > static_cast<int64_t>(limit) * limit;
     }
 
     void anchor_after_warp(PhysicsObject& phobj, uint16_t owner_fhid)
@@ -80,7 +79,9 @@ namespace jrc::pet_follow
         const int32_t stop_distance = inputs.pursuing_loot ? 14 : 34;
         const int32_t threshold = inputs.moving ? stop_distance : start_distance;
 
-        if (outside_owner_leash(inputs.pet_position, inputs.owner_position))
+        if (outside_owner_leash(inputs.pet_position, inputs.owner_position,
+                inputs.pursuing_loot ? LOOT_LEASH_DISTANCE
+                                     : OWNER_LEASH_DISTANCE))
         {
             return Action::WARP_TO_OWNER;
         }

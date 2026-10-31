@@ -1,4 +1,5 @@
 #include <LazyFS/LazyFileLoader.h>
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <vector>
@@ -63,7 +64,9 @@ namespace LazyFS
 		size_t chunk_index = offset / CHUNK_SIZE;
 		size_t chunk_offset = offset % CHUNK_SIZE;
 
-		// Fast path: Data fits entirely within a single chunk
+		// Fast path: Data fits entirely within a single chunk. Serving an
+		// already-resident chunk never suspends, so it stays safe for
+		// re-entrant readers (they only mutate last_access).
 		if (chunk_offset + size <= CHUNK_SIZE)
 		{
 			Chunk* chunk = get_or_load_chunk(chunk_index);
@@ -82,11 +85,32 @@ namespace LazyFS
 			return chunk->data.data() + chunk_offset;
 		}
 
-		// Slow path: Data spans across chunks - Stitching
-		// std::cout << "[LazyFS] Stitching " << size << " bytes at " << offset << std::endl;
-		stitch_buffer_.resize(size);
+		// Slow path: Data spans across chunks. Stitch into a stable per-range
+		// buffer so the returned pointer stays valid across later reads: the
+		// node/audio/bitmap callers retain these pointers (or lengths parsed
+		// from them), and the previous shared scratch buffer was overwritten
+		// mid-use by any other spanning read, corrupting the nx tree.
+		// A cached stitch is pure lookup; safe for re-entrant readers.
+		const auto range = std::make_pair(offset, size);
+		auto found = stitch_cache_.find(range);
+		if (found != stitch_cache_.end())
+		{
+			return found->second->data();
+		}
+
+
+		// Refuse ranges beyond EOF instead of caching truncated data.
+		if (size > backend_->size() || offset > backend_->size() - size)
+		{
+			std::cerr << "[LazyFS] Rejecting out-of-bounds range " << offset
+			          << "+" << size << " (file " << backend_->size() << ")" << std::endl;
+			return nullptr;
+		}
+
+		auto stitched = std::make_unique<std::vector<uint8_t>>(size);
 		size_t bytes_copied = 0;
 		size_t current_offset = offset;
+		bool complete = true;
 
 		while (bytes_copied < size)
 		{
@@ -103,19 +127,55 @@ namespace LazyFS
 			if (chunk->data.size() < current_chunk_off + to_copy)
 			{
 				if (current_chunk_off >= chunk->data.size())
-					break; // EOF reached
+				{
+					complete = false; // EOF reached before the range was filled
+					break;
+				}
 				to_copy = chunk->data.size() - current_chunk_off;
 			}
 
-			std::memcpy(stitch_buffer_.data() + bytes_copied, chunk->data.data() + current_chunk_off, to_copy);
+			std::memcpy(stitched->data() + bytes_copied, chunk->data.data() + current_chunk_off, to_copy);
 			bytes_copied += to_copy;
 			current_offset += to_copy;
 
 			if (to_copy == 0)
-				break; // Should not happen unless logic error or true EOF
+			{
+				complete = false; // Should not happen unless logic error or true EOF
+				break;
+			}
 		}
 
-		return stitch_buffer_.data();
+		if (!complete)
+		{
+			std::cerr << "[LazyFS] Short stitch for range " << offset << "+"
+			          << size << " (" << bytes_copied << " bytes); not caching" << std::endl;
+			return nullptr;
+		}
+
+		const void* result = stitched->data();
+		stitch_cache_bytes_ += size;
+		stitch_cache_[range] = std::move(stitched);
+		stitch_cache_order_.push_back(range);
+
+		// FIFO eviction once the pinned total exceeds the cap. Keep at least
+		// the freshly inserted range so a cache-cap run never returns nullptr
+		// for the read in flight.
+		while (stitch_cache_bytes_ > STITCH_CACHE_CAP_BYTES &&
+		       stitch_cache_order_.size() > 1)
+		{
+			const auto oldest = stitch_cache_order_.front();
+			stitch_cache_order_.pop_front();
+			auto it = stitch_cache_.find(oldest);
+			if (it != stitch_cache_.end())
+			{
+				stitch_cache_bytes_ -= it->second->size();
+				stitch_cache_.erase(it);
+				std::cerr << "[LazyFS] Stitch cache cap reached; evicted range "
+				          << oldest.first << "+" << oldest.second << std::endl;
+			}
+		}
+
+		return result;
 	}
 
 	void LazyFileLoader::prefetch_contiguous_data(size_t offset, size_t size) const
@@ -201,7 +261,9 @@ namespace LazyFS
 			return cached;
 		}
 
-		// Not in cache, load it
+		// Not in cache: load it. Concurrency safety comes from the main tick
+		// guard in Journey.cpp: at most one wasm stack is ever runnable, so
+		// this suspension can never interleave with another loader call.
 		auto new_chunk = std::make_unique<Chunk>();
 		new_chunk->index = chunk_index;
 		new_chunk->last_access = access_counter_;
@@ -227,12 +289,9 @@ namespace LazyFS
 			return nullptr;
 		}
 
-		// std::cout << "[LazyFS] Loaded chunk " << chunk_index << " (" << read << " bytes)" << std::endl;
-
 		// Add to cache (evict if needed)
 		if (cache_.size() >= CACHE_SIZE)
 		{
-			// Find LRU
 			auto lru_it = cache_.begin();
 			for (auto it = cache_.begin(); it != cache_.end(); ++it)
 			{

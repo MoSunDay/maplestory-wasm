@@ -1,0 +1,342 @@
+# 服务端源码补丁：现金商城装备纯装饰化（CASH 栏 + EQUIPPED -100-x 外观覆盖）
+# 背景：link_repos/MapleStory-Server 是无版本控制的 linked checkout，
+# 重新 checkout/同步后以下改动会丢失，须重放本补丁。
+# 目标：现金装备（如 1002000）取出后落入角色 CASH 物品栏（原先进 EQUIP），
+#       双击后作为"外观覆盖"戴在 EQUIPPED 槽位 -100-x（x=正常装备槽 1..30+），
+#       只改外观、不影响属性。客户端把穿脱覆盖编码为 MOVE_ITEM：
+#       穿上 = CASH 栏 src + dst=-(100+eqslot)；卸下 = EQUIPPED -(100+eqslot) + dst=CASH 空格，
+#       最终经 ItemMoveHandler → MapleInventoryManipulator.equip/unequip。
+# 改动点：
+#   1. CashOperationHandler action 0x0D：Equip 取出目标栏改 CASH（宠物/道具券不变），
+#      目标栏满（addItem == -1）时 enableCSActions 并中止；
+#   2. MapleInventoryManipulator：equip(dst <= -100) → equipCashCover（跳过 canWearEquipment
+#      职业性别等级校验，避免现金件误报 packet-edit；旧覆盖件挤回 CASH，CASH 满则整单拒绝）；
+#      unequip(src <= -100) → unequipCashCover（目标栏 CASH，dst==0 自动取空位，满/占用则拒绝）。
+#      公告必须拆两包发送：modifyInventory 每包只有一个 movement 字节、整包共享，
+#      "旧覆盖 MOVE_UNEQUIP 让位"与"新覆盖 MOVE_EQUIP 穿上"混在一包会互相覆盖 movement，
+#      客户端按错误 movement 应用双向 swap 导致 EQUIPPED/EQUIP/CASH 三栏错乱；
+#      顺序：先公告让位（旧覆盖 EQUIPPED -100-x → CASH），再公告穿上；
+#   3. ModifyInventory：新增 (mode, item, oldPos, invType) 覆盖构造器——跨栏移动
+#      （CASH 栏装备穿上）公告的 type 必须显式写 CASH(5)，按 itemid 推导会错成 EQUIP(1)，
+#      客户端 swap 的源栏就错了（invType=-1 时保持原推导，行为不变）；
+#   4. MapleCharacter.recalcEquipStats：跳过 position <= -100 的覆盖件，不计入属性；
+#   5. ItemFactory：CASH 栏中的 Equip（按 itemid/1000000 == 1 判定，宠物等不受影响）
+#      在 4 处 load/save 判定中并入 equip 持久化路径，重登后不再丢装备数据；
+#   6. MaplePacketCreator：
+#      a) addInventoryInfo 的 USE/SETUP/ETC/CASH 段改用 addItemInfoBytePos（位置按
+#         单字节写入，即使物品是 Equip——客户端在这四段按 byte 读位置，原先对装备
+#         写 short 会导致整包错位、SET_FIELD 解析 underflow）；
+#      b) addItemInfo 去掉 equippedCash 位置的 -100 折叠（-101 现在原样发 101，
+#         客户端按 -pos 取负后 >=100 → 隐藏 EQUIP 覆盖槽 100+x）。
+# 验证：node tools/verify/maplestory-webui/cash-shop-take-equip-flow.mjs 全 PASS
+#       （取出落 CASH → 双击戴上外观=覆盖件、真实装备与属性不变 → 卸下回 CASH）；
+#       bash posix-compile.sh 无错，docker restart ms-game-server 后 8484 正常监听。
+# 重放：cd link_repos/MapleStory-Server && patch -p1 < 本文件 && bash posix-compile.sh && docker restart ms-game-server
+--- a/src/net/server/channel/handlers/CashOperationHandler.java
++++ b/src/net/server/channel/handlers/CashOperationHandler.java
+@@ -222,7 +222,9 @@
+                         c.enableCSActions();
+                         return;
+                     }
+-                    if (chr.getInventory(item.getInventoryType()).addItem(item) != -1) {
++                    // cosmetic equips are worn as appearance covers, so they are handed out to the CASH tab instead of the EQUIP one
++                    MapleInventoryType target = item instanceof Equip ? MapleInventoryType.CASH : item.getInventoryType();
++                    if (chr.getInventory(target).addItem(item) != -1) {
+                         cs.removeFromInventory(item);
+                         c.announce(MaplePacketCreator.takeFromCashInventory(item));
+ 
+@@ -233,6 +235,9 @@
+                                 chr.addPlayerRing(ring);
+                             }
+                         }
++                    } else {
++                        c.enableCSActions();
++                        return;
+                     }
+                 } else if (action == 0x0E) { // Put into Cash Inventory
+                     int cashId = slea.readInt();
+--- a/src/client/inventory/manipulator/MapleInventoryManipulator.java
++++ b/src/client/inventory/manipulator/MapleInventoryManipulator.java
+@@ -476,8 +476,13 @@
+     }
+ 
+     public static void equip(MapleClient c, short src, short dst) {
+-        MapleItemInformationProvider ii = MapleItemInformationProvider.getInstance();
++        if (dst <= -100) {  // cosmetic cash covers are worn over the regular equipment slot, appearance only
++            equipCashCover(c, src, dst);
++            return;
++        }
+         
++        MapleItemInformationProvider ii = MapleItemInformationProvider.getInstance();
++
+         MapleCharacter chr = c.getPlayer();
+         MapleInventory eqpInv = chr.getInventory(MapleInventoryType.EQUIP);
+         MapleInventory eqpdInv = chr.getInventory(MapleInventoryType.EQUIPPED);
+@@ -589,7 +594,78 @@
+         chr.equipChanged();
+     }
+ 
++    private static void equipCashCover(MapleClient c, short src, short dst) {
++        MapleCharacter chr = c.getPlayer();
++        MapleInventory cashInv = chr.getInventory(MapleInventoryType.CASH);
++        MapleInventory eqpInv = chr.getInventory(MapleInventoryType.EQUIP);
++        MapleInventory eqpdInv = chr.getInventory(MapleInventoryType.EQUIPPED);
++
++        MapleInventory sourceInv = cashInv;
++        Item item = cashInv.getItem(src);
++        if (item == null) {    // fallback for covers that still sit on the EQUIP tab
++            item = eqpInv.getItem(src);
++            sourceInv = eqpInv;
++        }
++        if (!(item instanceof Equip)) {    // pets and vouchers on the CASH tab cannot be worn
++            c.announce(MaplePacketCreator.enableActions());
++            return;
++        }
++        Equip cover = (Equip) item;
++
++        Equip displaced = (Equip) eqpdInv.getItem(dst);
++        if (displaced != null && cashInv.getNextFreeSlot() < 0) {   // old cover cannot return to the CASH tab, reject the whole operation
++            chr.dropMessage(1, "Inventory full.");
++            c.announce(MaplePacketCreator.getInventoryFull());
++            c.announce(MaplePacketCreator.getShowInventoryFull());
++            return;
++        }
++
++        short displacedDst = 0;
++        if (displaced != null) {
++            displacedDst = cashInv.getNextFreeSlot();
++            eqpdInv.lockInventory();
++            try {
++                chr.unequippedItem(displaced);
++                eqpdInv.removeSlot(dst);
++            } finally {
++                eqpdInv.unlockInventory();
++            }
++        }
++
++        short oldSrc = cover.getPosition();
++        sourceInv.removeSlot(src);
++
++        cover.setPosition(dst);
++        eqpdInv.lockInventory();
++        try {
++            chr.equippedItem(cover);
++            eqpdInv.addItemFromDB(cover);
++        } finally {
++            eqpdInv.unlockInventory();
++        }
++
++        // Each modifyInventory packet carries a single movement byte shared
++        // by all of its mods, so the displacement (MOVE_UNEQUIP) and the
++        // cover being worn (MOVE_EQUIP) must be announced in separate
++        // packets, displacement first: the client then frees the hidden
++        // EQUIP cover slot before the new cover lands in it.
++        if (displaced != null) {
++            displaced.setPosition(displacedDst);
++            cashInv.addItemFromDB(displaced);
++            c.announce(MaplePacketCreator.modifyInventory(true, Collections.singletonList(
++                    new ModifyInventory(2, displaced, dst))));   // MOVE_UNEQUIP back to the CASH tab
++        }
++        c.announce(MaplePacketCreator.modifyInventory(true, Collections.singletonList(
++                new ModifyInventory(2, cover, oldSrc, (byte) 5))));   // oldPos > 0 && newPos <= -100 is read as MOVE_EQUIP by the client; the source tab is CASH
++        chr.equipChanged();
++    }
++
+     public static void unequip(MapleClient c, short src, short dst) {
++        if (src <= -100) {  // cosmetic cash covers are taken off to the CASH tab
++            unequipCashCover(c, src, dst);
++            return;
++        }
++        
+         MapleCharacter chr = c.getPlayer();
+         MapleInventory eqpInv = chr.getInventory(MapleInventoryType.EQUIP);
+         MapleInventory eqpdInv = chr.getInventory(MapleInventoryType.EQUIPPED);
+@@ -631,6 +707,39 @@
+         chr.equipChanged();
+     }
+ 
++    private static void unequipCashCover(MapleClient c, short src, short dst) {
++        MapleCharacter chr = c.getPlayer();
++        MapleInventory cashInv = chr.getInventory(MapleInventoryType.CASH);
++        MapleInventory eqpdInv = chr.getInventory(MapleInventoryType.EQUIPPED);
++
++        Equip cover = (Equip) eqpdInv.getItem(src);
++        if (cover == null) {
++            c.announce(MaplePacketCreator.enableActions());
++            return;
++        }
++        if (dst == 0) {
++            dst = cashInv.getNextFreeSlot();
++        }
++        if (dst <= 0 || cashInv.getItem(dst) != null) {    // clients only drop covers on free CASH slots
++            chr.dropMessage(1, "Inventory full.");
++            c.announce(MaplePacketCreator.enableActions());
++            return;
++        }
++
++        eqpdInv.lockInventory();
++        try {
++            chr.unequippedItem(cover);
++            eqpdInv.removeSlot(src);
++        } finally {
++            eqpdInv.unlockInventory();
++        }
++
++        cover.setPosition(dst);
++        cashInv.addItemFromDB(cover);
++        c.announce(MaplePacketCreator.modifyInventory(true, Collections.singletonList(new ModifyInventory(2, cover, src))));   // MOVE_UNEQUIP
++        chr.equipChanged();
++    }
++
+     public static void drop(MapleClient c, MapleInventoryType type, short src, short quantity) {
+         MapleItemInformationProvider ii = MapleItemInformationProvider.getInstance();
+         if (src < 0) {
+--- a/src/client/inventory/ModifyInventory.java
++++ b/src/client/inventory/ModifyInventory.java
+@@ -9,6 +9,7 @@
+     private int mode;
+     private Item item;
+     private short oldPos;
++    private byte invType = -1;   // -1: derive from the item id (default)
+ 
+     public ModifyInventory(final int mode, final Item item) {
+         this.mode = mode;
+@@ -20,13 +21,23 @@
+         this.item = item.copy();
+         this.oldPos = oldPos;
+     }
++
++    // Cross-inventory moves (e.g. wearing a cash cover from the CASH tab)
++    // must announce the source inventory, which differs from the type
++    // derived from the item id.
++    public ModifyInventory(final int mode, final Item item, final short oldPos, final byte invType) {
++        this.mode = mode;
++        this.item = item.copy();
++        this.oldPos = oldPos;
++        this.invType = invType;
++    }
+     
+     public final int getMode() {
+         return mode;
+     }
+ 
+     public final int getInventoryType() {
+-        return item.getInventoryType().type;
++        return invType >= 0 ? invType : item.getInventoryType().type;
+     }
+ 
+     public final short getPosition() {
+--- a/src/client/MapleCharacter.java
++++ b/src/client/MapleCharacter.java
+@@ -7703,6 +7703,9 @@
+             //equipjump = 0;
+ 
+             for (Item item : getInventory(MapleInventoryType.EQUIPPED)) {
++                if (item.getPosition() <= -100) {
++                    continue;   // cosmetic cash covers (slot -100-x) are appearance-only, they must not affect stats
++                }
+                 Equip equip = (Equip) item;
+                 equipmaxhp += equip.getHp();
+                 equipmaxmp += equip.getMp();
+--- a/src/client/inventory/ItemFactory.java
++++ b/src/client/inventory/ItemFactory.java
+@@ -30,6 +30,7 @@
+ import java.util.concurrent.locks.Lock;
+ import net.server.audit.locks.MonitoredLockType;
+ import net.server.audit.locks.factory.MonitoredReentrantLockFactory;
++import constants.ItemConstants;
+ import tools.DatabaseConnection;
+ import tools.Pair;
+ 
+@@ -164,7 +165,7 @@
+             while (rs.next()) {
+                 MapleInventoryType mit = MapleInventoryType.getByType(rs.getByte("inventorytype"));
+ 
+-                if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED)) {
++                if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED) || (mit.equals(MapleInventoryType.CASH) && ItemConstants.getInventoryType(rs.getInt("itemid")) == MapleInventoryType.EQUIP)) {    // equips handed out to the CASH tab as cosmetic covers
+                     items.add(new Pair<Item, MapleInventoryType>(loadEquipFromResultSet(rs), mit));
+                 } else {
+                     Item item = new Item(rs.getInt("itemid"), (byte) rs.getInt("position"), (short) rs.getInt("quantity"), rs.getInt("petid"));
+@@ -231,7 +232,7 @@
+ 
+                     pse = con.prepareStatement("INSERT INTO `inventoryequipment` VALUES (DEFAULT, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+ 
+-                    if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED)) {
++                    if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED) || (mit.equals(MapleInventoryType.CASH) && ItemConstants.getInventoryType(item.getItemId()) == MapleInventoryType.EQUIP)) {    // equips handed out to the CASH tab as cosmetic covers
+                         rs = ps.getGeneratedKeys();
+ 
+ 			if (!rs.next()) {
+@@ -319,7 +320,7 @@
+                 
+                 MapleInventoryType mit = MapleInventoryType.getByType(rs.getByte("inventorytype"));
+ 
+-                if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED)) {
++                if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED) || (mit.equals(MapleInventoryType.CASH) && ItemConstants.getInventoryType(rs.getInt("itemid")) == MapleInventoryType.EQUIP)) {    // equips handed out to the CASH tab as cosmetic covers
+                     items.add(new Pair<Item, MapleInventoryType>(loadEquipFromResultSet(rs), mit));
+                 } else {
+                     if(bundles > 0) {
+@@ -419,7 +420,7 @@
+                     pse.executeUpdate();
+                     pse.close();
+ 
+-                    if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED)) {
++                    if (mit.equals(MapleInventoryType.EQUIP) || mit.equals(MapleInventoryType.EQUIPPED) || (mit.equals(MapleInventoryType.CASH) && ItemConstants.getInventoryType(item.getItemId()) == MapleInventoryType.EQUIP)) {    // equips handed out to the CASH tab as cosmetic covers
+                         pse = con.prepareStatement("INSERT INTO `inventoryequipment` VALUES (DEFAULT, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                         pse.setInt(1, genKey);
+ 						
+--- a/src/tools/MaplePacketCreator.java
++++ b/src/tools/MaplePacketCreator.java
+@@ -357,6 +357,14 @@
+         addItemInfo(mplew, item, false);
+     }
+ 
++    // USE/SETUP/ETC/CASH inventory sections delimit items with one-byte
++    // positions, even for equips (decorative cash covers are stored in the
++    // CASH tab), so the position must be written as a byte there.
++    private static void addItemInfoBytePos(final MaplePacketLittleEndianWriter mplew, Item item) {
++        mplew.write(item.getPosition());
++        addItemInfo(mplew, item, true);
++    }
++
+     protected static void addItemInfo(final MaplePacketLittleEndianWriter mplew, Item item, boolean zeroPosition) {
+         MapleItemInformationProvider ii = MapleItemInformationProvider.getInstance();
+         boolean isCash = ii.isCash(item.getItemId());
+@@ -376,7 +384,10 @@
+                 if (pos < 0)
+                     pos *= -1;
+ 
+-                mplew.writeShort(pos > 100 ? pos - 100 : pos);
++                // Worn cash covers (position <= -100) keep their full slot
++                // index on the wire: the client negates the position and
++                // routes values >= 100 to the hidden EQUIP cover slots.
++                mplew.writeShort(pos);
+             } else {
+                 mplew.write(pos);
+             }
+@@ -499,22 +510,22 @@
+         mplew.writeInt(0);
+ 
+         for (Item item : chr.getInventory(MapleInventoryType.USE).list())
+-            addItemInfo(mplew, item);
++            addItemInfoBytePos(mplew, item);
+ 
+         mplew.write(0);
+ 
+         for (Item item : chr.getInventory(MapleInventoryType.SETUP).list())
+-            addItemInfo(mplew, item);
++            addItemInfoBytePos(mplew, item);
+ 
+         mplew.write(0);
+ 
+         for (Item item : chr.getInventory(MapleInventoryType.ETC).list())
+-            addItemInfo(mplew, item);
++            addItemInfoBytePos(mplew, item);
+ 
+         mplew.write(0);
+ 
+         for (Item item : chr.getInventory(MapleInventoryType.CASH).list())
+-            addItemInfo(mplew, item);
++            addItemInfoBytePos(mplew, item);
+     }
+ 
+     private static void addSkillInfo(final MaplePacketLittleEndianWriter mplew, MapleCharacter chr) {

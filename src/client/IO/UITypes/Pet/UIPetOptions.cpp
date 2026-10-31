@@ -5,6 +5,7 @@
 #include "../UIStatusBar.h"
 
 #include "../../../Gameplay/Pet/PetAutomation.h"
+#include "../../../Gameplay/Pet/PetVitalityPolicy.h"
 #include "../../../Gameplay/Stage.h"
 #include "../../../Data/ItemData.h"
 #include "../../../Net/Packets/PlayerPackets.h"
@@ -76,6 +77,7 @@ namespace jrc
           mp_fill(1, 8, Geometry::HPBAR_LIGHTGREEN, 1.0f),
           potion_background(POTION_WIDTH, POTION_HEIGHT, Geometry::WHITE, 0.10f),
           button_background(85, 28, Geometry::WHITE, 0.16f),
+          pet_status(Text::A11M, Text::CENTER, Text::WHITE, ""),
           title(Text::A13B, Text::CENTER, Text::WHITE, "PET AUTO RECOVERY"),
           help(Text::A11M, Text::CENTER, Text::LIGHTGREY,
                "Choose thresholds and items from USE inventory"),
@@ -106,6 +108,46 @@ namespace jrc
         sync_potion_labels();
     }
 
+    void UIPetOptions::update()
+    {
+        UIElement::update();
+        sync_pet_status();
+    }
+
+    void UIPetOptions::sync_pet_status()
+    {
+        const Player& player = Stage::get().get_player();
+        const PetLook* pet = player.get_pet(0);
+        const Inventory& inventory = player.get_inventory();
+        const Pet* petinfo = pet ? inventory.get_pet_by_cash_id(pet->get_uniqueid()) : nullptr;
+
+        pet_vitality::State state = pet_vitality::classify(
+            petinfo != nullptr, petinfo ? petinfo->get_fullness() : 0);
+
+        std::string text = pet_vitality::describe(state);
+        Text::Color color = Text::LIGHTGREY;
+        if (petinfo)
+        {
+            text = petinfo->get_name() + "  Lv." +
+                std::to_string(petinfo->get_level()) + "  Fullness " +
+                std::to_string(petinfo->get_fullness());
+            color = Text::WHITE;
+        }
+
+        if (state == pet_vitality::State::HUNGRY)
+        {
+            text += " - HUNGRY!";
+            color = Text::ORANGE;
+        }
+
+        if (text != pet_status_cache)
+        {
+            pet_status_cache = text;
+            pet_status.change_color(color);
+            pet_status.change_text(text);
+        }
+    }
+
     void UIPetOptions::draw(float alpha) const
     {
         panel_background.draw(position);
@@ -122,6 +164,7 @@ namespace jrc
         potion_background.draw(position + Point<int16_t>(POTION_LEFT, MP_POTION_Y));
 
         title.draw(position + Point<int16_t>(141, 30));
+        pet_status.draw(position + Point<int16_t>(141, 56));
         help.draw(position + Point<int16_t>(141, 78));
         hp_label.draw(position + Point<int16_t>(52, 119));
         mp_label.draw(position + Point<int16_t>(52, 263));

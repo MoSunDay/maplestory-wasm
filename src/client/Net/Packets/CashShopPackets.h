@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../OutPacket.h"
+#include "../../Character/Inventory/InventoryType.h"
 #include "../../IO/CashShop/CashShopModel.h"
 
 namespace jrc
@@ -35,6 +36,25 @@ namespace jrc
             write_byte(0);
             write_int(static_cast<int32_t>(currency));
             write_int(sn);
+        }
+    };
+
+    /// Buys four extra slots for one inventory tab.
+    /// Opcode: CASHSHOP_OPERATION(0x06); the server answers a successful
+    /// purchase with 0x60 (tab + new slot maximum) and then pushes the
+    /// balances (0x144). A rejection is the balance push alone.
+    class BuyCashInventorySlotsPacket : public OutPacket
+    {
+    public:
+        BuyCashInventorySlotsPacket(CashCurrency currency,
+            InventoryType::Id inventory_type)
+            : OutPacket(CASHSHOP_OPERATION)
+        {
+            write_byte(0x06);
+            write_byte(0);
+            write_int(static_cast<int32_t>(currency));
+            write_byte(0);
+            write_byte(static_cast<int8_t>(inventory_type));
         }
     };
 

@@ -261,23 +261,20 @@ namespace jrc::cash_shop_layout
     constexpr Point<int16_t> TRANSFER_HINT_POS{ 652, 270 };
     constexpr int16_t TRANSFER_HINT_WIDTH = 280;
 
-    // Selected item details: a 22px header and one icon/three-line block.
-    constexpr Point<int16_t> DETAILS_PANEL_POS{ 508, 294 };
-    constexpr Point<int16_t> DETAILS_PANEL_SIZE{ 288, 94 };
-    constexpr Point<int16_t> DETAILS_HEADER_LINE_POS{ 508, 316 };
-    constexpr Point<int16_t> DETAILS_HEADER_LINE_SIZE{ 288, 1 };
-    constexpr Point<int16_t> DETAILS_TITLE_POS{ 516, 298 };
-    constexpr Point<int16_t> DETAILS_ICON_CENTER{ 552, 352 };
-    constexpr int16_t DETAILS_ICON_MAX = 62;
-    constexpr Point<int16_t> DETAILS_TEXT_CENTER{ 694, 318 };
-    constexpr int16_t DETAILS_TEXT_WIDTH = 178;
-    constexpr int16_t DETAILS_COUNT_Y = 334;
-    constexpr int16_t DETAILS_META_Y = 348;
-    constexpr int16_t DETAILS_EXTRA_Y = 362;
-    constexpr Point<int16_t> DETAILS_HINT_CENTER{ 652, 342 };
-    constexpr int16_t DETAILS_HINT_WIDTH = 280;
+    // Inventory slot expansion: a 22px header and a 2x2 grid of pill
+    // buttons, one per inventory tab. Each confirmed pill buys 4 slots.
+    constexpr Point<int16_t> SLOTBUY_PANEL_POS{ 508, 294 };
+    constexpr Point<int16_t> SLOTBUY_PANEL_SIZE{ 288, 94 };
+    constexpr Point<int16_t> SLOTBUY_TITLE_POS{ 516, 298 };
+    constexpr Point<int16_t> SLOTBUY_INFO_RIGHT{ 788, 298 };
+    constexpr int16_t SLOTBUY_INFO_WIDTH = 168;
+    constexpr Point<int16_t> SLOTBUY_HEADER_LINE_POS{ 508, 316 };
+    constexpr Point<int16_t> SLOTBUY_HEADER_LINE_SIZE{ 288, 1 };
+    constexpr Point<int16_t> SLOTBUY_PILL_SIZE{ 132, 30 };
+    constexpr int16_t SLOTBUY_PILL_XS[2]{ 516, 656 };
+    constexpr int16_t SLOTBUY_PILL_YS[2]{ 322, 358 };
 
-    // Featured commodity preview below the details card.
+    // Featured commodity preview below the slot-expansion panel.
     constexpr Point<int16_t> FEATURED_PANEL_POS{ 508, 396 };
     constexpr Point<int16_t> FEATURED_PANEL_SIZE{ 288, 196 };
     constexpr Point<int16_t> FEATURED_BUTTON_POS{ 508, 396 };
@@ -363,6 +360,15 @@ namespace jrc::cash_shop_layout
         return {
             static_cast<int16_t>(SLOT_GRID_POS.x() + (index % SLOT_COLS) * SLOT_STEP),
             static_cast<int16_t>(SLOT_GRID_POS.y() + (index / SLOT_COLS) * SLOT_STEP)
+        };
+    }
+
+    // Top-left corner of the n-th slot-expansion pill (0..3, row-major).
+    inline Point<int16_t> slotbuy_pill_position(size_t index)
+    {
+        return {
+            SLOTBUY_PILL_XS[index % 2],
+            SLOTBUY_PILL_YS[index / 2]
         };
     }
 

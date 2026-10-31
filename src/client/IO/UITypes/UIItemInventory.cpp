@@ -27,6 +27,8 @@
 
 #include "../../Data/ItemData.h"
 #include "../../Data/EquipData.h"
+#include "../../Gameplay/Pet/PetCapabilityPolicy.h"
+#include "../../Gameplay/Pet/PetVitalityPolicy.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/PetPackets.h"
@@ -106,6 +108,7 @@ namespace jrc
         buttons[button_by_tab(tab)]->set_state(Button::PRESSED);
 
         mesolabel = { Text::A11M, Text::RIGHT, Text::LIGHTGREY };
+        hungry_badge = { Text::A12B, Text::CENTER, Text::RED, "!" };
 
         // The scrollbar runs along the strip between the last socket
         // column and the border; its arrows span the six socket rows.
@@ -142,6 +145,8 @@ namespace jrc
             {
                 Point<int16_t> slotpos = get_slotpos(slot);
                 icon.second->draw(position + slotpos);
+                if (is_hungry_pet_slot(slot))
+                    hungry_badge.draw(position + slotpos + Point<int16_t>(28, -2));
             }
         }
 
@@ -188,6 +193,12 @@ namespace jrc
             int16_t count;
             if (tab == InventoryType::EQUIP)
             {
+                count = -1;
+            }
+            else if (tab == InventoryType::CASH && item_id / 1000000 == 1)
+            {
+                // Equip-type locker items are unstacked one-per-slot, so
+                // hide the count badge like the EQUIP tab does.
                 count = -1;
             }
             else
@@ -280,13 +291,33 @@ namespace jrc
                 switch (tab)
                 {
                 case InventoryType::EQUIP:
-                    EquipItemPacket(
-                        slot,
-                        inventory.find_equipslot(item_id)
-                    ).dispatch();
+                    if (EquipData::get(item_id).is_cash())
+                    {
+                        // Cash equips keep their look-only role even when
+                        // they end up on the EQUIP tab: wear them through
+                        // the cover path so no normal equip is displaced.
+                        EquipItemPacket(
+                            slot,
+                            inventory.find_equipslot(item_id),
+                            true
+                        ).dispatch();
+                    }
+                    else
+                    {
+                        EquipItemPacket(
+                            slot,
+                            inventory.find_equipslot(item_id)
+                        ).dispatch();
+                    }
                     break;
                 case InventoryType::USE:
-                    if (
+                    if (pet_vitality::is_pet_food(item_id))
+                    {
+                        // The server feeds the summoned pet that is the
+                        // most hungry with this item.
+                        PetFoodPacket(slot, item_id).dispatch();
+                    }
+                    else if (
                         item_id / 10000 != 204 &&
                         item_id / 10000 != 206 &&
                         item_id / 10000 != 207
@@ -302,9 +333,10 @@ namespace jrc
                     {
                         SpawnPetPacket(static_cast<int8_t>(slot)).dispatch();
                     }
-                    else if (EquipData::get(item_id).is_cash())
+                    else if (item_id / 1000000 == 1)
                     {
-                        // Cash equips are worn for the look only.
+                        // Equip-type locker items always wear via the cash
+                        // cover path (hidden EQUIP slot 100 + eqslot).
                         EquipItemPacket(
                             slot,
                             inventory.find_equipslot(item_id),
@@ -497,6 +529,20 @@ namespace jrc
     bool UIItemInventory::is_not_visible(int16_t slot) const
     {
         return slot < slotrange.first || slot > slotrange.second;
+    }
+
+    bool UIItemInventory::is_hungry_pet_slot(int16_t slot) const
+    {
+        if (tab != InventoryType::CASH)
+            return false;
+
+        int32_t item_id = inventory.get_item_id(tab, slot);
+        if (!pet_capability::is_pet_item(item_id))
+            return false;
+
+        const Pet* pet = inventory.get_pet_by_cash_id(
+            inventory.get_cash_id(tab, slot));
+        return pet && pet_vitality::is_hungry(pet->get_fullness());
     }
 
     int16_t UIItemInventory::hit_test(Point<int16_t> cursorpos) const

@@ -17,6 +17,20 @@ namespace jrc
         }
     };
 
+    // Feeds pet food to the summoned pet. The server picks the pet that is
+    // currently the most hungry; the client only supplies the food item.
+    class PetFoodPacket : public OutPacket
+    {
+    public:
+        PetFoodPacket(int16_t use_slot, int32_t item_id)
+            : OutPacket(PET_FOOD)
+        {
+            write_time();
+            write_short(use_slot);
+            write_int(item_id);
+        }
+    };
+
     class MovePetPacket : public MovementPacket
     {
     public:

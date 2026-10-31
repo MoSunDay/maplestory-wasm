@@ -16,13 +16,16 @@ namespace jrc::pet_loot
     // Pickup requests are swept in batches around the pet; the rest of a
     // cluster follows on the next attempt.
     constexpr uint8_t BATCH_LIMIT = 4;
-    // Horizontal half-window of the pet pickup sweep around the pet.
-    constexpr int16_t BATCH_RANGE = 50;
+    // Horizontal half-window of the pet pickup sweep around the pet,
+    // widened 5x to 250px to cover the expanded loot range.
+    constexpr int16_t BATCH_RANGE = 250;
     // A drop's icon center sits ~16px below its foothold and often lands a
     // platform step below the pet's feet; vertical reach must cover that
     // while staying inside the pursuit band (jump reach up, fall guard
     // down), so a parked pet is never locked out of adjacent loot.
-    constexpr int32_t REACH_DROP_LIMIT = 96;
+    // Deepened 5x to 480px so the vertical probe below the pet matches the
+    // expanded loot range.
+    constexpr int32_t REACH_DROP_LIMIT = 480;
     // Pursuit that has not reached pickup range by this many frames can
     // never close the gap; give the drop up instead of standing frozen.
     constexpr uint16_t ABANDON_FRAMES = 240;

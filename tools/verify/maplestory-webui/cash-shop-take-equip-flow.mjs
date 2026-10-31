@@ -1,18 +1,26 @@
-// 现金商城「仓库取出 → 物品栏穿戴」浏览器专项验收。
+// 现金商城「仓库取出 → CASH 栏 → 外观覆盖穿戴/卸下」浏览器专项验收。
 //
-// 修复的两个回归点：
-//   1) 双击商城仓库槽位应只发起一次「取出」；成功后的第二下点击不得因
-//      右栏自动选中而再次触发「存回」，否则装备会从背包消失。
-//   2) 取出的装备进入角色 EQUIP 物品栏后，打开物品栏双击该格应正常穿戴，
-//      并从 EQUIP 栏移除、更新已装备外观与属性。
+// 新契约（现金商城装备纯装饰化，服务端 patch 0005）：
+//   1) 商城仓库「取出」（CASHSHOP_OPERATION 0x68/0x0D）的装备落入角色
+//      CASH 物品栏（InventoryType id=5，物品栏 CASH 标签），不再进 EQUIP
+//      标签；双击仓库格仍只触发一次取出，成功后的自动选中不得把装备存回。
+//   2) 物品栏切到 CASH 标签后双击该装备格：以「外观覆盖」方式戴上
+//      （MOVE_ITEM dst=-(100+eqslot)，落 EQUIP 隐藏槽 100+eqslot），
+//      不占真实装备槽、不顶掉普通装备、不改任何属性总值。
+//   3) 装备窗口双击对应部位：覆盖卸下（MOVE_ITEM src=-(100+eqslot)、
+//      dst=CASH 空格），装备回到 CASH 栏，属性总值仍不变。
 //
-// 断言使用客户端只读探针：
-//   mscashshop_locker_count / mscashshop_inventory_count / mscashshop_pending
-//   msinventory_quantity / msinventory_slot / msinventory_equipped /
-//   msinventory_equipped_marker
-//   msiteminventory_active / _x / _y / _tab / _first_slot / _last_slot / _slot_at
+// 断言使用客户端只读探针（注意语义：msinventory_slot/quantity 按
+// InventoryType::by_item_id 定栏——现金装备 1002000 属 CASH 栏；
+// msinv_slot_item(invtype, slot) 直接按栏读格，本脚本用它扫描）：
+//   mscashshop_locker_count / _inventory_count / _pending / _nx_credit /
+//   _selected_right_row / _filtered_count / _highlighted_item / _selected_left
+//   msinv_slot_item / msinventory_equipped / _equipped_marker / _cover_equipped
+//   msiteminventory_active / _x / _y / _tab / _slot_at / _tab_x / _tab_y
+//   msstatusbar_control_bounds（状态栏 INVENTORY/EQUIPS 快捷钮中心）
+//   msui_front_at（装备窗口命中）msstat_total（STR..JUMP 属性快照）
 //
-// 前置：角色至少有一个空 EQUIP 槽位；测试商品在售且可被当前性别购买。
+// 前置：测试商品在售且可被当前性别购买；CASH 栏有空位；角色离线。
 // Run: CHROME_BIN=/usr/bin/chromium-browser node \
 //   tools/verify/maplestory-webui/cash-shop-take-equip-flow.mjs
 
@@ -31,8 +39,21 @@ const price = Number(process.env.TAKE_EQUIP_PRICE || 3700);
 const capEquipSlot = Number(process.env.TAKE_EQUIP_CAP_SLOT || 1);
 
 const uiState = Object.freeze({ login: 1, world: 2, characters: 3, game: 5, cashShop: 6 });
+const elementType = Object.freeze({ itemInventory: 17, equipInventory: 18 });
+const statusbarButton = Object.freeze({ inventory: 9, equips: 10 });
 const inventoryTypeEquip = 1;
+const inventoryTypeCash = 5;
+const statIds = Array.from({ length: 15 }, (unused, i) => i);
 const rightGrid = Object.freeze({ x: 517, y: 88, pitch: 39, hit: 18 });
+// 物品栏格心相对窗口原点的偏移：post-Chaos 网格 (11,51) 36/35 间距，
+// 传统 v83 为 (8,50) 36/34 间距；用 msiteminventory_slot_at 校验命中。
+const slotOffsets = Object.freeze([
+  { dx: 11 + 18, dy: 51 + 17, pitchX: 36, pitchY: 35 },
+  { dx: 8 + 18, dy: 50 + 17, pitchX: 36, pitchY: 34 }
+]);
+// 装备窗口默认位 PosEQINV (250,150)，CAP 插槽 post-Chaos (43,25)、
+// v83 (38,35)，32px 格取中心；两个世代候选均落在彼此的 CAP 格内。
+const capSocketCandidates = Object.freeze([[309, 191], [304, 201]]);
 const charCard = index => ({ x: 105 + 120 * index + 25, y: 210 });
 
 let failed = false;
@@ -69,6 +90,42 @@ async function waitFor(predicate, seconds = 30) {
 async function requireState(name, predicate, seconds = 30) {
   if (!await waitFor(predicate, seconds)) throw new Error(`Timed out: ${name}`);
   console.log(`PASS  ${name}`);
+}
+async function statsSnapshot(driver) {
+  const values = [];
+  for (const stat of statIds) values.push(await probe(driver, 'msstat_total', [stat]));
+  return values;
+}
+async function assertStatsUnchanged(driver, baseline, label) {
+  const current = await statsSnapshot(driver);
+  report(JSON.stringify(current) === JSON.stringify(baseline),
+    `${label}: stat totals unchanged (${baseline.join(',')} -> ${current.join(',')})`);
+}
+// 扫描一个物品栏的可见页（1..24），返回 itemId 所在 slot（0=未找到）。
+async function findSlotInTab(driver, invtype, wanted) {
+  for (let slot = 1; slot <= 24; slot += 1) {
+    if (await probe(driver, 'msinv_slot_item', [invtype, slot]) === wanted) return slot;
+  }
+  return 0;
+}
+// 返回 itemId 在该栏占用的全部 slot（历史遗留的同类装备可能已存在）。
+async function findSlotsInTab(driver, invtype, wanted) {
+  const slots = [];
+  for (let slot = 1; slot <= 24; slot += 1) {
+    if (await probe(driver, 'msinv_slot_item', [invtype, slot]) === wanted) slots.push(slot);
+  }
+  return slots;
+}
+async function statusbarButtonCenter(driver, id) {
+  const edges = [];
+  for (let edge = 0; edge < 4; edge += 1) {
+    edges.push(await probe(driver, 'msstatusbar_control_bounds', [id, edge]));
+  }
+  if (edges.some(edge => edge < 0)) return null;
+  return {
+    x: Math.round((edges[0] + edges[2]) / 2),
+    y: Math.round((edges[1] + edges[3]) / 2)
+  };
 }
 
 async function loginAndEnterGame(driver) {
@@ -141,7 +198,7 @@ async function buyCap(driver, before) {
 async function takeCap(driver, before) {
   const row = await probe(driver, 'mscashshop_selected_right_row');
   report(row >= 0, `purchased item selected in locker (row=${row})`);
-  if (row < 0) return 0;
+  if (row < 0) throw new Error('purchased locker row was not selected');
   const x = rightGrid.x + (row % 7) * rightGrid.pitch + rightGrid.hit;
   const y = rightGrid.y + Math.floor(row / 7) * rightGrid.pitch + rightGrid.hit;
   await driver.doubleClick(x, y);
@@ -149,13 +206,29 @@ async function takeCap(driver, before) {
     await probe(driver, 'mscashshop_pending') === 0 &&
     await probe(driver, 'mscashshop_locker_count') === before.locker &&
     await probe(driver, 'mscashshop_inventory_count') === before.inventory + 1, 30);
-  const slot = await probe(driver, 'msinventory_slot', [itemId]);
-  report(slot >= 1 && slot <= 24, `taken item is in EQUIP inventory (slot=${slot})`);
-  const quantity = await probe(driver, 'msinventory_quantity', [itemId]);
-  report(quantity === before.quantity + 1,
-    `taken item count increased by one (${before.quantity} -> ${quantity})`);
-  await driver.screenshot('11-taken-into-inventory');
+
+  const slot = await findSlotInTab(driver, inventoryTypeCash, itemId);
+  report(slot >= 1 && slot <= 24, `taken equip lands on the CASH tab (slot=${slot})`);
+  const equipSlotsAfter = await findSlotsInTab(driver, inventoryTypeEquip, itemId);
+  report(JSON.stringify(equipSlotsAfter) === JSON.stringify(before.equipSlots),
+    `EQUIP tab keeps only pre-existing copies (${JSON.stringify(before.equipSlots)} -> ${JSON.stringify(equipSlotsAfter)})`);
+  const equipped = await probe(driver, 'msinventory_equipped', [capEquipSlot]);
+  const marker = await probe(driver, 'msinventory_equipped_marker', [capEquipSlot]);
+  const cover = await probe(driver, 'msinventory_cover_equipped', [capEquipSlot]);
+  report(equipped === before.equipped && marker === before.marker && cover === before.cover,
+    `take does not touch equipment slots (equipped ${before.equipped}->${equipped}, ` +
+    `marker ${before.marker}->${marker}, cover ${before.cover}->${cover})`);
+  await assertStatsUnchanged(driver, before.stats, 'take keeps stat totals');
+  await driver.screenshot('11-taken-into-cash-tab');
   return slot;
+}
+
+async function exitCashShop(driver) {
+  await driver.key('Escape', 'Escape', 27);
+  await requireState('cash shop exits back to game', uiStateIs(driver, uiState.game), 30);
+  await requireState('returned map assets ready', assetsIdle(driver), 60);
+  await requireState('game UI enabled', async () =>
+    await probe(driver, 'msui_enabled') === 1, 60);
 }
 
 async function openItemInventory(driver) {
@@ -179,11 +252,21 @@ async function openItemInventory(driver) {
   return false;
 }
 
-async function equipTakenCap(driver, slot) {
+// 换到目标标签并返回（校验用）格坐标：优先用探针给出的 tab 按钮中心。
+async function switchItemTab(driver, targetTab) {
+  const tabX = await probe(driver, 'msiteminventory_tab_x', [itemId]);
+  const tabY = await probe(driver, 'msiteminventory_tab_y', [itemId]);
+  report(tabX > 0 && tabY > 0, `CASH tab button resolved from item id (${tabX},${tabY})`);
+  await driver.retryClick(tabX, tabY, async () =>
+    await probe(driver, 'msiteminventory_tab') === targetTab, 4, 2000);
+  await requireState('item inventory shows the CASH tab', async () =>
+    await probe(driver, 'msiteminventory_tab') === targetTab, 10);
+}
+
+async function equipCover(driver, slot, before) {
   await requireState('item inventory opened', () => openItemInventory(driver), 30);
   await requireState('item inventory assets ready', assetsIdle(driver), 45);
-  const tab = await probe(driver, 'msiteminventory_tab');
-  report(tab === inventoryTypeEquip, `item inventory shows EQUIP tab (tab=${tab})`);
+  await switchItemTab(driver, inventoryTypeCash);
   const first = await probe(driver, 'msiteminventory_first_slot');
   const last = await probe(driver, 'msiteminventory_last_slot');
   report(slot >= first && slot <= last,
@@ -193,23 +276,72 @@ async function equipTakenCap(driver, slot) {
   const originY = await probe(driver, 'msiteminventory_y');
   const column = (slot - first) % 4;
   const row = Math.floor((slot - first) / 4);
-  const x = originX + 29 + column * 36;
-  const y = originY + 68 + row * 35;
-  const hit = await probe(driver, 'msiteminventory_slot_at', [x, y]);
+  let x = 0;
+  let y = 0;
+  let hit = -1;
+  for (const offset of slotOffsets) {
+    x = originX + offset.dx + column * offset.pitchX;
+    y = originY + offset.dy + row * offset.pitchY;
+    hit = await probe(driver, 'msiteminventory_slot_at', [x, y]);
+    if (hit === slot) break;
+  }
   report(hit === slot, `grid hit test resolves slot ${slot} (got ${hit} at ${x},${y})`);
 
-  const equippedBefore = await probe(driver, 'msinventory_equipped', [capEquipSlot]);
-  const markerBefore = await probe(driver, 'msinventory_equipped_marker', [capEquipSlot]);
-  const quantityBefore = await probe(driver, 'msinventory_quantity', [itemId]);
-  const expectedQuantity = equippedBefore === itemId ? quantityBefore : quantityBefore - 1;
   await driver.doubleClick(x, y);
-  await requireState('double-click equips taken cap', async () =>
-    await probe(driver, 'msinventory_equipped', [capEquipSlot]) === itemId &&
-    await probe(driver, 'msinventory_equipped_marker', [capEquipSlot]) !== markerBefore &&
-    await probe(driver, 'msinventory_quantity', [itemId]) === expectedQuantity, 30);
-  await driver.screenshot('12-cap-equipped');
-  console.log(`equipped cap ${equippedBefore} -> ${await probe(driver, 'msinventory_equipped', [capEquipSlot])}, ` +
-    `marker ${markerBefore} -> ${await probe(driver, 'msinventory_equipped_marker', [capEquipSlot])}`);
+  await requireState('double-click wears the cash cover', async () =>
+    await probe(driver, 'msinventory_cover_equipped', [capEquipSlot]) === itemId, 30);
+  report(await probe(driver, 'msinv_slot_item', [inventoryTypeCash, slot]) === 0,
+    `worn cover left its CASH slot empty (slot=${slot})`);
+  const equipped = await probe(driver, 'msinventory_equipped', [capEquipSlot]);
+  const marker = await probe(driver, 'msinventory_equipped_marker', [capEquipSlot]);
+  report(equipped === itemId,
+    `cover look is shown while worn (${before.equipped} -> ${equipped}, cover=${itemId})`);
+  report(marker === before.marker,
+    `equipped cash-id marker unchanged (${before.marker} -> ${marker})`);
+  await assertStatsUnchanged(driver, before.stats, 'wearing the cover keeps stat totals');
+  await driver.screenshot('12-cover-worn');
+}
+
+async function unequipCover(driver, before) {
+  // 覆盖穿戴完成后物品栏窗口仍开着，且默认位 (300,150) 会盖住装备窗口
+  // (250,150) 的 CAP 插槽：先点状态栏 INVENTORY 快捷钮把它收起。
+  const invenCenter = await statusbarButtonCenter(driver, statusbarButton.inventory);
+  report(invenCenter !== null, `statusbar INVENTORY shortcut located (${JSON.stringify(invenCenter)})`);
+  if (invenCenter) {
+    await driver.retryClick(invenCenter.x, invenCenter.y, async () =>
+      await probe(driver, 'msiteminventory_active') === 0, 4, 1500);
+  }
+  await requireState('item inventory closed', async () =>
+    await probe(driver, 'msiteminventory_active') === 0, 15);
+
+  const equipsCenter = await statusbarButtonCenter(driver, statusbarButton.equips);
+  report(equipsCenter !== null, `statusbar EQUIPS shortcut located (${JSON.stringify(equipsCenter)})`);
+  if (!equipsCenter) throw new Error('statusbar EQUIPS shortcut missing');
+  await driver.retryClick(equipsCenter.x, equipsCenter.y, async () => {
+    for (const [x, y] of capSocketCandidates) {
+      if (await probe(driver, 'msui_front_at', [x, y]) === elementType.equipInventory) return true;
+    }
+    return false;
+  }, 4, 2000);
+  await requireState('equip inventory window opened over the CAP socket', async () => {
+    for (const [x, y] of capSocketCandidates) {
+      if (await probe(driver, 'msui_front_at', [x, y]) === elementType.equipInventory) return true;
+    }
+    return false;
+  }, 15);
+
+  const [x, y] = capSocketCandidates[0];
+  await driver.doubleClick(x, y);
+  await requireState('double-click takes the cover off', async () =>
+    await probe(driver, 'msinventory_cover_equipped', [capEquipSlot]) === 0, 30);
+  const slot = await findSlotInTab(driver, inventoryTypeCash, itemId);
+  report(slot >= 1 && slot <= 24, `cover returned to the CASH tab (slot=${slot})`);
+  const equipped = await probe(driver, 'msinventory_equipped', [capEquipSlot]);
+  const marker = await probe(driver, 'msinventory_equipped_marker', [capEquipSlot]);
+  report(equipped === before.equipped && marker === before.marker,
+    `normal equip untouched after the cover comes off (${before.equipped}/${before.marker} -> ${equipped}/${marker})`);
+  await assertStatsUnchanged(driver, before.stats, 'removing the cover keeps stat totals');
+  await driver.screenshot('13-cover-removed');
 }
 
 async function main() {
@@ -218,23 +350,30 @@ async function main() {
     await driver.start();
     await driver.navigate(pageUrl);
     await loginAndEnterGame(driver);
-    await enterCashShop(driver);
+    // Equipment baselines are readable in-game, but shop probes (locker /
+    // inventory / nx) only answer once the cash-shop UI exists, so capture
+    // them after entering the shop (-1 otherwise).
     const before = {
-      locker: await probe(driver, 'mscashshop_locker_count'),
-      inventory: await probe(driver, 'mscashshop_inventory_count'),
-      nx: await probe(driver, 'mscashshop_nx_credit'),
-      quantity: await probe(driver, 'msinventory_quantity', [itemId])
+      equipped: await probe(driver, 'msinventory_equipped', [capEquipSlot]),
+      marker: await probe(driver, 'msinventory_equipped_marker', [capEquipSlot]),
+      cover: await probe(driver, 'msinventory_cover_equipped', [capEquipSlot]),
+      equipSlots: await findSlotsInTab(driver, inventoryTypeEquip, itemId),
+      stats: await statsSnapshot(driver)
     };
+    await enterCashShop(driver);
+    before.locker = await probe(driver, 'mscashshop_locker_count');
+    before.inventory = await probe(driver, 'mscashshop_inventory_count');
+    before.nx = await probe(driver, 'mscashshop_nx_credit');
+    report(before.locker >= 0 && before.inventory >= 0 && before.nx >= 0,
+      `shop baselines captured (locker=${before.locker}, inventory=${before.inventory}, nx=${before.nx})`);
     await buyCap(driver, before);
     const slot = await takeCap(driver, before);
-    await driver.key('Escape', 'Escape', 27);
-    await requireState('cash shop exits back to game', uiStateIs(driver, uiState.game), 30);
-    await requireState('returned map assets ready', assetsIdle(driver), 60);
-    await requireState('game UI enabled', async () =>
-      await probe(driver, 'msui_enabled') === 1, 60);
-    await equipTakenCap(driver, slot);
+    await exitCashShop(driver);
+    await equipCover(driver, slot, before);
+    await unequipCover(driver, before);
+    report(true, 'decorative cash-equip contract holds end to end');
   } catch (error) {
-    report(false, `cash shop take/equip flow aborted: ${error.message}`);
+    report(false, `cash shop take/cover flow aborted: ${error.message}`);
     console.error(error);
   } finally {
     if (driver.errors.length) {

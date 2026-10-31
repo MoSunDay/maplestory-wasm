@@ -124,6 +124,10 @@ namespace jrc
         const pet_automation::Controller& get_pet_automation() const;
         pet_capability::Capabilities get_pet_capabilities() const;
         int32_t get_pet_loot_target_oid() const;
+        // Returns true when the lead summoned pet is hungry (fullness below the
+        // pet vitality threshold). A hungry pet keeps following its owner but
+        // stops looting and using potions.
+        bool is_pet_hungry() const;
 
         // Return a pointer to a character, possibly the player.
         Optional<Char> get_character(int32_t cid);

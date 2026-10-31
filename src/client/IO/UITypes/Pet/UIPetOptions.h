@@ -6,6 +6,7 @@
 #include "../../../Graphics/Text.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace jrc
@@ -20,6 +21,7 @@ namespace jrc
         UIPetOptions();
 
         void draw(float alpha) const override;
+        void update() override;
         void update_screen(int16_t width, int16_t height) override;
         CursorResult send_cursor(bool pressed, Point<int16_t> cursorpos) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
@@ -34,6 +36,7 @@ namespace jrc
         void select_potion(bool hp, int32_t direction);
         void sync_labels();
         void sync_potion_labels();
+        void sync_pet_status();
         Rectangle<int16_t> slider_bounds(bool hp) const;
         Rectangle<int16_t> potion_bounds(bool hp) const;
 
@@ -57,6 +60,8 @@ namespace jrc
         ColorBox mp_fill;
         ColorBox potion_background;
         ColorBox button_background;
+        Text pet_status;
+        std::string pet_status_cache;
         Text title;
         Text help;
         Text hp_label;

@@ -75,7 +75,9 @@ namespace jrc
             Point<int16_t> origin;
             int32_t character_id = 0;
             int32_t party_id = -1;
-            int16_t range = 150;
+            // Horizontal loot search radius around the owner, widened 5x
+            // from 150px to match the expanded pet loot range.
+            int16_t range = 750;
             bool meso_magnet = false;
             bool item_pouch = false;
             bool magic_scales = false;

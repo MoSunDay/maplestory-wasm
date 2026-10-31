@@ -87,7 +87,9 @@ namespace jrc
         }
 
         if (stance != HANG &&
-            pet_follow::outside_owner_leash(curpos, charpos))
+            pet_follow::outside_owner_leash(curpos, charpos,
+                loot_target.has_value() ? pet_follow::LOOT_LEASH_DISTANCE
+                                        : pet_follow::OWNER_LEASH_DISTANCE))
         {
             last_warp_owner_distance = pet_follow::distance_between(
                 curpos, charpos);
@@ -197,7 +199,9 @@ namespace jrc
             phobj.set_flag(PhysicsObject::NOGRAVITY);
             break;
         case FLY:
-            if (pet_follow::outside_owner_leash(curpos, charpos))
+            if (pet_follow::outside_owner_leash(curpos, charpos,
+                    loot_target.has_value() ? pet_follow::LOOT_LEASH_DISTANCE
+                                            : pet_follow::OWNER_LEASH_DISTANCE))
             {
                 last_warp_owner_distance = pet_follow::distance_between(
                     curpos, charpos);

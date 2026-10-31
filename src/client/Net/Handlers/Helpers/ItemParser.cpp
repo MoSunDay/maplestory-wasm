@@ -171,11 +171,17 @@ namespace jrc
         }
 
         InventoryType::Id parse_item_auto(InPacket& recv, int16_t slot,
-            Inventory& inventory, int64_t forced_cash_id)
+            Inventory& inventory, int64_t forced_cash_id, bool equip_to_cash)
         {
             const auto item_type = static_cast<uint8_t>(recv.read_byte());
             int32_t iid = recv.read_int();
             InventoryType::Id type = InventoryType::by_item_id(iid);
+            // Locker withdrawals are cash items; equips among them live on
+            // the CASH tab so they wear through the cover path.
+            if (equip_to_cash && type == InventoryType::EQUIP)
+            {
+                type = InventoryType::CASH;
+            }
             parse_item_body(recv, item_type, type, slot, iid, inventory,
                 forced_cash_id);
             return type;

@@ -27,6 +27,13 @@ namespace jrc
         Pet(int32_t item_id, int64_t expiration, const std::string& name,
             uint8_t level, uint16_t closeness, uint8_t fullness);
 
+        int32_t get_itemid() const;
+        int64_t get_expiration() const;
+        const std::string& get_name() const;
+        uint8_t get_level() const;
+        uint16_t get_closeness() const;
+        uint8_t get_fullness() const;
+
     private:
         int32_t item_id;
         int64_t expiration;

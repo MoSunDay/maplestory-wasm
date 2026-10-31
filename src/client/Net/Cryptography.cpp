@@ -87,7 +87,9 @@ namespace jrc
             headermask |= static_cast<uint8_t>(bytes[i]) << (8 * i);
         }
 
-        return static_cast<int16_t>(
+        // The wire length is an unsigned 16-bit value; an int16_t cast would
+        // sign-extend lengths whose low byte is >= 0x80 and reject them.
+        return static_cast<uint16_t>(
             (headermask >> 16) ^ (headermask & 0xFFFF)
         );
 #else

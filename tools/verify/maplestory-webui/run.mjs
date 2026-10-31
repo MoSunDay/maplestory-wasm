@@ -6,6 +6,8 @@ import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
 import { verifyUserInfoFlow } from './user-info-flow.mjs';
 import { boostShoeStats, parseShoeStatsEnv } from './pet-stat-boost.mjs';
+import { parsePetHungerEnv, preparePetHunger } from './pet-hunger-fixture.mjs';
+import { verifyPetHungerFlow } from './pet-hunger-flow.mjs';
 import {
   createAssetIdleWaiter,
   createRuntimeProbes,
@@ -41,11 +43,14 @@ const requireMobs = process.env.E2E_REQUIRE_MOBS === '1';
 const routeTutorialMobMap = process.env.E2E_ROUTE_TUTORIAL_MOB_MAP === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const petOptionsMode = process.env.E2E_PET_OPTIONS || '';
-const verifyPetOptions = ['1', 'configure', 'runtime', 'pickup', 'follow'].includes(petOptionsMode);
+const verifyPetOptions = ['1', 'configure', 'runtime', 'pickup', 'follow', 'hunger'].includes(petOptionsMode);
 const verifyCharacterInfo = process.env.E2E_CHARACTER_INFO === '1';
 const attackSamples = Number(process.env.E2E_ATTACK_SAMPLES || 20);
 const attackSampleGapMs = Number(process.env.E2E_ATTACK_SAMPLE_GAP_MS || 1200);
 const shoeStats = parseShoeStatsEnv(process.env.E2E_PET_SHOE_STATS);
+const petHunger = petOptionsMode === 'hunger'
+  ? parsePetHungerEnv(process.env.E2E_PET_HUNGER || `10,10`)
+  : parsePetHungerEnv(process.env.E2E_PET_HUNGER);
 
 const uiState = Object.freeze({ login: 1, worldSelect: 2, charSelect: 3, charCreation: 4, game: 5, cashShop: 6 });
 
@@ -58,6 +63,8 @@ const driver = new BrowserDriver({
 let passed = false;
 
 async function requireState(name, predicate, timeoutSeconds = 30) {
+  // Shared-host knob: raise every gate's budget without touching call sites.
+  timeoutSeconds = Math.max(timeoutSeconds, Number(process.env.E2E_STATE_TIMEOUT_S || 0));
   for (let second = 0; second < timeoutSeconds; second += 1) {
     if (await predicate()) {
       console.log(`PASS  ${name}`);
@@ -97,6 +104,9 @@ function assertRuntimeHealthy() {
   }
 }
 
+const restorePetHunger = petHunger && petOptionsMode === 'hunger'
+  ? preparePetHunger({ configPath: process.env.MS_SERVER_CONFIG, account, fullness: petHunger.fullness, foodQty: petHunger.foodQty }).restore
+  : null;
 const restoreShoeStats = shoeStats && verifyPetOptions
   ? boostShoeStats({ configPath: process.env.MS_SERVER_CONFIG, account, speed: shoeStats.speed, jump: shoeStats.jump }).restore
   : null;
@@ -677,7 +687,7 @@ try {
         await enterTutorialMobMap(driver, {
           mapId, playerX, playerY, mapAssetLoading
         }, requireState);
-      if (petOptionsMode === 'pickup' && await mapId() === 40000)
+      if ((petOptionsMode === 'pickup' || petOptionsMode === 'hunger') && await mapId() === 40000)
         await enterTutorialLootMap(driver, {
           mapId, playerX, playerY, mapAssetLoading
         }, requireState);
@@ -946,6 +956,11 @@ try {
       if (!verifyPetOptions) throw new Error('__CHARACTER_INFO_COMPLETE__');
     }
 
+    if (verifyPetOptions && petOptionsMode === 'hunger') {
+      await verifyPetHungerFlow(driver, probes, requireState);
+      throw new Error('__PET_OPTIONS_COMPLETE__');
+    }
+
     if (verifyPetOptions) {
       await verifyPetAutomationFlow(
         driver, probes, requireState, petOptionsMode === '1' ? 'options' : petOptionsMode);
@@ -1055,9 +1070,24 @@ try {
 } finally {
   fs.writeFileSync(`${driver.artifactDir}/browser-console.log`, `${driver.logs.join('\n')}\n`);
   fs.writeFileSync(`${driver.artifactDir}/browser-errors.log`, `${driver.errors.join('\n')}\n`);
+  fs.writeFileSync(`${driver.artifactDir}/browser-stderr.log`,
+    `${(driver.browserStderr || []).join('\n')}\n`);
   console.log(`artifacts: ${driver.artifactDir}`);
   console.log(`console lines: ${driver.logs.length}; browser exceptions: ${driver.errors.length}`);
   await driver.stop();
+  if (restorePetHunger) {
+    // The server saves the character only after the browser disconnects
+    // above; let the logout save land before restoring, or it clobbers the
+    // pets.fullness restore with the in-session value.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5000);
+    });
+    try {
+      console.log(`PASS  pet hunger fixture restored ${JSON.stringify(restorePetHunger())}`);
+    } catch (error) {
+      console.log(`FAIL  pet hunger fixture restore: ${error.message}`);
+    }
+  }
   if (restoreShoeStats) {
     // The server saves the character (rewriting equipment rows with the
     // in-memory buffed values) only after the browser disconnects above;

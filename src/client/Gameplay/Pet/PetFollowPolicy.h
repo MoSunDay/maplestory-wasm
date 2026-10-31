@@ -32,6 +32,9 @@ namespace jrc::pet_follow
     constexpr int32_t FALL_HEIGHT_LIMIT = 240;
 
     constexpr int32_t OWNER_LEASH_DISTANCE = 300;
+    // Chasing loot may stray 5x farther than the follow leash so the pet
+    // can reach drops targeted at the expanded loot range.
+    constexpr int32_t LOOT_LEASH_DISTANCE = 1500;
     constexpr uint8_t MAX_FAILED_LOOT_JUMPS = 3;
 
     // Apex height in pixels a takeoff speed of jump_force reaches under gravity.
@@ -72,7 +75,8 @@ namespace jrc::pet_follow
     int32_t distance_between(Point<int16_t> first, Point<int16_t> second);
     bool made_progress(int32_t previous_distance, int32_t current_distance);
     bool outside_owner_leash(Point<int16_t> pet_position,
-        Point<int16_t> owner_position);
+        Point<int16_t> owner_position,
+        int32_t limit = OWNER_LEASH_DISTANCE);
     Point<int16_t> player_side_position(Point<int16_t> owner_position);
     // Re-anchor a warped pet to its owner's foothold, so update_fh evaluates
     // the landing spot against the owner's platform, not the stale one.

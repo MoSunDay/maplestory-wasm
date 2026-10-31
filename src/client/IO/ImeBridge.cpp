@@ -7,7 +7,9 @@
 #include "UITypes/UICharCreation.h"
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
+#include "UITypes/UIStatusBar.h"
 #include "../Gameplay/Stage.h"
+#include "../Character/Inventory/InventoryType.h"
 #include "../Net/Login/CharlistTransition.h"
 
 #ifdef MS_PLATFORM_WASM
@@ -394,11 +396,55 @@ extern "C"
         return shop ? shop->button_center(jrc::BT_BUY).y() : -32768;
     }
 
+    // Current slot maximum of one inventory tab (1=EQUIP..4=ETC).
+    EMSCRIPTEN_KEEPALIVE int mscashshop_slotmax(int type)
+    {
+        const auto slotmax = jrc::Stage::get().get_player().get_inventory()
+            .get_slotmax(static_cast<jrc::InventoryType::Id>(type));
+        return slotmax;
+    }
+
+    // Centre of the i-th (0..3) slot-expansion pill.
+    EMSCRIPTEN_KEEPALIVE int mscashshop_slotbuy_x(int index)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->button_center(static_cast<uint16_t>(
+            jrc::BT_SLOTBUY_FIRST + index)).x() : -32768;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mscashshop_slotbuy_y(int index)
+    {
+        auto shop = jrc::UI::get().get_element<jrc::UICashShop>();
+        return shop ? shop->button_center(static_cast<uint16_t>(
+            jrc::BT_SLOTBUY_FIRST + index)).y() : -32768;
+    }
+
     EMSCRIPTEN_KEEPALIVE int msplayer_frame()
     {
         return jrc::Stage::get().get_player().get_look().get_frame();
     }
 
+
+    // Post-chaos chat bar toggle state + open-button center for browser
+    // acceptance: Enter key events can be silently dropped by a busy
+    // renderer, so tests click the button instead.
+    EMSCRIPTEN_KEEPALIVE int mschatbar_open()
+    {
+        auto bar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return bar && bar->chat_open() ? 1 : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mschatbar_openbutton_x()
+    {
+        auto bar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return bar ? bar->chat_open_button().x() : -32768;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int mschatbar_openbutton_y()
+    {
+        auto bar = jrc::UI::get().get_element<jrc::UIStatusbar>();
+        return bar ? bar->chat_open_button().y() : -32768;
+    }
 
     // Browser click compatibility entry point. UIWorldSelect makes this
     // idempotent with the normal GLFW mouse-down route.

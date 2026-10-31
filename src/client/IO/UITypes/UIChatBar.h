@@ -38,6 +38,12 @@ namespace jrc
     class UIChatbar : public UIElement
     {
     public:
+        bool is_open() const;
+
+        // Center of the post-chaos BT_OPENCHAT button ({-32768,-32768}
+        // when the pre-chaos bar has no such button) for browser tests.
+        Point<int16_t> open_button_center() const;
+
         enum ChatTarget
         {
             CHT_ALL,

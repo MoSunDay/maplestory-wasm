@@ -27,4 +27,34 @@ namespace jrc
         petlevel(level),
         closeness(closeness),
         fullness(fullness) {}
+
+    int32_t Pet::get_itemid() const
+    {
+        return item_id;
+    }
+
+    int64_t Pet::get_expiration() const
+    {
+        return expiration;
+    }
+
+    const std::string& Pet::get_name() const
+    {
+        return petname;
+    }
+
+    uint8_t Pet::get_level() const
+    {
+        return petlevel;
+    }
+
+    uint16_t Pet::get_closeness() const
+    {
+        return closeness;
+    }
+
+    uint8_t Pet::get_fullness() const
+    {
+        return fullness;
+    }
 }

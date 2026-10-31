@@ -660,6 +660,25 @@ namespace jrc
             return;
         }
 
+        if (mode1 == 4) // pet level up
+        {
+            if (recv.length() < 2 * sizeof(int8_t))
+            {
+                log_show_item_gain_once(
+                    "mode4_truncated",
+                    "[ShowItemGainInChatHandler] Mode 4 payload is truncated."
+                );
+                return;
+            }
+
+            // Unused zero byte, then the pet index.
+            recv.skip(2);
+
+            if (auto statusbar = UI::get().get_element<UIStatusbar>())
+                statusbar->send_chatline("Your pet has leveled up!", UIChatbar::BLUE);
+            return;
+        }
+
         if (mode1 == 13) // card effect
         {
             Stage::get()

@@ -5,6 +5,9 @@
 
 #include "../Constants.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Stage.h"
+#include "../IO/UI.h"
+#include "../IO/UITypes/UIStatusMessenger.h"
 #include "../Util/Misc.h"
 
 #include "Effects/ComboOrbs.h"
@@ -443,9 +446,12 @@ namespace jrc
             return;
 
         pets[index] = PetLook();
-        if (hunger)
+        if (hunger && this == &Stage::get().get_player())
         {
-
+            // The server force-despawns a pet when it is starving.
+            if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+                messenger->show_status(Text::ORANGE,
+                    "Your pet got too hungry and went home. Feed it!");
         }
     }
 

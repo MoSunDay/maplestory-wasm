@@ -132,6 +132,12 @@ namespace LazyFS
 					return 0;
 				}
 
+				// Sync fast-path: a fully resident range is copied into the wasm
+				// heap without suspending, so re-entrant reads can never collide
+				// inside Asyncify's single rewind buffer.
+				var hit = Module.LazyFS.readCachedSync ? Module.LazyFS.readCachedSync(path, offset, size) : null;
+				if (hit) { HEAPU8.set(hit, bufferPtr); return 1; }
+
 				// Use Asyncify.handleSleep directly to avoid Promise wrapper issues
 				return Asyncify.handleSleep(function(wakeUp) {
 					Module.LazyFS.readFileData(path, offset, size)

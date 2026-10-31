@@ -45,3 +45,16 @@ CDP `Runtime.evaluate` 45s 超时、渲染器 CPU 降至个位数（活死）、
   `docker logs ms-game-server --since 10m | grep -c "WORLD_LIST"` > 0。
 - 附带澄清：`--virtual-time-budget` 会让 LazyFS 胶水的 setTimeout 立即到期，
   控制台出现假阳性 `LazyFS request timed out`；抓 console 时勿用虚拟时间。
+
+## 2026-10-30 追记：冻结也出现在选角→进游戏（频道连接）阶段
+
+- 症状扩展：不止 login 阶段；双击角色后（客户端经 ws-proxy 连**频道端口**
+  7575-7975）同样会 Asyncify 挂起——CDP evaluate 永久超时、心跳断流 6 分钟
+  无恢复（`/tmp/hb-wedge.mjs` 探针：主线程 200ms 心跳 + Debugger.pause 抓栈，
+  栈顶为 `MainLoop_runner` 内 wasm 帧）。
+- 18:0x-18:2x 观测到端口混战：宿主机直跑的 java（PID 见 `ss -ltnp`，占
+  7575-7975）与 ms-game-server 容器争 8484，两边各持一半端口 → 登录服
+  "Address already in use"、频道口拒绝 → 客户端在两个连接阶段随机挂起。
+- 反证「物品数量导致冻结」：EQUIP 栏 32 件时全流程 42 次聊天交互零冻结
+  （17:5x 稳定窗口）；所有"进游戏卡死"样本均可对上服务器不稳定窗口。
+  复跑判据请加上：`ss -ltn | grep -E '8484|7575'` 端口**同一进程**持有。

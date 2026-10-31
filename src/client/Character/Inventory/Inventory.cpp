@@ -406,6 +406,24 @@ namespace jrc
         return iter == inventories[type].end() ? 0 : iter->second.cash_id;
     }
 
+    const Pet* Inventory::get_pet_by_cash_id(int64_t cash_id) const
+    {
+        if (cash_id == 0)
+            return nullptr;
+
+        for (const auto& iter : inventories[InventoryType::CASH])
+        {
+            const Slot& slot = iter.second;
+            if (slot.cash_id != cash_id)
+                continue;
+
+            auto pet = pets.find(slot.unique_id);
+            if (pet != pets.end())
+                return &pet->second;
+        }
+        return nullptr;
+    }
+
     bool Inventory::has_equipped_item(int32_t item_id) const
     {
         for (const auto& entry : inventories[InventoryType::EQUIPPED])

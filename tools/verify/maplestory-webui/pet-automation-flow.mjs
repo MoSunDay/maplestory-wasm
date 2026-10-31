@@ -29,7 +29,27 @@ async function moveToX(driver, probes, targetX, tolerance = 70) {
   throw new Error(`Could not move near x=${targetX}; current=${await probes.playerX()}`);
 }
 
-async function ensurePetSummoned(driver, probes, requireState) {
+
+// Open the item inventory through the items-menu button click path: a raw
+// 'i' keypress can be swallowed when canvas focus was lost after summons.
+export async function openItemInventory(driver, probes, requireState) {
+  if (await probes.itemInventoryActive() === 1)
+    return;
+  await requireState('item menu assets idle', async () =>
+    await probes.assetBlocking() === 0, 45);
+  if (await probes.itemsMenuX() < 0) {
+    await driver.click(711, 574);
+    await sleep(400);
+  }
+  const menu = { x: await probes.itemsMenuX(), y: await probes.itemsMenuY() };
+  if (!Number.isFinite(menu.x) || !Number.isFinite(menu.y) || menu.x < 0 || menu.y < 0)
+    throw new Error(`Items menu point unavailable: ${JSON.stringify(menu)}`);
+  await driver.click(menu.x, menu.y);
+  await requireState('item inventory opened', async () =>
+    await probes.itemInventoryActive() === 1, 30);
+}
+
+export async function ensurePetSummoned(driver, probes, requireState) {
   if (await probes.petActive() === 1) {
     const activeItemId = await probes.petItemId();
     if (activeItemId !== STARTER_PUPPY)
@@ -50,20 +70,7 @@ async function ensurePetSummoned(driver, probes, requireState) {
   let originY = 0;
   for (let attempt = 0; attempt < 3 && !tabSelected; attempt += 1) {
     if (attempt > 0) await sleep(600);
-    if (await probes.itemInventoryActive() !== 1) {
-      await requireState('item menu assets idle', async () =>
-        await probes.assetBlocking() === 0, 45);
-      if (await probes.itemsMenuX() < 0) {
-        await driver.click(711, 574);
-        await sleep(400);
-      }
-      const menu = { x: await probes.itemsMenuX(), y: await probes.itemsMenuY() };
-      if (!Number.isFinite(menu.x) || !Number.isFinite(menu.y) || menu.x < 0 || menu.y < 0)
-        throw new Error(`Items menu point unavailable: ${JSON.stringify(menu)}`);
-      await driver.click(menu.x, menu.y);
-      await requireState('item inventory opened', async () =>
-        await probes.itemInventoryActive() === 1, 10);
-    }
+    await openItemInventory(driver, probes, requireState);
     await requireState('item inventory assets ready', async () =>
       await probes.assetBlocking() === 0 &&
       await driver.evaluate("document.getElementById('asset-loading-screen').classList.contains('is-hidden')"),
@@ -164,7 +171,7 @@ async function ensurePotions(driver, probes, requireState, hpItem, mpItem) {
   await requireState('potion shop closed', async () => await probes.shopActive() === 0);
 }
 
-async function openOptions(driver, probes, requireState) {
+export async function openOptions(driver, probes, requireState) {
   await driver.click(400, 300);
   let point = { x: -32768, y: -32768 };
   for (let attempt = 0; attempt < 3 && point.x < 0; attempt += 1) {

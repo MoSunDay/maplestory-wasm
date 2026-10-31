@@ -30,13 +30,17 @@ CDP 输入在资产流高负载下会整击丢失，因此关键交互使用 `cd
 
 设置 `E2E_CAPTURE_ATTACK_EFFECTS=1` 会在进入地图后使用普通攻击，通过 CDP screencast 连续保存真实合成帧，并断言攻击期间没有素材遮罩或全局资源阻塞；默认采集 20 次，可用 `E2E_ATTACK_SAMPLES` 调整。只读 WASM 探针会逐帧记录刺击/挥砍姿态、身体帧以及非零透明残影是否实际提交渲染，并要求两类攻击均覆盖。它可以与 `E2E_STOP_AT_GAME=1` 组合，用于冷缓存和热缓存的武器残影验收；合成帧仍需抽样确认剑光形状与人物图层观感。
 
-设置 `E2E_PET_OPTIONS=1` 会打开宠物自动补给设置，再让角色移动并通过只读探针验证首只宠物的正常速度、跳跃样本及 300px 唯一瞬移门槛。生产等价验收分为两个阶段：`E2E_PET_OPTIONS=configure` 在 Perion 药店通过正常 NPC 商店购买可用药品、选择 HP/MP 药品并保存 98% 阈值；`E2E_PET_OPTIONS=runtime` 验证重连加载的药品设置、真实资源恢复、真实怪物掉落目标转换和服务端确认的本角色宠物拾取。`E2E_PET_OPTIONS=pickup` 可让新测试角色只验证 Brown Puppy 的内建能力、真实拾取和 300px 跟随恢复，不依赖已有药品设置。`E2E_PET_OPTIONS=follow` 不修改补给配置或拾取物品，只逐帧验证宠物斜坡贴合、真实受阻跳跃因果与 300px 安全绳。配置与运行阶段可通过 `E2E_PROFILE_DIR` 复用浏览器本地阈值设置，`E2E_ARTIFACT_DIR` 固定各阶段证据目录。召唤序列不再使用固定坐标：现金页标签与幼犬图标中心改由 `msiteminventory_x/y` 窗口原点、可见页槽位范围与 `msiteminventory_slot_at` 命中测试动态解析（现金页以 `itemInventoryTab()===5` 断言），窗口被拖动或布局代差（35/34px 行距）均可命中。
+设置 `E2E_PET_OPTIONS=1` 会打开宠物自动补给设置，再让角色移动并通过只读探针验证首只宠物的正常速度、跳跃样本及 300px 唯一瞬移门槛。生产等价验收分为两个阶段：`E2E_PET_OPTIONS=configure` 在 Perion 药店通过正常 NPC 商店购买可用药品、选择 HP/MP 药品并保存 98% 阈值；`E2E_PET_OPTIONS=runtime` 验证重连加载的药品设置、真实资源恢复、真实怪物掉落目标转换和服务端确认的本角色宠物拾取。`E2E_PET_OPTIONS=pickup` 可让新测试角色只验证 Brown Puppy 的内建能力、真实拾取和 300px 跟随恢复，不依赖已有药品设置。`E2E_PET_OPTIONS=follow` 不修改补给配置或拾取物品，只逐帧验证宠物斜坡贴合、真实受阻跳跃因果与 300px 安全绳。`E2E_PET_OPTIONS=hunger` 配合 `E2E_PET_HUNGER="fullness,foodQty"`（默认 `"10,10"`）与 `E2E_REQUIRE_MOBS=1 E2E_ROUTE_TUTORIAL_MOB_MAP=1` 验证温饱度闭环：夹具把首角色现金栏新手宠温饱度写入 DB 并向 USE 栏注入 2120000 宠物食品；客户端召唤后按 `mspet_hungry/fullness/level` 探针断言饥饿态，截图宠物面板橙色 HUNGRY! 状态行与现金栏红色 ! 角标，打怪掉落后 10 秒采样断言饿宠罢工（拾取计数不涨、`mspet_loot_target_oid` 恒 0、宠物不消失），双击 USE 栏食品喂食（PET_FOOD 0x4C）后断言 +30 温饱度、饥饿解除且掉落被捡走（复工）；结束按业务键还原 pets.fullness 并清理注入食品行。配置与运行阶段可通过 `E2E_PROFILE_DIR` 复用浏览器本地阈值设置，`E2E_ARTIFACT_DIR` 固定各阶段证据目录。召唤序列不再使用固定坐标：现金页标签与幼犬图标中心改由 `msiteminventory_x/y` 窗口原点、可见页槽位范围与 `msiteminventory_slot_at` 命中测试动态解析（现金页以 `itemInventoryTab()===5` 断言），窗口被拖动或布局代差（35/34px 行距）均可命中。
 
 设置 `E2E_CHARACTER_INFO=1` 会双击本人角色，验证人物信息响应、卡片关闭，以及存在已召唤宠物时的宠物面板展开。`social-flow.mjs` 另用双账号验证远端人物信息卡片，以及卡片 `BtParty` 与右键菜单「组队邀请」行两条组队入口（右键菜单「交易」行的进房取证见下文交易段）；自动化只读取人气状态，不发送会持久化的人气增减请求。
 
 设置 `E2E_RETRY_CHARACTER=<未使用名称>` 会先提交非法名称，断言原生提示实际出现并验证关闭提示后的输入恢复，再提交指定名称进入外观定制，随后取消返回角色选择；该模式默认不会创建测试角色或进入游戏。与 `E2E_STOP_AFTER_CHARACTER_CREATE=1` 组合时会执行最终创建，等待新角色响应返回角色选择后结束，适合隔离建角验收。
 
 完整游戏流程使用独立浏览器缓存，并在进入地图前监听真实 `Texture::draw()` 驱动的前台 NX 范围请求。验收要求至少一个请求在发起前尚未驻留、素材遮罩实际出现，并将证据写入产物目录的 `natural-asset-loading.json`。`E2E_ASSET_ONLY=1` 仅运行独立 LazyFS 网络、失败和重试检查，不代替完整游戏触发验收。
+
+## 选角进场双击竞态（所有进游戏脚本的公共坑）
+
+`UICharSelect` 在 CHARLIST 到达后仍需若干帧完成 nx 驱动的 `initialize_ui()`；`ui_initialized` 置位前的 `doubleclick` 会被静默丢弃且客户端不会重发——单发双击的脚本会永远停在选人界面：服务端日志停在 CHARLIST（PLAYER_LOGIN 从未发出）、页面存活但无新请求、state 恒为 3。另一已知成因是 Window.cpp 双击窗口 350ms/4px 在 WASM 忙时超窗（见下文辛迪冒烟段）。进游戏一律用重试循环：最多 4 轮「双击卡片热区 + 轮询 `msui_state==5` 各 1s×5」（cash-shop-take-equip/slots 即此写法），或 state 3 后先稳等数秒再双击。
 
 ## 好友与组队双账号流程
 
@@ -98,13 +102,28 @@ TRYON_FLOW_ACCOUNT=test1 TRYON_FLOW_PASSWORD=test1 TRYON_FLOW_CARD=1 CHROME_BIN=
 
 ## 现金商城取出装备并穿戴流程
 
-`cash-shop-take-equip-flow.mjs` 覆盖「仓库双击取出后消失且未穿戴」修复：搜索并购买现金帽 SN `20000016`（物品 1002000，3700 NX），确认购买进入商城仓库；对选中仓库格双击后断言仓库数量减一、角色现金栏数量加一且请求已结算，证明双击只取出一次、没有被成功后的自动选中触发逆向存回。Escape 回图后通过状态栏 ITEMS 菜单打开物品栏（带重试以吸收资产加载抖动），用 `msiteminventory_slot_at` 校验 EQUIP 槽命中坐标后双击，断言 `msinventory_equipped(1)` 为 1002000、`msinventory_equipped_marker(1)`（装备现金 ID 标记）发生变化，且同 ID 换装时 EQUIP 数量不变也会被识别。测试会真实消耗 NX 并留下仓库/背包数据，运行前需角色离线且 EQUIP 栏至少有一个空位。
+`cash-shop-take-equip-flow.mjs` 验收现金商城装备「纯装饰化」契约（服务端 patch 0005）：搜索并购买现金帽 SN `20000016`（物品 1002000，3700 NX）后双击取出，断言装备落入 CASH 物品栏（`msinv_slot_item(5,slot)`）而非 EQUIP 标签，真实装备槽（`msinventory_equipped_marker`/`_cover_equipped`）与 15 项属性总值全程不变。Escape 回图后在物品栏切到 CASH 标签（`msiteminventory_tab_x/_y` 按物品定位 tab 按钮）双击穿上：覆盖件移入隐藏 EQUIP 槽 100+slot，外观显示为覆盖件、真实装备标记与属性仍不变；再经装备窗口 CAP 插槽双击卸下，覆盖件回到 CASH 栏、外观与属性还原。测试会真实消耗 NX 并留下仓库/CASH 栏数据，运行前需角色离线且 CASH 栏至少有一个空位。
 
 ```bash
 TAKE_EQUIP_ACCOUNT=test1 TAKE_EQUIP_PASSWORD=test1 TAKE_EQUIP_CARD=1 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-take-equip-flow.mjs
 ```
 
+注意：取出物合法落位可能在 CASH 栏**任意空位**（本测试床常为 128 号位，
+第 6 页），若断言只扫可见页 1..24 会误报 FAIL——取出的 dispatch 判定请以
+`mscashshop_pending`/`msinv_count(5)` 变化或全栏定位为准（已在本仓二进制
+上复验：take 流程本身通过，仅 slot 断言范围不足）。
+
 环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`TAKE_EQUIP_DEBUG_PORT`（默认 9251）、`TAKE_EQUIP_ACCOUNT`/`TAKE_EQUIP_PASSWORD`（默认 test1/test1）、`TAKE_EQUIP_CARD`（角色卡索引 0..3，默认 1）、`TAKE_EQUIP_ITEM_ID`（默认 1002000）、`TAKE_EQUIP_SN`（默认 20000016）、`TAKE_EQUIP_PRICE`（默认 3700）、`TAKE_EQUIP_CAP_SLOT`（默认 1）、`TAKE_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。
+
+## 现金商城购买背包格子流程
+
+`cash-shop-slots-flow.mjs` 验收商城右栏「物品详情」面板删除后原位新增的「购买背包格子」面板：断言四个扩充 pill（`mscashshop_slotbuy_x/_y`，2x2 布局）中心均落在面板区域 (508,294)+288x94 内；点击目标 pill（默认 0 → EQUIP 栏）弹出 UIYesNo 确认框，确认后发送 CASHSHOP_OPERATION 0x06，服务端回 0x60 结算——断言 `mscashshop_slotmax` 恰好 +4（上限 128 前有空间）、`mscashshop_nx_credit` 恰好 -4000、`mscashshop_pending` 归零、其余三栏 slotmax 不受影响；Escape 回图后 slotmax 仍保持新值（服务端 gainSlots 已 saveCharToDB 持久化）。测试会真实消耗 4000 NX 并永久 +4 格，运行前需角色离线。
+
+```bash
+SLOTS_ACCOUNT=test1 SLOTS_PASSWORD=test1 SLOTS_CARD=1 CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-shop-slots-flow.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`SLOTS_DEBUG_PORT`（默认 9252）、`SLOTS_ACCOUNT`/`SLOTS_PASSWORD`（默认 test1/test1）、`SLOTS_CARD`（角色卡索引 0..3，默认 1）、`SLOTS_PILL`（pill 0..3 → EQUIP/USE/SETUP/ETC，默认 0）、`SLOTS_PRICE`（默认 4000）、`SLOTS_URL`（默认 http://127.0.0.1:8000/web/index.html）。
 
 ## 现金商城宠物购买与自动化全链路流程
 
@@ -206,6 +225,21 @@ x≈34）对话里菜单爱心 `#fEffect/CharacterEff/1062114/1/0#` 的端到端
 `update accounts set loggedin=0 where name='fmflow1';`。
 环境变量：`NPC_EMBED_ACCOUNT/PASSWORD/CARD/X/URL`、`CHROME_BIN`，
 产物在 `/tmp/maplestory-webui-*/`（open/closed 截图 + npc-embed-icons.json）。
+
+## 射手村辛迪移除冒烟（正向对照 + 负向缺席）
+
+`henesys-cindy-gone-flow.mjs` 验证 NPC 9200000（辛迪/Cody）从 Map.nx 移除后
+射手村 100000000 的 NPC 系统仍正常：正向对照 1012000（x≈149）Space 可弹出
+对话（`msnpc_active=1`），负向断言辛迪原位（x=424 ±120px）Space 不产生对话。
+选角不用 doubleClick——Window.cpp 双击窗口 350ms/4px，WASM 忙时两次
+glfwPollEvents 间隔易超窗（服务端日志停在 CHARLIST 即此症状）；改为单击
+卡片热区 + 单击 BtSelect。注意本仓 UI.nx 为 post-Chaos 资产
+（Login.img/WorldSelect/BtChannel marker），BtSelect 锚点 =
+charinfopos(662,355)+(-76,72)，sprite 140x52 origin(0,0)，hit 区
+(586,427)-(726,479)，点击 (656,453)。busy renderer 会丢 CDP 输入，务必用
+retryClick。环境变量 `CINDY_ACCOUNT/PASSWORD/CARD/URL/DEBUG_PORT`；前置 SQL
+把 card0 角色迁回 100000000 sp=0 并清 loggedin。回滚数据见
+features/changelog/2026-10-28/cindy-9200000-life-entries.json。
 
 ## /gohome 快捷回自由市场
 
@@ -418,3 +452,54 @@ post-Chaos 519px 对话框几何）、`fm-pq-nav.mjs`（各 PQ 攀爬/隐藏门
 路线）、`cdp.mjs` 的 move()。服务端契约另见
 `tools/verify/pq-solo-server-contract.mjs`（含 minPlayers 数值断言与 E 节 wz 招募图 life cy≤fh 斜面落点断言，
 已登记 tools/verify/index.md）。
+
+## 现金商城取出被拒重试 + 聊天栏默认收起（cash-shop-take-reject-retry）
+
+登录进图后分四阶段验收两项修复：A 传统(pre-Chaos)状态栏聊天栏默认收起
+（`msime_field_focused` 初始为 0、`mschatbar_open`=0；打开按钮展开、发送
+后自动收起释放 IME，截图 a0/a1/a2 留档人工核对）；B 断言 DB 预填的 CASH
+栏物品已随登录下发（`msinv_count(5)` ≥ 100；预填 5210000 券 ×127 于
+1..127 号位——ItemFactory 以 `(byte)position` 读档，128 号位加载即溢出
+丢弃，故 127 为 DB 预填上限）；C 进商城按 SN `20000016` 连买两件帽子
+（各 3700 NX）：第 1 件双击取出断言成功落 128 号位把 CASH 栏补满，第 2 件
+取出验证**拒绝**——server patch 0005 后满栏回 0x144（enableCSUse → 客户端
+即时报错解锁），静默服则由操作超时兜底解锁，两路均要求
+`mscashshop_pending` 归零、`mscashshop_require_reenter`=0、
+`mscashshop_can_mutate`=1（不锁死商城、按钮仍可点）、错误弹窗可见可关闭、
+被拒物品原位保留在仓库；D Escape 回游戏 `!clearslot cash` 清 CASH 栏
+（1..100；穿戴覆盖位 101+ 不受影响）后重进商城重选仓库格重试双击断言取出
+成功（locker 复原、`mscashshop_inventory_count` 最终 +2——第 1 件在
+128 号位未被清空，截图 c1/d1）。A 先行、B-D 各阶段独立 try/catch 继续汇报
+（`REJECT_FAIL_FAST=1` 失败即中止），保证聊天修复在商城流程中断时仍有
+结论；重进商城后仓库整包重载会复位选中，脚本按 locker 追加序号重新
+点选（跨页自动翻页）。运行前置：DB 预填 + `docker restart ms-game-server`。
+
+### 双击时序与选中复位（e2e 稳定性要点，2026-10-30 定稿）
+
+- **选中按压与双击首压必须间隔 ≥500ms**：`Window::is_doubleclick` 的合成
+  窗口是 350ms/4px，`selectLockerSlot` 的按压若与 `takeFromLocker` 双击的
+  press1 间隔不足，会被合成成一次游戏内双击直接触发 take；随后双击自身
+  的 press2/press3 再合成第二个双击，若 0x68 已回、右面板切到 INVENTORY，
+  第二个双击会把刚取出的物品 **PUT 回仓库**（take+put 净零，断言 locker
+  计数永不收敛）。脚本在每次双击前 `sleep(500)` 隔离，phase C/D 全绿。
+- **取出成功后右面板自动切 INVENTORY 并选中取出物**：take#2 前必须先点
+  回 LOCKER 页签（canvas (579,43)，= `TAB_LOCKER_POS{508,34}` +
+  `TAB_SIZE{142,18}` 中心，origin=(0,0)），且因 locker 行序前移一格、行号
+  需 -1。
+- **弹窗关闭用 Enter 而非坐标点击**：`UIOk::send_key` 处理 RETURN/ESC，
+  键盘路径稳定；BtOK4 按钮坐标随文本高度浮动，硬编码易超时。
+- 服务端 CS 退出分支已补 `saveCharToDB(false)`（ChangeMapHandler），退出
+  不再丢商城内变更；见 changelog 2026-10-30。**重置 locker SQL 必须等上
+  一轮角色完全下线**（服务端异步退出 save 可能晚于超时击杀落盘，与
+  DELETE+INSERT 竞态会产生重复行）。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node \
+tools/verify/maplestory-webui/cash-shop-take-reject-retry.mjs
+```
+
+环境变量：`REJECT_DEBUG_PORT`（默认 9259）、`REJECT_URL`（默认
+http://127.0.0.1:8000/web/index.html）、`REJECT_ACCOUNT`/`REJECT_PASSWORD`
+（默认 test1/test1）、`REJECT_CARD`（角色卡索引 0..3，默认 1）、
+`REJECT_ITEM_ID`/`REJECT_SN`/`REJECT_PRICE`（默认 1002000/20000016/3700）、
+`REJECT_FAIL_FAST`（=1 阶段失败立即中止）。前置：账号 NX Credit ≥ 商品价。

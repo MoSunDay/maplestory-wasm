@@ -28,6 +28,7 @@
 #include "../Util/Misc.h"
 #include "Pet/PetSettingsStore.h"
 #include "Pet/PetLootPolicy.h"
+#include "Pet/PetVitalityPolicy.h"
 
 #include "nlnx/nx.hpp"
 
@@ -314,6 +315,14 @@ namespace jrc
             return;
         }
 
+        // A hungry pet goes on strike: it keeps following its owner but
+        // stops looting and auto-potting until it is fed.
+        if (is_pet_hungry())
+        {
+            clear_pet_loot_target(pet);
+            return;
+        }
+
         const Inventory& inventory = player.get_inventory();
         const pet_capability::Capabilities capabilities = get_pet_capabilities();
         const CharStats& stats = player.get_stats();
@@ -356,7 +365,7 @@ namespace jrc
             player.get_position(),
             player.get_oid(),
             current_party_id(),
-            120,
+            600,
             capabilities.meso_magnet,
             capabilities.item_pouch,
             capabilities.magic_scales,
@@ -586,6 +595,17 @@ namespace jrc
     const pet_automation::Controller& Stage::get_pet_automation() const
     {
         return pet_automation;
+    }
+
+    bool Stage::is_pet_hungry() const
+    {
+        const PetLook* pet = player.get_pet(0);
+        if (!pet)
+            return false;
+
+        const Inventory& inventory = player.get_inventory();
+        const Pet* petinfo = inventory.get_pet_by_cash_id(pet->get_uniqueid());
+        return petinfo && pet_vitality::is_hungry(petinfo->get_fullness());
     }
 
     pet_capability::Capabilities Stage::get_pet_capabilities() const

@@ -62,6 +62,8 @@ namespace jrc
 
         void send_chatline(const std::string& line, UIChatbar::LineType type);
         void focus_chatfield();
+        bool chat_open() const;
+        Point<int16_t> chat_open_button() const;
         void display_message(Messages::Type line, UIChatbar::LineType type);
         void set_chat_target(UIChatbar::ChatTarget target);
         void cycle_chat_target();

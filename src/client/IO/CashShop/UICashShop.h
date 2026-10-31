@@ -54,6 +54,9 @@ namespace jrc
         void package_purchase_succeeded(std::vector<CashLockerItem> items);
         void take_succeeded(int64_t cash_id);
         void put_succeeded(CashLockerItem item, int64_t cash_id);
+        // 0x60 settled a slot expansion: the handler already raised the
+        // tab's slot maximum, so this only ends the pending operation.
+        void slots_purchase_succeeded();
         void show_error(const std::string& message);
         void reconnect_failed(const std::string& address);
         // SetField that ends a cash shop session: the pending EXIT was acked
@@ -109,6 +112,9 @@ namespace jrc
         void clear_search();
         void refresh();
         void refresh_rows();
+        // Updates the slot-expansion pills: tab names, current slot counts
+        // and whether each purchase is still allowed.
+        void refresh_slotbuy();
         void refresh_category_icons();
         void press_equip_menu(uint16_t id);
         std::optional<size_t> highlighted_index() const;
@@ -128,6 +134,9 @@ namespace jrc
         void select_new_locker_item(int64_t cash_id);
         void select_inventory_item(int64_t cash_id);
         void request_purchase(size_t filtered_index);
+        // Validates one slot-expansion pill and asks for confirmation
+        // before sending the 0x06 CASHSHOP_OPERATION request.
+        void request_slot_expansion(size_t pill_index);
         // Selected catalog entry exists and lives on the currently shown page.
         bool left_selection_visible() const;
         void request_transfer(size_t item_index);
@@ -145,7 +154,7 @@ namespace jrc
         void draw_category_counts() const;
         void draw_equip_menu() const;
         void draw_card_meta() const;
-        void draw_details_text() const;
+        void draw_slot_panel() const;
         void draw_feature_panel() const;
         void draw_sidebar_legend() const;
         void draw_right_pane() const;
@@ -203,12 +212,8 @@ namespace jrc
         Text search_clear_label;
         Text rail_help;
         Text rail_status;
-        Text details_title;
         Text empty_catalog_text;
         Text transfer_hint;
-        Text details_hint;
-        Text details_name;
-        Text details_count;
         Text buy_label;
         Text reset_label;
         Text transfer_label;
@@ -230,8 +235,9 @@ namespace jrc
         Text equip_sub_labels[cash_shop_view::EQSUB_COUNT];
         Text equip_sub_counts[cash_shop_view::EQSUB_COUNT];
         Text card_meta[cash_shop_view::CATALOG_PAGE_SIZE];
-        Text details_meta;
-        Text details_extra;
+        Text slotbuy_title;
+        Text slotbuy_info;
+        Text slotbuy_labels[cash_shop_buttons::SLOTBUY_CHOICES];
         Text featured_title;
         Text featured_name;
         Text featured_meta;

@@ -16,7 +16,8 @@ namespace jrc
             BUY = 1,
             TAKE = 2,
             PUT = 3,
-            EXIT = 4
+            EXIT = 4,
+            SLOTS = 5
         };
 
         using Clock = std::chrono::steady_clock;
@@ -30,7 +31,8 @@ namespace jrc
 
         constexpr bool is_operation(PendingKind kind)
         {
-            return kind == BUY || kind == TAKE || kind == PUT;
+            return kind == BUY || kind == TAKE || kind == PUT ||
+                kind == SLOTS;
         }
 
         constexpr bool can_mutate(bool balances_ready, bool balance_failed,
@@ -57,6 +59,8 @@ namespace jrc
             case 0x57:
             case 0x89:
                 return BUY;
+            case 0x60:
+                return SLOTS;
             case 0x68:
                 return TAKE;
             case 0x6A:

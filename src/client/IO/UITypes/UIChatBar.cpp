@@ -34,7 +34,12 @@ namespace jrc
     {
         position = pos;
         dimension = { 500, 60 };
-        chatopen = true;
+        // Both generations start collapsed: the expanded log is a black
+        // box that bleeds through the transparent bottoms of the storage
+        // and quest windows. Pre-chaos has no close button at all (it can
+        // never be dismissed once open); post-chaos re-opens via its own
+        // button or by pressing enter.
+        chatopen = false;
         chattarget = CHT_ALL;
         chatrows = 4;
         rowpos = 0;
@@ -104,17 +109,26 @@ namespace jrc
             if (msg.empty())
             {
                 chatfield.set_state(Textfield::NORMAL);
-                return;
             }
-
-            if (!handle_social_command(msg))
+            else
             {
-                send_chat_message(msg);
+                if (!handle_social_command(msg))
+                {
+                    send_chat_message(msg);
+                }
+
+                lastentered.push_back(msg);
+                lastpos = lastentered.size();
+                chatfield.set_state(Textfield::NORMAL);
             }
 
-            lastentered.push_back(msg);
-            lastpos = lastentered.size();
-            chatfield.set_state(Textfield::NORMAL);
+            // Enter folds the log back after sending (or on an empty
+            // enter) in both generations: the open log is the black box
+            // that bleeds through the storage/quest window bottoms, so it
+            // must not linger after a chat send. focus_chatfield()
+            // re-opens it on the next enter, and the post-chaos bar keeps
+            // its own open button for users who want the log pinned.
+            set_chat_open(false);
         });
         chatfield.set_key_callback(KeyAction::UP, [&](){
             if (lastpos > 0)
@@ -158,6 +172,23 @@ namespace jrc
         {
             chat_target_label.change_text(TARGET_NAMES[chattarget]);
         }
+    }
+
+    bool UIChatbar::is_open() const
+    {
+        return chatopen;
+    }
+
+    Point<int16_t> UIChatbar::open_button_center() const
+    {
+        const auto found = buttons.find(BT_OPENCHAT);
+        if (found == buttons.end())
+            return { -32768, -32768 };
+        const Rectangle<int16_t> rect = found->second->bounds(position);
+        return {
+            static_cast<int16_t>((rect.l() + rect.r()) / 2),
+            static_cast<int16_t>((rect.t() + rect.b()) / 2)
+        };
     }
 
     void UIChatbar::set_chat_open(bool open)
@@ -291,6 +322,13 @@ namespace jrc
     {
         if (statusbar::prechaos())
         {
+            // collapsed: nothing interactive floats above the bar, so skip
+            // the log bounds. the statusbar's own statusbar_range still
+            // covers the bottom strip, letting clicks on the log area fall
+            // through to the game world instead of being swallowed here.
+            if (!chatopen)
+                return false;
+
             const Rectangle<int16_t> bounds(
                 0,
                 statusbar::chat_log_width(),

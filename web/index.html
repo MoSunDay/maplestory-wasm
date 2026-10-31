@@ -516,8 +516,10 @@
             }
         }
 
-        window.onerror = function () {
-            console.error('[post-exception status] Exception thrown, see JavaScript console');
+        window.onerror = function (message, source, line, column, error) {
+            console.error('[post-exception status] Exception thrown:',
+                message, 'at', source + ':' + line + ':' + column,
+                error && error.stack ? error.stack.split('\n').slice(0, 4).join(' | ') : '');
             failStartup('客户端运行出错，请刷新页面后重试');
         };
 

@@ -113,6 +113,7 @@ namespace jrc
         SORT_ITEMS   = 70,
         MOVE_ITEM    = 71,
         USE_ITEM     = 72,
+        PET_FOOD     = 0x4C,
         SCROLL_EQUIP = 86,
 
         // Player

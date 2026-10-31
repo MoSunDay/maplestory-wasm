@@ -26,6 +26,16 @@ namespace jrc
         chatbar.send_line(line, type);
     }
 
+    bool UIStatusbar::chat_open() const
+    {
+        return chatbar.is_open();
+    }
+
+    Point<int16_t> UIStatusbar::chat_open_button() const
+    {
+        return chatbar.open_button_center();
+    }
+
     void UIStatusbar::focus_chatfield()
     {
         chatbar.focus_chatfield();
