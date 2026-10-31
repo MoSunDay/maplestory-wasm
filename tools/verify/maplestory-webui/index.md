@@ -513,3 +513,14 @@ http://127.0.0.1:8000/web/index.html）、`REJECT_ACCOUNT`/`REJECT_PASSWORD`
 （默认 test1/test1）、`REJECT_CARD`（角色卡索引 0..3，默认 1）、
 `REJECT_ITEM_ID`/`REJECT_SN`/`REJECT_PRICE`（默认 1002000/20000016/3700）、
 `REJECT_FAIL_FAST`（=1 阶段失败立即中止）。前置：账号 NX Credit ≥ 商品价。
+
+## support/ 辅助工具
+
+- `support/rangesrv.py [ROOT] [PORT]`：支持 HTTP Range（206）的静态服务
+  器，私有 e2e 栈专用（stdlib `http.server` 不支持 Range，wasm 分块
+  下载会失败）；
+- `support/async_glue_instrument.py <JourneyClient.js>`：向 glue 注入
+  Asyncify 只读埋点（`window.__asyncLog` + `[ASYNC-STUCK]` 卡死轮询），
+  幂等。私有栈搭建步骤、楔死根因与 `E2E_CDP_TIMEOUT_MS` 推荐
+  （120000，勿用 900000）见
+  `docs/known-issues/2026-10-31-asyncify-wedge-and-private-e2e-stack.md`。
