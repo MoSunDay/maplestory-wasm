@@ -264,14 +264,15 @@ namespace jrc
         int8_t effect = recv.read_byte();
         if (effect == 10) // recovery
         {
-            recv.read_byte(); // 'amount'
+            if (recv.available() >= 1)
+                recv.read_byte(); // 'amount'
         }
         else if (effect == 13) // card effect
         {
             Stage::get()
                 .show_character_effect(cid, CharEffect::MONSTER_CARD);
         }
-        else if (recv.available()) // skill
+        else if (recv.available() >= 4) // skill
         {
             int32_t skillid = recv.read_int();
             recv.read_byte(); // 'direction'
