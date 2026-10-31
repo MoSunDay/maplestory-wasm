@@ -48,6 +48,9 @@
    一次即恢复（复跑判据见
    docs/known-issues/2026-10-29-game-server-restart-client-freeze.md）。
 
+以上陷阱的完整排查记录与判据固化在
+docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md。
+
 ## e2e 健壮性修正（脚本侧）
 
 - `mapId` 断言存在双取值竞态（条件先取可为 -1、模板重取已恢复），
