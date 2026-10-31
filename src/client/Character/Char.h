@@ -142,7 +142,7 @@ namespace jrc
         /// Return wether the character sprite uses stances for two-handed weapons.
         bool is_twohanded() const;
         /// Return the type of the currently equipped weapon.
-        Weapon::Type get_weapontype() const;
+        virtual Weapon::Type get_weapontype() const;
 
         /// Obtain a reference to this character's look.
         CharLook& get_look();

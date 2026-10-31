@@ -26,10 +26,18 @@
 //   * a normal equip in the same visible slot still contributes stats;
 //   * taking it off (MOVE_UNEQUIP) returns it to the CASH tab;
 //   * the SET_FIELD cash-equipped segment serializes worn cash equips as
-//     negative -100-ish slots which the parser keeps in hidden EQUIP slots.
+//     negative -100-ish slots which the parser keeps in hidden EQUIP slots;
+//   * weapon covers are cosmetic only: a real weapon parsed into the EQUIPPED
+//     weapon slot (slot -11) supplies the gameplay weapon type and WATK for
+//     stat totals, while a worn cover parses into the hidden EQUIP slot
+//     100 + WEAPON (slot -111) and its WATK never reaches the totals;
+//   * a cover id (170xxxx) alone maps to Weapon::CASH via Weapon::by_value,
+//     which is not a gameplay weapon type, so covers can never pose as the
+//     real weapon for damage formulas or attack speed.
 //
 // Real Character.nx data is used: the first cash cap and the first non-cash
-// cap found under character/Cap drive the fake packets.
+// cap found under character/Cap drive the fake packets, and the first real
+// weapon and first cash cover under character/Weapon drive the cover checks.
 //
 // Usage (from the repository root; clang++ is required because GCC rejects
 // Cache<ItemData>'s unordered_map member while ItemData is still incomplete,
@@ -38,6 +46,7 @@
 //       -Isrc/client/includes tools/verify/cash-equip-policy.cpp \
 //       src/client/Character/Inventory/Inventory.cpp \
 //       src/client/Character/Inventory/InventoryType.cpp \
+//       src/client/Character/Inventory/Weapon.cpp \
 //       src/client/Character/Inventory/Equip.cpp \
 //       src/client/Character/Inventory/EquipQuality.cpp \
 //       src/client/Character/Inventory/Item.cpp \
@@ -138,7 +147,7 @@ namespace
 
     // Mirrors the wire layout consumed by ItemParser::add_equip.
     void append_equip_entry(Bytes& bytes, int32_t itemid, bool cash,
-        int64_t cash_id, uint16_t str_inc)
+        int64_t cash_id, uint16_t str_inc, uint16_t watk = 0)
     {
         append_byte(bytes, 1);
         append_int(bytes, itemid);
@@ -148,9 +157,16 @@ namespace
         append_long(bytes, 0);
         append_byte(bytes, 0);
         append_byte(bytes, 0);
-        append_short(bytes, static_cast<int16_t>(str_inc));
-        for (int i = 1; i < jrc::Equipstat::LENGTH; ++i)
-            append_short(bytes, 0);
+        // The equip stats follow the Equipstat order STR, DEX, INT, LUK, HP,
+        // MP, WATK, ... on the wire, so WATK rides the short at index
+        // Equipstat::WATK (the one after the five stats following STR).
+        for (size_t i = 0; i < jrc::Equipstat::LENGTH; ++i)
+        {
+            const uint16_t value = i == static_cast<size_t>(jrc::Equipstat::WATK)
+                ? watk
+                : i == 0 ? str_inc : 0;
+            append_short(bytes, static_cast<int16_t>(value));
+        }
         append_string(bytes, "");
         append_short(bytes, 0);
         if (cash)
@@ -205,6 +221,51 @@ namespace
                 break;
         }
         return { cash_hat, normal_hat };
+    }
+
+    bool is_weapon_image(const std::string& name)
+    {
+        return name.size() == 12 && name.substr(8) == ".img";
+    }
+
+    int32_t weapon_id(const std::string& name)
+    {
+        return std::stoi(name.substr(0, 8));
+    }
+
+    // Find the first real gameplay weapon and the first cash weapon cover
+    // (170xxxx) in Character.nx. A cover id maps to Weapon::CASH through
+    // Weapon::by_value, which carries no gameplay weapon data. The Weapon
+    // directory also holds cash-flagged oddities (prefixes 102/160 and cash
+    // event variants of real weapon types), so the cover must map to
+    // Weapon::CASH to count.
+    std::pair<int32_t, int32_t> find_sample_weapons()
+    {
+        int32_t real_weapon = 0;
+        int32_t cash_cover = 0;
+        for (nl::node child : nl::nx::character["Weapon"])
+        {
+            const std::string name = child.name();
+            if (!is_weapon_image(name))
+                continue;
+            const int32_t id = weapon_id(name);
+            const jrc::Weapon::Type type = jrc::Weapon::by_value(id / 10000);
+            const bool cash = child["info"]["cash"].get_bool();
+            const bool gameplay = type != jrc::Weapon::NONE
+                && type != jrc::Weapon::CASH;
+            if (cash && type == jrc::Weapon::CASH)
+            {
+                if (cash_cover == 0)
+                    cash_cover = id;
+            }
+            else if (real_weapon == 0 && !cash && gameplay)
+            {
+                real_weapon = id;
+            }
+            if (real_weapon != 0 && cash_cover != 0)
+                break;
+        }
+        return { real_weapon, cash_cover };
     }
 }
 
@@ -308,6 +369,53 @@ int main(int argc, char** argv)
     inv2.recalc_stats(Weapon::NONE);
     ok &= expect(inv2.get_stat(Equipstat::STR) == 0,
         "set-field cash equip stats excluded from totals");
+
+    // 8. Cash weapon covers are cosmetic: the EQUIPPED weapon slot keeps the
+    // real weapon (the id get_weaponid()/get_weapontype() derive gameplay
+    // data from), while the worn cover lives only in the hidden EQUIP slot
+    // 100 + WEAPON and its stats never feed the totals.
+    const std::pair<int32_t, int32_t> weapons = find_sample_weapons();
+    const int32_t real_weapon = weapons.first;
+    const int32_t cash_cover = weapons.second;
+    ok &= expect(real_weapon != 0, "real weapon sample found in Character.nx");
+    ok &= expect(cash_cover != 0,
+        "cash weapon cover sample found in Character.nx");
+    std::cout << "samples: real weapon " << real_weapon
+        << ", cash weapon cover " << cash_cover << '\n';
+    const Weapon::Type real_type = Weapon::by_value(real_weapon / 10000);
+    ok &= expect(real_type != Weapon::NONE && real_type != Weapon::CASH,
+        "real weapon id maps to a gameplay weapon type");
+    ok &= expect(Weapon::by_value(cash_cover / 10000) == Weapon::CASH,
+        "cover id alone maps to Weapon::CASH, not a gameplay weapon type");
+
+    Inventory inv3;
+    Bytes weapon_bytes;
+    append_equip_entry(weapon_bytes, real_weapon, false, 0, 0, 7);
+    InPacket weapon_packet(weapon_bytes.data(), weapon_bytes.size());
+    ItemParser::parse_item(weapon_packet, InventoryType::EQUIPPED, -11, inv3);
+    ok &= expect(inv3.get_item_id(InventoryType::EQUIPPED, Equipslot::WEAPON)
+        == real_weapon, "real weapon parses into EQUIPPED weapon slot");
+
+    Bytes cover_bytes;
+    append_equip_entry(cover_bytes, cash_cover, true, 0x55667788, 0, 88);
+    InPacket cover_packet(cover_bytes.data(), cover_bytes.size());
+    ItemParser::parse_item(cover_packet, InventoryType::EQUIPPED, -111, inv3);
+    ok &= expect(inv3.get_item_id(InventoryType::EQUIP,
+        100 + Equipslot::WEAPON) == cash_cover,
+        "cash weapon cover parses into hidden EQUIP slot 111");
+    ok &= expect(!inv3.has_equipped(Equipslot::WEAPON)
+        || inv3.get_item_id(InventoryType::EQUIPPED, Equipslot::WEAPON)
+            == real_weapon,
+        "EQUIPPED weapon slot still carries the real weapon id");
+
+    // The real weapon's WATK 7 is counted; no bullet WATK can be added since
+    // inv3 has no USE items (and the BulletData stub reports 0 anyway), so
+    // the cover's WATK 88 must not move the total off 7.
+    inv3.recalc_stats(real_type);
+    ok &= expect(inv3.get_stat(Equipstat::WATK) >= 7,
+        "real weapon WATK counted in totals");
+    ok &= expect(inv3.get_stat(Equipstat::WATK) == 7,
+        "cash weapon cover WATK 88 excluded from totals");
 
     if (ok)
         std::cout << "PASS cash equip policy\n";

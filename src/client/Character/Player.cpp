@@ -339,9 +339,25 @@ namespace jrc
         return get_layer();
     }
 
+    int32_t Player::get_weaponid() const
+    {
+        // The look may show a cash cover; use the real equipped weapon instead.
+        return inventory.get_item_id(InventoryType::EQUIPPED, Equipslot::WEAPON);
+    }
+
+    Weapon::Type Player::get_weapontype() const
+    {
+        int32_t weapon_id = get_weaponid();
+        if (weapon_id <= 0)
+            return Weapon::NONE;
+
+        return WeaponData::get(weapon_id)
+            .get_type();
+    }
+
     int8_t Player::get_integer_attackspeed() const
     {
-        int32_t weapon_id = look.get_equips().get_weapon();
+        int32_t weapon_id = get_weaponid();
         if (weapon_id <= 0)
         {
             return 0;
