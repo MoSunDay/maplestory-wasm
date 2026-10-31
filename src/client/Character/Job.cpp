@@ -88,137 +88,137 @@ namespace jrc
         switch (jid)
         {
         case 0:
-            return "Beginner";
+            return "新手";
         case 100:
-            return "Swordsman";
+            return "战士";
         case 110:
-            return "Fighter";
+            return "剑客";
         case 111:
-            return "Crusader";
+            return "勇士";
         case 112:
-            return "Hero";
+            return "英雄";
         case 120:
-            return "Page";
+            return "准骑士";
         case 121:
-            return "White Knight";
+            return "骑士";
         case 122:
-            return "Paladin";
+            return "圣骑士";
         case 130:
-            return "Spearman";
+            return "枪战士";
         case 131:
-            return "Dragon Knight";
+            return "龙骑士";
         case 132:
-            return "Dark Knight";
+            return "黑骑士";
         case 200:
-            return "Magician";
+            return "魔法师";
         case 210:
-            return "Wizard (F/P)";
+            return "火毒法师";
         case 211:
-            return "Mage (F/P)";
+            return "火毒巫师";
         case 212:
-            return "Archmage (F/P)";
+            return "火毒魔导师";
         case 220:
-            return "Wizard (I/L)";
+            return "冰雷法师";
         case 221:
-            return "Mage (I/L)";
+            return "冰雷巫师";
         case 222:
-            return "Archmage (I/L)";
+            return "冰雷魔导师";
         case 230:
-            return "Cleric";
+            return "牧师";
         case 231:
-            return "Priest";
+            return "祭司";
         case 232:
-            return "Bishop";
+            return "主教";
         case 300:
-            return "Archer";
+            return "弓箭手";
         case 310:
-            return "Hunter";
+            return "猎人";
         case 311:
-            return "Ranger";
+            return "游侠";
         case 312:
-            return "Bowmaster";
+            return "神射手";
         case 320:
-            return "Crossbowman";
+            return "弩弓手";
         case 321:
-            return "Sniper";
+            return "狙击手";
         case 322:
-            return "Marksman";
+            return "神弩手";
         case 400:
-            return "Rogue";
+            return "飞侠";
         case 410:
-            return "Assassin";
+            return "刺客";
         case 411:
-            return "Hermit";
+            return "无影人";
         case 412:
-            return "Nightlord";
+            return "隐士";
         case 420:
-            return "Bandit";
+            return "侠盗";
         case 421:
-            return "Chief Bandit";
+            return "神偷";
         case 422:
-            return "Shadower";
+            return "影武者";
         case 500:
-            return "Pirate";
+            return "海盗";
         case 510:
-            return "Brawler";
+            return "拳手";
         case 511:
-            return "Marauder";
+            return "斗士";
         case 512:
-            return "Buccaneer";
+            return "拳霸";
         case 520:
-            return "Gunslinger";
+            return "枪手";
         case 521:
-            return "Outlaw";
+            return "大副";
         case 522:
-            return "Corsair";
+            return "枪神";
         case 1000:
-            return "Noblesse";
+            return "贵族";
         case 1100:
-            return "Dawn Warrior";
+            return "魂骑士";
         case 1110:
-            return "Dawn Warrior (2nd)";
+            return "魂骑士(2转)";
         case 1111:
-            return "Dawn Warrior (3rd)";
+            return "魂骑士(3转)";
         case 1112:
-            return "Dawn Warrior (4th)";
+            return "魂骑士(4转)";
         case 1200:
-            return "Blaze Wizard";
+            return "炎术士";
         case 1210:
-            return "Blaze Wizard (2nd)";
+            return "炎术士(2转)";
         case 1211:
-            return "Blaze Wizard (3rd)";
+            return "炎术士(3转)";
         case 1212:
-            return "Blaze Wizard (4th)";
+            return "炎术士(4转)";
         case 1300:
-            return "Wind Archer";
+            return "风灵使者";
         case 1310:
-            return "Wind Archer (2nd)";
+            return "风灵使者(2转)";
         case 1311:
-            return "Wind Archer (3rd)";
+            return "风灵使者(3转)";
         case 1312:
-            return "Wind Archer (4th)";
+            return "风灵使者(4转)";
         case 1400:
-            return "Night Walker";
+            return "夜行者";
         case 1410:
-            return "Night Walker (2nd)";
+            return "夜行者(2转)";
         case 1411:
-            return "Night Walker (3rd)";
+            return "夜行者(3转)";
         case 1412:
-            return "Night Walker (4th)";
+            return "夜行者(4转)";
         case 1500:
-            return "Thunder Breaker";
+            return "奇袭者";
         case 1510:
-            return "Thunder Breaker (2nd)";
+            return "奇袭者(2转)";
         case 1511:
-            return "Thunder Breaker (3rd)";
+            return "奇袭者(3转)";
         case 1512:
-            return "Thunder Breaker (4th)";
+            return "奇袭者(4转)";
         case 2000:
         case 2100:
         case 2110:
         case 2111:
         case 2112:
-            return "Aran";
+            return "战神";
         default:
             return "";
         }

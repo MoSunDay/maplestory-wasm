@@ -78,21 +78,21 @@ namespace jrc
           potion_background(POTION_WIDTH, POTION_HEIGHT, Geometry::WHITE, 0.10f),
           button_background(85, 28, Geometry::WHITE, 0.16f),
           pet_status(Text::A11M, Text::CENTER, Text::WHITE, ""),
-          title(Text::A13B, Text::CENTER, Text::WHITE, "PET AUTO RECOVERY"),
+          title(Text::A13B, Text::CENTER, Text::WHITE, "宠物自动恢复"),
           help(Text::A11M, Text::CENTER, Text::LIGHTGREY,
-               "Choose thresholds and items from USE inventory"),
+               "设置触发比例并从消耗栏选择道具"),
           hp_label(Text::A12M, Text::LEFT, Text::WHITE, ""),
           mp_label(Text::A12M, Text::LEFT, Text::WHITE, ""),
-          hp_potion_title(Text::A11M, Text::LEFT, Text::LIGHTGREY, "HP RECOVERY ITEM"),
-          mp_potion_title(Text::A11M, Text::LEFT, Text::LIGHTGREY, "MP RECOVERY ITEM"),
+          hp_potion_title(Text::A11M, Text::LEFT, Text::LIGHTGREY, "HP 恢复道具"),
+          mp_potion_title(Text::A11M, Text::LEFT, Text::LIGHTGREY, "MP 恢复道具"),
           hp_potion_label(Text::A11M, Text::LEFT, Text::WHITE, "", 125),
           mp_potion_label(Text::A11M, Text::LEFT, Text::WHITE, "", 125),
           previous_arrow(Text::A13B, Text::CENTER, Text::YELLOW, "<"),
           next_arrow(Text::A13B, Text::CENTER, Text::YELLOW, ">"),
           potion_help(Text::A11M, Text::CENTER, Text::LIGHTGREY,
-              "Click left / right to select; OFF disables it"),
-          ok_label(Text::A12B, Text::CENTER, Text::WHITE, "OK"),
-          cancel_label(Text::A12B, Text::CENTER, Text::WHITE, "CANCEL")
+              "点击左/右切换；OFF 为关闭"),
+          ok_label(Text::A12B, Text::CENTER, Text::WHITE, "确定"),
+          cancel_label(Text::A12B, Text::CENTER, Text::WHITE, "取消")
     {
         const Inventory& inventory = Stage::get().get_player().get_inventory();
         hp_candidates = potion_candidates(inventory, true);
@@ -311,8 +311,8 @@ namespace jrc
 
     void UIPetOptions::sync_labels()
     {
-        hp_label.change_text("Recover HP at or below " + std::to_string(hp_threshold) + "%");
-        mp_label.change_text("Recover MP at or below " + std::to_string(mp_threshold) + "%");
+        hp_label.change_text("HP 不高于 " + std::to_string(hp_threshold) + "% 时自动恢复");
+        mp_label.change_text("MP 不高于 " + std::to_string(mp_threshold) + "% 时自动恢复");
         hp_fill.setwidth(static_cast<int16_t>(SLIDER_WIDTH * hp_threshold / 100));
         mp_fill.setwidth(static_cast<int16_t>(SLIDER_WIDTH * mp_threshold / 100));
     }

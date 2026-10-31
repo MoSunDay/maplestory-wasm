@@ -25,17 +25,17 @@ namespace jrc
     const EnumMap<Messages::Type, const char*> Messages::messages =
     {
         "",
-        "You cannot use this skill with this weapon.",
-        "You do not have enough hp to use this skill.",
-        "You do not have enough mp to use this skill.",
-        "You do not have enough arrows to use this attack.",
-        "You do not have enough bullets to use this attack.",
-        "You do not have enough throwing stars to use this attack.",
-        "You cannot use this skill as it is on cooldown.",
-        "You need at least one combo orb to use this skill.",
-        "The scroll lights up and it's mysterious powers have been transferred to the item.",
-        "The scroll lights up but the item remains as if nothing happened.",
-        "The item has been destroyed due to the overwhelming power of the scroll."
+        "该武器无法使用此技能。",
+        "HP 不足，无法使用该技能。",
+        "MP 不足，无法使用该技能。",
+        "箭矢不足，无法使用该攻击。",
+        "子弹不足，无法使用该攻击。",
+        "飞镖不足，无法使用该攻击。",
+        "该技能尚在冷却中，无法使用。",
+        "需要至少一个连击点才能使用该技能。",
+        "卷轴发出光芒，神秘的力量已转移到道具上。",
+        "卷轴发出光芒，但道具毫无变化。",
+        "卷轴的强大力量摧毁了该道具。"
     };
 
 

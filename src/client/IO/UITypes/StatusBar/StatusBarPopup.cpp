@@ -20,17 +20,17 @@ namespace jrc
         if (statusbar::prechaos())
         {
             initialize_panel_prechaos(menu, {
-                { "Character Info", Action::STATS },
-                { "Equip", Action::EQUIPS },
-                { "Inventory", Action::ITEMS },
-                { "Skills", Action::SKILLS },
-                { "Quests", Action::QUESTS }
+                { "角色信息", Action::STATS },
+                { "装备", Action::EQUIPS },
+                { "物品栏", Action::ITEMS },
+                { "技能", Action::SKILLS },
+                { "任务", Action::QUESTS }
             });
             initialize_panel_prechaos(system, {
-                { "Key Config", Action::KEY_CONFIG },
-                { "Pet Options", Action::PET_OPTIONS },
-                { "Game Options", Action::GAME_OPTIONS },
-                { "Quit Game", Action::LOGOUT }
+                { "按键设置", Action::KEY_CONFIG },
+                { "宠物设置", Action::PET_OPTIONS },
+                { "游戏设置", Action::GAME_OPTIONS },
+                { "退出游戏", Action::LOGOUT }
             });
             return;
         }

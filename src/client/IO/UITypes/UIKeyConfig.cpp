@@ -147,11 +147,11 @@ namespace jrc
             // The v83 buttons are label-less sockets, so their captions are
             // drawn as text. Post-Chaos buttons ship caption textures and
             // keep this map empty, which turns the label draw into a no-op.
-            english_button_labels[CANCEL] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Cancel");
-            english_button_labels[DEFAULT] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Default");
-            english_button_labels[DELETE] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Delete");
-            english_button_labels[KEYSETTING] = Text(Text::A11M, Text::CENTER, Text::WHITE, "Quick Slot");
-            english_button_labels[OK] = Text(Text::A11M, Text::CENTER, Text::WHITE, "OK");
+            english_button_labels[CANCEL] = Text(Text::A11M, Text::CENTER, Text::WHITE, "取消");
+            english_button_labels[DEFAULT] = Text(Text::A11M, Text::CENTER, Text::WHITE, "默认");
+            english_button_labels[DELETE] = Text(Text::A11M, Text::CENTER, Text::WHITE, "删除");
+            english_button_labels[KEYSETTING] = Text(Text::A11M, Text::CENTER, Text::WHITE, "快捷键");
+            english_button_labels[OK] = Text(Text::A11M, Text::CENTER, Text::WHITE, "确定");
         }
 
         dimension = bgdim;
@@ -307,7 +307,7 @@ namespace jrc
                     reset_to_defaults();
                 }
             };
-            UI::get().emplace<UIYesNo>("Revert to default key bindings?", on_decide);
+            UI::get().emplace<UIYesNo>("恢复默认按键设置？", on_decide);
             break;
         }
         case DELETE:
@@ -322,7 +322,7 @@ namespace jrc
                     rebuild_bound_actions();
                 }
             };
-            UI::get().emplace<UIYesNo>("Clear all key bindings?", on_decide);
+            UI::get().emplace<UIYesNo>("清除所有按键设置？", on_decide);
             break;
         }
         case OK:
@@ -585,7 +585,7 @@ namespace jrc
             }
         };
 
-        UI::get().emplace<UIYesNo>("Save key binding changes?", on_decide);
+        UI::get().emplace<UIYesNo>("保存按键修改？", on_decide);
     }
 
     void UIKeyConfig::close_discard()

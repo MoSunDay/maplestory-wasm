@@ -165,7 +165,7 @@ namespace jrc
     void UIChatbar::apply_chat_target_label()
     {
         static const char* TARGET_NAMES[UIChatbar::NUM_TARGETS] = {
-            "All", "Buddy", "Guild", "Alliance", "Party", "Squad"
+            "全部", "好友", "公会", "联盟", "组队", "远征队"
         };
 
         if (chattarget >= CHT_ALL && chattarget < NUM_TARGETS)

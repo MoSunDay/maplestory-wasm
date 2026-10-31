@@ -66,15 +66,15 @@ namespace jrc
           section_divider(DIVIDER_WIDTH, 1, Geometry::WHITE, 0.28f),
           value_background(VALUE_WIDTH, VALUE_HEIGHT, Geometry::WHITE, 0.10f),
           button_background(BUTTON_WIDTH, BUTTON_HEIGHT, Geometry::WHITE, 0.16f),
-          title(Text::A13B, Text::CENTER, Text::WHITE, "GAME OPTIONS"),
-          row_label(Text::A12M, Text::LEFT, Text::WHITE, "DISPLAY RESOLUTION"),
+          title(Text::A13B, Text::CENTER, Text::WHITE, "游戏设置"),
+          row_label(Text::A12M, Text::LEFT, Text::WHITE, "显示分辨率"),
           value_label(Text::A12B, Text::CENTER, Text::WHITE, ""),
           previous_arrow(Text::A13B, Text::CENTER, Text::YELLOW, "<"),
           next_arrow(Text::A13B, Text::CENTER, Text::YELLOW, ">"),
           hint(Text::A11M, Text::CENTER, Text::LIGHTGREY,
-              "Changes apply when you press OK"),
-          ok_label(Text::A12B, Text::CENTER, Text::WHITE, "OK"),
-          cancel_label(Text::A12B, Text::CENTER, Text::WHITE, "CANCEL")
+              "点击“确定”后生效"),
+          ok_label(Text::A12B, Text::CENTER, Text::WHITE, "确定"),
+          cancel_label(Text::A12B, Text::CENTER, Text::WHITE, "取消")
     {
         buttons[BT_PREV] = std::make_unique<AreaButton>(
             Point<int16_t>(ARROW_LEFT, ARROW_TOP),
@@ -173,7 +173,7 @@ namespace jrc
                     UI::get().get_element<UIStatusbar>())
                 {
                     statusbar->send_chatline(
-                        "Unable to save display settings locally",
+                        "无法在本地保存显示设置",
                         UIChatbar::RED);
                 }
             }
