@@ -116,4 +116,28 @@ namespace jrc::quest_log_model
         }
         return row.category + " - " + row.name;
     }
+
+    std::vector<std::string> quest_paragraphs(int16_t id)
+    {
+        const nl::node info =
+            nl::nx::quest["QuestInfo.img"][std::to_string(id)];
+        if (!static_cast<bool>(info))
+        {
+            return {};
+        }
+
+        // The story text lives in the numbered string children; the cap
+        // guards against runaway nodes on hand-edited data.
+        std::vector<std::string> paragraphs;
+        for (int i = 0; i < 32; ++i)
+        {
+            const nl::node paragraph = info[std::to_string(i)];
+            if (paragraph.data_type() != nl::node::type::string)
+            {
+                break;
+            }
+            paragraphs.push_back(paragraph.get_string());
+        }
+        return paragraphs;
+    }
 }

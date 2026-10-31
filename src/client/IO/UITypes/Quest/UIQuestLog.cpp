@@ -20,6 +20,8 @@
 #include "../../Components/TwoSpriteButton.h"
 #include "QuestLogNodes.h"
 
+#include "../../../Console.h"
+
 #include "nlnx/node.hpp"
 
 #include <algorithm>
@@ -38,6 +40,7 @@ namespace jrc
         constexpr Point<int16_t> INFO_NAME_OFFSET = { 20, 44 };
         constexpr Point<int16_t> INFO_CATEGORY_OFFSET = { 20, 68 };
         constexpr Point<int16_t> INFO_STATE_OFFSET = { 20, 90 };
+        constexpr Point<int16_t> INFO_PARAGRAPH_OFFSET = { 20, 112 };
     }
 
     constexpr Point<int16_t> UIQuestLog::LIST_OFFSET;
@@ -45,11 +48,25 @@ namespace jrc
     UIQuestLog::UIQuestLog(const Questlog& quest_log)
         : UIDragElement({ 250, 20 }),
           quests(quest_log),
+          completed_label(Text::A11M, Text::LEFT, Text::WHITE),
           tab0_label(Text::A11M, Text::LEFT, Text::WHITE, "In Progress"),
-          tab1_label(Text::A11M, Text::LEFT, Text::LIGHTGREY, "Completed")
+          tab1_label(Text::A11M, Text::LEFT, Text::LIGHTGREY, "Completed"),
+          selected_name(Text::A11M, Text::LEFT, Text::WHITE),
+          selected_category(Text::A11L, Text::LEFT, Text::LIGHTGREY),
+          selected_state(Text::A11L, Text::LEFT, Text::LIGHTGREY)
     {
         initialize_sprites();
         initialize_tabs();
+
+        // Cover one whole list row with a translucent band so the selected
+        // quest is visibly highlighted (mirrors the storage cell overlay).
+        selection_box = ColorBox(
+            static_cast<int16_t>(
+                list_width - SLIDER_MARGIN - LIST_OFFSET.x() + 8),
+            static_cast<int16_t>(quest_log_model::ROW_HEIGHT - 2),
+            Geometry::WHITE,
+            0.5f
+        );
 
         slider = {
             11,
@@ -83,6 +100,15 @@ namespace jrc
 
         const Texture list_bg(list["backgrnd"]);
         list_width = list_bg.get_dimensions().x();
+        if (list_width <= 0)
+        {
+            // Missing list art must not collapse the window to zero width
+            // (it would render nothing and swallow all input); fall back
+            // to the v83 pane width so the window stays usable.
+            Console::get().print(
+                "UIQuestLog: missing list background, using fallback width");
+            list_width = 245;
+        }
         sprites.emplace_back(list["backgrnd"]);
 
         // The post-Chaos list pane ships a second inner shade; the v83 pane
@@ -103,12 +129,28 @@ namespace jrc
             sprites.emplace_back(info["backgrnd2"], info_position);
         }
 
-        const int16_t total_width = list_width + Texture(info_bg).get_dimensions().x();
-        const int16_t height = std::max(
-            list_bg.get_dimensions().y(),
-            Texture(info_bg).get_dimensions().y()
-        );
+        const Texture info_bg_texture(info_bg);
+        info_width = info_bg_texture.get_dimensions().x();
+        info_height = info_bg_texture.get_dimensions().y();
+        if (info_width <= 0)
+        {
+            info_width = 296;
+        }
+        if (info_height <= 0)
+        {
+            info_height = 289;
+        }
+
+        const int16_t total_width =
+            static_cast<int16_t>(list_width + info_width);
+        const int16_t height =
+            std::max(list_bg.get_dimensions().y(), info_height);
         dimension = { total_width, height };
+        if (dimension.y() <= 0)
+        {
+            // No pane art at all: keep a sane window frame.
+            dimension = { total_width, 396 };
+        }
         dragarea = { static_cast<int16_t>(total_width - 40), 20 };
     }
 
@@ -197,6 +239,7 @@ namespace jrc
             "Completed: " + std::to_string(quests.list_completed().size())
         );
 
+        selected_paragraphs.clear();
         if (selected >= 0 && selected < static_cast<int16_t>(rows.size()))
         {
             const auto& row = rows[selected];
@@ -207,6 +250,21 @@ namespace jrc
             selected_state.change_text(
                 filter == Filter::IN_PROGRESS ? "In Progress" : "Completed"
             );
+
+            // Story text comes from the numbered QuestInfo children and is
+            // wrapped to the info pane width by the text layout.
+            for (const auto& paragraph :
+                 quest_log_model::quest_paragraphs(row.id))
+            {
+                selected_paragraphs.emplace_back(
+                    Text::A11L,
+                    Text::LEFT,
+                    Text::WHITE,
+                    paragraph,
+                    static_cast<uint16_t>(
+                        std::max<int16_t>(info_width - 40, 100))
+                );
+            }
         }
         else
         {
@@ -294,7 +352,11 @@ namespace jrc
         {
             tab0_label.draw(position + Point<int16_t>(TAB_X, TAB_Y + 12));
             tab1_label.draw(
-                position + Point<int16_t>(TAB_X + 120, TAB_Y + 12)
+                position
+                + Point<int16_t>(
+                    static_cast<int16_t>(TAB_X + tab0_label.width() + 8),
+                    TAB_Y + 12
+                )
             );
         }
 
@@ -307,6 +369,22 @@ namespace jrc
         selected_name.draw(info_position + INFO_NAME_OFFSET);
         selected_category.draw(info_position + INFO_CATEGORY_OFFSET);
         selected_state.draw(info_position + INFO_STATE_OFFSET);
+
+        Point<int16_t> paragraph_position =
+            info_position + INFO_PARAGRAPH_OFFSET;
+        for (const auto& paragraph : selected_paragraphs)
+        {
+            const int16_t line_height = paragraph.height();
+            if (paragraph_position.y() + line_height
+                > info_position.y() + info_height - 10)
+            {
+                // Pane bottom reached; the remaining story stays clipped.
+                break;
+            }
+            paragraph.draw(paragraph_position);
+            paragraph_position.shift_y(
+                static_cast<int16_t>(line_height + 6));
+        }
 
         draw_buttons(alpha);
         slider.draw(position);
@@ -378,6 +456,14 @@ namespace jrc
         }
     }
 
+    void UIQuestLog::send_scroll(double yoffset)
+    {
+        if (slider.isenabled())
+        {
+            slider.send_scroll(yoffset);
+        }
+    }
+
     Button::State UIQuestLog::button_pressed(uint16_t id)
     {
         switch (id)
@@ -396,5 +482,12 @@ namespace jrc
     int UIQuestLog::row_count() const
     {
         return static_cast<int>(rows.size());
+    }
+
+    int16_t UIQuestLog::selected_id() const
+    {
+        return selected >= 0 && selected < static_cast<int16_t>(rows.size())
+            ? rows[selected].id
+            : -1;
     }
 }

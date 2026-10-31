@@ -59,17 +59,13 @@ extern "C"
 
     int msgame_options_active()
     {
-        return jrc::UI::get().is_element_active(
-            jrc::UIElement::GAMEOPTIONS
-        ) ? 1 : 0;
+        return jrc::UI::get().is_element_active(jrc::UIElement::GAMEOPTIONS) ? 1 : 0;
     }
 
     int msgame_options_index()
     {
         auto options = jrc::UI::get().get_element<jrc::UIGameOptions>();
-        return options
-            ? static_cast<int>(options->selected_index())
-            : -1;
+        return options ? static_cast<int>(options->selected_index()) : -1;
     }
 
     int msgame_options_next_x()
@@ -646,6 +642,12 @@ extern "C"
     {
         auto window = jrc::UI::get().get_element<jrc::UIQuestLog>();
         return window ? window->row_count() : -1;
+    }
+
+    int msui_questlog_selected()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIQuestLog>();
+        return window ? window->selected_id() : -1;
     }
 
     const char* msnpc_prompt()

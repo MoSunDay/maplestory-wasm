@@ -110,7 +110,12 @@ namespace jrc
             }
         }
 #endif
-        UI::get().send_key(key, action != GLFW_RELEASE);
+        // Auto-repeat must not re-trigger toggled windows (holding Q would
+        // flip the quest log open/closed on every OS repeat tick).
+        if (action == GLFW_PRESS || action == GLFW_RELEASE)
+        {
+            UI::get().send_key(key, action == GLFW_PRESS);
+        }
     }
 
     namespace

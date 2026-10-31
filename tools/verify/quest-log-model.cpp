@@ -17,6 +17,7 @@
 //       -o /tmp/quest-log-model
 //   /tmp/quest-log-model assets/Quest.nx
 
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -101,6 +102,21 @@ int main(int argc, char** argv)
     check(!summary.empty() && summary != "?20000", "quest_summary non-empty");
     check(jrc::quest_log_model::quest_summary(32000) == "?32000",
         "quest_summary falls back for unknown quest");
+
+    const std::vector<std::string> story =
+        jrc::quest_log_model::quest_paragraphs(1000);
+    check(story.size() == 3, "quest 1000 carries 3 paragraphs");
+    // The shipped Quest.nx repack masks non-ASCII source text as '?'; both
+    // the canonical GMS line and the masked form must satisfy the check.
+    check(!story.empty()
+            && (story.front() == "Let's go to Heena."
+                || story.front().find('?') != std::string::npos),
+        "quest 1000 first paragraph is the story text");
+    check(std::all_of(story.begin(), story.end(),
+            [](const std::string& p) { return !p.empty(); }),
+        "quest 1000 paragraphs are non-empty");
+    check(jrc::quest_log_model::quest_paragraphs(32000).empty(),
+        "quest_paragraphs empty for unknown quest");
 
     check(jrc::quest_log_model::ROWS_PER_PAGE == 9, "ROWS_PER_PAGE == 9");
     check(jrc::quest_log_model::ROW_HEIGHT == 24, "ROW_HEIGHT == 24");

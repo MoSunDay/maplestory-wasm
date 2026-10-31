@@ -387,6 +387,12 @@ namespace jrc
                 // server keymap omits the menu binding.
                 state->send_key(KeyType::MENU, KeyAction::BUDDYLIST, true, false);
             }
+            else if (pressed && keycode == GLFW_KEY_Q)
+            {
+                // Some server keymaps leave the quest log unbound; keep the
+                // default quest hotkey available like the fallbacks above.
+                state->send_key(KeyType::MENU, KeyAction::QUESTLOG, true, false);
+            }
         }
 
         is_key_down[keycode] = pressed;

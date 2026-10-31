@@ -49,9 +49,14 @@ namespace jrc
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override;
         CursorResult send_cursor(bool clicked, Point<int16_t> cursorpos) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
+        void send_scroll(double yoffset) override;
 
         // Number of rows in the active filter (probe helper).
         int row_count() const;
+
+        // Id of the selected row, or -1 when nothing is selected (probe
+        // helper).
+        int16_t selected_id() const;
 
     protected:
         Button::State button_pressed(uint16_t id) override;
@@ -82,6 +87,9 @@ namespace jrc
         std::vector<quest_log_model::QuestRow> rows;
         std::vector<Text> row_labels;
 
+        // Story paragraphs of the selected quest, wrapped to the info pane.
+        std::vector<Text> selected_paragraphs;
+
         Slider slider;
         ColorBox selection_box;
         Text completed_label;
@@ -94,6 +102,8 @@ namespace jrc
 
         int16_t list_width = 0;
         int16_t info_x = 0;
+        int16_t info_width = 0;
+        int16_t info_height = 0;
         int16_t offset = 0;
         int16_t selected = -1;
         uint64_t last_rev = 0;

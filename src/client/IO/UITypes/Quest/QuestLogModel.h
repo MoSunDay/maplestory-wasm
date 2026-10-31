@@ -38,6 +38,11 @@ namespace jrc::quest_log_model
     // dialogues.
     std::string quest_summary(int16_t id);
 
+    // Story paragraphs for the info pane: the numbered string children
+    // ("0", "1", ...) of the QuestInfo entry, in order. Empty for unknown
+    // quests.
+    std::vector<std::string> quest_paragraphs(int16_t id);
+
     constexpr size_t ROWS_PER_PAGE = 9;
     constexpr int16_t ROW_HEIGHT = 24;
 }

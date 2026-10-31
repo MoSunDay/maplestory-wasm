@@ -303,6 +303,13 @@
                     event.stopPropagation();
                     return;
                 }
+                if (event.repeat) {
+                    // Match the GLFW path: auto-repeat must not re-trigger
+                    // toggled windows, so only the initial press is forwarded.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 if (moduleReady()) {

@@ -8,8 +8,13 @@
 //   * UIQuestLog 是 TOGGLED 元素：再按一次 Q 经 pre_add 翻转关闭 →
 //     active === 0；再按 Q 重开，按 Escape 走 send_key(escape) 分支
 //     deactivate → active === 0。
+//   * 点击列表行 → msui_questlog_selected 反映选中任务 id（打开时
+//     rebuild_rows 会自动选中首行，因此 rows>1 时改点第二行断言切换）。
+//   * rows > 9 时对列表中部发 CDP mouseWheel 滚轮事件（Slider 无 offset
+//     探针，仅弱断言窗口保持 active 并截图）。
 //
-// 探针 _msui_questlog_active / _msui_questlog_rows 由
+// 探针 _msui_questlog_active / _msui_questlog_rows /
+// _msui_questlog_selected 由
 // src/client/CMakeLists.txt 的 EXPORTED_FUNCTIONS 导出；窗口实现位于
 // IO/UITypes/Quest/UIQuestLog.{h,cpp}，数据源 Character/QuestLog +
 // Quest.nx QuestInfo.img。
@@ -53,6 +58,31 @@ const probe = (driver, name) =>
   driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', [], [])`);
 const questlogActive = driver => probe(driver, 'msui_questlog_active');
 const questlogRows = driver => probe(driver, 'msui_questlog_rows');
+const questlogSelected = driver => probe(driver, 'msui_questlog_selected');
+
+// 列表行命中区：PosQUEST 默认 (150,120)（Configuration.h）+
+// LIST_OFFSET{14,70}（UIQuestLog.h）+ 行高 24（QuestLogModel.h）。
+// 第一行中心 = (150+14+80, 120+70+12) = (244,202)，第二行 y+24。
+const LIST_FIRST_ROW = { x: 244, y: 202 };
+const LIST_ROW_STRIDE = 24;
+
+async function wheelAt(driver, gameX, gameY, deltaY) {
+  const point = await driver.evaluate(`(() => {
+    const canvas = document.getElementById('canvas');
+    const bounds = canvas.getBoundingClientRect();
+    return {
+      x: bounds.left + ${gameX} * bounds.width / canvas.width,
+      y: bounds.top + ${gameY} * bounds.height / canvas.height
+    };
+  })()`);
+  await driver.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved', x: point.x, y: point.y, button: 'none'
+  });
+  await driver.send('Input.dispatchMouseEvent', {
+    type: 'mouseWheel', x: point.x, y: point.y, button: 'none',
+    deltaX: 0, deltaY
+  });
+}
 
 async function waitFor(predicate, seconds = 45) {
   for (let i = 0; i < seconds * 4; i += 1) {
@@ -111,7 +141,9 @@ async function loginAndEnterGame(driver) {
 }
 
 async function pressQuestLogKey(driver) {
-  // Q = GLFW keycode 81；keymap 81→5/8 → KeyAction::QUESTLOG。
+  // 发送的是 GLFW keycode Q=81；DB keymap 的 `key` 列是客户端 Keytable
+  // 的 MS 扫描码下标（Q=16），绑定须写成 16→4/8（MENU/QUESTLOG）——
+  // 误写 81 实际落到 PAGE_DOWN 槽位，Q 不会开窗（见文件头注释）。
   await driver.key('q', 'KeyQ', 81);
 }
 
@@ -125,6 +157,37 @@ async function testQuestLog(driver) {
   const rows = await questlogRows(driver);
   report(Number.isInteger(rows) && rows >= 0,
     `任务日志行数为非负整数（rows=${rows}）`);
+
+  if (rows > 0) {
+    const initial = await questlogSelected(driver);
+    if (initial === -1) {
+      await driver.click(LIST_FIRST_ROW.x, LIST_FIRST_ROW.y);
+      const picked = await waitFor(
+        async () => await questlogSelected(driver) !== -1, 8);
+      report(picked,
+        `点击第一行选中任务（selected=${await questlogSelected(driver)}）`);
+    } else if (rows > 1) {
+      // 打开时已自动选中首行：点第二行断言选中切换。
+      await driver.click(LIST_FIRST_ROW.x, LIST_FIRST_ROW.y + LIST_ROW_STRIDE);
+      const second = await questlogSelected(driver);
+      report(second !== initial && second >= 0,
+        `点击第二行切换选中（${initial} → ${second}）`);
+    } else {
+      report(true, `单行时首行已选中（selected=${initial}）`);
+    }
+    await settleShot(driver, 'questlog-selected');
+
+    if (rows > 9) {
+      // 滚轮用例：向列表中部发 wheel（deltaY<0 → offset+1）；无 offset
+      // 探针，仅断言窗口仍 active 并留截图。
+      await wheelAt(driver, LIST_FIRST_ROW.x, LIST_FIRST_ROW.y + 4 * LIST_ROW_STRIDE, -120);
+      await wheelAt(driver, LIST_FIRST_ROW.x, LIST_FIRST_ROW.y + 4 * LIST_ROW_STRIDE, -120);
+      report(await questlogActive(driver) === 1, '滚轮滚动后窗口保持打开');
+      await settleShot(driver, 'questlog-scrolled');
+    } else {
+      console.log(`INFO  rows=${rows} ≤ 9，跳过滚轮用例`);
+    }
+  }
 
   await pressQuestLogKey(driver);
   const toggledOff = await waitFor(async () => await questlogActive(driver) === 0, 8);
