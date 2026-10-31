@@ -40,9 +40,9 @@
 - 新增 `cash-shop-take-reject-retry.mjs`：背包满静默拒绝 → 超时后
   `require_reenter=0`、`can_mutate=1`、超时弹窗可关闭、仓库物品原位
   保留 → 清背包重进商城重试取出成功。
-- 2026-10-30 定稿：phase A-C 全 PASS（第 2 件取出被拒后 pending 归零、
-  商城不锁、按钮可点、错误弹窗 Enter 可关、被拒物品原位保留），phase D
-  重试取出服务端 `addResult` 落位确认成功（脚本侧 locker 计数断言因
-  并发会话污染超时，产品行为以服务端日志与 phase C 探针为准）。e2e
-  稳定性要点（双击 500ms 隔离、LOCKER 页签回切、行号 -1）见
-  tools/verify/maplestory-webui/index.md。
+- 2026-10-30 定稿（final34，正式端点 :8000）：**42 PASS / 0 FAIL 全绿**——
+  A 聊天收起、B 预填、C 第 2 件取出被拒后 pending 归零/商城不锁/按钮可点/
+  弹窗 Enter 可关/物品原位保留、D `!clearslot cash` 清仓后重试取出成功并
+  正常退出商城；DB 终态双通道印证（locker 4→2，两件 cap 均落 CASH 栏）。
+  e2e 稳定性要点（双击 500ms 隔离、LOCKER 页签回切、行号 -1、clearslot
+  需 gm=2、retry poll 弹窗容错）见 tools/verify/maplestory-webui/index.md。

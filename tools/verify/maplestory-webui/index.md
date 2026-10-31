@@ -488,6 +488,16 @@ post-Chaos 519px 对话框几何）、`fm-pq-nav.mjs`（各 PQ 攀爬/隐藏门
   需 -1。
 - **弹窗关闭用 Enter 而非坐标点击**：`UIOk::send_key` 处理 RETURN/ESC，
   键盘路径稳定；BtOK4 按钮坐标随文本高度浮动，硬编码易超时。
+- **phase D 的 `!clearslot cash` 是 GM 命令**：角色 `gm=0` 时只当普通聊天
+  打印、CASH 栏不会清空，重试取出会因满栏被拒且成功断言永不收敛
+  （脚本已加生效快检：clearslot 后 `msinv_count(5)` 须 <100，否则报
+  "is the character GM?" 中止）。跑该 e2e 前需 `gm=2`，跑完归零。
+- **phase D retry 的成功 poll 需弹窗容错**：retry 双击偶发合成第二个
+  TAKE（CASH 栏重新填满后被拒），poll 内先探测 `msui_notice_active`
+  并 Enter 关闭再采样；retry 双击前同样 `sleep(500)` 隔离选行按压。
+  2026-10-30 final34：42 PASS / 0 FAIL 全绿（A 聊天、B 预填、C 拒绝
+  解锁、D 清仓重试取出 + 最终退出），DB 终态双通道印证（locker 4→2、
+  CASH 栏 2 件 cap）。
 - 服务端 CS 退出分支已补 `saveCharToDB(false)`（ChangeMapHandler），退出
   不再丢商城内变更；见 changelog 2026-10-30。**重置 locker SQL 必须等上
   一轮角色完全下线**（服务端异步退出 save 可能晚于超时击杀落盘，与

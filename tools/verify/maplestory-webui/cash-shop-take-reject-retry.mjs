@@ -371,6 +371,14 @@ async function phaseD(driver) {
     await probe(driver, 'msui_enabled') === 1, 60);
   await sendChat(driver, '!clearslot cash');
   await sleep(1200);
+  // !clearslot is a GM command: with gm=0 it prints as plain chat and the
+  // CASH tab stays full, so the retry below is rejected for the wrong reason
+  // and the success poll can never converge. Fail fast instead.
+  const cashLeft = await probe(driver, 'msinv_count', [5]);
+  report(cashLeft < 100,
+    `clearslot freed the CASH tab (${cashLeft} slots left)`);
+  if (cashLeft >= 100)
+    throw new Error('!clearslot cash had no effect — is the character GM?');
   await enterCashShop(driver);
   report(await probe(driver, 'mscashshop_locker_count') === before.locker - 1,
     'item still in locker after re-enter');
@@ -384,11 +392,22 @@ async function phaseD(driver) {
     inventory: await probe(driver, 'mscashshop_inventory_count')
   };
   const point = lockerSlotPoint(row2);
+  // Same press-isolation as takeFromLocker: the row-selection press must not
+  // synthesize a stray doubleclick with the retry pair's first press.
+  await sleep(500);
   await driver.doubleClick(point.x, point.y);
-  await requireState('retry after recovery takes the item', async () =>
-    await probe(driver, 'mscashshop_pending') === 0 &&
-    await probe(driver, 'mscashshop_locker_count') === before.locker - 2 &&
-    await probe(driver, 'mscashshop_inventory_count') === preRetry.inventory + 1, 60);
+  await requireState('retry after recovery takes the item', async () => {
+    // A synthesized second take after the CASH tab refills gets rejected and
+    // raises the error dialog; dismiss it and re-sample — the retry itself
+    // already succeeded at that point.
+    if (await probe(driver, 'msui_notice_active') === 1) {
+      await driver.key('Enter', 'Enter', 13);
+      await sleep(300);
+    }
+    return await probe(driver, 'mscashshop_pending') === 0 &&
+      await probe(driver, 'mscashshop_locker_count') === before.locker - 2 &&
+      await probe(driver, 'mscashshop_inventory_count') === preRetry.inventory + 1;
+  }, 60);
   await driver.screenshot('d1-retry-taken');
   await driver.key('Escape', 'Escape', 27);
   await requireState('cash shop exits back to game (final)', uiStateIs(driver, uiState.game), 30);
