@@ -37,6 +37,15 @@ namespace jrc::cash_shop_view
         return index >= 0 && (index < 11 || (index >= 30 && index < 50) || index == 70);
     }
 
+    // Effective rental days for a commodity. Cash equips (1xxxxxx) are
+    // permanent on the linked server no matter what the WZ Period says,
+    // so the catalog normalizes their period to 0 before any display or
+    // badge decision; everything else keeps the WZ Period verbatim.
+    constexpr int32_t effective_period(int32_t item_id, int32_t period)
+    {
+        return item_id / 1'000'000 == 1 ? 0 : period;
+    }
+
     enum class RightPane : uint8_t
     {
         LOCKER,

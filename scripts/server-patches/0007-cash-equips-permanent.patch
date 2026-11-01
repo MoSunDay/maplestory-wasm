@@ -1,0 +1,63 @@
+# 服务端源码补丁：现金装备（cash EQUIP）改为永久
+# 背景：WZ Commodity.img 给多数现金装备标 Period=90，CashShop.CashItem
+# 构造器又把 Period 0 强转 90，toItem() 在 ItemConstants.EXPIRING_ITEMS
+# （恒 true）下对所有售出物品盖 now + 24h*period 的到期戳 → 现金装备
+# 90 天后到期；MapleCharacter.expirationTask() 每 60s 扫描，到期即
+# itemExpired 公告并删除。本补丁：
+#   1. toItem() 把装备判定提为局部 isEquip，`!isEquip && EXPIRING_ITEMS`
+#      才盖戳——EQUIP 类现金购买不再盖到期戳，Item.expiration 保持默认
+#      -1（封包写入器把 -1 映射为永久哨兵值）；period==1 优惠券特例与
+#      非 equip 分支不变，构造器 period 0→90 强转保留（仅非装备触达）。
+#   2. expirationTask() 的 `for (Item item : inv.list())` 循环体开头加
+#      遗留数据迁移守卫：CASH 栏中的 Equip 若带盖章到期时间（!=-1），
+#      迁移为 -1 并 forceUpdateItem 落库，而不是按到期删除——历史已购
+#      现金装备由此就地转为永久。
+# 关联：0005-cash-cover-equips.patch（现金装备落 CASH 栏 / 外观覆盖）。
+#
+# 应用（在 link_repos/MapleStory-Server 目录内）：
+#   patch -p1 < ../../../scripts/server-patches/0007-cash-equips-permanent.patch
+# 验证：
+#   grep -n "isEquip && ItemConstants.EXPIRING_ITEMS" src/server/CashShop.java
+#   grep -n "instanceof Equip" src/client/MapleCharacter.java
+#   bash posix-compile.sh && docker restart ms-game-server     # 登录口 8484 就绪
+#
+--- a/src/server/CashShop.java
++++ b/src/server/CashShop.java
+@@ -100,13 +100,16 @@
+                 petid = MaplePet.createPet(itemId);
+             }
+             
+-            if (ItemConstants.getInventoryType(itemId).equals(MapleInventoryType.EQUIP)) {
++            boolean isEquip = ItemConstants.getInventoryType(itemId).equals(MapleInventoryType.EQUIP);
++            if (isEquip) {
+                 item = MapleItemInformationProvider.getInstance().getEquipById(itemId);
+             } else {
+                 item = new Item(itemId, (byte) 0, count, petid);
+             }
+ 
+-            if (ItemConstants.EXPIRING_ITEMS) {
++            // Cash equips are permanent on this server: keep expiration at -1
++            // (Item's default) instead of stamping the WZ Commodity period.
++            if (!isEquip && ItemConstants.EXPIRING_ITEMS) {
+                     if(period == 1) {
+                             if(itemId == 5211048 || itemId == 5360042) { // 4 Hour 2X coupons, the period is 1, but we don't want them to last a day.
+                                     item.setExpiration(Server.getInstance().getCurrentTime() + (1000 * 60 * 60 * 4));
+--- a/src/client/MapleCharacter.java
++++ b/src/client/MapleCharacter.java
+@@ -3682,6 +3682,16 @@
+                         for (Item item : inv.list()) {
+                             expiration = item.getExpiration();
+ 
++                            if (inv.getType() == MapleInventoryType.CASH && (item instanceof Equip)) {
++                                // Cash cover equips bought before they became permanent keep a
++                                // stamped expiration; migrate them instead of deleting.
++                                if (expiration != -1) {
++                                    item.setExpiration(-1);
++                                    forceUpdateItem(item);
++                                }
++                                continue;
++                            }
++
+                             if (expiration != -1 && (expiration < currenttime) && ((item.getFlag() & ItemConstants.LOCK) == ItemConstants.LOCK)) {
+                                 byte aids = item.getFlag();
+                                 aids &= ~(ItemConstants.LOCK);

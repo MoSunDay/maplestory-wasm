@@ -172,7 +172,7 @@ namespace jrc
                 item.sn = number(fields, 1);
                 item.item_id = number(fields, 2);
                 item.price = number(fields, 3);
-                item.period = number(fields, 4);
+                item.period = cash_shop_view::effective_period(item.item_id, number(fields, 4));
                 item.count = static_cast<int16_t>(number(fields, 5));
                 item.gender = static_cast<int8_t>(number(fields, 6));
                 item.priority = number(fields, 7);

@@ -121,6 +121,18 @@ int main()
             CommodityBadge::NONE,
         "commodity badge thresholds");
     ok &= expect(
+        effective_period(1002190, 90) == 0 &&
+        effective_period(1702000, 90) == 0 &&
+        effective_period(1802000, 14) == 0 &&
+        effective_period(5000001, 90) == 90 &&
+        effective_period(5211048, 1) == 1 &&
+        effective_period(5070000, 14) == 14,
+        "equip period normalization");
+    ok &= expect(
+        commodity_badge(item(20000009, 2, EQUIP_CATEGORY, true, "Perm Equip", 1, 0)) ==
+            CommodityBadge::NONE,
+        "permanent equip never limited");
+    ok &= expect(
         std::string(badge_name(CommodityBadge::SALE)) == "特惠" &&
         std::string(badge_name(CommodityBadge::LIMITED)) == "限时" &&
         std::string(badge_name(CommodityBadge::EVENT)) == "活动" &&
