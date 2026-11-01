@@ -353,7 +353,11 @@ namespace jrc
         combo_attack::apply_damage(player, attack);
         attack.stance = player.get_look().get_stance();
 
-        AttackResult result = mobs.send_attack(attack, final_attack_targets);
+        // Original final-attack semantics: the swing targets its own hit
+        // box, falling back to the primary snapshot only if it is empty.
+        AttackResult result = mobs.send_attack(attack);
+        if (result.damagelines.empty())
+            result = mobs.send_attack(attack, final_attack_targets);
         final_attack_targets.clear();
         result.attacker = player.get_oid();
         apply_shadow_partner(player, result);
