@@ -15,6 +15,9 @@
 //    13101002) plus the Dawn Warrior 1st-job trigger tables
 //    (11001002/11001003 -> 11101002 30/40) must carry the same 2-hits-8-mobs
 //    contract.
+//  - Every skill id in the archive must resolve to the image named by its
+//    prefix (7 digits -> 3, 8 digits -> 4), the rule string_format::skill_image
+//    implements for the client's library lookups.
 //  - Combo Attack (1111002) and Advanced Combo (1120003) must expose their
 //    'state' node with six direct bitmap frames: the static aura frame "0"
 //    plus five pulsing orb frames "1".."5" with delay/a0/a1 fade props.
@@ -78,6 +81,44 @@ namespace
         check(ok, label + "all 30 levels grant 2 hits on 8 mobs");
     }
 
+    void check_image_prefixes(nl::node root)
+    {
+        // string_format::skill_image() derives the image from the id: three
+        // digits for 7-digit ids, four for the 8-digit Cygnus/Aran ones. The
+        // whole archive must follow that rule or skill lookups silently miss.
+        size_t images = 0;
+        size_t skills = 0;
+        size_t bad = 0;
+        std::string sample;
+        for (auto img : root)
+        {
+            const std::string name = img.name();
+            if (name.size() != 7 && name.size() != 8)
+                continue;
+            nl::node entries = img["skill"];
+            if (!present(entries))
+                continue;
+            ++images;
+            for (auto entry : entries)
+            {
+                const std::string id = entry.name();
+                ++skills;
+                const std::string want =
+                    id.substr(0, id.size() > 7 ? 4 : 3) + ".img";
+                if (want != name)
+                {
+                    if (bad++ == 0)
+                        sample = name + "/" + id;
+                }
+            }
+        }
+        check(images >= 70 && skills >= 480,
+            "archive has the expected skill images (" + std::to_string(images)
+                + " images, " + std::to_string(skills) + " skills)");
+        check(bad == 0, "every skill id resolves to its image name"
+            + (bad ? ", first miss " + sample : ""));
+    }
+
     void check_combo_state(nl::node root, const char* id)
     {
         const std::string label = std::string(id) + " state ";
@@ -125,6 +166,8 @@ int main(int argc, char** argv)
     }
     nl::file file(argv[1]);
     nl::node skill = file.root();
+
+    check_image_prefixes(skill);
 
     std::cout << "finalAttack trigger table\n";
     nl::node table = find_skill(skill, "1001005")["finalAttack"];
