@@ -136,6 +136,10 @@ int main(int argc, char** argv)
     log.update_data(30000, "fresh");
     check(log.is_started(30000), "update_data adds an unknown quest");
 
+    // Compile-time proof that the read accessors work on a const log.
+    const Questlog& const_log = log;
+    check(const_log.is_started(30000), "is_started is const-callable");
+
     log.complete(1000, 1234567890);
     check(!log.is_started(1000), "complete removes the started quest");
     check(log.list_completed().count(1000) == 1
@@ -146,6 +150,41 @@ int main(int argc, char** argv)
 
     Questlog empty;
     check(empty.get_last_started() == 0, "empty get_last_started is zero");
+
+    // Info sub-quest pairing: the linked server appends an entry keyed by
+    // the parent's infoNumber directly after the parent (10015 -> 10024).
+    Questlog wire;
+    wire.add_questlog_entry(10015, "");
+    wire.add_questlog_entry(10024, "");
+    check(!wire.is_started(10024), "info entry does not stay in started");
+    check(wire.list_in_progress().count(10015) == 1
+        && wire.list_in_progress().at(10015).first == 10024,
+        "info entry pairs into the parent's in_progress bucket");
+    check(jrc::quest_log_model::collect_rows(wire, Filter::IN_PROGRESS).size() == 1,
+        "paired quest renders a single row");
+
+    // Runtime progress keyed by the info number folds back to the parent.
+    wire.update_data(10024, "3/10");
+    check(wire.list_in_progress().at(10015).second == "3/10",
+        "update_data(infoNumber) refreshes the parent bucket");
+    wire.update_data(10015, "5/10");
+    check(wire.list_in_progress().at(10015).second == "5/10"
+        && !wire.is_started(10015),
+        "update_data(parentId) refreshes the in_progress bucket");
+    wire.update_data(31999, "x");
+    check(wire.is_started(31999),
+        "update_data(unknown) still starts a fresh entry");
+
+    // A quest without an info child stays a plain started entry.
+    Questlog plain;
+    plain.add_questlog_entry(20000, "0");
+    plain.add_questlog_entry(20001, "0");
+    check(plain.is_started(20000) && plain.is_started(20001),
+        "unrelated consecutive quests stay separate started rows");
+    // Repeating the same id keeps the legacy fallback inert.
+    plain.add_questlog_entry(20000, "1");
+    check(plain.is_started(20000),
+        "repeated id without a distinct parent stays started");
 
     if (failures == 0)
     {

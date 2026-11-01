@@ -244,26 +244,16 @@ namespace jrc
         int16_t size = recv.read_short();
         for (int16_t i = 0; i < size; ++i)
         {
-            int16_t qid = recv.read_short();
-            std::string qdata = recv.read_string();
-            if (quests.is_started(qid))
-            {
-                int16_t qidl = quests.get_last_started();
-                quests.add_in_progress(qidl, qid, qdata);
-                i--;
-            }
-            else
-            {
-                quests.add_started(qid, qdata);
-            }
+            const int16_t qid = recv.read_short();
+            const std::string qdata = recv.read_string();
+            quests.add_questlog_entry(qid, qdata);
         }
 
-        std::map<int16_t, int64_t> completed = {};
         size = recv.read_short();
         for (int16_t i = 0; i < size; ++i)
         {
-            int16_t qid  = recv.read_short();
-            int64_t time = recv.read_long();
+            const int16_t qid = recv.read_short();
+            const int64_t time = recv.read_long();
             quests.add_completed(qid, time);
         }
     }
