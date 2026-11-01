@@ -22,6 +22,33 @@
 #include "nlnx/nx.hpp"
 
 
+namespace
+{
+    // Top-level npc nodes which are not animation stances:
+    // 'shop' is the shop portrait, 'condition*' map quest state to stances.
+    bool is_special_node(const std::string& name)
+    {
+        return name == "info" || name == "shop"
+            || name.rfind("condition", 0) == 0;
+    }
+
+    // Checks if the node has at least one direct bitmap child, which
+    // mirrors how 'Animation' collects its numbered frames.
+    bool has_bitmap_frame(const nl::node& node)
+    {
+        for (auto child : node)
+        {
+            if (child.data_type() == nl::node::type::bitmap)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+
 namespace jrc
 {
     Npc::Npc(int32_t id,
