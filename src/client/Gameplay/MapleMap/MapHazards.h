@@ -26,6 +26,11 @@
 
 namespace jrc
 {
+    // Damage applied by obstacle objs whose definition marks `obstacle` but
+    // ships no `damage` value (the steam/gas jets of the Ellinia dungeon
+    // "迷宫" maps). Matches the 100 of the jet's sibling design families.
+    constexpr int32_t DEFAULT_OBSTACLE_DAMAGE = 100;
+
     // A damaging map object (地刺/陷阱): the sprite footprint of a placed obj
     // in map coordinates plus the fixed damage its Obj definition declares.
     struct MapHazard
@@ -52,6 +57,24 @@ namespace jrc
         return { mirror_left, mirror_right, top, bottom };
     }
 
+    // Footprint of one placed obj frame from its authored hit box. `lt`/`rb`
+    // are the collision vectors of the sprite frame relative to its anchor.
+    inline Rectangle<int16_t> hazard_bounds_from_hitbox(Point<int16_t> pos,
+        bool flip, Point<int16_t> lt, Point<int16_t> rb)
+    {
+        const int16_t left = pos.x() + lt.x();
+        const int16_t right = pos.x() + rb.x();
+        const int16_t top = pos.y() + lt.y();
+        const int16_t bottom = pos.y() + rb.y();
+        if (!flip)
+            return { left, right, top, bottom };
+
+        // Flip mirrors the hit box around the anchor's x position.
+        const int16_t mirror_left = 2 * pos.x() - right;
+        const int16_t mirror_right = 2 * pos.x() - left;
+        return { mirror_left, mirror_right, top, bottom };
+    }
+
     // First hazard whose footprint overlaps the player rectangle, or nullptr.
     inline const MapHazard* find_map_hazard_hit(
         const std::vector<MapHazard>& hazards,
@@ -67,6 +90,7 @@ namespace jrc
 
     // Walk the map image layers and collect every damaging obstacle. An obj
     // is a hazard when its definition node (Map.nx `Obj/<oS>.img/<l0>/<l1>/
-    // <l2>`) carries `obstacle` >= 1 and `damage` >= 1 fields.
+    // <l2>`) carries `obstacle` >= 1; `damage` defaults to
+    // DEFAULT_OBSTACLE_DAMAGE when the definition has no `damage` >= 1.
     std::vector<MapHazard> collect_map_hazards(nl::node mapsrc);
 }

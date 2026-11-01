@@ -55,7 +55,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **攻击特效**: 支持多段/多目标命中、斗气终结和属性充能特效；一次按键只发起一次攻击
 - **伤害数字显示**: 伤害数值渲染
 - **Buff 管理**: 增益/减益效果
-- **[地图机关伤害](changelog/2026-11-01/map-obstacle-damage.md)**: 地刺/陷阱等地面机关恢复伤害判定——客户端从 Obj 定义的 `obstacle`/`damage` 字段收集机关足迹，玩家踏入即受固定伤害（地铁跳跳图地刺条、忍苦树林尖刺、椰子赛陷阱洞、CWKPQ 石柱等 224 个机关定义），`TAKE_DAMAGE -2` 上报，服务端不再丢弃无怪物来源的受击
+- **[地图机关伤害](changelog/2026-11-01/map-obstacle-damage.md)**: 地刺/陷阱等地面机关恢复伤害判定——客户端从 Obj 定义的 `obstacle`/`damage` 字段收集机关足迹，玩家踏入即受固定伤害（地铁跳跳图地刺条、忍苦树林尖刺、椰子赛陷阱洞、CWKPQ 石柱等 224 个机关定义），`TAKE_DAMAGE -2` 上报，服务端不再丢弃无怪物来源的受击；迷宫喷气/蒸汽陷阱（trap.img/steam/0/*）定义无 `damage` 字段，按 `DEFAULT_OBSTACLE_DAMAGE=100` 落伤，足迹优先取帧 `lt`/`rb` 碰撞盒
 - **[怪物仇恨战斗](mob-combat/)**: 怪物受击后按累计伤害锁定目标并持续追击，在范围内使用普通攻击或服务端授权技能，完整呈现状态、疾病和雾效果
 
 相关模块: [游戏世界](../agents/client/Gameplay/index.md), [角色系统](../agents/client/Character/index.md)

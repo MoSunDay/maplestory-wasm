@@ -38,7 +38,7 @@ Stage 内部组合了所有地图实体管理器。
 | `MapTilesObjs` | 图块和静态对象渲染 |
 | `MapBackgrounds` | 背景层渲染 |
 | `MapPortals` | 传送门管理 |
-| `MapHazards` | 机关伤害区（地刺/陷阱）：地图加载时从 Obj 定义的 `obstacle`/`damage` 字段收集足迹矩形，`Stage::update` 检测玩家相交后按 `damagefrom=-2` 上报受击 |
+| `MapHazards` | 机关伤害区（地刺/陷阱）：地图加载时从 Obj 定义的 `obstacle`（≥1 即机关，缺 `damage` 时按 `DEFAULT_OBSTACLE_DAMAGE=100` 兜底，如迷宫喷气/蒸汽陷阱）收集足迹矩形（优先帧 `lt`/`rb` 碰撞盒），`Stage::update` 检测玩家相交后按 `damagefrom=-2` 上报受击 |
 | `MapChars` | 其他玩家角色管理（不含自身），向 UI 提供当前可见玩家的点击目标 |
 | `MapMobs` | 怪物管理（生成、控制权、仇恨目标、攻击/技能动作、状态） |
 | `MapNpcs` | NPC 管理（对话、商店） |

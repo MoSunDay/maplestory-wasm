@@ -64,28 +64,47 @@ namespace jrc
             {
                 const nl::node def = resolve_obj_definition(objsrc);
                 const int32_t obstacle = def["obstacle"];
-                const int32_t damage = def["damage"];
-                if (obstacle < 1 || damage < 1)
+                if (obstacle < 1)
                     continue;
 
+                // Steam/gas jet definitions mark `obstacle` but ship no
+                // `damage`; fall back to the sibling families' scale.
+                int32_t damage = def["damage"];
+                if (damage < 1)
+                    damage = DEFAULT_OBSTACLE_DAMAGE;
+
                 // Anchor and footprint come from the first sprite frame,
-                // mirroring how the visual Obj is placed on the map.
+                // mirroring how the visual Obj is placed on the map. Authored
+                // lt/rb collision vectors describe the hit box exactly and
+                // win over the bitmap rectangle.
                 const nl::node frame = first_bitmap_frame(def);
                 if (!frame)
                     continue;
 
-                const nl::bitmap bitmap = frame;
-                const Point<int16_t> origin{ frame["origin"] };
-                const Point<int16_t> dimensions{
-                    bitmap.width(),
-                    bitmap.height()
-                };
                 const Point<int16_t> pos{ objsrc["x"], objsrc["y"] };
                 const bool flip = objsrc["f"].get_bool();
-                hazards.push_back({
-                    hazard_bounds(pos, flip, origin, dimensions),
-                    damage
-                });
+                Rectangle<int16_t> bounds;
+                if (nl::node lt = frame["lt"], rb = frame["rb"]
+                    ; lt && rb)
+                {
+                    bounds = hazard_bounds_from_hitbox(
+                        pos,
+                        flip,
+                        Point<int16_t>{ lt },
+                        Point<int16_t>{ rb }
+                    );
+                }
+                else
+                {
+                    const nl::bitmap bitmap = frame;
+                    const Point<int16_t> origin{ frame["origin"] };
+                    const Point<int16_t> dimensions{
+                        bitmap.width(),
+                        bitmap.height()
+                    };
+                    bounds = hazard_bounds(pos, flip, origin, dimensions);
+                }
+                hazards.push_back({ bounds, damage });
             }
         }
         return hazards;

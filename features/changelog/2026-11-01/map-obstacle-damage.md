@@ -64,3 +64,28 @@ WASM 重编通过（`scripts/docker_build_wasm.sh`）；服务端单文件 `java
 - [网络协议 0x0030 TAKE_DAMAGE](../../../docs/ms-network-protocol.md)
 - [游戏世界](../../../agents/client/Gameplay/index.md)
 - [网络层](../../../agents/client/Net/index.md)
+
+## 2026-11-01 追补：迷宫喷气蒸汽陷阱（无 damage 字段）
+
+艾琳迷宫系列（105060000/105070000/105080000/105090000 及 105090100-
+105090400、105090900、211041100-211042200、280020000/1、801000110/210、
+921100000、990000611-641 水路之迷宫等）的喷气/蒸汽机关定义是
+`Obj/trap.img/steam/0/{0,1,2}`：只有 `obstacle=1`、**没有 `damage`
+字段**（解析为 0），被 `collect_map_hazards` 的 `obstacle>=1 且
+damage>=1` 双门槛整体跳过，喷气全程不落伤。
+
+修复（`MapHazards.{h,cpp}`）：
+
+- 收集门槛改为只看 `obstacle >= 1`；定义缺 `damage`（<1）时按新增
+  `DEFAULT_OBSTACLE_DAMAGE = 100` 兜底（steam/1-4 兄弟设计族伤害为
+  100/130/160、100/150、100、150，取代表值 100）。
+- 足迹优先取机关首帧自带的 `lt`/`rb` 碰撞向量（steam/0/0 帧 0：
+  lt=(-18,-68)、rb=(16,0)，即整根喷气柱），无 lt/rb 的机关回退原
+  origin+位图尺寸路径；新增内联纯函数 `hazard_bounds_from_hitbox`
+  承接翻转镜像。
+
+验证：`tools/verify/map-hazards.cpp` 补喷气断言（lt/rb 碰撞盒纯函数
+两侧 + 带 Map.nx 实测 105060000 ≥38 个机关、全部 damage≥1、(717,522)
+喷气柱与玩家盒相交；990000620 ≥3），命令已更新登记于
+[tools/verify/index.md](../../../tools/verify/index.md)；地铁三号线 B1
+31 个地刺条等既有机关回归不变，普通地图仍 0 误伤。
