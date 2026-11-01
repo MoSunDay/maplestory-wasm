@@ -73,7 +73,7 @@ WASM 的浏览器到 `ws-proxy` 连接支持从页面主机名或显式 `ProxyIP
 - 控制端通过 `MOVE_MONSTER(0xBC)` 上报递增 `moveId`、原始动作、技能 ID/等级、起点与标准移动片段。动作值 24–41 对应 `attack1..attack9`，42–59 对应技能 action1–action9，低位承载朝向。
 - `MOVE_MONSTER_RESPONSE(0xF0)` 回显序列、服务端仇恨状态和当前 MP，并可下发一个绑定该序列的技能建议。客户端只接受与最新已发序列完全一致的响应；建议在实际施法上报后一次性清除。
 - `MOVE_MONSTER(0xEF)` 广播携带服务端接受后的原始动作。`MobMovedHandler` 完整消费保留位、动作/技能、option、起点和移动片段，远端怪物不会从移动姿态猜测攻击。
-- `TAKE_DAMAGE(0x30)` 的 0–8 表示对应普通攻击动作；linked server 只接受已授权、未过期、仍在 WZ 范围内且该角色尚未消费的命中。`-1` 继续表示接触伤害。玩家攻击伤害沿用 v83 的负数暴击编码，发送与接收均保留逐段暴击位，供硬皮等服务端规则判定。
+- `TAKE_DAMAGE(0x30)` 的 0–8 表示对应普通攻击动作；linked server 只接受已授权、未过期、仍在 WZ 范围内且该角色尚未消费的命中。`-1` 继续表示接触伤害，`-2` 表示地图机关（地刺/陷阱）固定伤害：客户端检测机关足迹命中后本地预测伤害数字与 2 秒无敌帧，服务端按无怪物来源直接扣血并广播。玩家攻击伤害沿用 v83 的负数暴击编码，发送与接收均保留逐段暴击位，供硬皮等服务端规则判定。
 - `APPLY/CANCEL_MONSTER_STATUS(0xF2/0xF3)`、`SPAWN/REMOVE_MIST(0x111/0x112)` 已注册真实处理器；状态包截断会抛出 `PacketError`，雾包按完整 owner/skill/level/delay/rectangle 布局消费。
 - `GIVE_BUFF(0x20)` 同时支持普通技能 Buff 与怪物疾病条目。疾病使用 `value:short + mobSkillId:short + level:short + duration:int`，不会误按玩家技能 ID 解析。
 

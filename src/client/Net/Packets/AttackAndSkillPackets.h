@@ -224,6 +224,7 @@ namespace jrc
     public:
         enum From : int8_t
         {
+            OBSTACLE = -2,
             TOUCH = -1,
             ATTACK_1 = 0
         };
@@ -239,6 +240,11 @@ namespace jrc
             write_int(oid);
             write_byte(direction);
         }
+
+        // From a fixed-damage map hazard (地刺/陷阱, damagefrom = -2). The
+        // server applies these without an attacking mob.
+        TakeDamagePacket(int32_t damage, From from, uint8_t direction)
+            : TakeDamagePacket(from, 0, damage, 0, 0, direction) {}
 
         // From mob attack result.
         TakeDamagePacket(const MobAttackResult& result, From from)

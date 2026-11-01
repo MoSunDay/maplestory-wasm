@@ -24,6 +24,7 @@
 #include "MapleMap/MapEffect.h"
 #include "Loading/MapAssetGate.h"
 #include "Input/ConfusedInput.h"
+#include "MapleMap/MapHazards.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
 #include "MapleMap/MapPortals.h"
@@ -181,6 +182,8 @@ namespace jrc
 
         MapInfo mapinfo;
         MapTilesObjs tilesobjs;
+        // Damaging map objects (地刺/陷阱) collected from the current map.
+        std::vector<MapHazard> hazards;
         MapBackgrounds backgrounds;
         MapPortals portals;
         MapReactors reactors;

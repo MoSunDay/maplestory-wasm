@@ -1028,7 +1028,7 @@ damage     int    Damage dealt
 ```
 Field          Type   Notes
 [int]          int    Client timestamp (ignored)
-damagefrom     byte   -1=touch, 0–8=authorized attack1–attack9, -2=legacy mob skill, -3=fall, -4=poison/DoT
+damagefrom     byte   -1=touch, 0–8=authorized attack1–attack9, -2=map obstacle (地刺/陷阱), -3=fall, -4=poison/DoT
 element        byte   Elemental type of the attack
 damage         int    Amount of damage taken
 [If damagefrom != -3 and != -4:]
@@ -1041,6 +1041,12 @@ For normal mob actions (`damagefrom` 0–8), the server requires an unexpired
 attack window for the same mob/action, validates WZ range again, and permits at
 most one hit per character. It then applies HP/MP damage and rebroadcasts
 `DAMAGE_PLAYER` (0xC0) to all players on the map.
+
+For map obstacles (`damagefrom` -2) the client sends `monsterId`/`mobOid` = 0
+with the fixed damage declared by the obj definition (`Obj/*.img` nodes
+carrying `obstacle` >= 1 and `damage` >= 1). The server applies these without
+an attacking mob and rebroadcasts the hit; the client predicts the damage
+number locally and suppresses the self display of the broadcast.
 
 ---
 

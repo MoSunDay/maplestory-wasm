@@ -102,6 +102,7 @@ namespace jrc
         combat.clear();
         chars.clear();
         npcs.clear();
+        hazards.clear();
         mobs.clear();
         drops.clear();
         mists.clear();
@@ -123,6 +124,7 @@ namespace jrc
         nl::node src       = nl::nx::map["Map"]["Map" + prefix][strid + ".img"];
 
         tilesobjs   = MapTilesObjs(src);
+        hazards     = collect_map_hazards(src);
         backgrounds = MapBackgrounds(src["back"]);
         physics     = Physics(src["foothold"]);
         mapinfo     = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
@@ -252,6 +254,20 @@ namespace jrc
         {
             MobAttackResult result = player.damage(action_attack);
             TakeDamagePacket(result, result.attack_index).dispatch();
+            return;
+        }
+
+        const Point<int16_t> position = player.get_position();
+        const Rectangle<int16_t> player_bounds{
+            position.x() - 10,
+            position.x() + 10,
+            position.y() - 40,
+            position.y()
+        };
+        if (const MapHazard* hazard = find_map_hazard_hit(hazards, player_bounds))
+        {
+            player.show_damage(hazard->damage);
+            TakeDamagePacket(hazard->damage, TakeDamagePacket::OBSTACLE, 0).dispatch();
             return;
         }
 
