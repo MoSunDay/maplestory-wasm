@@ -23,7 +23,9 @@
 | [0003-deterministic-idle-session-reaping.patch](0003-deterministic-idle-session-reaping.patch) | `manageIdleSessions` 移除无条件 `idleSessions.clear()`，改为按 15s 阈值 testPing 后移除/断连移除/未达阈值保留，空闲会话 ~45-75s 确定性收割 | 已应用于当前 checkout 并重编入 dist（2026-10-26） |
 | [0004-parse-damage-unlearned-skill-guard.patch](0004-parse-damage-unlearned-skill-guard.patch) | `AttackInfo.parseDamage` 未学习技能（skilllevel<=0）降级为普攻，避免 `effects.get(-1)` 越界吞异常 | 已应用于当前 checkout 并重编入 dist（2026-10-26） |
 | [0005-cash-cover-equips.patch](0005-cash-cover-equips.patch) | 现金商城装备纯装饰化：取出落 CASH 栏，穿戴为 EQUIPPED -100-x 外观覆盖（`equipCashCover`/`unequipCashCover`，跳过 canWearEquipment；让位/穿上两条公告拆包发送，避免共享 movement 字节互相覆盖），ModifyInventory invType 覆盖构造器（CASH 栏装备公告 type=5），`recalcEquipStats` 跳过 <=-100 槽位，ItemFactory 4 处判定让 CASH 栏 Equip 走装备持久化，addInventoryInfo 四段 byte 位置 + equippedCash 原样发 101+ | 已应用于当前 checkout 并重编入 dist（2026-10-29） |
+| [0006-storage-30-slots-and-type-buckets.patch](0006-storage-30-slots-and-type-buckets.patch) | 仓库 30 格上限（新建默认 30、`gainSlots` 上限 48→30）；`sendStorage`/`arrangeItems` 的 `typeItems` 改为按类型过滤桶，修复多类型混存时“页签内索引→全量下标”映射错位导致的取错/取不出 | 已应用于当前 checkout 并重编入 dist（2026-11-01） |
 | [0006-cash-shop-exit-save.patch](0006-cash-shop-exit-save.patch) | `ChangeMapHandler` CS 退出分支 `open(false)` 后补 `chr.saveCharToDB(false)`：换线重连前把商城内 locker take/put/buy、CASH 余额、wishlist 落盘，修复退出商城丢档（进入侧 `EnterCashShopHandler` 本就有 save，退出侧原本缺失） | 已应用于当前 checkout 并重编入 dist（2026-10-30） |
+| [0007-cash-equips-permanent.patch](0007-cash-equips-permanent.patch) | 现金装备改永久：`CashItem.toItem()` 提取 `isEquip` 局部变量，`!isEquip && EXPIRING_ITEMS` 才盖到期戳（EQUIP 类购买保持 expiration -1，WZ Commodity Period=90 不再生效）；`expirationTask()` 对 CASH 栏遗留 Equip 带 !=-1 到期戳的迁移为 -1 落库而非到期删除 | 已应用于当前 checkout 并重编入 dist（2026-11-01） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。

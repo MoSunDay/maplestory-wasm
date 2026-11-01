@@ -1,0 +1,68 @@
+From: opencode <opencode@localhost>
+Subject: [PATCH] storage: 30-slot cap and per-type tab buckets
+
+仓库(Trunk)窗口交互修复 + 自由市场仓库 NPC 的容量约束：
+
+1. `MapleStorage.MAX_SLOTS = 30`：新建仓库默认 30 格，`gainSlots` 扩容上限
+   由 48 收敛到 30（“仓库 NPC 最多可存放 30 个物品”）。
+2. `sendStorage`/`arrangeItems` 的 `typeItems` 由“全量列表塞进每个分页”
+   改为 `filterItems(type)` 按类型过滤：客户端取出时上发“页签内索引”，
+   `getSlot()` 需要通过过滤后的桶映射回全量下标；此前多类型混存时取出的
+   是错误条目（或静默无响应），与 takeOut/store 已有的过滤桶保持一致。
+
+配套 DB（操作者执行，非源码）：
+    UPDATE storages SET slots = 30;
+    INSERT INTO plife (world, map, life, type, cy, f, fh, rx0, rx1, x, y, hide, mobtime, team)
+        VALUES (0, 910000000, 1100000, 'n', 23, 0, 143, 450, 450, 450, 18, 0, 0, -1);
+（1100000 Kirium/仓库管理员 已有 scripts/npc/1100000.js 开仓脚本；
+plife 行把该 NPC 以 fh143 地面段放到自由市场入口 x=450。）
+
+已在当前 checkout 应用并重编入 dist（2026-11-01）。
+---
+--- a/src/server/MapleStorage.java	2026-11-01 18:45:51.808146231 +0800
++++ b/src/server/MapleStorage.java	2026-11-01 18:45:16.587758798 +0800
+@@ -53,6 +53,8 @@
+     private static Map<Integer, Integer> trunkGetCache = new HashMap<>();
+     private static Map<Integer, Integer> trunkPutCache = new HashMap<>();
+     
++    public static final int MAX_SLOTS = 30;
++
+     private int id;
+     private int currentNpcid;
+     private int meso;
+@@ -71,7 +73,7 @@
+     private static MapleStorage create(int id, int world) {
+         try {
+             Connection con = DatabaseConnection.getConnection();
+-            try (PreparedStatement ps = con.prepareStatement("INSERT INTO storages (accountid, world, slots, meso) VALUES (?, ?, 4, 0)")) {
++            try (PreparedStatement ps = con.prepareStatement("INSERT INTO storages (accountid, world, slots, meso) VALUES (?, ?, " + MAX_SLOTS + ", 0)")) {
+                 ps.setInt(1, id);
+                 ps.setInt(2, world);
+                 ps.executeUpdate();
+@@ -122,7 +124,7 @@
+     public synchronized boolean gainSlots(int slots) {
+         slots += this.slots;
+ 
+-        if (slots <= 48) {
++        if (slots <= MAX_SLOTS) {
+             this.slots = (byte) slots;
+             return true;
+         }
+@@ -249,7 +251,7 @@
+             
+             List<Item> storageItems = getItems();
+             for (MapleInventoryType type : MapleInventoryType.values()) {
+-                typeItems.put(type, new ArrayList<>(storageItems));
++                typeItems.put(type, new ArrayList<>(filterItems(type)));
+             }
+             
+             currentNpcid = npcId;
+@@ -285,7 +287,7 @@
+             items = msi.sortItems();
+             
+             for (MapleInventoryType type : MapleInventoryType.values()) {
+-                typeItems.put(type, new ArrayList<>(items));
++                typeItems.put(type, new ArrayList<>(filterItems(type)));
+             }
+ 
+             c.announce(MaplePacketCreator.arrangeStorage(slots, items));
