@@ -91,6 +91,8 @@ namespace jrc
         // Return the horizontally closest live mob on the same platform band.
         std::optional<Point<int16_t>> find_nearest_position(
             Point<int16_t> origin, int16_t max_vertical_distance) const;
+        // Test hook: play the first attacking mob's combat sounds (e2e probe).
+        bool probe_play_mob_sound() const;
 
     private:
         std::vector<int32_t> find_closest(Rectangle<int16_t> range, Point<int16_t> origin, uint8_t mobcount) const;

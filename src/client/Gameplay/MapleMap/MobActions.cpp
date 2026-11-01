@@ -1,7 +1,9 @@
 #include "Mob.h"
 
+#include "MobSoundStats.h"
 #include "../../Constants.h"
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
 
@@ -42,6 +44,15 @@ namespace jrc
 
     void Mob::load_combat(const nl::node& source, const nl::node& visual_source)
     {
+        // Attack/skill sounds live in Sound.nx under the mob's own id;
+        // linked mobs may keep them under the link source id instead.
+        nl::node sndsrc = nl::nx::sound["Mob.img"]
+            [string_format::extend_id(id, 7)];
+        if (!sndsrc && visual_source)
+        {
+            sndsrc = nl::nx::sound["Mob.img"][visual_source.name()];
+        }
+
         for (uint8_t index = 0; index < 9; ++index)
         {
             const std::string name = "attack" + std::to_string(index + 1);
@@ -78,6 +89,12 @@ namespace jrc
                 std::max<int64_t>(0, info["attackAfter"].get_integer(0)));
             attack.range = range;
             attack.animation = Animation(attack_visual);
+            const nl::node attacksnd = sndsrc["Attack" + std::to_string(index + 1)];
+            attack.attacksound = attacksnd;
+            if (attacksnd)
+            {
+                mobsound::record_loaded();
+            }
             normal_attacks.push_back(std::move(attack));
         }
         attack_cooldowns.assign(normal_attacks.size(), 0);
@@ -121,6 +138,12 @@ namespace jrc
                 std::max<int64_t>(0, binding["effectAfter"].get_integer(0)));
             skill.range = read_range(global);
             skill.animation = Animation(action_visual);
+            const nl::node skillsnd = sndsrc["Skill" + std::to_string(action)];
+            skill.skillsound = skillsnd;
+            if (skillsnd)
+            {
+                mobsound::record_loaded();
+            }
             skill_actions.push_back(std::move(skill));
         }
     }
@@ -296,19 +319,43 @@ namespace jrc
         }
     }
 
+    bool Mob::probe_play_sounds() const
+    {
+        bool any = false;
+        for (const NormalAttack& attack : normal_attacks)
+        {
+            attack.attacksound.play();
+            any = true;
+        }
+        for (const SkillAction& skill : skill_actions)
+        {
+            skill.skillsound.play();
+            any = true;
+        }
+        if (any)
+        {
+            // Action mark 100 distinguishes probe plays from real attacks (1..9).
+            mobsound::record_played(id, 100, false);
+        }
+        return any;
+    }
+
     void Mob::begin_attack(size_t attack_pos, bool notify_server)
     {
         if (attack_pos >= normal_attacks.size())
         {
             return;
         }
+        const NormalAttack& attack = normal_attacks[attack_pos];
         active_action_pos = attack_pos;
         action_kind = ActionKind::ATTACK;
         action_elapsed = 0;
-        action_hit_delay = normal_attacks[attack_pos].effect_after;
+        action_hit_delay = attack.effect_after;
         action_hit_pending = true;
         normal_attacks[attack_pos].animation.reset();
-        attack_cooldowns[attack_pos] = normal_attacks[attack_pos].cooldown;
+        attack.attacksound.play();
+        mobsound::record_played(id, attack.index + 1, false);
+        attack_cooldowns[attack_pos] = attack.cooldown;
         next_attack = (attack_pos + 1) % normal_attacks.size();
         if (notify_server)
         {
@@ -322,11 +369,14 @@ namespace jrc
         {
             return;
         }
+        const SkillAction& skill = skill_actions[skill_pos];
         active_action_pos = skill_pos;
         action_kind = ActionKind::SKILL;
         action_elapsed = 0;
         action_hit_pending = false;
         skill_actions[skill_pos].animation.reset();
+        skill.skillsound.play();
+        mobsound::record_played(id, skill.action, true);
         suggested_skill_id = 0;
         suggested_skill_level = 0;
         if (notify_server)

@@ -121,6 +121,21 @@ namespace jrc
         }
     }
 
+    bool MapMobs::probe_play_mob_sound() const
+    {
+        for (auto& entry : mobs)
+        {
+            if (Optional<const Mob> mob = entry.second.get())
+            {
+                if (mob->probe_play_sounds())
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     void MapMobs::suggest_skill(int32_t oid, int16_t moveid, bool aggro,
                                 uint8_t skill_id,
                                 uint8_t skill_level)

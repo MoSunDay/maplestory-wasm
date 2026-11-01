@@ -74,6 +74,8 @@ namespace jrc
         /// Change this mob's control mode:
         /// 0 - no control, 1 - control, 2 - aggro
         void set_control(int8_t mode);
+        /// Test hook: play every loaded combat sound once (e2e audio probe).
+        bool probe_play_sounds() const;
         /// Send movement to the mob.
         void send_movement(Point<int16_t> start, uint8_t raw_activity,
                            uint8_t skill_id, uint8_t skill_level,
@@ -130,6 +132,7 @@ namespace jrc
             bool magic = false;
             uint16_t effect_after = 0;
             uint16_t cooldown = 0;
+            Sound attacksound;
             mob_action::Range range;
             Animation animation;
         };
@@ -140,6 +143,7 @@ namespace jrc
             uint8_t level = 0;
             uint8_t action = 0;
             uint16_t effect_after = 0;
+            Sound skillsound;
             mob_action::Range range;
             Animation animation;
         };

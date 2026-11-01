@@ -200,8 +200,12 @@ namespace jrc
         if (!active)
         {
             set_search(worldmap_nodes::has_search());
-            update_world(user_map);
         }
+
+        // Re-resolve on every toggle so a first open before the field
+        // data arrived (or a transient resolve failure) never leaves the
+        // window blank until the next map change.
+        update_world(user_map);
     }
 
     bool UIWorldMap::remove_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -325,8 +329,10 @@ namespace jrc
     void UIWorldMap::update_world(const std::string& map)
     {
         nl::node world_map = worldmap_nodes::worldmap_data()[map + ".img"];
-        if (!world_map)
+        if (!world_map["BaseImg"]["0"])
         {
+            // Missing region data falls back to the whole-world image
+            // instead of rendering an empty frame.
             world_map = worldmap_nodes::worldmap_data()["WorldMap.img"];
         }
 
