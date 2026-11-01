@@ -15,7 +15,12 @@ still stale.  This tool applies the matching three edits on the XML side:
   (``Skill.getEffect(level)`` returns ``effects.get(level - 1)``);
 * **counters** -- ``attackCount=2``/``mobCount=8`` spliced into every level
   of 3100001, 3200001, 11101002 and 13101002 (all 30 levels; stray values
-  are rewritten to 2/8);
+  are rewritten to 2/8), plus ``bulletCount=2`` for the three ranged
+  variants 3100001/3200001/13101002 -- the client derives the damage-line
+  count of an ``Attack::RANGED`` follow-up from ``bulletCount``
+  (``Skill.cpp`` ``apply_stats``), so attackCount alone is ignored there;
+  11101002 is the Dawn Warrior sword FA (``Attack::CLOSE``) and keeps the
+  plain 2/8 pair without a bulletCount;
 * **trigger** -- ``finalAttack`` (one entry ``11101002`` with ``0=30`` and
   ``1=40``) inserted under 11001002 and 11001003 in ``1100.img.xml``, every
   other child preserved.
@@ -25,10 +30,10 @@ one-line XML, and the patched text is un-edited again to prove the pre-write
 bytes are untouched.  One ``.pre-fa-variants-backup`` copy is kept per file
 (never overwritten) and serves as the byte-level reference afterwards.  The
 files are re-parsed (``ElementTree``) and the data contracts are asserted by
-``fa_variants_xml_verify.py``: ten FA skills whose 30 levels each read 2/8,
-the three new subtrees matching the archive level for level, both trigger
-tables naming 11101002.  A JSON summary is printed and any failed assertion
-exits non-zero.
+``fa_variants_xml_verify.py``: ten FA skills whose 30 levels each read 2/8
+(the three ranged ones also ``bulletCount=2``), the three new subtrees
+matching the archive level for level, both trigger tables naming 11101002.
+A JSON summary is printed and any failed assertion exits non-zero.
 
 Idempotent: a rerun finds everything in place, writes nothing (same inode
 and mtime) and reports ``status: noop``.
@@ -51,8 +56,9 @@ for _p in (REPO / 'tools', REPO / 'tools/nx'):
     sys.path.insert(0, str(_p))
 
 from fa_variants_xml_common import (  # noqa: E402
-    BACKUP_SUFFIX, COUNTER_LEVELS, GRAFTS, LEVELS, apply_with_undo,
-    backup_once, fail, plan, read_text, stat_of, target_images, write_text,
+    BACKUP_SUFFIX, BULLET_LEVELS, COUNTER_LEVELS, GRAFTS, LEVELS,
+    RANGED_COUNTERS, apply_with_undo, backup_once, fail, plan, read_text,
+    stat_of, target_images, write_text,
 )
 from fa_variants_xml_verify import (  # noqa: E402
     check_all, check_untouched,
@@ -139,10 +145,11 @@ def main(argv=None):
         checks = check_all(wz_dir, nx)
         check_untouched(wz_dir, nx)
         print('  verified: %d FA skills x %d levels at attackCount=%d/'
-              'mobCount=%d, %d grafted subtrees match assets/Skill.nx, '
-              '%d trigger tables, XMLs parse'
+              'mobCount=%d (%d ranged at bulletCount=%d), %d grafted '
+              'subtrees match assets/Skill.nx, %d trigger tables, XMLs parse'
               % (checks['fa_skills'], checks['levels'],
                  COUNTER_LEVELS['attackCount'], COUNTER_LEVELS['mobCount'],
+                 len(RANGED_COUNTERS), BULLET_LEVELS['bulletCount'],
                  len(checks['grafts']), len(checks['triggers'])))
         for sid, row in sorted(checks['rows'].items()):
             print('    %-9s %-9s lv1 %s | lv30 %s'

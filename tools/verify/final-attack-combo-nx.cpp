@@ -14,7 +14,11 @@
 //    vectors), and the archer / Cygnus FA skills (3100001, 3200001, 11101002,
 //    13101002) plus the Dawn Warrior 1st-job trigger tables
 //    (11001002/11001003 -> 11101002 30/40) must carry the same 2-hits-8-mobs
-//    contract.
+//    contract.  The three ranged variants (3100001/3200001/13101002) must
+//    also carry bulletCount=2 on every level: the client's Attack::RANGED
+//    path takes the damage-line count from bulletCount, not attackCount, so
+//    without it the archer FA still lands a single line.  11101002 is the
+//    Dawn Warrior sword FA (Attack::CLOSE) and must carry no bulletCount.
 //  - Every skill id in the archive must resolve to the image named by its
 //    prefix (7 digits -> 3, 8 digits -> 4), the rule string_format::skill_image
 //    implements for the client's library lookups.
@@ -79,6 +83,27 @@ namespace
                 && lv["mobCount"].get_integer() == 8;
         }
         check(ok, label + "all 30 levels grant 2 hits on 8 mobs");
+    }
+
+    void check_every_level_bullet(nl::node node, const char* id, bool wanted)
+    {
+        // Ranged FA variants: Player::prepare_attack(true) returns
+        // Attack::RANGED for bow/crossbow, and Skill.cpp apply_stats then
+        // takes hitcount from bulletCount (SkillData defaults it to 1), so
+        // attackCount=2 alone still fires a single damage line. Melee FA
+        // skills (11101002, Dawn Warrior sword) must carry no bulletCount.
+        const std::string label = std::string(id) + " ";
+        nl::node levels = node["level"];
+        bool ok = present(levels) && levels.size() == 30;
+        for (auto lv : levels)
+        {
+            const bool has = is_int(lv["bulletCount"]);
+            ok = ok && (wanted ? has && lv["bulletCount"].get_integer() == 2
+                               : !has);
+        }
+        check(ok, label
+            + (wanted ? "all 30 levels carry bulletCount=2 (ranged FA)"
+                      : "carries no bulletCount (melee FA)"));
     }
 
     void check_image_prefixes(nl::node root)
@@ -234,6 +259,11 @@ int main(int argc, char** argv)
     std::cout << "Archer / Cygnus FA counters\n";
     for (const char* id : {"3100001", "3200001", "11101002", "13101002"})
         check_every_level_counters(find_skill(skill, id), id);
+
+    std::cout << "Ranged FA damage-line count (bulletCount)\n";
+    for (const char* id : {"3100001", "3200001", "13101002"})
+        check_every_level_bullet(find_skill(skill, id), id, true);
+    check_every_level_bullet(find_skill(skill, "11101002"), "11101002", false);
 
     std::cout << "FA level stats (prop/damage/counters)\n";
     for (const char* fa : present_ids)

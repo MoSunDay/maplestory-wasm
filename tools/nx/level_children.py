@@ -4,7 +4,8 @@
 Two operations on ``Skill.nx`` level nodes, shared by the FA data tools:
 
 * ``plan_counters``/``apply_counters`` -- force ``attackCount``/``mobCount``
-  on every level of a skill, splicing missing ints into the child block and
+  (plus per-target extras such as the ranged FA ``bulletCount``) on every
+  level of a skill, splicing missing ints into the child block and
   overwriting stray values;
 * ``plan_level_sync``/``apply_level_sync`` -- copy one skill's whole per-level
   child sets from a resident sibling (a graft keeps its icons/hit/req).
@@ -56,16 +57,27 @@ def int_values(nx, idx):
 
 
 # ------------------------------------------------------------- level counters
-def plan_counters(nx, targets):
-    """Per-skill report plus the pending counter inserts/overwrites."""
+def plan_counters(nx, targets, extras=None):
+    """Per-skill report plus the pending counter inserts/overwrites.
+
+    Every level of every target carries the fixed ``PROPS`` pair
+    (``attackCount=2``/``mobCount=8``); ``extras`` optionally maps a target
+    ``(img, sid)`` to further ``(prop, value)`` pairs.  The ranged Final
+    Attack variants use it for ``bulletCount=2``: the client derives the
+    damage-line count of an ``Attack::RANGED`` follow-up from ``bulletCount``
+    (``Skill.cpp`` ``apply_stats``), so attackCount alone is ignored there.
+    """
+    extras = extras or {}
     report, inserts, sets, per_level = [], [], [], {}
     for img, sid in targets:
         if find_path(nx, skill_path(img, sid)) is None:
             continue
+        props = tuple(PROPS) + tuple(extras.get((img, sid), ()))
         ok = fixed = inserted = 0
         for lv in level_indices(nx, img, sid):
             here = 0
-            for (act, at), (prop, value) in zip(plan_level(nx, lv), PROPS):
+            for (act, at), (prop, value) in zip(plan_level(nx, lv, props),
+                                                props):
                 if act == 'insert':
                     inserts.append((lv, prop, value, at))
                     here += 1
@@ -78,7 +90,8 @@ def plan_counters(nx, targets):
                 per_level[lv] = per_level.get(lv, 0) + here
                 inserted += here
         report.append({'image': '%d.img' % img, 'skill': sid, 'ok': ok,
-                       'set': fixed, 'insert': inserted})
+                       'set': fixed, 'insert': inserted,
+                       'props': [prop.decode() for prop, _ in props]})
     return report, inserts, sets, per_level
 
 
@@ -88,9 +101,9 @@ def apply_counters(nx, inserts, sets, per_level):
         set_prop(nx, lv, prop, value)
     if not inserts:
         return 0
-    points = splice_props(nx, sorted(inserts, key=lambda t: t[3]))
-    bump_level_counts(nx, points, per_level)
-    return len(points)
+    points, counts = splice_props(nx, inserts)
+    bump_level_counts(nx, points, per_level, counts)
+    return sum(counts)
 
 # ------------------------------------------------------- sibling level copy
 def level_leaves(nx, idx):

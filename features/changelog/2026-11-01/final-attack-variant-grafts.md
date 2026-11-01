@@ -35,7 +35,7 @@ FA）数据缺口，客户端与服务端都会受影响：
     `icon`/`iconDisabled`/`iconMouseOver`/`hit`/`req`/`skillType` 不变；
   - level 子块拼接与计数补丁抽到 `tools/nx/level_children.py`（纯函数，
     供后续数据补丁复用；image 摘要助手并入 `tools/nx/map079_tree.py`），
-    工具本体保持在 400 行以内；
+    工具本体与复用助手分文件维护；
   - **trigger**：给 `11001002`/`11001003` 重建 `finalAttack` 子节点，
     恰好含一项 `11101002`（`0=30`、`1=40`），其余子节点原样保留；
   - **counter**：对 10 个 FA 技能（3 个 graft + `1100002`/`1200003`/
@@ -110,6 +110,99 @@ FA）数据缺口，客户端与服务端都会受影响：
   10 个技能 `maxLevel=30`，lv1/lv2/lv15/lv29/lv30 的 `getAttackCount()=2`、
   `getMobCount()=8`，`getDamage()` 依次 105/110/175/245/350（`11101002`、
   `13101002` 同样 2 段 8 只，lv30 伤害沿用自身 250）——位置索引未错级。
+
+## 后续修复：弓箭手 / 魂骑士 FA 仍然只打一段（`bulletCount`）
+
+### 根因
+
+客户端对**远程**攻击的段数取值路径与近战不同：
+
+- `src/client/Gameplay/Combat/Skill.cpp` 的 `apply_stats` 里
+  `case Attack::RANGED: attack.hitcount = std::min(stats.bulletcount, 15)`，
+  近战分支才用 `stats.attackcount`；
+- `src/client/Data/SkillData.cpp` 读 `bulletCount` 时缺省 `get_integer(1)`；
+- `Player::prepare_attack(true)` 对弓 / 弩（带箭）返回 `Attack::RANGED`。
+
+因此上面第一轮补的 `attackCount=2` 对弓箭手终极攻击完全无效：`3100001`
+只有 30 级自带 `bulletCount=2`（1-29 级缺键），`3200001` / `13101002`
+则 30 级全部没有该键，客户端一律按 1 段结算。`11101002` 是魂骑士
+**剑**终极攻击（`Attack::CLOSE`），走 `attackCount`，本来就不需要
+`bulletCount`，补了反而会污染近战语义。
+
+### 变更
+
+- `tools/nx/level_children.py`：`plan_counters(nx, targets, extras=None)`
+  新增 `extras`（`{(img, sid): ((prop, value), ...)}`），每条目标的 level
+  都要同时满足 `attackCount=2`/`mobCount=8` **加上**该技能的 extra 项；
+  report 行新增 `props` 字段，`plan_level` / `splice_props` 改成按调用方
+  传入的 prop 序列工作（`splice_props` 改为从待插入节点本身 intern 名称，
+  不再假定只有 `attackCount`/`mobCount` 两个名字）。
+  `patch_final_attack_counts_nx.py` 新增默认参数 `props=PROPS`
+  （`plan_level`、`xml_edits`）与按需编译的 `prop_int`，原 CLI 行为不变。
+- `tools/nx/patch_final_attack_counts_nx.py`（`splice_props`）顺带修了一个
+  潜在碰撞：同一个 level 缺 `attackCount` 与 `bulletCount` 时两者算出**同一个
+  插入点**（`bisect_left` 到块首），旧的「插入点必须唯一」断言会直接 fail。
+  现在一个插入点可以带一组按名排序的新 int（`shift_base`/`bump_level_counts`
+  改为按每个点的叶子数累计位移，单点单叶时与旧行为完全等价），
+  `apply_counters` 返回拼接的 int 个数而非插入点数。
+- `tools/nx/inject_final_attack_variants_nx.py`：新增
+  `RANGED = 3100001/3200001/13101002` 与 `EXTRA_PROPS = {target: ((bulletCount, 2),)}`；
+  `plan_counters(nx, ALL_FA, EXTRA_PROPS)` 让 noop 判定把缺的
+  `bulletCount` 也算进待办，`check_counters` 对这三个 id 额外断言
+  `bulletCount=2`，并反向断言其余七个 FA（含 `11101002`）**不得**出现
+  `bulletCount`；报告 / SUMMARY 增加 `props`、`ranged` 与
+  `ranged FA also at bulletCount=2` 一行。
+- 实跑（NX）：`Skill.nx` 280566611 → **280568387** 字节（+1776），
+  splice **89** 个 int 节点（`3100001` 29 个、`3200001` 30 个、
+  `13101002` 30 个），0 个 level 整体替换，104 张未触及 image 摘要不变；
+  sha256 `a53af13ce0b3d81e4053ff95ebb8bd658fb5347a9f28f925c947932008ec1152`。
+  一次性备份 `assets/Skill.nx.pre-fa-variants-backup`
+  （280446245 字节，sha256
+  `0325497115b20c98d6b300035f83b966d19d188813fb849973d96721df81e9e4`）
+  仍是最初 graft 前的原文，未被覆盖；二次运行 size/inode/mtime 全不变
+  （严格 noop）。把这份 pristine 原文拷到临时目录重跑工具（`--assets-dir`）
+  得到与 `assets/Skill.nx` **逐字节相同**的产物（sha256 一致，280568387
+  字节），即工具是「pristine 输入 → 唯一输出」的确定性函数；同样的方法用
+  `Skill.nx.pre-fa-counts-backup` 重跑 `patch_final_attack_counts_nx.py`
+  也复现出 `Skill.nx.pre-fa-variants-backup` 的原文（sha256 一致）。
+- `tools/nx/fa_variants_xml_common.py`：新增 `RANGED_COUNTERS`、
+  `BULLET_LEVELS`、`COUNTER_PROPS`/`BULLET_PROPS`、`counter_props(sid)` 与
+  `level_contract(sid)`；`plan()` 对这三个 id 走
+  `attackCount/mobCount/bulletCount` 三项，report 增加 `props`。
+- `tools/nx/fa_variants_xml_verify.py`：`check_levels` 按
+  `level_contract(sid)` 断言（远程三个多一项 `bulletCount=2`），并反向
+  断言非远程 FA 不得携带 `bulletCount`。
+- 实跑（服务端 XML，前 → 后字节）：
+  `310.img.xml` 63844 → **64859**、
+  `320.img.xml` 38671 → **39721**、
+  `1310.img.xml` 44280 → **45330**（其余 5 个文件无编辑、原地 noop），
+  一次性备份 `<img>.xml.pre-fa-variants-backup` 全部保留未覆盖；
+  `--check` exit 0 且 `pending_edits=0`，二次默认运行 size/inode/mtime 不变。
+  sha256：`310.img.xml` `eb1cc550…e66117`、`320.img.xml`
+  `3c388f70…c23274`、`1310.img.xml` `1f591bd2…a9deb8`
+  （`1110.img.xml` `1fc333e9…3ee877`，无 `bulletCount`）。
+- `tools/verify/final-attack-combo-nx.cpp`：新增
+  `check_every_level_bullet`，断言 `3100001`/`3200001`/`13101002`
+  30 级全部 `bulletCount=2`，且 `11101002` 一级都不带；原有
+  「10 个 FA 每级 2 段 8 只」「全部技能 id → image 前缀」断言保留。
+
+### 验证
+
+- `final-attack-combo-nx assets/Skill.nx`：**93** 项全绿（exit 0）。
+- `/tmp/fainv/lvdump assets/Skill.nx 3100001|3200001|13101002`：lv1/15/29/30
+  均为 `attackCount=2 bulletCount=2 mobCount=8`；`11101002` 四级均无
+  `bulletCount`。`fa_inventory --levels`：10 个 FA 技能 `missing=none`，
+  `3100001`/`3200001`/`13101002` 每级 keys 含 `bulletCount`。
+- 回归（同一归档）：`skill-2023-port-nx`（35）、`second-job-attack-nx`（228）、
+  `attack-gap-skills-nx`（28）、`wide-attack-nx`（214）、`magic-damage-nx`（29）、
+  `job-damage-settlement-nx`（586）全部 PASSED；`patch_final_attack_counts_nx.py
+  --dry-run` 双侧 no-op。
+- 服务端重启（`scripts/game_server_restart.sh`）：`Skills: Loaded in 0.31
+  seconds`，6 个监听（5 世界 + 8484）全起，日志无 `Skill.wz` 解析异常。
+- 运行时探针（容器内 `-Dwzpath=wz/`，直接调 `SkillFactory`/`Skill.getEffect`）：
+  10 个 FA 技能 `maxLevel=30`，lv1/2/15/29/30 的 `getAttackCount()=2`、
+  `getMobCount()=8` 未受影响；`3100001`/`3200001`/`13101002` 的原始
+  `bulletCount=2` 覆盖 **30/30** 级，`11101002` 与三个近战 FA 为 0/30 级。
 
 ## 备注
 

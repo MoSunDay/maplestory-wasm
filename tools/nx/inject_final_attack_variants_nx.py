@@ -18,7 +18,12 @@ archive still has all of them, so this tool:
   1100.img/skill/11001002 and .../11001003, preserving the other children;
 * forces ``attackCount=2``/``mobCount=8`` on every level of the six warrior
   FA skills (three grafts + 1100002/1200003/1300002) and of the archer and
-  Cygnus variants 3100001, 3200001, 11101002, 13101002.
+  Cygnus variants 3100001, 3200001, 11101002, 13101002.  The three ranged
+  variants (3100001/3200001/13101002) also get ``bulletCount=2``: the client
+  derives the damage-line count of an ``Attack::RANGED`` follow-up from
+  ``bulletCount`` (``Skill.cpp`` ``apply_stats``), so without it the archer
+  FA would still land a single line; 11101002 is the Dawn Warrior sword FA
+  (``Attack::CLOSE``) and keeps the plain 2/8 pair.
 
 Grafts reuse ``inject_skill_nx``'s descriptor clone, counters reuse
 ``patch_final_attack_counts_nx``'s sorted-block splice and the level
@@ -72,6 +77,14 @@ SIBLING_OF = {graft[1]: sib[1] for graft, sib in SIBLING}
 # Archer / Cygnus FA skills that exist but omit the counters.
 COUNTERS = ((310, '3100001'), (320, '3200001'), (1110, '11101002'),
             (1310, '13101002'))
+# Ranged FA variants: Player::prepare_attack(true) returns Attack::RANGED for
+# bow/crossbow (and the Cygnus bow), and Skill.cpp apply_stats then derives
+# hitcount from bulletCount instead of attackCount.
+RANGED = ((310, '3100001'), (320, '3200001'), (1310, '13101002'))
+BULLET_PROPS = ((b'bulletCount', 2),)
+# 11101002 is the Dawn Warrior sword FA (CLOSE) and stays on attackCount/2.
+EXTRA_PROPS = {target: BULLET_PROPS for target in RANGED}
+RANGED_IDS = frozenset(sid for _, sid in RANGED)
 # 1st-job attacks that lost their FA trigger table in 079MAX4.
 TRIGGERS = ((1100, '11001002'), (1100, '11001003'))
 TRIGGER_ENTRY, TRIGGER_PROPS = '11101002', {'0': 30, '1': 40}
@@ -157,15 +170,19 @@ def graft_triggers(nx, src, targets):
 
 
 def check_counters(nx, img, sid):
-    """30 sorted levels, each carrying attackCount=2 and mobCount=8."""
+    """30 sorted levels: attackCount=2/mobCount=8, bulletCount=2 if ranged."""
     lvs = level_indices(nx, img, sid)
+    props = tuple(PROPS) + tuple(EXTRA_PROPS.get((img, sid), ()))
     for lv in lvs:
         vals = int_values(nx, lv)
-        for prop, value in PROPS:
+        for prop, value in props:
             if vals.get(prop) != value:
                 fail('%s level %s: %s=%r, expected %d' % (
                     sid, node_name(nx, lv).decode(), prop.decode(),
                     vals.get(prop), value))
+        if sid not in RANGED_IDS and b'bulletCount' in vals:
+            fail('%s level %s: melee FA must not carry bulletCount' % (
+                sid, node_name(nx, lv).decode()))
         names = [node_name(nx, c) for c in child_indices(nx, lv)]
         if names != sorted(names):
             fail('%s level %s: children unsorted' % (sid, node_name(nx, lv).decode()))
@@ -264,15 +281,18 @@ def verify(nx, src, before):
         check_triggers(nx, img, sid)
     curves = [check_graft(nx, src, img, sid) for img, sid in GRAFTS]
     return {'counters': len(ALL_FA), 'triggers': len(TRIGGERS),
-            'grafts': len(GRAFTS), 'untouched_digests': check_untouched(nx, before),
+            'grafts': len(GRAFTS), 'ranged': len(RANGED),
+            'untouched_digests': check_untouched(nx, before),
             'curves': curves}
 
 # --------------------------------------------------------------------- main
 def report_rows(rows):
     """Print one plan/result row per target skill."""
     for r in rows:
-        print('  NX %s/skill/%s: ok %d, set %d, insert %d' % (
-            r['image'], r['skill'], r['ok'], r['set'], r['insert']))
+        extra = [prop for prop in r['props'] if prop not in NORMALISE]
+        print('  NX %s/skill/%s: ok %d, set %d, insert %d%s' % (
+            r['image'], r['skill'], r['ok'], r['set'], r['insert'],
+            ' [%s=2]' % ','.join(extra) if extra else ''))
 
 
 def report_sync_rows(rows):
@@ -315,10 +335,11 @@ def main(argv=None):
 
     summary = {'tool': 'inject_final_attack_variants_nx', 'archive': str(skill_nx),
                'bytes_before': old_size, 'grafted_skills': [], 'counters': [],
-               'grafted_triggers': [], 'backup': None}
+               'grafted_triggers': [], 'backup': None,
+               'ranged': [sid for _, sid in RANGED]}
 
     if not missing and not redo:
-        rows, _, _, _ = plan_counters(nx, ALL_FA)
+        rows, _, _, _ = plan_counters(nx, ALL_FA, EXTRA_PROPS)
         sync_rows, edits = plan_level_sync(nx, SIBLING)
         if not any(row['set'] + row['insert'] for row in rows) and not edits:
             summary.update(status='noop', bytes_after=old_size, counters=rows,
@@ -347,7 +368,7 @@ def main(argv=None):
     report_sync_rows(sync_rows)
     synced = apply_level_sync(nx, edits)
 
-    rows, inserts, sets, per_level = plan_counters(nx, ALL_FA)
+    rows, inserts, sets, per_level = plan_counters(nx, ALL_FA, EXTRA_PROPS)
     summary['counters'] = rows
     report_rows(rows)
 
@@ -385,10 +406,12 @@ def main(argv=None):
         print('  curve %s <- %s: prop %d->%d, damage %d->%d (sibling levels)'
               % (c['skill'], c['sibling'], c['prop_1'], c['prop_30'],
                  c['damage_1'], c['damage_30']))
-    print('  verified: %d FA skills x %d levels at %d/%d, %d trigger tables, %d '
-          'grafted icon sets, %d untouched digests'
+    print('  verified: %d FA skills x %d levels at %d/%d, %d ranged FA also '
+          'at bulletCount=%d, %d trigger tables, %d grafted icon sets, %d '
+          'untouched digests'
           % (verified['counters'], LEVELS, NORMALISE['attackCount'],
-             NORMALISE['mobCount'], verified['triggers'], verified['grafts'],
+             NORMALISE['mobCount'], verified['ranged'],
+             BULLET_PROPS[0][1], verified['triggers'], verified['grafts'],
              verified['untouched_digests']))
     print('summary ' + json.dumps(summary, sort_keys=True))
 

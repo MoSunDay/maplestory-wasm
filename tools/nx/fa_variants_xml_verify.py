@@ -7,7 +7,11 @@ violation:
 
 * all ten Final Attack skills exist, expose exactly 30 level children in
   numeric order (the server indexes them positionally) and carry
-  ``attackCount=2``/``mobCount=8`` on every level;
+  ``attackCount=2``/``mobCount=8`` on every level; the three ranged variants
+  (3100001/3200001/13101002) additionally carry ``bulletCount=2`` on every
+  level, because the client's ``Attack::RANGED`` path takes the damage-line
+  count from ``bulletCount``, while every melee FA skill (11101002 included)
+  must stay free of it;
 * the three grafted subtrees (1100003/1200002/1300003) match
   ``assets/Skill.nx`` level for level, equal their resident sibling's curve
   (lv1 2 %/105 % -> lv30 60 %/350 %) and keep the lv30 ``lt``/``rb``
@@ -29,9 +33,9 @@ for _p in (REPO / 'tools', REPO / 'tools/nx'):
     sys.path.insert(0, str(_p))
 
 from fa_variants_xml_common import (  # noqa: E402
-    BACKUP_SUFFIX, COUNTER_LEVELS, GRAFTS, LEVELS, TRIGGER_ENTRY,
-    TRIGGER_PROPS, TRIGGERS, apply_with_undo, fa_skills, fail, nx_levels,
-    plan, read_text, target_images,
+    BACKUP_SUFFIX, GRAFTS, LEVELS, RANGED_COUNTERS, TRIGGER_ENTRY,
+    TRIGGER_PROPS, TRIGGERS, apply_with_undo, fa_skills, fail, level_contract,
+    nx_levels, plan, read_text, target_images,
 )
 
 
@@ -79,16 +83,25 @@ def load_docs(wz_dir):
 
 
 def check_levels(sid, node):
-    """Level order + counters of one FA skill; returns the row for the table."""
+    """Level order + counters of one FA skill; returns the row for the table.
+
+    Every level carries ``attackCount=2``/``mobCount=8``; the ranged variants
+    (3100001/3200001/13101002) additionally carry ``bulletCount=2`` and every
+    melee FA skill must stay free of it.
+    """
     order, levels = element_levels(node)
     if order != list(range(1, LEVELS + 1)):
         fail('%s: level imgdirs are not in numeric order 1..%d (%s)'
              % (sid, LEVELS, order[:6]))
+    contract = level_contract(sid)
     for level, values in levels.items():
-        for key, want in COUNTER_LEVELS.items():
+        for key, want in contract.items():
             if values.get(key) != want:
                 fail('%s lv%d: %s=%r, want %d'
                      % (sid, level, key, values.get(key), want))
+        if sid not in RANGED_COUNTERS and 'bulletCount' in values:
+            fail('%s lv%d: melee FA must not carry bulletCount'
+                 % (sid, level))
     return {'levels': len(levels),
             'lv1': 'prop=%s damage=%s' % (levels[1].get('prop'),
                                           levels[1].get('damage')),

@@ -13,7 +13,12 @@ CLI that writes) and ``fa_variants_xml_verify.py`` (the contracts):
 * minified-XML surgery: locate the ``<imgdir name="skill">`` node and its
   direct children, splice a grafted subtree into numeric slot order, splice
   the ``finalAttack`` table under a skill, and reverse a batch of edits so
-  the pre-write bytes can be re-derived.
+  the pre-write bytes can be re-derived;
+* the per-level counter contract: ``attackCount=2``/``mobCount=8`` for every
+  FA skill, plus ``bulletCount=2`` for the three ranged variants (3100001,
+  3200001, 13101002) whose client side derives the damage-line count of an
+  ``Attack::RANGED`` follow-up from ``bulletCount``.  11101002 (Dawn Warrior
+  sword FA, ``Attack::CLOSE``) must not carry it.
 """
 from __future__ import annotations
 
@@ -33,6 +38,14 @@ SERVER_WZ = REPO / 'link_repos' / 'MapleStory-Server' / 'wz' / 'Skill.wz'
 BACKUP_SUFFIX = '.pre-fa-variants-backup'
 LEVELS = 30
 COUNTER_LEVELS = {'attackCount': 2, 'mobCount': 8}
+# Ranged FA variants: the client's Attack::RANGED path (Skill.cpp apply_stats)
+# derives the damage-line count from bulletCount instead of attackCount, so
+# the bow/crossbow skills need bulletCount=2 as well.  11101002 is the Dawn
+# Warrior sword FA (Attack::CLOSE) and must stay on the plain 2/8 pair.
+RANGED_COUNTERS = frozenset(('3100001', '3200001', '13101002'))
+BULLET_LEVELS = {'bulletCount': 2}
+COUNTER_PROPS = ((b'attackCount', 2), (b'mobCount', 8))
+BULLET_PROPS = ((b'bulletCount', 2),)
 # (img, grafted skill, resident sibling whose level curve the graft inherited)
 GRAFTS = ((110, '1100003', '1100002'), (120, '1200002', '1200003'),
           (130, '1300003', '1300002'))
@@ -50,6 +63,19 @@ TRIGGER_BLOCK = ('<imgdir name="finalAttack"><imgdir name="%s">'
 
 def fail(msg):
     sys.exit('fa_variants_xml: ' + str(msg))
+
+
+def counter_props(sid):
+    """Bytes (prop, value) pairs every level of skill sid must carry."""
+    return COUNTER_PROPS + (BULLET_PROPS if sid in RANGED_COUNTERS else ())
+
+
+def level_contract(sid):
+    """{prop: value} every level of skill sid must carry."""
+    out = dict(COUNTER_LEVELS)
+    if sid in RANGED_COUNTERS:
+        out.update(BULLET_LEVELS)
+    return out
 
 
 # ------------------------------------------------------------- file plumbing
@@ -195,10 +221,13 @@ def plan(text, nx, img):
             report['grafts'].append({'id': sid, 'state': state})
     for counter_img, sid in COUNTERS:
         if counter_img == img:
-            new, (inserted, fixed, ok) = xml_edits(text, int(sid))
+            props = counter_props(sid)
+            names = [prop.decode() for prop, _ in props]
+            new, (inserted, fixed, ok) = xml_edits(text, int(sid), props)
             edits += new
             report['counters'].append({'id': sid, 'inserted': inserted,
-                                       'fixed': fixed, 'ok': ok})
+                                       'fixed': fixed, 'ok': ok,
+                                       'props': names})
     for trigger_img, sid in TRIGGERS:
         if trigger_img == img:
             new, state = trigger_edits(text, sid)

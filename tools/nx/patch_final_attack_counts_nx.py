@@ -52,9 +52,17 @@ BACKUP_SUFFIX = '.pre-fa-counts-backup'
 INT_TAG = '<int name="%s" value="%d"/>'
 IMGDIR = re.compile(r'<imgdir\b[^>]*>|</imgdir>')
 NAME = re.compile(r'name="([^"]*)"')
-PROP_INT = {name.decode(): re.compile(
-    r'<int\s+name="%s"\s+value="(-?\d+)"\s*/>' % name.decode())
-    for name, _ in PROPS}
+PROP_INT = {}
+INT_MATCH = r'<int\s+name="%s"\s+value="(-?\d+)"\s*/>'
+
+
+def prop_int(prop):
+    """Compiled <int name="prop" value="N"/> matcher, cached per prop name."""
+    key = prop.decode()
+    pattern = PROP_INT.get(key)
+    if pattern is None:
+        pattern = PROP_INT[key] = re.compile(INT_MATCH % key)
+    return pattern
 
 
 def fail(msg):
@@ -96,15 +104,20 @@ def level_children(nx, lv):
             for k in range(num)]
 
 
-def plan_level(nx, lv):
-    """Per-prop plan: ('ok', None) | ('set', None) | ('insert', point)."""
+def plan_level(nx, lv, props=PROPS):
+    """Per-prop plan: ('ok', None) | ('set', None) | ('insert', point).
+
+    ``props`` defaults to the fixed ``attackCount``/``mobCount`` pair; callers
+    that need an extra per-level int (the ranged Final Attack ``bulletCount``)
+    pass their own (prop, value) sequence.
+    """
     kids = level_children(nx, lv)
     names = [k[0] for k in kids]
     if names != sorted(names):
         fail('level node %d children are not bytewise sorted' % lv)
     _, base, _, _, _ = nx['nodes'][lv]
     plan = []
-    for prop, value in PROPS:
+    for prop, value in props:
         current = next((k for k in kids if k[0] == prop), None)
         if current is None:
             plan.append(('insert', base + bisect.bisect_left(names, prop)))
@@ -152,44 +165,58 @@ def check_insert_points(nx, points, parents):
                  % (owners[0], ch, ch + num))
 
 
-def shift_base(base, points):
-    """Children remap: +1 per point strictly below base.
+def shift_base(base, points, counts=None):
+    """Children remap: +1 per leaf inserted strictly below base.
 
-    A point equal to ``base`` is the front-insert case: the new node takes
-    the old first slot, so the parent keeps its pointer value.
+    ``counts`` holds the number of leaves emitted at each point (all 1 when a
+    point carries a single insert).  A point equal to ``base`` is the
+    front-insert case: the new leaves take the old first slots, so the parent
+    keeps its pointer value.
     """
-    return base + bisect.bisect_left(points, base)
+    k = bisect.bisect_left(points, base)
+    return base + (k if counts is None else sum(counts[:k]))
 
 
 def splice_props(nx, inserts):
-    """Insert (level, name, value, point) nodes, points unique ascending."""
-    points = [at for _, _, _, at in inserts]
-    if points != sorted(points) or len(set(points)) != len(points):
-        fail('insertion points are not unique and ascending')
-    for lv, _, _, at in inserts:
-        if at <= lv:
-            fail('insertion point %d is not after level node %d' % (at, lv))
-    check_insert_points(nx, points, [lv for lv, _, _, _ in inserts])
+    """Insert (level, name, value, point) nodes; returns (points, counts).
+
+    The prop names are interned from the inserts themselves, so callers may
+    splice any per-level int (``bulletCount`` included) without touching the
+    fixed ``PROPS`` pair.  Several ints may share one insertion point -- a
+    level that misses ``attackCount`` and ``bulletCount`` inserts both into
+    the same slot -- so each point carries a name-sorted run of leaves and the
+    parent keeps pointing at the run's first leaf.
+    """
     strings = nx['strings']
     index = {s: i for i, s in enumerate(strings)}
-    name_ids = {name: intern(strings, index, name) for name, _ in PROPS}
-    by_point = dict((at, (name_ids[name], struct.pack('<q', value)))
-                    for _, name, value, at in inserts)
+    runs = {}
+    for lv, name, value, at in inserts:
+        if at <= lv:
+            fail('insertion point %d is not after level node %d' % (at, lv))
+        runs.setdefault(at, []).append((name, struct.pack('<q', value)))
+    points = sorted(runs)
+    check_insert_points(nx, points, [lv for lv, _, _, _ in inserts])
+    by_point = {at: sorted(((intern(strings, index, name), union)
+                            for name, union in leaves),
+                           key=lambda leaf: strings[leaf[0]])
+                for at, leaves in runs.items()}
+    counts = [len(by_point[at]) for at in points]
     out, pi = [], 0
     for i, node in enumerate(nx['nodes']):
-        while pi < len(points) and points[pi] == i:
-            name_id, union = by_point[i]
-            out.append((name_id, 0, 0, T_INT, union))
+        if pi < len(points) and points[pi] == i:
+            out.extend((name_id, 0, 0, T_INT, union)
+                       for name_id, union in by_point[i])
             pi += 1
-        out.append((node[0], shift_base(node[1], points)) + tuple(node[2:]))
+        out.append((node[0], shift_base(node[1], points, counts))
+                   + tuple(node[2:]))
     nx['nodes'] = out
-    return points
+    return points, counts
 
 
-def bump_level_counts(nx, points, per_level):
+def bump_level_counts(nx, points, per_level, counts=None):
     """Each level's child count += its inserts, remapped by shift_base."""
     for lv, count in per_level.items():
-        i = shift_base(lv, points)
+        i = shift_base(lv, points, counts)
         nm, ch, num, typ, union = nx['nodes'][i]
         nx['nodes'][i] = (nm, ch, num + count, typ, union)
 
@@ -250,10 +277,10 @@ def patch_nx(skill_nx, dry):
     backup_once(skill_nx)
     for lv, prop, value in sets:
         set_prop(nx, lv, prop, value)
-    points = []
+    points, counts = [], []
     if inserts:
-        points = splice_props(nx, sorted(inserts, key=lambda t: t[3]))
-    bump_level_counts(nx, points, per_level)
+        points, counts = splice_props(nx, inserts)
+    bump_level_counts(nx, points, per_level, counts)
     blob = with_tail_pad(build(nx), nx)
     tmp = Path(str(skill_nx) + '.tmp')
     tmp.write_bytes(blob)
@@ -316,13 +343,18 @@ def level_spans(text, sid):
     return out
 
 
-def xml_edits(text, sid):
-    """(edits, (inserted, fixed, ok)); edits are (start, end, replacement)."""
+def xml_edits(text, sid, props=PROPS):
+    """(edits, (inserted, fixed, ok)); edits are (start, end, replacement).
+
+    ``props`` defaults to the fixed ``attackCount``/``mobCount`` pair; callers
+    may pass extra per-level ints (the archer/Cygnus FA ``bulletCount``) and
+    the counters in ``stats`` then span every prop of every level.
+    """
     edits, stats = [], [0, 0, 0]
     for _, inner, close in level_spans(text, sid):
         tags = []
-        for prop, value in PROPS:
-            found = PROP_INT[prop.decode()].search(text, inner, close)
+        for prop, value in props:
+            found = prop_int(prop).search(text, inner, close)
             if found is None:
                 tags.append(INT_TAG % (prop.decode(), value))
                 stats[0] += 1
