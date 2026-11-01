@@ -36,16 +36,9 @@ namespace jrc
     {
         const SkillData& data = SkillData::get(skillid);
 
-        std::string strid;
-        if (skillid < 10000000)
-        {
-            strid = string_format::extend_id(skillid, 7);
-        }
-        else
-        {
-            strid = std::to_string(skillid);
-        }
-        nl::node src = nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid];
+        std::string strid = string_format::extend_id(skillid, 7);
+        nl::node src =
+            nl::nx::skill[string_format::skill_image(skillid)]["skill"][strid];
 
         projectile = true;
         overregular = false;

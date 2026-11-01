@@ -42,6 +42,19 @@ namespace jrc
             }
             return strid;
         }
+
+        std::string skill_image(int32_t skill_id)
+        {
+            if (skill_id <= 0)
+                return {};
+
+            // Ids are stored zero-padded to 7 digits, so anything longer is an
+            // 8-digit id of a 4th-job-generation class (Cygnus, Aran, Evan),
+            // whose skills live under a 4-digit image instead of a 3-digit one.
+            std::string strid = extend_id(skill_id, 7);
+            size_t prefix = strid.size() > 7 ? 4 : 3;
+            return strid.substr(0, prefix) + ".img";
+        }
     }
 
     namespace bytecode

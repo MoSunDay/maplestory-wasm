@@ -173,16 +173,9 @@ namespace jrc
         if (wrong_job)
             return;
 
-        std::string strid;
-        if (skill_id < 10000000)
-        {
-            strid = string_format::extend_id(skill_id, 7);
-        }
-        else
-        {
-            strid = std::to_string(skill_id);
-        }
-        nl::node src = nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid]["level"][skill_level];
+        std::string strid = string_format::extend_id(skill_id, 7);
+        nl::node src = nl::nx::skill[string_format::skill_image(skill_id)]
+            ["skill"][strid]["level"][skill_level];
 
         const PassiveBuff* buff = iter->second.get();
         if (buff && buff->is_applicable(stats, src))

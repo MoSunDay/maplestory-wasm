@@ -31,7 +31,8 @@ namespace jrc
     {
         // Locate sources
         std::string strid = string_format::extend_id(id, 7);
-        nl::node src = nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid];
+        nl::node src =
+            nl::nx::skill[string_format::skill_image(id)]["skill"][strid];
         nl::node strsrc = nl::nx::string["Skill.img"][strid];
 
 

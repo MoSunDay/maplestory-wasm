@@ -7,8 +7,14 @@
 //    1300002) must carry prop/damage per level with attackCount=2 and
 //    mobCount=8 on EVERY level (patch_final_attack_counts_nx.py), so the
 //    follow-up hits the full 2-mob spread before max level too.
-//    The three absent variants (1100003, 1200002, 1300003) must stay absent
-//    so find_skill() filters them out instead of sending empty skills.
+//    The three variants 079MAX4 dropped (1100003, 1200002, 1300003) are
+//    grafted from the v83 archive by inject_final_attack_variants_nx.py; they
+//    keep their own icon bitmaps plus the resident sibling's per-level child
+//    set (079MAX4 balance: level 30 60% / 350% with the lt/rb hitbox
+//    vectors), and the archer / Cygnus FA skills (3100001, 3200001, 11101002,
+//    13101002) plus the Dawn Warrior 1st-job trigger tables
+//    (11001002/11001003 -> 11101002 30/40) must carry the same 2-hits-8-mobs
+//    contract.
 //  - Combo Attack (1111002) and Advanced Combo (1120003) must expose their
 //    'state' node with six direct bitmap frames: the static aura frame "0"
 //    plus five pulsing orb frames "1".."5" with delay/a0/a1 fade props.
@@ -51,7 +57,25 @@ namespace
 
     nl::node find_skill(nl::node root, const char* id)
     {
-        return root[std::string(id, 3) + ".img"]["skill"][id];
+        // v83 image names use the 3-digit job prefix; 8-digit (Cygnus) skill
+        // ids live in the 4-digit image (11101002 -> 1110.img).
+        const std::string sid = id;
+        return root[sid.substr(0, sid.size() > 7 ? 4 : 3) + ".img"]["skill"][id];
+    }
+
+    void check_every_level_counters(nl::node node, const char* id)
+    {
+        const std::string label = std::string(id) + " ";
+        nl::node levels = node["level"];
+        bool ok = present(levels) && levels.size() == 30;
+        for (auto lv : levels)
+        {
+            ok = ok && is_int(lv["attackCount"])
+                && lv["attackCount"].get_integer() == 2
+                && is_int(lv["mobCount"])
+                && lv["mobCount"].get_integer() == 8;
+        }
+        check(ok, label + "all 30 levels grant 2 hits on 8 mobs");
     }
 
     void check_combo_state(nl::node root, const char* id)
@@ -118,11 +142,55 @@ int main(int argc, char** argv)
         check(present(find_skill(skill, fa)),
             std::string("skill node exists: ") + fa);
 
-    std::cout << "FA skill nodes absent in this dataset (regression)\n";
-    const char* absent_ids[] = {"1100003", "1200002", "1300003"};
-    for (const char* fa : absent_ids)
-        check(!present(find_skill(skill, fa)),
-            std::string("skill node absent: ") + fa);
+    std::cout << "FA skill nodes grafted from the v83 archive (079 gap fill)\n";
+    const char* grafted_ids[] = {"1100003", "1200002", "1300003"};
+    for (const char* fa : grafted_ids)
+    {
+        const std::string label = std::string(fa) + " ";
+        nl::node node = find_skill(skill, fa);
+        check(present(node), label + "skill node exists");
+        check(node.size() == 7 && node["level"].size() == 30,
+            label + "keeps icons/hit/req/skillType and 30 levels");
+        check(node["icon"].data_type() == nl::node::type::bitmap
+                && node["iconDisabled"].data_type() == nl::node::type::bitmap
+                && node["iconMouseOver"].data_type() == nl::node::type::bitmap,
+            label + "carries the three icon bitmaps");
+        check(is_int(node["skillType"]), label + "keeps skillType");
+        nl::node lv1 = node["level"]["1"];
+        nl::node lv30 = node["level"]["30"];
+        check(is_int(lv1["prop"]) && lv1["prop"].get_integer() == 2
+                && is_int(lv1["damage"]) && lv1["damage"].get_integer() == 105,
+            label + "level 1 keeps the 2% / 105% curve");
+        check(is_int(lv30["prop"]) && lv30["prop"].get_integer() == 60
+                && is_int(lv30["damage"]) && lv30["damage"].get_integer() == 350,
+            label + "level 30 carries the sibling 60% / 350% balance");
+        nl::node lt = lv30["lt"];
+        nl::node rb = lv30["rb"];
+        check(lt.data_type() == nl::node::type::vector
+                && rb.data_type() == nl::node::type::vector
+                && lt.get_vector() == (nl::vector2i{-300, -300})
+                && rb.get_vector() == (nl::vector2i{300, 300}),
+            label + "level 30 carries the sibling lt/rb hitbox vectors");
+        check_every_level_counters(node, fa);
+    }
+
+    std::cout << "Dawn Warrior 1st-job FA trigger tables (079 gap fill)\n";
+    for (const char* id : {"11001002", "11001003"})
+    {
+        const std::string label = std::string("finalAttack ") + id + " ";
+        nl::node table = find_skill(skill, id)["finalAttack"];
+        check(table.size() == 1 && present(table["11101002"]),
+            label + "names exactly 11101002");
+        check(is_int(table["11101002"]["0"])
+                && table["11101002"]["0"].get_integer() == 30
+                && is_int(table["11101002"]["1"])
+                && table["11101002"]["1"].get_integer() == 40,
+            label + "carries prop 30 / damage 40");
+    }
+
+    std::cout << "Archer / Cygnus FA counters\n";
+    for (const char* id : {"3100001", "3200001", "11101002", "13101002"})
+        check_every_level_counters(find_skill(skill, id), id);
 
     std::cout << "FA level stats (prop/damage/counters)\n";
     for (const char* fa : present_ids)

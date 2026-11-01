@@ -63,6 +63,12 @@ namespace jrc
 
         // Prefix an id with zeroes so that it has the minimum specified length.
         std::string extend_id(int32_t id, size_t length);
+
+        // Name of the skill image that stores the given skill id. v83 skill
+        // images are named after a job prefix: 3 digits normally (1100002 ->
+        // "110.img"), 4 for the Cygnus/Aran jobs whose ids are 8 digits long
+        // (11101002 -> "1110.img"). Empty for non-positive ids.
+        std::string skill_image(int32_t skill_id);
     };
 
     namespace bytecode

@@ -25,6 +25,7 @@
 #include "../../Gameplay/Combat/ComboAttack.h"
 #include "../../Graphics/DrawArgument.h"
 #include "../../Graphics/Texture.h"
+#include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
@@ -88,11 +89,9 @@ namespace jrc
         // Read the 'state' node of a combo skill into draw data.
         ComboVisuals load_visuals(int32_t skillid)
         {
-            std::string strid = std::to_string(skillid);
-            while (strid.size() < 7)
-                strid.insert(strid.begin(), '0');
+            std::string strid = string_format::extend_id(skillid, 7);
 
-            nl::node state = nl::nx::skill[strid.substr(0, 3) + ".img"]
+            nl::node state = nl::nx::skill[string_format::skill_image(skillid)]
                 ["skill"][strid]["state"];
 
             ComboVisuals visuals;

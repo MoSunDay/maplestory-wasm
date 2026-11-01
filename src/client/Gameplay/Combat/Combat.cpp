@@ -315,9 +315,10 @@ namespace jrc
         final_attack_pending = 0;
         final_attack_targets.clear();
 
-        if (!move.is_skill() || attack.type != Attack::CLOSE)
-            return;
-        if (result.damagelines.empty())
+        // FA follows the equipped weapon family, not the attack range, so
+        // bow/crossbow attacks (Attack::RANGED) trigger their FA as well.
+        if (!move.is_skill() || attack.type == Attack::MAGIC
+            || result.damagelines.empty())
             return;
 
         Weapon::Type weapon = player.get_stats().get_weapontype();
@@ -326,8 +327,7 @@ namespace jrc
         if (fa_skill == 0)
             return;
 
-        bool proc = final_attack::roll(fa_skill, player.get_skills());
-        if (proc)
+        if (final_attack::roll(fa_skill, player.get_skills()))
         {
             final_attack_pending = fa_skill;
             for (const auto& line : result.damagelines)

@@ -113,8 +113,9 @@ namespace jrc
         if (skill_id > 0)
         {
             std::string strid = string_format::extend_id(skill_id, 7);
-            nl::node skill_src = nl::nx::skill[strid.substr(0, 3) + ".img"]
-                ["skill"][strid]["afterimage"][name][stance_name];
+            nl::node skill_src =
+                nl::nx::skill[string_format::skill_image(skill_id)]
+                    ["skill"][strid]["afterimage"][name][stance_name];
             if (has_animation(skill_src))
             {
                 src = skill_src;

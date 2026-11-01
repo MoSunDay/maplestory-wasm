@@ -24,8 +24,11 @@ namespace jrc
 {
     class Skillbook;
 
-    // Helpers for the warrior passive 'Final Attack', which can trigger a
-    // second close-range attack after a primary melee skill hit.
+    // Helpers for the passive 'Final Attack' skills, which can trigger a
+    // second hit after a primary attack. The FA skill follows the equipped
+    // weapon family: swords/axes/blunts/spears/polearms fire the warrior
+    // variants, bows and crossbows the archer (and Cygnus) variants, so the
+    // trigger is not limited to close-range attacks.
     namespace final_attack
     {
         // Return the final-attack skill id that can follow the primary skill

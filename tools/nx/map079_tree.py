@@ -254,6 +254,19 @@ def subtree_digest(nx, idx):
     return count, sha.hexdigest()
 
 
+def skill_digests(nx, images):
+    """Structural digests: every image, plus every skill of ``images``."""
+    out_images = {node_name(nx, c).decode(): subtree_digest(nx, c)
+                  for c in child_indices(nx, 0)}
+    skills = {}
+    for image in sorted(images):
+        idx = find_path(nx, (image.encode(), b'skill'))
+        skills[image] = ({node_name(nx, c).decode(): subtree_digest(nx, c)
+                          for c in child_indices(nx, idx)}
+                         if idx is not None else {})
+    return {'images': out_images, 'skills': skills}
+
+
 def child_stats(nx, idx):
     """{child name: [subtree count, digest]} for spot-check baselines.
 

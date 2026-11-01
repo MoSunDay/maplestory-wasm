@@ -33,24 +33,34 @@ namespace jrc
         nl::node skill_node(int32_t skillid)
         {
             std::string strid = string_format::extend_id(skillid, 7);
-            return nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid];
+            return nl::nx::skill[string_format::skill_image(skillid)]["skill"][strid];
         }
 
+        // Final attack is bound to the equipped weapon family, not to the
+        // attack range: a warrior's melee FA follows the sword/axe/blunt/
+        // spear/polearm variant, while the archer (and Cygnus) FA variants
+        // follow bows and crossbows, which attack at range.
         bool matches_weapon(int32_t fa_skill, Weapon::Type weapon)
         {
             switch (fa_skill)
             {
-            case 1100002: // Fighter - sword
-            case 1200003: // Page - sword
+            case 1100002:   // Fighter - sword FA
+            case 1200002:   // Page - sword FA
+            case 11101002:  // Dawn Warrior (Cygnus) - sword FA
                 return weapon == Weapon::SWORD_1H || weapon == Weapon::SWORD_2H;
-            case 1100003: // Fighter - axe
+            case 1100003:   // Fighter - axe FA
                 return weapon == Weapon::AXE_1H || weapon == Weapon::AXE_2H;
-            case 1200002: // Page - blunt weapon
+            case 1200003:   // Page - blunt weapon (mace) FA
                 return weapon == Weapon::MACE_1H || weapon == Weapon::MACE_2H;
-            case 1300002: // Spearman - spear
+            case 1300002:   // Spearman - spear FA
                 return weapon == Weapon::SPEAR;
-            case 1300003: // Spearman - polearm
+            case 1300003:   // Spearman - polearm FA
                 return weapon == Weapon::POLEARM;
+            case 3100001:   // Hunter - bow FA
+            case 13101002:  // Wind Archer (Cygnus) - bow FA
+                return weapon == Weapon::BOW;
+            case 3200001:   // Crossbowman - crossbow FA
+                return weapon == Weapon::CROSSBOW;
             default:
                 return false;
             }

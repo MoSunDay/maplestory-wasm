@@ -81,6 +81,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **[圣甲术 buff 修复](changelog/2026-10-25/iron-body-buff-skill-id-fix.md)**: 服务端技能常量 1000003→1001003，圣甲术正确下发 WDEF 增益（GIVE_BUFF、图标、属性面板与到期移除）
 - **[技能名消失修复](changelog/2026-11-01/skillbook-names-and-final-attack-hit-counts.md)**: Asyncify 重放期间禁止走 LazyFS 同步快路径（挂起读必须重放到记录帧，其它读同步返回），技能窗口不再整列空白、启动不再 `null function` 崩溃
 - **[终极攻击 2 段 8 只](changelog/2026-11-01/skillbook-names-and-final-attack-hit-counts.md)**: 1100002/1200003/1300002 的 1-29 级补齐 `attackCount=2`/`mobCount=8`（NX 归档 + 服务端 wz XML 双侧），非满级终极攻击也打满两段
+- **[终极攻击缺失变体补齐](changelog/2026-11-01/final-attack-variant-grafts.md)**: 从 v83 归档 graft 1100003/1200002/1300003（三张图标 + 原生兄弟的整级数据：lv30 60%/350% + `lt`/`rb` 判定向量），3100001/3200001/11101002/13101002 全级 `attackCount=2`/`mobCount=8`，11001002/11001003 补回 `finalAttack`（`11101002` 0=30/1=40）
 
 相关模块: [角色系统](../agents/client/Character/index.md)
 
