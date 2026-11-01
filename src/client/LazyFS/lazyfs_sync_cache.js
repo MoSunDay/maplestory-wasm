@@ -8,10 +8,9 @@
 // trampoline copies it straight into the wasm heap and never calls
 // Asyncify.handleSleep, which removes the suspension entirely.
 //
-// When the guard rejects a re-entrant read (another chain is parked), the
-// rejection schedules a pure-JS warmup that waits for the wasm side to go
-// idle and then loads the chunks into the memory cache, so the wasm retry on
-// a later frame hits the synchronous fast-path.
+// The fast path is only consulted while Asyncify is idle or unwinding. During
+// a rewind (state 2) LazyFileBackend bypasses it, because the resumed read has
+// to replay through handleSleep to stop at its recorded frame.
 (function (global) {
 	'use strict';
 
@@ -20,10 +19,17 @@
 			return;
 		}
 
-		// Returns a Uint8Array view of [offset, offset+length) of filepath
-		// when the whole range is covered by resident memory chunks and the
-		// file metadata (size, hence version tag) is already known.
+		// Returns a Uint8Array view (or stitched copy for multi-chunk
+		// ranges) of [offset, offset+length) of filepath when the whole
+		// range is covered by resident memory chunks and the file metadata
+		// (size, hence version tag) is already known.
 		// Returns null whenever anything would need an async fetch.
+		//
+		// Multi-chunk stitching matters for Asyncify rewind replays: a read
+		// re-executed during a replay must return synchronously or the replay
+		// restarts forever (the documented asyncify busy-wedge). Large node
+		// tables are read as spans across chunk boundaries, so spans covered
+		// by resident chunks must also hit this fast path.
 		LazyFS.readCachedSync = function (filepath, offset, length) {
 			const fileEntry = this.files.get(filepath);
 			if (!fileEntry || fileEntry.size === null || length <= 0) {
@@ -31,34 +37,45 @@
 			}
 			const start = Math.floor(offset / this.CHUNK_SIZE);
 			const end = Math.floor((offset + length - 1) / this.CHUNK_SIZE);
-			if (start !== end) {
-				return null; // multi-chunk spans keep the async path
-			}
 			const versionTag = this.getFileVersionTag(fileEntry);
-			const chunk = this.chunkCache.get(this.getChunkCacheKey(filepath, versionTag, start));
-			if (!chunk) {
-				return null;
-			}
-			const inChunk = offset % this.CHUNK_SIZE;
-			if (inChunk + length > chunk.length) {
-				return null;
-			}
-			return chunk.subarray(inChunk, inChunk + length);
-		};
-
-		// Fire-and-forget warmup for ranges the wasm side asked about while
-		// another chain was parked. Pure JS: no wasm export is touched while
-		// Asyncify is busy, and the actual readFileData only starts once the
-		// wasm state is idle again.
-		LazyFS.warmupAfterPark = function (filepath, offset, length) {
-			const attempt = () => {
-				if (typeof Asyncify !== 'undefined' && (Asyncify.currData || Asyncify.state)) {
-					setTimeout(attempt, 30);
-					return;
+			// Collect every covered chunk first; any miss keeps the async path.
+			const chunks = [];
+			for (let i = start; i <= end; i++) {
+				const chunk = this.chunkCache.get(this.getChunkCacheKey(filepath, versionTag, i));
+				if (!chunk || !chunk.length) {
+					return null;
 				}
-				this.readFileData(filepath, offset, length, false).catch(() => {});
-			};
-			setTimeout(attempt, 0);
+				chunks.push(chunk);
+			}
+			if (start === end) {
+				const inChunk = offset % this.CHUNK_SIZE;
+				const chunk = chunks[0];
+				if (inChunk + length > chunk.length) {
+					return null;
+				}
+				return chunk.subarray(inChunk, inChunk + length);
+			}
+			// Stitch [offset, offset+length) across chunk boundaries. An
+			// interior chunk shorter than CHUNK_SIZE means a truncated fetch;
+			// reject the whole range so the async path stays authoritative.
+			for (let i = 0; i < chunks.length - 1; i++) {
+				if (chunks[i].length !== this.CHUNK_SIZE) {
+					return null;
+				}
+			}
+			const result = new Uint8Array(length);
+			let pos = 0;
+			for (let i = start; i <= end; i++) {
+				const chunk = chunks[i - start];
+				const from = (i === start) ? offset % this.CHUNK_SIZE : 0;
+				const take = Math.min(chunk.length - from, length - pos);
+				if (take <= 0) {
+					return null; // range not covered by resident data
+				}
+				result.set(chunk.subarray(from, from + take), pos);
+				pos += take;
+			}
+			return pos === length ? result : null;
 		};
 	}
 

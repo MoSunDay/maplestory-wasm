@@ -86,3 +86,38 @@ boot 期 null function 回归，勿默认绿）：
   `fed pet resumed looting (pickups 0 -> 2)`，截图 20a（现金栏红!
   角标）/20b（宠物面板 HUNGRY! 状态行）各 ~330-370KB；
 - 复跑命令模板见 `tools/verify/maplestory-webui/index.md` 宠物段落。
+
+## 后续结论（2026-11-01）：快路径不能服务「挂起读的重放」
+
+技能窗口所有技能名变空 + 启动 "null function" 崩溃，是上面第 2/3 形态的
+一个可稳定复现的子集，根因在 LazyFS 的同步快路径，而非 socket 层：
+
+- Asyncify 重放从**栈底整帧重执行**，`LazyFileBackend` 的 `open()` /
+  `fetch_data()` 会在 state 2 (Rewinding) 再跑一遍；
+- 8b5cde5 加入的 `readCachedSync` 快路径对重放也生效：挂起读所需的 chunk
+  此时已在 `chunkCache` 里，快路径直接返回数据，于是重放**越过**记录帧继续
+  往下跑，后续 `dynCall` 拿到已失效的索引 → `null function`，或重放读到
+  尚未取回的字节 → 空的 `Skill.img` 字符串缓存。
+- d1dbf54 全禁快路径后，重放里那次非挂起读又必须 `handleSleep`，单 rewind
+  缓冲下变成从栈底无限重放（忙自旋冻死）。
+
+定稿修复（`src/client/LazyFS/`）：
+
+- `fetch_data`：state 2 且是本挂起点（`Module.LazyFS.pendingSyncRead` 同键）
+  → 走 `handleSleep`（重放到记录帧即返回）；state 2 的**其它**读 → 只走
+  `readCachedSync`，命中给数据、未命中 `replayFailures++` 后返回 0；快路径
+  仅用于 state 0/1。
+- `open()` 的 size 取回同理：重放的 `open` 只在 size 已缓存时同步返回，
+  绝不二次挂起。
+- `lazyfs_sync_cache.js` 的 `readCachedSync` 支持跨 chunk 拼接（大节点表常
+  跨 chunk；旧实现跨段恒返回 null 会把重放逼进 `handleSleep`）。
+- 移除 `warmupAfterPark`（在重放里追加异步请求只会喂给单缓冲）。
+
+取证：`Module.LazyFS.fetchTrace` 环缓冲显示 `eq:true`（同一挂起读）却命中
+`fast-hit`；修复后全部为 `replay-sleep`，随后读回到 `fast-hit`，
+`fails:0`，启动及技能名读取均通过（登录态直接调用 `SkillData::get(id)
+.get_name()` 探针，1100002/1200003/1300002/1001004/1101004 全部非空）。
+
+注意：socket 层的并发 park/wake 仍是单 rewind 缓冲下的独立风险，本文档上面
+的 runbook 继续有效；进图阶段的 Chromium/SwiftShader renderer+GPU
+`pthread_cond_wait` 互等是环境级死锁，与本修复无关。

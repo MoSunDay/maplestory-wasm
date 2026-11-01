@@ -22,10 +22,27 @@ namespace LazyFS
 				if (typeof Module.LazyFS !== 'undefined' && Module.LazyFS.files.has(path))
 				{
 					var fileEntry = Module.LazyFS.files.get(path);
-					// Fetch size if not already known
-					if (fileEntry.size === null)
+					// Asyncify replays the whole wasm stack from the bottom frame on
+					// wake-up, so this open() runs again. Only the read that actually
+					// suspended may go through handleSleep; every other re-executed
+					// open finds the size already cached and returns it synchronously
+					// (never both, or the replay would stop at the wrong frame).
+					var asyncifyState = (typeof Asyncify !== 'undefined') ? Asyncify.state : 0;
+					var sizeKey = 'size#' + path;
+					var replayingSuspendedSize =
+						asyncifyState === 2 && Module.LazyFS.pendingSyncRead === sizeKey;
+					if (asyncifyState === 2 && !replayingSuspendedSize && fileEntry.size === null)
 					{
-						return Asyncify.handleSleep(function(wakeUp) {
+						// The original size fetch failed; report it and let the
+						// caller retry in the Normal state instead of wedging the
+						// rewinder in a suspension that can never be replayed.
+						return 0;
+					}
+					if (fileEntry.size === null || replayingSuspendedSize)
+					{
+						var sizeWasRewinding = asyncifyState === 2;
+						Module.LazyFS.pendingSyncRead = sizeKey;
+						var sizeResult = Asyncify.handleSleep(function(wakeUp) {
 							Module.LazyFS.getFileSize(path).then(function(size) {
 								fileEntry.size = size;
 								wakeUp(size);
@@ -35,6 +52,11 @@ namespace LazyFS
 								wakeUp(0);
 							});
 						});
+						// A rewinding call runs its tail, so only clear our own tag.
+						if (sizeWasRewinding && Module.LazyFS.pendingSyncRead === sizeKey) {
+							Module.LazyFS.pendingSyncRead = null;
+						}
+						return sizeResult;
 					}
 					return fileEntry.size;
 				}
@@ -134,23 +156,45 @@ namespace LazyFS
 
 				// Sync fast-path: a fully resident range is copied into the wasm
 				// heap without suspending, so re-entrant reads can never collide
-				// inside Asyncify's single rewind buffer. Never take it while
-				// Asyncify is unwinding/rewinding: handleSleep suspensions replay
-				// this whole function on wake-up, so a fetch that missed on the
-				// first pass runs the EM_ASM again with the chunk now resident.
-				// Serving that replay hit would return before the recorded
-				// resume point, corrupt the rewind state machine and crash every
-				// later dynCall dispatch with "null function" (wasm OOB storms
-				// share the same failure shape). Only Normal-state executions may
-				// shortcut; replays fall through to handleSleep, which resumes
-				// with the recorded wakeUp value.
-				var asyncifyActive = typeof Asyncify !== 'undefined' && Asyncify.state;
-				var hit = (!asyncifyActive && Module.LazyFS.readCachedSync)
-					? Module.LazyFS.readCachedSync(path, offset, size) : null;
+				// inside Asyncify's single rewind buffer.
+				//
+				// A woken handleSleep replays the wasm stack from the bottom frame
+				// and reaches this block again (Asyncify state 2 = Rewinding):
+				// - The read that actually suspended (tagged in
+				//   pendingSyncRead) must replay through handleSleep so the rewind
+				//   stops here with the recorded wakeUp value. Serving it from the
+				//   fast path instead (its chunks are resident by then) would run
+				//   past the recorded resume point and crash later dynCall
+				//   dispatches with "null function".
+				// - Any other re-executed read finished earlier in this tick, so its
+				//   chunks are resident (chunkCache is append-only) and it MUST be
+				//   answered synchronously: suspending again in Rewinding state
+				//   restarts the replay from the bottom frame forever (busy-wedge).
+				var asyncifyState = (typeof Asyncify !== 'undefined') ? Asyncify.state : 0;
+				var pendingKey = path + '#' + offset + '#' + size;
+				var replayingSuspendedRead =
+					asyncifyState === 2 && Module.LazyFS.pendingSyncRead === pendingKey;
+				if (asyncifyState === 2 && !replayingSuspendedRead)
+				{
+					var replayed = Module.LazyFS.readCachedSync
+						? Module.LazyFS.readCachedSync(path, offset, size) : null;
+					if (replayed) { HEAPU8.set(replayed, bufferPtr); return 1; }
+					// No resident data means the original read failed too; report
+					// the same failure so the caller retries in Normal state.
+					Module.LazyFS.replayFailures = (Module.LazyFS.replayFailures || 0) + 1;
+					return 0;
+				}
+				var hit = asyncifyState === 2 ? null
+					: (Module.LazyFS.readCachedSync
+						? Module.LazyFS.readCachedSync(path, offset, size) : null);
 				if (hit) { HEAPU8.set(hit, bufferPtr); return 1; }
 
-				// Use Asyncify.handleSleep directly to avoid Promise wrapper issues
-				return Asyncify.handleSleep(function(wakeUp) {
+				// Use Asyncify.handleSleep directly to avoid Promise wrapper issues.
+				// Tag this read as the live suspension point; a rewinding replay
+				// clears the tag once it has resumed at the recorded frame.
+				var wasRewinding = asyncifyState === 2;
+				Module.LazyFS.pendingSyncRead = pendingKey;
+				var fetched = Asyncify.handleSleep(function(wakeUp) {
 					Module.LazyFS.readFileData(path, offset, size)
 						.then(function(data) {
 							if (data) {
@@ -182,6 +226,10 @@ namespace LazyFS
 							try { wakeUp(0); } catch(e) {} 
 						});
 				});
+				if (wasRewinding && Module.LazyFS.pendingSyncRead === pendingKey) {
+					Module.LazyFS.pendingSyncRead = null;
+				}
+				return fetched;
 			},
 			path_.c_str(),
 			(double)offset,
