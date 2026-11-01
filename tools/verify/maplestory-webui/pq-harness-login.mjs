@@ -47,8 +47,15 @@ async function typeAccount(driver, account) {
 
 async function typePassword(driver, password, clearFirst) {
   await driver.clickField(PASSWORD_AT[0], PASSWORD_AT[1]);
-  if (clearFirst) await clearFieldKeys(driver);
-  await driver.typeAscii(password);
+  if (clearFirst) {
+    // 无间隔的连发退格在繁忙标签页会被合并丢弃，反而放大输入噪声。
+    for (let i = 0; i < 24; i += 1) {
+      await driver.key('Backspace', 'Backspace', 8);
+      await sleep(15);
+    }
+  }
+  await driver.typeAscii(password, 80);
+  await sleep(400);   // 末尾键位落定后再交给调用方按 Enter，降低丢尾字符概率
 }
 
 // 返回 'ok' | 'retry'（可就地重试）| 'reload'（需要整页重载）。
@@ -67,9 +74,18 @@ export async function attemptLogin(driver, account, password, hadNotice = null) 
   const notice = await probe(driver, 'msui_login_notice_message');
   if (notice === 3 || notice === 20 || notice === 7) {
     // 3=密码错（键盘丢字符）20=账号错 7=已登录：都可以在本地处理后重试。
+    // 关公告的 Enter 同样可能被丢：不验证就返回会让 notice 残留盖住登录框，
+    // 后续所有点击（含 clickField）全部落在 notice 层上。
     console.log(`INFO  登录被拒（notice id=${notice}），关闭公告后重试`);
-    await driver.key('Enter', 'Enter', 13);
-    await sleep(800);
+    for (let closeTry = 0; closeTry < 3; closeTry += 1) {
+      await driver.key('Enter', 'Enter', 13);
+      await sleep(600);
+      if (await probe(driver, 'msui_login_notice_active') !== 1) break;
+    }
+    if (await probe(driver, 'msui_login_notice_active') === 1) {
+      console.log('INFO  公告未能关闭（Enter 被丢弃），转整页重载');
+      return 'reload';
+    }
     return 'retry';
   }
   if (notice >= 0) return 'reload';
@@ -85,7 +101,15 @@ export async function loginAndEnterGame(driver, { account, password, cardIndex, 
   for (let attempt = 0; ; attempt += 1) {
     if (!await waitFor(stateIs(uiState.login), 30))
       throw new Error('login UI did not activate');
-    const outcome = await attemptLogin(driver, account, password, hadNotice);
+    let outcome;
+    try {
+      outcome = await attemptLogin(driver, account, password, hadNotice);
+    } catch (error) {
+      // 焦点竞争/CDP 求值超时是瞬时错误：按 reload 路径整页重来，而不是炸穿外层。
+      if (!/never gained focus|command timed out/.test(error.message) || attempt >= 2) throw error;
+      console.log(`INFO  登录输入中断（${error.message.split('\n')[0]}），重载页面重试`);
+      outcome = 'reload';
+    }
     hadNotice = outcome === 'retry' ? true : null;
     if (outcome === 'ok') break;
     if (outcome === 'retry' && attempt < 5) continue;

@@ -309,6 +309,7 @@ namespace jrc
                 UIElement::KEYCONFIG,
                 UIElement::NPCTALK,
                 UIElement::SHOP,
+                UIElement::STORAGE,
                 UIElement::ITEMINVENTORY,
                 UIElement::EQUIPINVENTORY,
                 UIElement::SKILLBOOK,

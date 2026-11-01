@@ -77,7 +77,7 @@ namespace jrc
             if (is_equip)
             {
                 recv.skip(2); // upgrade slots + level
-                recv.skip(28); // stats
+                recv.skip(30); // stats (15 shorts: STR..Jump)
                 recv.read_string(); // owner
                 recv.skip(2); // flags
 
