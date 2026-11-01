@@ -59,6 +59,7 @@ const probe = (driver, name) =>
 const questlogActive = driver => probe(driver, 'msui_questlog_active');
 const questlogRows = driver => probe(driver, 'msui_questlog_rows');
 const questlogSelected = driver => probe(driver, 'msui_questlog_selected');
+const questlogForfeitArmed = driver => probe(driver, 'msui_questlog_forfeit_armed');
 
 // 列表行命中区：PosQUEST 默认 (150,120)（Configuration.h）+
 // LIST_OFFSET{14,70}（UIQuestLog.h）+ 行高 24（QuestLogModel.h）。
@@ -176,6 +177,12 @@ async function testQuestLog(driver) {
       report(true, `单行时首行已选中（selected=${initial}）`);
     }
     await settleShot(driver, 'questlog-selected');
+
+    // 放弃按钮探针：进行中 Tab 选中行后应可用（0=禁用/1=可用）。
+    const armed = await questlogForfeitArmed(driver);
+    report(armed === 1 || armed === 0,
+      `放弃按钮探针可达（armed=${armed}）`);
+    report(armed === 1, '选中进行中任务后放弃按钮可用');
 
     if (rows > 9) {
       // 滚轮用例：向列表中部发 wheel（deltaY<0 → offset+1）；无 offset

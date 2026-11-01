@@ -58,6 +58,10 @@ namespace jrc
         // helper).
         int16_t selected_id() const;
 
+        // Whether the give-up button is armed for the selected
+        // in-progress quest (probe helper).
+        bool forfeit_armed() const;
+
     protected:
         Button::State button_pressed(uint16_t id) override;
 
@@ -65,7 +69,8 @@ namespace jrc
         enum Buttons
         {
             BT_TAB0,
-            BT_TAB1
+            BT_TAB1,
+            BT_GIVEUP
         };
 
         static constexpr Point<int16_t> LIST_OFFSET = { 14, 70 };
@@ -74,6 +79,7 @@ namespace jrc
 
         void initialize_sprites();
         void initialize_tabs();
+        void initialize_giveup_button();
         void rebuild_rows(bool keep_selection);
         void refresh_info_texts();
         void change_filter(quest_log_model::Filter new_filter);

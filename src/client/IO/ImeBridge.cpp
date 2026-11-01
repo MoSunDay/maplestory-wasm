@@ -8,6 +8,7 @@
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
 #include "UITypes/UIStatusBar.h"
+#include "UITypes/Quest/UIQuestLog.h"
 #include "../Gameplay/Stage.h"
 #include "../Character/Inventory/InventoryType.h"
 #include "../Net/Login/CharlistTransition.h"
@@ -257,6 +258,14 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE int msui_questlog_active()
     {
         return jrc::UI::get().is_element_active(jrc::UIElement::QUESTLOG) ? 1 : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_questlog_forfeit_armed()
+    {
+        auto window = jrc::UI::get().get_element<jrc::UIQuestLog>();
+        return window && window->is_active() && window->forfeit_armed()
+            ? 1
+            : 0;
     }
 
     EMSCRIPTEN_KEEPALIVE int msui_progressbanner_active()

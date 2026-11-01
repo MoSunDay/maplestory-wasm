@@ -61,5 +61,12 @@ namespace jrc
                 ? nl::nx::ui["UIWindow2.img"]["Quest"]["list"]["completeCount"]
                 : nl::node();
         }
+
+        // Give-up button of the info pane. Both generations ship it
+        // under the info pane root with all four states.
+        inline nl::node giveup_src()
+        {
+            return info_src()["BtGiveup"];
+        }
     }
 }

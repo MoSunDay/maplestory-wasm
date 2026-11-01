@@ -18,9 +18,11 @@
 #include "UIQuestLog.h"
 
 #include "../../Components/TwoSpriteButton.h"
+#include "../../Components/MapleButton.h"
 #include "QuestLogNodes.h"
 
 #include "../../../Console.h"
+#include "../../../Net/Packets/QuestPackets.h"
 
 #include "nlnx/node.hpp"
 
@@ -41,6 +43,10 @@ namespace jrc
         constexpr Point<int16_t> INFO_CATEGORY_OFFSET = { 20, 68 };
         constexpr Point<int16_t> INFO_STATE_OFFSET = { 20, 90 };
         constexpr Point<int16_t> INFO_PARAGRAPH_OFFSET = { 20, 112 };
+
+        // Give-up button sits at the bottom-right of the info pane art.
+        constexpr int16_t GIVEUP_RIGHT_MARGIN = 16;
+        constexpr int16_t GIVEUP_BOTTOM_MARGIN = 12;
     }
 
     constexpr Point<int16_t> UIQuestLog::LIST_OFFSET;
@@ -57,6 +63,7 @@ namespace jrc
     {
         initialize_sprites();
         initialize_tabs();
+        initialize_giveup_button();
 
         // Cover one whole list row with a translucent band so the selected
         // quest is visibly highlighted (mirrors the storage cell overlay).
@@ -181,6 +188,22 @@ namespace jrc
                 ).get_dimensions().x() + TAB_GAP
             );
         }
+    }
+
+    void UIQuestLog::initialize_giveup_button()
+    {
+        // Anchored to the bottom-right of the info pane; the art differs
+        // per asset generation but always carries four states.
+        buttons[BT_GIVEUP] = std::make_unique<MapleButton>(
+            questlog_nodes::giveup_src(),
+            Point<int16_t>(
+                static_cast<int16_t>(
+                    info_x + info_width - GIVEUP_RIGHT_MARGIN),
+                static_cast<int16_t>(
+                    info_height - GIVEUP_BOTTOM_MARGIN - 17)
+            )
+        );
+        buttons[BT_GIVEUP]->set_state(Button::DISABLED);
     }
 
     void UIQuestLog::rebuild_rows(bool keep_selection)
@@ -319,6 +342,16 @@ namespace jrc
             selected_category.change_text("");
             selected_state.change_text("");
         }
+
+        // Arm the give-up button only for a selected in-progress quest;
+        // completed quests and empty selections stay disabled.
+        buttons[BT_GIVEUP]->set_state(
+            selected >= 0
+            && selected < static_cast<int16_t>(rows.size())
+            && rows[selected].completed_time == 0
+                ? Button::NORMAL
+                : Button::DISABLED
+        );
     }
 
     void UIQuestLog::change_filter(Filter new_filter)
@@ -521,6 +554,16 @@ namespace jrc
         case BT_TAB1:
             change_filter(Filter::COMPLETED);
             return Button::PRESSED;
+        case BT_GIVEUP:
+        {
+            const int16_t qid = selected_id();
+            if (qid >= 0 && rows[selected].completed_time == 0)
+            {
+                QuestForfeitPacket(qid).dispatch();
+                buttons[BT_GIVEUP]->set_state(Button::DISABLED);
+            }
+            return Button::PRESSED;
+        }
         default:
             return Button::PRESSED;
         }
@@ -536,5 +579,14 @@ namespace jrc
         return selected >= 0 && selected < static_cast<int16_t>(rows.size())
             ? rows[selected].id
             : -1;
+    }
+
+    bool UIQuestLog::forfeit_armed() const
+    {
+        auto button = buttons.find(BT_GIVEUP);
+        return button != buttons.end()
+            && button->second
+            && button->second->get_state() != Button::DISABLED
+            && selected_id() >= 0;
     }
 }
