@@ -130,8 +130,8 @@ namespace jrc
         int32_t get_visual_buff_source(Buffstat::Id stat) const override;
         /// Return the character's attacking speed.
         int8_t get_integer_attackspeed() const override;
-        /// Return the type of the real equipped weapon (ignores cash covers).
-        Weapon::Type get_weapontype() const override;
+        /// Return the id of the real equipped weapon (ignores cash covers).
+        int32_t get_weaponid() const override;
 
         /// Returns the current walking force, calculated from the total ES_SPEED stat.
         float get_walkforce() const;
@@ -180,10 +180,6 @@ namespace jrc
         Monsterbook& get_monsterbook();
 
     private:
-        // Cash covers are cosmetic; gameplay weapon data comes from the real
-        // EQUIPPED weapon, which never contains cash items.
-        int32_t get_weaponid() const;
-
         void update_cooldowns();
 
         CharStats stats;

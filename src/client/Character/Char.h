@@ -141,6 +141,9 @@ namespace jrc
         bool is_climbing() const;
         /// Return wether the character sprite uses stances for two-handed weapons.
         bool is_twohanded() const;
+        /// Return the id of the weapon driving attacks. The look may show a
+        /// cash cover with no attack info, so combat data must come from here.
+        virtual int32_t get_weaponid() const;
         /// Return the type of the currently equipped weapon.
         virtual Weapon::Type get_weapontype() const;
 

@@ -287,16 +287,15 @@ namespace jrc
         draw({ position, flipped }, interstance, interexpression, 0, 0);
     }
 
-    std::vector<Stance::Id> CharLook::prepare_attack_assets() const
+    std::vector<Stance::Id> CharLook::prepare_attack_assets(uint8_t attacktype) const
     {
         if (!body || !hair || !equips.has_weapon())
         {
             return {};
         }
 
-        const WeaponData& weapon = WeaponData::get(equips.get_weapon());
         std::vector<Stance::Id> attack_stances =
-            regular_attack::all_choices(weapon.get_attack());
+            regular_attack::all_choices(attacktype);
         for (Stance::Id attack_stance : attack_stances)
         {
             body->prepare(attack_stance);
@@ -532,15 +531,12 @@ namespace jrc
         }
     }
 
-    void CharLook::attack(bool degenerate)
+    void CharLook::attack(const WeaponData& weapon, bool degenerate)
     {
-        int32_t weapon_id = equips.get_weapon();
-        if (weapon_id <= 0)
+        if (!weapon)
         {
             return;
         }
-
-        const WeaponData& weapon = WeaponData::get(weapon_id);
 
         uint8_t attacktype = weapon.get_attack();
         if (attacktype == 9 && !degenerate)

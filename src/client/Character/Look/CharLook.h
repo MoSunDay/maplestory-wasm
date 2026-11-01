@@ -21,6 +21,7 @@
 #include "Hair.h"
 #include "Face.h"
 #include "CharEquips.h"
+#include "../../Data/WeaponData.h"
 
 #include "../../Net/Login.h"
 #include "../../Template/Interpolated.h"
@@ -46,7 +47,7 @@ namespace jrc
         void draw(const DrawArgument& args, float alpha) const;
         void draw(Point<int16_t> pos, bool flip,
             Stance::Id stance, Expression::Id expression) const;
-        std::vector<Stance::Id> prepare_attack_assets() const;
+        std::vector<Stance::Id> prepare_attack_assets(uint8_t attacktype) const;
         void prepare_movement_assets() const;
         bool update(uint16_t timestep);
 
@@ -57,7 +58,9 @@ namespace jrc
         void add_equip(int32_t equipid, Texture::LoadMode load_mode);
         void remove_equip(Equipslot::Id slot);
 
-        void attack(bool degenerate);
+        // The weapon comes from the char's real weapon: a cash cover in the
+        // weapon slot carries no attack info, so it cannot drive the stance.
+        void attack(const WeaponData& weapon, bool degenerate);
         void attack(Stance::Id stance);
         void set_stance(Stance::Id stance);
         void set_expression(Expression::Id expression);

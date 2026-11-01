@@ -201,14 +201,15 @@ namespace jrc
         regular_afterimages.clear();
         prepared_afterimage_weapon_id = 0;
 
-        std::vector<Stance::Id> attack_stances = look.prepare_attack_assets();
-        int32_t weapon_id = look.get_equips().get_weapon();
+        int32_t weapon_id = get_weaponid();
         if (weapon_id <= 0)
         {
             return;
         }
 
         const WeaponData& weapon = WeaponData::get(weapon_id);
+        std::vector<Stance::Id> attack_stances =
+            look.prepare_attack_assets(weapon.get_attack());
         int16_t weapon_level = weapon.get_equipdata().get_reqstat(Maplestat::LEVEL);
         for (Stance::Id attack_stance : attack_stances)
         {
@@ -366,7 +367,7 @@ namespace jrc
 
     void Char::attack(bool degenerate)
     {
-        look.attack(degenerate);
+        look.attack(WeaponData::get(get_weaponid()), degenerate);
 
         attacking = true;
         look.set_alerted(5000);
@@ -374,7 +375,7 @@ namespace jrc
 
     void Char::set_afterimage(int32_t skill_id)
     {
-        int32_t weapon_id = look.get_equips().get_weapon();
+        int32_t weapon_id = get_weaponid();
         if (weapon_id <= 0)
             return;
 
@@ -494,9 +495,14 @@ namespace jrc
         return look.get_equips().is_twohanded();
     }
 
+    int32_t Char::get_weaponid() const
+    {
+        return look.get_equips().get_weapon();
+    }
+
     Weapon::Type Char::get_weapontype() const
     {
-        int32_t weapon_id = look.get_equips().get_weapon();
+        int32_t weapon_id = get_weaponid();
         if (weapon_id <= 0)
             return Weapon::NONE;
 
