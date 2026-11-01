@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Keyboard.h"
+#include "DefaultKeymap.h"
 
 #include <GLFW/glfw3.h>
 
@@ -58,8 +59,14 @@ namespace jrc
         keymap[GLFW_KEY_DOWN]  = { KeyType::ACTION, KeyAction::DOWN  };
         keymap[GLFW_KEY_ENTER] = { KeyType::ACTION, KeyAction::RETURN };
         keymap[GLFW_KEY_KP_ENTER] = { KeyType::ACTION, KeyAction::RETURN };
-        // Fallback defaults until keymap packet arrives.
-        keymap[GLFW_KEY_Z]     = { KeyType::ACTION, KeyAction::PICKUP };
+
+        // Full v83 defaults, overwritten entry-by-entry by the keymap packet.
+        for (const auto& kv : default_basic_mappings())
+        {
+            assign(static_cast<uint8_t>(kv.first),
+                   static_cast<uint8_t>(kv.second.type),
+                   kv.second.action);
+        }
 
         textactions[GLFW_KEY_BACKSPACE] = KeyAction::BACK;
         textactions[GLFW_KEY_ENTER]     = KeyAction::RETURN;

@@ -226,6 +226,12 @@ namespace jrc
     {
         if (!connected)
         {
+            static bool warned_disconnected = false;
+            if (!warned_disconnected)
+            {
+                warned_disconnected = true;
+                Console::get().print("Session: dropping outbound packet, not connected");
+            }
             return;
         }
 
@@ -233,8 +239,17 @@ namespace jrc
         cryptography.create_header(header, packet_length);
         cryptography.encrypt(packet_bytes, packet_length);
 
-        socket.dispatch(header, HEADER_LENGTH);
-        socket.dispatch(packet_bytes, packet_length);
+        bool header_ok = socket.dispatch(header, HEADER_LENGTH);
+        bool body_ok = socket.dispatch(packet_bytes, packet_length);
+        if (!header_ok || !body_ok)
+        {
+            static bool warned_write = false;
+            if (!warned_write)
+            {
+                warned_write = true;
+                Console::get().print("Session: socket write failed, packet dropped");
+            }
+        }
     }
 
     void Session::read()
