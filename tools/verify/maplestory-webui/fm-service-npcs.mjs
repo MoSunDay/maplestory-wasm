@@ -4,8 +4,8 @@
 //     第一分类「维多利亚岛及周边」→ 第一目的地 100000000（射手村）→
 //     cm.warp 落图。菜单选项用默认选中项 0，通过点击首行选项直接确认。
 //   * 9201116「Kopee Relicseeker」x=600：Space 开商店（服务端 shops.shopid=1339），
-//     断言 msshop_buy_item 至少 2 行命中本店物品，并买下 2030004/2030000 之一
-//     （价格 500/400 mesos，库存数量 +1）。
+//     断言 msshop_buy_item 至少 2 行命中本店物品，并买下宠物饲料 2120000/回城石 2030000
+//     之一（价格 200/400 mesos，库存数量 +1）。
 //
 // 客户端不读 Map.nx 的 life，NPC 全部由服务端 SPAWN_NPC 包生成；两条 life
 // 位于 wz/Map.wz/Map/Map9/910000000.img.xml 的 index 4/5，商店数据位于
@@ -57,7 +57,8 @@ const SHOP_ITEMS = new Set([
   2070000, 2070001, 2070002, 2070003, 2070004, 2070005, 2070006, 2070007,
   2070008, 2070009, 2070010, 2070011, 2070012, 2070013, 2070016, 2070018,
   2330000, 2330001, 2330002, 2330003, 2330004, 2330005, 2331000, 2332000,
-  4006000, 4006001, 2000004, 2000005, 2020014, 2020015, 2030000, 2030004
+  4006000, 4006001, 2000004, 2000005, 2020014, 2020015, 2030000, 2120000,
+  2001001, 2001002
 ]);
 
 const uiState = Object.freeze({ login: 1, world: 2, characters: 3, game: 5 });
@@ -228,9 +229,9 @@ async function testShop(driver) {
   report(ours.length >= 2,
     `科皮: 商店含稀有物品（可见行 ${JSON.stringify(rows)}）`);
 
-  const buyRow = rows.findIndex(id => id === 2030004 || id === 2030000);
+  const buyRow = rows.findIndex(id => id === 2120000 || id === 2030000);
   if (buyRow < 0) {
-    console.log('INFO  科皮: 可见行无 2030004/2030000，跳过购买断言');
+    console.log('INFO  科皮: 可见行无 2120000/2030000，跳过购买断言');
   } else {
     const itemid = rows[buyRow];
     const x = await ccall1(driver, 'msshop_buy_x', buyRow);

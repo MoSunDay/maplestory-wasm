@@ -36,6 +36,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **[自由市场地图名恢复](changelog/2026-10-26/fm-map-name-restore.md)**: 910000000 街道名/地图名恢复原版「自由市场/自由市场入口」，注入管线加覆盖防回归，小地图实显取证通过
 - **[自由市场玩法向导 NPC](changelog/2026-10-25/fm-gameplay-guide-npcs.md)**: 910000000 内的 PQ 招募/BOSS 入口向导（9010000/9010005），一键传送到 13 个组队任务招募点与 12 个 BOSS 入口，危险地图先二次确认
 - **[自由市场科皮药水价格](changelog/2026-10-25/fm-kopee-potion-prices.md)**: 超级药水 5 万、特殊药水 2 万（shopid 1339 shopitems，重启生效）
+- **[自由市场科皮商店换货](changelog/2026-11-01/fm-kopee-shop-pet-food.md)**: 下架射手村回城券（2030004），上架宠物饲料 2120000（200 金）、棒棒冰 2001001（2300 金，HP+2000）与红豆刨冰 2001002（4000 金，MP+2000），货架 32→34 项（shopid 1339 shopitems，改后需重启服务端）
 - **[场景机关/进度横幅/BGM 切换](changelog/2026-10-25/field-obstacles-progress-banner.md)**: 服务端可开/关/批量/重置具名地图机关对象（OrbisPQ 陷阱、CWKPQ 石阵等），下发 PQ 进度横幅并运行时切换 BGM
 - **反应器**: 可交互物体（如采集物）
 - **掉落物**: 物品/meso 的拾取
