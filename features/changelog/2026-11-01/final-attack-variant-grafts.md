@@ -49,6 +49,31 @@ FA）数据缺口，客户端与服务端都会受影响：
   9 个 level 子节点整体替换（3 个 30 级），104 张未触及 image 的结构
   摘要逐字节不变。
 
+### 服务端数据（`link_repos/MapleStory-Server/wz/Skill.wz/*.img.xml`）
+
+服务端不读 NX，只读自己 checkout 里的 `Skill.wz` XML（容器 `ms-game-server`
+以 `-Dwzpath=wz/`、WorkingDir `/srv` 加载），且 `wz/Skill.wz` 从未同步过
+本次 NX 变更，因此新增独立补丁工具把同一份契约搬到 XML 上：
+
+- `tools/nx/fa_variants_xml_common.py`：NX 侧读取/校验 + XML 侧拼接。
+  graft 的 30 级 level 子树由 `1100002`/`1200003`/`1300002` 逐级渲染后
+  **按数值序**（1,2,…,30）插回——服务端 `Skill.getEffect(level)` 取
+  `effects.get(level-1)`，是位置索引，字节序（1,10,11,…）会让 2 级读到
+  10 级数据；XML 转义（`&`/`<`/`>` 与属性引号）与 int 子节点计数同步重建。
+- `tools/nx/fa_variants_xml_verify.py`：契约校验（10 个技能 30 级、
+  每级 2 段 8 只、graft 与 NX 逐级一致且与原生兄弟相等、lv1 2%/105% →
+  lv30 60%/350%、lv30 `lt`/`rb`、两张触发表）。
+- `tools/nx/patch_final_attack_variants_xml.py`：CLI，`--dry-run` 预览、
+  `--check` 只校验待办（exit 0 表示 XML 已是目标态）、默认落地；
+  幂等（无编辑即 noop，不重写文件、不覆盖备份），一次备份
+  `<name>.img.xml.pre-fa-variants-backup`。
+- 实跑 8 个文件（字节，前 → 后）：`110.img.xml` 42674→49220、
+  `120.img.xml` 43894→50439、`130.img.xml` 46875→53421、
+  `310.img.xml` 61834→63844、`320.img.xml` 36696→38671、
+  `1100.img.xml` 50441→50683、`1110.img.xml` 46526→48536、
+  `1310.img.xml` 42270→44280；二次运行 9 项全 noop（size/inode/mtime
+  不变），`--check` exit 0 且 `pending_edits=0`。
+
 ### 验证工具
 
 - `tools/verify/final-attack-combo-nx.cpp`：把原来「三个变体必定不存在」
@@ -72,9 +97,28 @@ FA）数据缺口，客户端与服务端都会受影响：
 - 回归（同一归档）：`skill-2023-port-nx`（35）、`second-job-attack-nx`（228）、
   `attack-gap-skills-nx`（28）、`wide-attack-nx`（214）、`magic-damage-nx`（29）、
   `job-damage-settlement-nx`（586）、`attack-effect-nx` 全部 PASSED。
+- 服务端 XML（独立验证器用 `ElementTree` 解析 + `difflib` 对比备份）：
+  8 个文件均可解析；10 个 FA 技能各 30 级且每级 `attackCount=2`/
+  `mobCount=8`；3 个 graft 与 NX dump 逐级 int 完全一致（lv1 `2`/`105`
+  → lv30 `60`/`350`，lv30 `lt=(-300,-300)`/`rb=(300,300)`）；两个
+  `finalAttack` 表均为 `11101002: {0:30, 1:40}`；相对备份**只有插入**，
+  `non-insert opcodes=none`（未改动任何既有字节）。
+- `patch_final_attack_variants_xml.py --check` exit 0 / `pending_edits=0`。
+- 重启 `scripts/game_server_restart.sh` 后 `Skills: Loaded in 0.331 seconds`，
+  5 个世界 + 8484 全部监听，日志无 XML/`Skill.wz` 解析异常。
+- 运行时探针（直接调服务端 `SkillFactory`/`Skill.getEffect`，`-Dwzpath=wz/`）：
+  10 个技能 `maxLevel=30`，lv1/lv2/lv15/lv29/lv30 的 `getAttackCount()=2`、
+  `getMobCount()=8`，`getDamage()` 依次 105/110/175/245/350（`11101002`、
+  `13101002` 同样 2 段 8 只，lv30 伤害沿用自身 250）——位置索引未错级。
 
 ## 备注
 
 - graft 的图标位图是 v83 原始子树，只带 `origin`/`z`，没有 079MAX4 给
   原生位图加的 `_hash` 子节点；客户端与 nlnx 都不读 `_hash`，不影响加载。
 - graft 技能没有 `effect` 子节点（v83 亦无），客户端施放特效按可选处理。
+- 服务端 XML 只在 `link_repos/MapleStory-Server/wz/Skill.wz` 内插入子树与
+  int 节点，未改动图标等其他资源；8 份 `<img>.xml.pre-fa-variants-backup`
+  保留改前原文，回滚即 `mv` 覆盖，重跑补丁工具可重新生成。
+- 服务端 graft 的 30 级数据由 NX 侧原生兄弟技能渲染而来（而非从别处
+  拷贝 XML），因此 XML 与客户端读到的数值天然同源；`--check` 可作为
+  「服务端是否已同步 NX 契约」的一键断言，适合常驻 CI 或发版前自检。
