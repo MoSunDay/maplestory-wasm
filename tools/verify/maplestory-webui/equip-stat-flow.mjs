@@ -69,22 +69,22 @@ try {
   if (!ok) exitCode = 1;
 
   // 真实 wasm 二进制上的公式对拍:
-  //   base = (mobatk - 0.7*DEF) / 2   (v83 防御系数 + 项目 PAD/2 基线)
+  //   base = mobatk - 0.7*DEF   (v83 防御系数抵扣全额怪攻, 已移除 LibreMaple 的 /2 砍半基线)
   //   dmg  = base - trunc(base * reducedamage), Achilles Lv30 x=800 => 减伤 20%。
-  // WDEF=198: (1000-138)/2=431 => 345; 裸装(DEF~4) 得 (1000-2)/2=499 => 399,
-  // 345 vs 399 即防御可见贡献。旧公式 mobatk/2+mobatk/DEF 得 404 且圣甲术几乎不改数字;
-  // 上一版 mobatk/2-DEF 的 1:1 抵扣会把 PAD<=2xWDEF 的怪全部打成恒 1 伤害。
+  // WDEF=198: 1000-138=862 => 690; 裸装(DEF~4) 得 1000-2=998 => 799,
+  // 690 vs 799 即防御可见贡献。/2 旧基线得 345/367 且过半怪物恒打 1;
+  // 更旧公式 mobatk/2+mobatk/DEF 得 404 且圣甲术几乎不改数字。
   const pdmg = await ccall2('msstat_damage', 1000, 0);
   const mdmg = await ccall2('msstat_damage', 1000, 1);
-  // C++ 侧运算顺序: max(1, (mobatk - def*7/10) / 2) - trunc(base * reducedamage)。
+  // C++ 侧运算顺序: max(1, mobatk - def*7/10) - trunc(base * reducedamage)。
   const dmg = (def) => {
-    const base = Math.max(1, Math.floor((1000 - Math.floor((def * 7) / 10)) / 2));
+    const base = Math.max(1, 1000 - Math.floor((def * 7) / 10));
     return base - Math.trunc(base * 0.2);
   };
   const expectP = dmg(wdef);
   const expectM = dmg(mdef);
   console.log(`damage probes: phys=${pdmg} (expect ${expectP}) magic=${mdmg} (expect ${expectM})`);
-  const dmgOk = pdmg === expectP && mdmg === expectM && pdmg < 600 && mdmg < 600;
+  const dmgOk = pdmg === expectP && mdmg === expectM && pdmg < 1000 && mdmg < 1000;
   console.log(dmgOk
     ? 'PASS 防御参与受击伤害计算, Achilles 减伤为 20% (wasm 运行时)'
     : 'FAIL 受击伤害未反映防御值或减伤比例错误');

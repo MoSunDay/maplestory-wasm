@@ -230,13 +230,12 @@ namespace jrc
     int32_t CharStats::calculate_damage(int32_t mobatk, bool magic) const
     {
         const Equipstat::Id defense_stat = magic ? Equipstat::MDEF : Equipstat::WDEF;
-        // 受击公式: 防御按 v83 复原系数 0.7 抵扣全额怪攻, 再沿用项目 PAD/2 基线。
-        // 旧占位公式 mobatk/2 + mobatk/defense 中防御经整除只贡献 0~5 点,
-        // 圣甲术 +40 WDEF 几乎无效, 而怪攻在 [0.8,1.0]xPAD 随机, 施放后受击
-        // 数字反而常见更高; 若直接 1:1 抵扣 PAD/2, 则 PAD<=2xWDEF 的怪恒打 1。
+        // 受击公式: 防御按 v83 系数 0.7 抵扣全额怪攻 (mobatk 已是 [0.8,1.0]xPAD
+        // 随机值)。LibreMaple 基线残留的 /2 会把全部受击再砍半, 与抵扣叠加后
+        // 过半怪物 (706/1320) 对成装角色恒打 1, 受击量级明显偏低, 故移除。
         const int32_t defense = std::max<int32_t>(1, get_total(defense_stat));
         const int32_t reduced_attack = std::max<int32_t>(1,
-            (mobatk - defense * 7 / 10) / 2);
+            mobatk - defense * 7 / 10);
         return std::max<int32_t>(1,
             reduced_attack - static_cast<int32_t>(reduced_attack * reducedamage));
     }

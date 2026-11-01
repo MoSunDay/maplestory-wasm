@@ -247,8 +247,8 @@ int main()
 
     jrc::CharStats shielded = armored;
     shielded.set_reducedamage(jrc::achilles_reduction(800));
-    // WDEF=50: v83 系数 0.7 抵扣全额怪攻后 base = max(1, (1000-35)/2) = 482。
-    const int32_t shield_base = (1000 - 50 * 7 / 10) / 2;
+    // WDEF=50: v83 系数 0.7 抵扣全额怪攻后 base = max(1, 1000-35) = 965。
+    const int32_t shield_base = 1000 - 50 * 7 / 10;
     std::cout << "achilles flow: damage="
               << shielded.calculate_damage(1000)
               << " (base " << shield_base << " -20%)\n";
