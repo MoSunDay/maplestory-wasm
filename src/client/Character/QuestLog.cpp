@@ -125,6 +125,9 @@ namespace jrc
         {
             last_started = 0;
         }
+        // Remember the info number so update_data can drop the server's
+        // trailing info echo instead of resurrecting it as a row.
+        forfeited_info_number = quest_info_number(qid);
         ++rev;
     }
 
@@ -168,6 +171,15 @@ namespace jrc
                 ++rev;
                 return;
             }
+        }
+
+        // Trailing info echo of a forfeit/expire removal. The legitimate
+        // re-accept path is already handled by the loop above, so this
+        // can only be the orphan echo: drop it.
+        if (forfeited_info_number != 0 && qid == forfeited_info_number)
+        {
+            forfeited_info_number = 0;
+            return;
         }
 
         started[qid] = qdata;

@@ -65,4 +65,7 @@ namespace jrc::quest_log_model
     constexpr size_t ROWS_PER_PAGE = 9;
     constexpr int16_t ROW_HEIGHT = 24;
     constexpr int16_t PARAGRAPH_GAP = 6;
+    // Info pane story block bottom inset; shared by refresh assembly
+    // and the draw-side line breaking.
+    constexpr int16_t PARAGRAPH_BOTTOM_INSET = 10;
 }

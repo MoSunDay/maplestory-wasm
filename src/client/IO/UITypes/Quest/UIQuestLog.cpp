@@ -303,8 +303,8 @@ namespace jrc
             // is replaced by an ellipsis row that always draws inside
             // the pane (it takes or displaces the first slot that did
             // not fit).
-            const int16_t pane_bottom =
-                static_cast<int16_t>(info_height - 10);
+            const int16_t pane_bottom = static_cast<int16_t>(
+                info_height - quest_log_model::PARAGRAPH_BOTTOM_INSET);
             const uint16_t wrap_width = static_cast<uint16_t>(
                 std::max<int16_t>(info_width - 40, 100));
 
@@ -464,14 +464,15 @@ namespace jrc
         {
             const int16_t line_height = paragraph.height();
             if (paragraph_position.y() + line_height
-                > info_position.y() + info_height - 10)
+                > info_position.y() + info_height
+                    - quest_log_model::PARAGRAPH_BOTTOM_INSET)
             {
                 // Pane bottom reached; the remaining story stays clipped.
                 break;
             }
             paragraph.draw(paragraph_position);
-            paragraph_position.shift_y(
-                static_cast<int16_t>(line_height + 6));
+            paragraph_position.shift_y(static_cast<int16_t>(
+                line_height + quest_log_model::PARAGRAPH_GAP));
         }
 
         draw_buttons(alpha);

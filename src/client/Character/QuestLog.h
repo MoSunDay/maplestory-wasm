@@ -71,6 +71,12 @@ namespace jrc
         // qid of the most recent add_started; only meaningful within one
         // setfield parse, where it pairs an info entry with its parent.
         int16_t last_started = 0;
+        // Info number of the most recently forfeited quest. The linked
+        // server trails a forfeit/expire removal with one info update
+        // keyed by exactly this id (NOT_STARTED branch of updateQuest);
+        // by the time it arrives every bucket that could own it is gone,
+        // so the update_data fallback must not resurrect it as a row.
+        int16_t forfeited_info_number = 0;
     };
 }
 

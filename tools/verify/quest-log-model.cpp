@@ -230,6 +230,21 @@ int main(int argc, char** argv)
     check(wire.is_started(31999),
         "update_data(unknown) still starts a fresh entry");
 
+    // Forfeit removal followed by the server's trailing info echo
+    // (keyed by the forfeited quest's info number) must not resurrect
+    // a ghost started row.
+    wire.forfeit(10015);
+    wire.update_data(10024, "x");
+    check(!wire.is_started(10024) && wire.list_in_progress().empty(),
+        "trailing forfeit info echo does not resurrect a ghost row");
+    // Re-accept still works: fresh parent start, then the next info
+    // update folds onto it through the info-number lookup.
+    wire.update_data(10015, "");
+    wire.update_data(10024, "1/1");
+    check(wire.list_in_progress().count(10015) == 1
+        && wire.list_in_progress().at(10015).first == 10024,
+        "re-accept after forfeit still pairs parent and info");
+
     // A quest without an info child stays a plain started entry.
     Questlog plain;
     plain.add_questlog_entry(20000, "0");
