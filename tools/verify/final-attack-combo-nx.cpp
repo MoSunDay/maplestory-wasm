@@ -4,8 +4,9 @@
 //    six warrior FA variants, so the client can map primary skill + learned
 //    book + weapon family to a follow-up attack skill id.
 //  - The FA skill nodes that exist in this dataset (1100002, 1200003,
-//    1300002) must carry prop/damage per level with attackCount/mobCount
-//    only on the max level, matching SkillData's default of 1 hit/1 mob.
+//    1300002) must carry prop/damage per level with attackCount=2 and
+//    mobCount=8 on EVERY level (patch_final_attack_counts_nx.py), so the
+//    follow-up hits the full 2-mob spread before max level too.
 //    The three absent variants (1100003, 1200002, 1300003) must stay absent
 //    so find_skill() filters them out instead of sending empty skills.
 //  - Combo Attack (1111002) and Advanced Combo (1120003) must expose their
@@ -137,8 +138,9 @@ int main(int argc, char** argv)
             label + "level 1 prop is 2%");
         check(is_int(lv1["damage"]) && lv1["damage"].get_integer() > 100,
             label + "level 1 damage above 100%");
-        check(!is_int(lv1["attackCount"]) && !is_int(lv1["mobCount"]),
-            label + "level 1 relies on default 1 hit / 1 mob");
+        check(is_int(lv1["attackCount"]) && lv1["attackCount"].get_integer() == 2
+                && is_int(lv1["mobCount"]) && lv1["mobCount"].get_integer() == 8,
+            label + "level 1 grants 2 hits on 8 mobs");
 
         check(is_int(lv30["prop"]) && lv30["prop"].get_integer() == 60,
             label + "level 30 prop is 60%");
