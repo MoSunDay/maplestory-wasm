@@ -12,6 +12,13 @@
 // sql/custom_fm_service_npcs.sql。对话选项是真实鼠标点击：UINpcTalk 的
 // SELECTION 模式默认 selected=0，点中首行会发送 selection(type, 首项 id)。
 //
+// testWarp 的目的地由 FM_SERVICE_DEST 选择：henesys（默认，首项 射手村
+// 100000000，点首行选项直接确认）或 ant-park（第 7 项 蚂蚁广场 105070001）。
+// 维多利亚子菜单共 12 项（index 11 为「返回主菜单」），按钮 NEXT/PREV 只循环
+// 移动 selected 不发包，OK 才发送 selections[selected]；从 selected=0 出发
+// ±6 ≡ 6 (mod 12)，NEXT×6 与 PREV×6 同落 index 6，故实测第 7 项时不依赖
+// 按钮方向（按钮几何经 msnpctalk_button_field/element_field 探针直读）。
+//
 // 前置（操作者执行，凭据不入代码仓库）：
 //   update accounts set loggedin=0 where name='test2';
 //   update characters set map=910000000, spawnpoint=0 where id=219;
@@ -21,6 +28,7 @@
 //   FM_SERVICE_ACCOUNT=test2 FM_SERVICE_PASSWORD=test2 \
 //   FM_SERVICE_CARD=0 CHROME_BIN=/usr/bin/chromium-browser \
 //   node tools/verify/maplestory-webui/fm-service-npcs.mjs
+//   # 实测蚂蚁广场：上面再追加 FM_SERVICE_DEST=ant-park
 
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
@@ -32,10 +40,19 @@ const account = process.env.FM_SERVICE_ACCOUNT || 'test2';
 const password = process.env.FM_SERVICE_PASSWORD || 'test2';
 const cardIndex = Number(process.env.FM_SERVICE_CARD ?? 0);
 
+// testWarp 目的地配置：optionIndex 是维多利亚子菜单的选项序号（0 起）。
+const warpDestName = process.env.FM_SERVICE_DEST || 'henesys';
+const WARP_DESTS = Object.freeze({
+  henesys: { mapId: 100000000, label: '射手村', optionIndex: 0, shot: 'fm-service-henesys' },
+  'ant-park': { mapId: 105070001, label: '蚂蚁广场', optionIndex: 6, shot: 'fm-service-ant-park' }
+});
+const warpDest = WARP_DESTS[warpDestName];
+if (!warpDest)
+  throw new Error(`FM_SERVICE_DEST 未知目的地 ${JSON.stringify(warpDestName)}，可选：${Object.keys(WARP_DESTS).join(' / ')}`);
+
 const HUB = 910000000;
 const PERRY_X = 300;
 const SHOP_X = 600;
-const HENESYS = 100000000;
 const SHOP_ITEMS = new Set([
   2070000, 2070001, 2070002, 2070003, 2070004, 2070005, 2070006, 2070007,
   2070008, 2070009, 2070010, 2070011, 2070012, 2070013, 2070016, 2070018,
@@ -237,6 +254,65 @@ async function testShop(driver) {
   await closeDialogue(driver, '科皮');
 }
 
+// UINpcTalk 按钮探针（仿 pq-harness-dialog.mjs）：msnpctalk_element_field(0/1)
+// 给对话框原点，msnpctalk_button_field(which, field) 给按钮相对矩形，
+// field: 0=x 1=y 2=w 3=h 4=active；which: 0=YES 1=NO 2=END 3=OK 4/5=循环
+// 按钮（NEXT/PREV）。探针失败/元素未激活时各字段拿不到有效数。
+async function dialogButtonGeometry(driver, which) {
+  const cc = (fn, ...args) => driver.evaluate(
+    `Module.ccall('${fn}','number',[${args.map(() => "'number'").join(',')}],[${args.join(',')}])`);
+  try {
+    return {
+      originX: Number(await cc('msnpctalk_element_field', 0)),
+      originY: Number(await cc('msnpctalk_element_field', 1)),
+      x: Number(await cc('msnpctalk_button_field', which, 0)),
+      y: Number(await cc('msnpctalk_button_field', which, 1)),
+      w: Number(await cc('msnpctalk_button_field', which, 2)),
+      h: Number(await cc('msnpctalk_button_field', which, 3)),
+      active: Number(await cc('msnpctalk_button_field', which, 4))
+    };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+const dialogButtonUsable = g => !g.error &&
+  [g.originX, g.originY, g.x, g.y, g.w, g.h, g.active].every(v => v > -9000) &&
+  g.active === 1 && g.w > 0 && g.h > 0;
+const dialogButtonCenter = g => ({
+  x: g.originX + g.x + (g.w >> 1), y: g.originY + g.y + (g.h >> 1) });
+async function probeDialogButton(driver, which) {
+  const g = await dialogButtonGeometry(driver, which);
+  return dialogButtonUsable(g) ? dialogButtonCenter(g) : null;
+}
+// 循环按钮不区分 NEXT/PREV（±6 mod 12 同位）：先探 which=4，无效再探 5。
+async function pickCycleButton(driver) {
+  const probes = {};
+  for (const which of [4, 5]) {
+    probes[which] = await dialogButtonGeometry(driver, which);
+    if (dialogButtonUsable(probes[which]))
+      return { which, center: dialogButtonCenter(probes[which]) };
+  }
+  throw new Error(`佩里: 未探到循环按钮 NEXT/PREV（probe=${JSON.stringify(probes)}）`);
+}
+
+// 子菜单非首项确认：SELECTION 点选项行会立即发包，故改用按钮路径——
+// 循环 optionIndex 次移动 selected，再点 OK 提交 selections[selected]。
+async function confirmByButtons(driver, optionIndex, label) {
+  const cycle = await pickCycleButton(driver);
+  if (await probe(driver, 'msnpc_active') !== 1)
+    throw new Error('佩里: 子菜单对话已关闭，无法循环选项');
+  for (let i = 0; i < optionIndex; i += 1) {
+    await driver.click(cycle.center.x, cycle.center.y);
+    await sleep(250);
+    if (await probe(driver, 'msnpc_active') !== 1)
+      throw new Error(`佩里: 第 ${i + 1}/${optionIndex} 次循环后对话已关闭`);
+  }
+  const ok = await probeDialogButton(driver, 3);
+  if (!ok) throw new Error('佩里: 未探到 OK 按钮（which=3）');
+  await driver.click(ok.x, ok.y);
+  console.log(`INFO  佩里: 循环 ${optionIndex} 次选中「${label}」，已点 OK`);
+}
+
 async function testWarp(driver) {
   await openNpc(driver, PERRY_X, '佩里 9110000');
   const main = await promptText(driver);
@@ -244,12 +320,17 @@ async function testWarp(driver) {
   const category = await clickFirstOption(driver);
   report(category.active && category.after.includes('维多利亚'),
     '佩里: 再次进入维多利亚分类');
-  const destination = await clickFirstOption(driver);
-  report(!destination.active, '佩里: 选择射手村后对话关闭');
-  const warped = await waitFor(
-    async () => await probe(driver, 'msmap_id') === HENESYS, 20);
-  report(warped, `佩里: 传送到 100000000（实测 ${await probe(driver, 'msmap_id')}）`);
-  if (warped) await settleShot(driver, 'fm-service-henesys');
+  if (warpDest.optionIndex === 0) {
+    const destination = await clickFirstOption(driver);
+    report(!destination.active, '佩里: 选择射手村后对话关闭');
+  } else {
+    await confirmByButtons(driver, warpDest.optionIndex, warpDest.label);
+  }
+  const warped = await waitFor(async () =>
+    await probe(driver, 'msnpc_active') === 0 &&
+    await probe(driver, 'msmap_id') === warpDest.mapId, 20);
+  report(warped, `佩里: 传送到 ${warpDest.mapId} ${warpDest.label}（实测 ${await probe(driver, 'msmap_id')}）`);
+  if (warped) await settleShot(driver, warpDest.shot);
 }
 
 async function main() {
