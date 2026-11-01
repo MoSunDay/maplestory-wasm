@@ -171,6 +171,32 @@ int main(int argc, char** argv)
     check(wire.list_in_progress().at(10015).second == "5/10"
         && !wire.is_started(10015),
         "update_data(parentId) refreshes the in_progress bucket");
+
+    // Row model carries progress and completion metadata for the panes.
+    // Checked while `wire` still holds just the folded 10015 row, before
+    // the fresh 31999 entry widens the list below.
+    const std::vector<QuestRow> wire_rows =
+        jrc::quest_log_model::collect_rows(wire, Filter::IN_PROGRESS);
+    check(wire_rows.size() == 1 && wire_rows[0].progress == "5/10",
+        "collect_rows exposes the folded progress string");
+
+    Questlog done_log;
+    done_log.add_completed(20010, 116444736000000000LL + 1760000000LL * 10000000LL);
+    const std::vector<QuestRow> done_rows =
+        jrc::quest_log_model::collect_rows(done_log, Filter::COMPLETED);
+    check(done_rows.size() == 1 && done_rows[0].completed_time > 0,
+        "collect_rows exposes the completion time");
+
+    check(jrc::quest_log_model::format_completed_time(0) == "?",
+        "format_completed_time rejects zero");
+    check(jrc::quest_log_model::format_completed_time(
+            116444736000000000LL + 1760000000LL * 10000000LL)
+            == "2025-10-09",
+        "format_completed_time renders FILETIME as UTC date");
+    check(jrc::quest_log_model::format_completed_time(1760000000LL)
+            == "2025-10-09",
+        "format_completed_time accepts plain epoch seconds");
+
     wire.update_data(31999, "x");
     check(wire.is_started(31999),
         "update_data(unknown) still starts a fresh entry");

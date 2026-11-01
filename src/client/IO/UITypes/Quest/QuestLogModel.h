@@ -21,6 +21,11 @@ namespace jrc::quest_log_model
         int16_t id = 0;
         std::string name;
         std::string category;
+        // Raw quest data ("3/10" mob progress and the like) while the
+        // quest runs; empty when the server sent none.
+        std::string progress;
+        // Completion time of finished quests; 0 while the quest runs.
+        int64_t completed_time = 0;
     };
 
     // Which half of the log the left pane lists.
@@ -42,6 +47,10 @@ namespace jrc::quest_log_model
     // ("0", "1", ...) of the QuestInfo entry, in order. Empty for unknown
     // quests.
     std::vector<std::string> quest_paragraphs(int16_t id);
+
+    // Completion date "YYYY-MM-DD" (UTC) for the info pane. Accepts both
+    // the setfield FILETIME and plain epoch seconds; "?" when unusable.
+    std::string format_completed_time(int64_t time);
 
     constexpr size_t ROWS_PER_PAGE = 9;
     constexpr int16_t ROW_HEIGHT = 24;

@@ -21,6 +21,7 @@
 #include "nlnx/nx.hpp"
 
 #include <algorithm>
+#include <ctime>
 #include <map>
 #include <set>
 
@@ -92,11 +93,47 @@ namespace jrc::quest_log_model
             }
         }
 
+        const auto& in_progress = log.list_in_progress();
+        const auto& started = log.list_started();
+        const auto& completed = log.list_completed();
+
         std::vector<QuestRow> rows;
         rows.reserve(ids.size());
         for (int16_t id : ids)
         {
-            rows.push_back(make_row(id));
+            QuestRow row = make_row(id);
+            if (filter == Filter::COMPLETED)
+            {
+                row.completed_time = completed.at(id);
+            }
+            else
+            {
+                // In-progress rows carry the raw progress string when the
+                // server sent one; a quest that also sits in the completed
+                // bucket keeps its completion time for the info pane.
+                const auto running = in_progress.find(id);
+                if (running != in_progress.end())
+                {
+                    row.progress = running->second.second;
+                }
+                else
+                {
+                    const auto begun = started.find(id);
+                    if (begun != started.end())
+                    {
+                        row.progress = begun->second;
+                    }
+                }
+                if (row.progress.empty())
+                {
+                    const auto done = completed.find(id);
+                    if (done != completed.end())
+                    {
+                        row.completed_time = done->second;
+                    }
+                }
+            }
+            rows.push_back(std::move(row));
         }
         return rows;
     }
@@ -115,6 +152,37 @@ namespace jrc::quest_log_model
             return row.name;
         }
         return row.category + " - " + row.name;
+    }
+
+    std::string format_completed_time(int64_t time)
+    {
+        if (time <= 0)
+        {
+            return "?";
+        }
+
+        // Setfield sends Windows FILETIME (100ns since 1601), runtime
+        // completions store plain epoch seconds; tell them apart by
+        // magnitude.
+        int64_t seconds = time;
+        if (time > 1000000000000000LL)
+        {
+            seconds = (time - 116444736000000000LL) / 10000000LL;
+        }
+
+        const std::time_t epoch = static_cast<std::time_t>(seconds);
+        const std::tm* utc = std::gmtime(&epoch);
+        if (!utc)
+        {
+            return "?";
+        }
+
+        char buffer[16] = {};
+        if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", utc) == 0)
+        {
+            return "?";
+        }
+        return buffer;
     }
 
     std::vector<std::string> quest_paragraphs(int16_t id)

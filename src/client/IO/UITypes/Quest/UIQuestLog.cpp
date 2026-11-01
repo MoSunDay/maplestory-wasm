@@ -49,8 +49,8 @@ namespace jrc
         : UIDragElement({ 250, 20 }),
           quests(quest_log),
           completed_label(Text::A11M, Text::LEFT, Text::WHITE),
-          tab0_label(Text::A11M, Text::LEFT, Text::WHITE, "In Progress"),
-          tab1_label(Text::A11M, Text::LEFT, Text::LIGHTGREY, "Completed"),
+          tab0_label(Text::A11M, Text::LEFT, Text::WHITE, "进行中"),
+          tab1_label(Text::A11M, Text::LEFT, Text::LIGHTGREY, "已完成"),
           selected_name(Text::A11M, Text::LEFT, Text::WHITE),
           selected_category(Text::A11L, Text::LEFT, Text::LIGHTGREY),
           selected_state(Text::A11L, Text::LEFT, Text::LIGHTGREY)
@@ -197,11 +197,17 @@ namespace jrc
         row_labels.reserve(rows.size());
         for (const auto& row : rows)
         {
+            std::string label =
+                std::to_string(row.id) + " " + row.name;
+            if (!row.progress.empty())
+            {
+                label += " (" + row.progress + ")";
+            }
             row_labels.emplace_back(
                 Text::A11L,
                 Text::LEFT,
                 Text::WHITE,
-                std::to_string(row.id) + " " + row.name,
+                label,
                 180
             );
         }
@@ -244,15 +250,38 @@ namespace jrc
         {
             const auto& row = rows[selected];
             selected_name.change_text(row.name);
+            const std::string summary =
+                quest_log_model::quest_summary(row.id);
             selected_category.change_text(
-                row.category.empty() ? "Quest" : row.category
+                !summary.empty() && summary.front() == '?'
+                    ? "任务"
+                    : summary
             );
-            selected_state.change_text(
-                filter == Filter::IN_PROGRESS ? "In Progress" : "Completed"
-            );
+            if (row.completed_time > 0)
+            {
+                selected_state.change_text(
+                    "已完成 · "
+                    + quest_log_model::format_completed_time(
+                        row.completed_time)
+                );
+            }
+            else if (!row.progress.empty())
+            {
+                selected_state.change_text("进行中 · " + row.progress);
+            }
+            else
+            {
+                selected_state.change_text("进行中");
+            }
 
-            // Story text comes from the numbered QuestInfo children and is
-            // wrapped to the info pane width by the text layout.
+            // Story text comes from the numbered QuestInfo children and
+            // is wrapped to the info pane width by the text layout. Only
+            // the paragraphs that fit the pane are kept; an ellipsis row
+            // marks the cut so long dialogues are visibly clipped.
+            const int16_t pane_bottom =
+                static_cast<int16_t>(info_height - 10);
+            int16_t paragraph_y = INFO_PARAGRAPH_OFFSET.y();
+            bool clipped = false;
             for (const auto& paragraph :
                  quest_log_model::quest_paragraphs(row.id))
             {
@@ -264,11 +293,29 @@ namespace jrc
                     static_cast<uint16_t>(
                         std::max<int16_t>(info_width - 40, 100))
                 );
+                paragraph_y = static_cast<int16_t>(
+                    paragraph_y + selected_paragraphs.back().height() + 6);
+                if (paragraph_y > pane_bottom)
+                {
+                    clipped = true;
+                    break;
+                }
+            }
+            if (clipped)
+            {
+                selected_paragraphs.emplace_back(
+                    Text::A11L,
+                    Text::LEFT,
+                    Text::LIGHTGREY,
+                    "……",
+                    static_cast<uint16_t>(
+                        std::max<int16_t>(info_width - 40, 100))
+                );
             }
         }
         else
         {
-            selected_name.change_text("No quest selected");
+            selected_name.change_text("未选择任务");
             selected_category.change_text("");
             selected_state.change_text("");
         }
