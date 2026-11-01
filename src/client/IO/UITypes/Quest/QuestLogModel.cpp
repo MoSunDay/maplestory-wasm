@@ -208,4 +208,31 @@ namespace jrc::quest_log_model
         }
         return paragraphs;
     }
+
+    size_t visible_paragraphs(int16_t top, int16_t bottom,
+        int16_t ellipsis_height, const std::vector<int16_t>& heights,
+        bool& clipped)
+    {
+        clipped = false;
+        int16_t y = top;
+        for (size_t i = 0; i < heights.size(); ++i)
+        {
+            if (y + heights[i] > bottom)
+            {
+                // First paragraph that does not fit: the ellipsis marks
+                // the cut. It takes this slot when it fits there;
+                // otherwise it displaces the previous paragraph (same
+                // font, so its single line is never taller than the
+                // paragraph it replaces plus the gap).
+                clipped = true;
+                if (y + ellipsis_height > bottom && i > 0)
+                {
+                    return i - 1;
+                }
+                return i;
+            }
+            y = static_cast<int16_t>(y + heights[i] + PARAGRAPH_GAP);
+        }
+        return heights.size();
+    }
 }

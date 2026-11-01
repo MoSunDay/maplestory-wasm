@@ -197,6 +197,35 @@ int main(int argc, char** argv)
             == "2025-10-09",
         "format_completed_time accepts plain epoch seconds");
 
+    // Paragraph clipping: gap is 6, so 10-high lines stack at 0/16/32...
+    // Everything fits: no clip, all paragraphs kept.
+    bool clipped = true;
+    check(jrc::quest_log_model::visible_paragraphs(
+            0, 100, 10, { 10, 10 }, clipped) == 2 && !clipped,
+        "visible_paragraphs keeps everything that fits");
+    // A tall wrapped second paragraph overflows its slot (16+30>40)
+    // while the single-line ellipsis still fits there (16+10<=40):
+    // keep one paragraph, the ellipsis takes the slot.
+    check(jrc::quest_log_model::visible_paragraphs(
+            0, 40, 10, { 10, 30 }, clipped) == 1 && clipped,
+        "tall wrapped paragraph still leaves room for the ellipsis");
+    // Second paragraph overflows (16+10>25) and the ellipsis does not
+    // fit the slot either (16+10>25): it displaces the only fitting
+    // paragraph.
+    check(jrc::quest_log_model::visible_paragraphs(
+            0, 25, 10, { 10, 10 }, clipped) == 0 && clipped,
+        "visible_paragraphs displaces the last fitting paragraph");
+    // First two fit (10, 26<=30), the third overflows at 32+10>30 and
+    // the ellipsis cannot take that slot: it displaces the second.
+    check(jrc::quest_log_model::visible_paragraphs(
+            0, 30, 10, { 10, 10, 10 }, clipped) == 1 && clipped,
+        "ellipsis displacement with multiple fitting paragraphs");
+    // First slot already overflows and the ellipsis does not fit either:
+    // nothing to displace, zero paragraphs kept but clipped reported.
+    check(jrc::quest_log_model::visible_paragraphs(
+            0, 5, 10, { 10, 10 }, clipped) == 0 && clipped,
+        "degenerate pane keeps zero paragraphs and still reports clip");
+
     wire.update_data(31999, "x");
     check(wire.is_started(31999),
         "update_data(unknown) still starts a fresh entry");

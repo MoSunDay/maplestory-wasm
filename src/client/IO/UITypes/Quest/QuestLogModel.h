@@ -52,6 +52,17 @@ namespace jrc::quest_log_model
     // the setfield FILETIME and plain epoch seconds; "?" when unusable.
     std::string format_completed_time(int64_t time);
 
+    // How many leading story paragraphs (by wrapped line height, each
+    // followed by PARAGRAPH_GAP) fit between top and bottom. clipped is
+    // set when paragraphs remain: the caller then draws the ellipsis row
+    // in place of the first paragraph that did not fit; when even that
+    // slot is too small the ellipsis displaces the previous paragraph
+    // (one fewer returned). heights entries <= 0 never clip.
+    size_t visible_paragraphs(int16_t top, int16_t bottom,
+        int16_t ellipsis_height, const std::vector<int16_t>& heights,
+        bool& clipped);
+
     constexpr size_t ROWS_PER_PAGE = 9;
     constexpr int16_t ROW_HEIGHT = 24;
+    constexpr int16_t PARAGRAPH_GAP = 6;
 }

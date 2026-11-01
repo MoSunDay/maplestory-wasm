@@ -298,42 +298,50 @@ namespace jrc
             }
 
             // Story text comes from the numbered QuestInfo children and
-            // is wrapped to the info pane width by the text layout. Only
-            // the paragraphs that fit the pane are kept; an ellipsis row
-            // marks the cut so long dialogues are visibly clipped.
+            // is wrapped to the info pane width by the text layout. The
+            // pure layout helper decides which paragraphs fit; the rest
+            // is replaced by an ellipsis row that always draws inside
+            // the pane (it takes or displaces the first slot that did
+            // not fit).
             const int16_t pane_bottom =
                 static_cast<int16_t>(info_height - 10);
-            int16_t paragraph_y = INFO_PARAGRAPH_OFFSET.y();
-            bool clipped = false;
-            for (const auto& paragraph :
-                 quest_log_model::quest_paragraphs(row.id))
+            const uint16_t wrap_width = static_cast<uint16_t>(
+                std::max<int16_t>(info_width - 40, 100));
+
+            const std::vector<std::string> story =
+                quest_log_model::quest_paragraphs(row.id);
+            std::vector<Text> lines;
+            lines.reserve(story.size());
+            std::vector<int16_t> heights;
+            heights.reserve(story.size());
+            for (const auto& paragraph : story)
             {
-                selected_paragraphs.emplace_back(
-                    Text::A11L,
-                    Text::LEFT,
-                    Text::WHITE,
-                    paragraph,
-                    static_cast<uint16_t>(
-                        std::max<int16_t>(info_width - 40, 100))
+                lines.emplace_back(
+                    Text::A11L, Text::LEFT, Text::WHITE,
+                    paragraph, wrap_width
                 );
-                paragraph_y = static_cast<int16_t>(
-                    paragraph_y + selected_paragraphs.back().height() + 6);
-                if (paragraph_y > pane_bottom)
-                {
-                    clipped = true;
-                    break;
-                }
+                heights.push_back(lines.back().height());
+            }
+
+            Text ellipsis(
+                Text::A11L, Text::LEFT, Text::LIGHTGREY,
+                "……", wrap_width
+            );
+            bool clipped = false;
+            const size_t visible = quest_log_model::visible_paragraphs(
+                INFO_PARAGRAPH_OFFSET.y(),
+                pane_bottom,
+                ellipsis.height(),
+                heights,
+                clipped
+            );
+            for (size_t i = 0; i < visible; ++i)
+            {
+                selected_paragraphs.push_back(std::move(lines[i]));
             }
             if (clipped)
             {
-                selected_paragraphs.emplace_back(
-                    Text::A11L,
-                    Text::LEFT,
-                    Text::LIGHTGREY,
-                    "……",
-                    static_cast<uint16_t>(
-                        std::max<int16_t>(info_width - 40, 100))
-                );
+                selected_paragraphs.push_back(std::move(ellipsis));
             }
         }
         else
