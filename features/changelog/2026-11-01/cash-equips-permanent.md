@@ -47,6 +47,16 @@
 - linked server `posix-compile.sh` 全量编译通过，`docker restart
   ms-game-server` 后登录口 8484 就绪。
 - WASM 构建：`docker compose run --rm wasm-builder` 通过。
+- 浏览器 e2e（`tools/verify/maplestory-webui/cash-shop-equip-permanent-flow.mjs`，
+  23 项断言全 PASS）：test1 登录进商城搜 SN `20000016` → 目录卡与「本期推荐」
+  面板截图经 tesseract(chi_sim) OCR 确认显示「装备 · 永久」、无「90天」与
+  「限时」徽标 → 真实购买（NX 7150→3450）→ 仓库取出落 CASH 栏槽位
+  （`msinv_slot_item(5,2)=1002000`）→ 退出商城落盘后 SQL 断言
+  `inventoryitems` 新行 `inventorytype=5`、`expiration=-1`（永久，无到期戳）。
+- 遗留数据迁移实测：修复前购买的 test1Pala 现金帽（行 45269，
+  `expiration=1801142852501`≈2027-01-28）在角色在线 >60s 触发
+  `expirationTask` 后经商城进出落盘，DB 行翻转为 `expiration=-1`、物品完好
+  未删除——0007 补丁两段行为（新购不盖章 + 存量迁移）均验证通过。
 
 ## Related Docs
 

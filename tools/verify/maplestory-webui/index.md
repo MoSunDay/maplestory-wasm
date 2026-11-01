@@ -117,6 +117,13 @@ TAKE_EQUIP_ACCOUNT=test1 TAKE_EQUIP_PASSWORD=test1 TAKE_EQUIP_CARD=1 CHROME_BIN=
 
 ## 现金商城购买背包格子流程
 
+`cash-shop-equip-permanent-flow.mjs` 验收现金装备永久化契约（服务端 patch 0007 + 客户端 `effective_period` 归一化）：搜索现金帽 SN `20000016` 后截取目录卡与「本期推荐」面板，OCR（tesseract chi_sim）断言期限文案为「永久」且不再出现「90天/限时」徽标；随后真实购买（3700 NX）→ 双击仓库取出 → Escape 退回游戏触发落盘，配合 SQL 断言 `inventoryitems` 中该次购买行 `inventorytype=5` 且 `expiration=-1`（永久）。遗留已购装备的到期戳迁移（`expirationTask` 就地改 -1）由手工流程覆盖：带戳角色在线停留 >60s 后进出商城触发保存，行由盖章时间戳翻转为 -1。测试会真实消耗 NX 并留下 CASH 栏数据，运行前需角色离线。
+
+```bash
+PERMANENT_ACCOUNT=test1 PERMANENT_PASSWORD=test1 CHROME_BIN=/usr/bin/chromium-browser \
+node tools/verify/maplestory-webui/cash-shop-equip-permanent-flow.mjs
+```
+
 `cash-shop-slots-flow.mjs` 验收商城右栏「物品详情」面板删除后原位新增的「购买背包格子」面板：断言四个扩充 pill（`mscashshop_slotbuy_x/_y`，2x2 布局）中心均落在面板区域 (508,294)+288x94 内；点击目标 pill（默认 0 → EQUIP 栏）弹出 UIYesNo 确认框，确认后发送 CASHSHOP_OPERATION 0x06，服务端回 0x60 结算——断言 `mscashshop_slotmax` 恰好 +4（上限 128 前有空间）、`mscashshop_nx_credit` 恰好 -4000、`mscashshop_pending` 归零、其余三栏 slotmax 不受影响；Escape 回图后 slotmax 仍保持新值（服务端 gainSlots 已 saveCharToDB 持久化）。测试会真实消耗 4000 NX 并永久 +4 格，运行前需角色离线。
 
 ```bash
