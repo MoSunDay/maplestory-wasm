@@ -1,0 +1,190 @@
+# 0008: 登录/频道端口 bind 重试与角色 world 缓存按 DB 刷新
+#
+# 背景：
+#   ms-game-server 容器重启时新旧进程短暂重叠（Java shutdown hook +
+#   HikariCP 收尾可达数秒），旧进程仍持有端口导致新进程
+#   "Address already in use"：
+#   - 8484（登录口）bind 失败原先仅 printStackTrace，进程继续以
+#     "is now online" 半活运行——频道全在、登录必死，客户端表现为
+#     无法登录且无任何服务端报错入口；
+#   - 频道口（7575+100*world+ch-1）bind 失败同样被吞，对应 world 的
+#     SERVER_IP 指向死端口，客户端 "Reconnecting to channel server"
+#     无限循环（本次 FM 仓库 e2e 排障实录，见
+#     docs/known-issues/2026-11-01-game-server-restart-bind-race-and-world-cache.md）。
+#   另：Server.worldChars 仅启动时从 DB 载入，测试侧直接 UPDATE
+#   characters.world 后不重启的话，CharSelectedHandler 仍按缓存下发
+#   旧 world 的频道端口。
+#
+# 变更：
+#   1. Server.run() 登录口 bind 与 Channel 构造器频道口 bind 改为
+#      bindLoginPortWithRetry / bindWithRetry：1/2/4/8/15s 退避重试 6 次，
+#      仍失败则登录口 System.exit(1)（容器 unless-stopped 策略会拉起）、
+#      频道口抛 RuntimeException 中止启动，杜绝半活；
+#   2. 新增 Server.getCharacterWorldRefreshed(chrid)：SELECT world 单行
+#      读取并回写 worldChars 缓存，SQL 失败回退旧缓存值；
+#      CharSelectedHandler 改用该方法。
+#
+# 应用与验证：
+#   patch -p1 < scripts/server-patches/0008-login-channel-bind-retry-and-world-cache-refresh.patch
+#   bash posix-compile.sh && docker restart ms-game-server
+#   验证：ss -tln 应见 8484/7575/7675/7775/7875/7975 全监听；
+#   docker logs 无 "Error while binding"；登录至角色列表冒烟
+#   （node tools/verify/maplestory-webui/ 冺烟脚本）通过且日志无
+#   SQLException。2026-11-01 已应用于当前 checkout 并重编入 dist。
+--- a/src/net/server/Server.java
++++ b/src/net/server/Server.java
+@@ -1081,11 +1081,7 @@
+         acceptor.getSessionConfig().setIdleTime(IdleStatus.BOTH_IDLE, 30);
+         acceptor.setHandler(new MapleServerHandler());
+ 
+-        try {
+-            acceptor.bind(new InetSocketAddress(8484));
+-        } catch (IOException ex) {
+-            ex.printStackTrace();
+-        }
++        bindLoginPortWithRetry(acceptor, 8484);
+ 
+         System.out.println("Listening on port 8484\r\n");
+         System.out.println(ServerConstants.NAME + " is now online\r\n");
+@@ -1095,6 +1091,77 @@
+         MapleSkillbookInformationProvider.getInstance();
+     }
+ 
++    // A half-alive login server (bind failed, process keeps running) is the
++    // worst outcome of a container restart overlap: channels may be up while
++    // 8484 is dead, and clients simply cannot log in. Retry past the old
++    // instance's shutdown window, then exit so the container supervisor
++    // (restart=unless-stopped) brings the process back cleanly.
++    private static void bindLoginPortWithRetry(IoAcceptor acceptor, int port) {
++        final long[] backoffMs = {1000, 2000, 4000, 8000, 15000};
++        for (int attempt = 0; ; attempt++) {
++            try {
++                acceptor.bind(new InetSocketAddress(port));
++                return;
++            } catch (IOException ex) {
++                if (attempt >= backoffMs.length) {
++                    System.err.println("[SEVERE] Login port " + port + " failed to bind after "
++                            + (attempt + 1) + " attempts; exiting for a clean supervisor restart.");
++                    ex.printStackTrace();
++                    System.exit(1);
++                }
++                System.err.println("[WARN] Login port " + port + " bind attempt " + (attempt + 1)
++                        + " failed (previous instance likely still shutting down); retrying in "
++                        + backoffMs[attempt] + " ms");
++                try {
++                    Thread.sleep(backoffMs[attempt]);
++                } catch (InterruptedException ie) {
++                    Thread.currentThread().interrupt();
++                }
++            }
++        }
++    }
++
++    // Character world cache (worldChars) is loaded once at boot; a world field
++    // edited directly in the DB while the server runs (test setups do this)
++    // otherwise keeps handing out the stale world's channel port, which may
++    // not even be listening. Re-read the authoritative row on char select and
++    // refresh the cache; fall back to the cached value on DB errors.
++    public int getCharacterWorldRefreshed(Integer chrid) {
++        try {
++            Connection con = DatabaseConnection.getConnection();
++            try {
++                PreparedStatement ps = con.prepareStatement("SELECT world FROM characters WHERE id = ?");
++                try {
++                    ps.setInt(1, chrid);
++                    ResultSet rs = ps.executeQuery();
++                    try {
++                        if (rs.next()) {
++                            int worldid = rs.getInt("world");
++                            lgnWLock.lock();
++                            try {
++                                worldChars.put(chrid, worldid);
++                            } finally {
++                                lgnWLock.unlock();
++                            }
++                            return worldid;
++                        }
++                    } finally {
++                        rs.close();
++                    }
++                } finally {
++                    ps.close();
++                }
++            } finally {
++                con.close();
++            }
++        } catch (SQLException e) {
++            System.err.println("[WARN] getCharacterWorldRefreshed(" + chrid
++                    + ") DB read failed, falling back to cached world");
++            e.printStackTrace();
++        }
++        return getCharacterWorld(chrid);
++    }
++
+     public Properties getSubnetInfo() {
+         return subnetInfo;
+     }
+--- a/src/net/server/channel/Channel.java
++++ b/src/net/server/channel/Channel.java
+@@ -22,6 +22,7 @@
+ package net.server.channel;
+ 
+ import java.io.File;
++import java.io.IOException;
+ import java.net.InetSocketAddress;
+ import java.util.ArrayList;
+ import java.util.LinkedList;
+@@ -159,7 +160,7 @@
+             acceptor.setHandler(new MapleServerHandler(world, channel));
+             acceptor.getSessionConfig().setIdleTime(IdleStatus.BOTH_IDLE, 30);
+             acceptor.getFilterChain().addLast("codec", (IoFilter) new ProtocolCodecFilter(new MapleCodecFactory()));
+-            acceptor.bind(new InetSocketAddress(port));
++            bindWithRetry(acceptor, port);
+ 
+             ((SocketSessionConfig) acceptor.getSessionConfig()).setTcpNoDelay(true);
+ 
+@@ -197,6 +198,33 @@
+         }
+     }
+ 
++    // Same rationale as the login port: a channel whose port failed to bind
++    // (container restart overlap leaves the old process holding it for a few
++    // seconds) would silently stay dead while the world reports online. Retry
++    // past the overlap window, then abort startup instead of running half-alive.
++    private static void bindWithRetry(IoAcceptor acceptor, int port) {
++        final long[] backoffMs = {1000, 2000, 4000, 8000, 15000};
++        for (int attempt = 0; ; attempt++) {
++            try {
++                acceptor.bind(new InetSocketAddress(port));
++                return;
++            } catch (IOException ex) {
++                if (attempt >= backoffMs.length) {
++                    throw new RuntimeException("Channel bind on port " + port
++                            + " failed after " + (attempt + 1) + " attempts", ex);
++                }
++                System.err.println("[WARN] Channel port " + port + " bind attempt " + (attempt + 1)
++                        + " failed (previous instance likely still shutting down); retrying in "
++                        + backoffMs[attempt] + " ms");
++                try {
++                    Thread.sleep(backoffMs[attempt]);
++                } catch (InterruptedException ie) {
++                    Thread.currentThread().interrupt();
++                }
++            }
++        }
++    }
++
+     public void reloadEventScriptManager() {
+         eventSM.cancel();
+         eventSM = null;
+--- a/src/net/server/handlers/login/CharSelectedHandler.java
++++ b/src/net/server/handlers/login/CharSelectedHandler.java
+@@ -88,7 +88,7 @@
+             return;
+         }
+         
+-        c.setWorld(server.getCharacterWorld(charId));
++        c.setWorld(server.getCharacterWorldRefreshed(charId));
+         World wserv = c.getWorldServer();
+         if(wserv == null || wserv.isWorldCapacityFull()) {
+             c.announce(MaplePacketCreator.getAfterLoginError(10));

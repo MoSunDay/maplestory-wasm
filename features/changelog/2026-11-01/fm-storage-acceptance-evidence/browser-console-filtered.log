@@ -1,0 +1,55 @@
+[status] Downloading...
+[config] Set MapleStoryServerIp from config.json: 127.0.0.1
+[config] Set ProxyPort from config.json: 8090
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[loading] wasm
+[dependencies] 1 remaining
+[dependencies] 0 remaining
+[status] Running...
+[runtime] Initialized
+[stdout] Connecting to 127.0.0.1:8484
+[stdout] Opening connection: 127.0.0.1:8484
+[stdout] Connecting to WebSocket proxy: ws://127.0.0.1:8090
+[loading] assets
+[stdout] [file::open] Base.nx sizeof(header)=52 struct_bitmap_count=0 raw_bitmap_count@28=0 struct_bitmap_offset=13264 raw_bitmap_offset@32=13264
+[stdout] [file::open] Character.nx sizeof(header)=52 struct_bitmap_count=551639 raw_bitmap_count@28=551639 struct_bitmap_offset=134488544 raw_bitmap_offset@32=134488544
+[stdout] [file::open] Effect.nx sizeof(header)=52 struct_bitmap_count=5198 raw_bitmap_count@28=5198 struct_bitmap_offset=579936 raw_bitmap_offset@32=579936
+[stdout] [file::open] Etc.nx sizeof(header)=52 struct_bitmap_count=10 raw_bitmap_count@28=10 struct_bitmap_offset=2645328 raw_bitmap_offset@32=2645328
+[stdout] [file::open] Item.nx sizeof(header)=52 struct_bitmap_count=17059 raw_bitmap_count@28=17059 struct_bitmap_offset=3216352 raw_bitmap_offset@32=3216352
+[stdout] [file::open] Map.nx sizeof(header)=52 struct_bitmap_count=35973 raw_bitmap_count@28=35973 struct_bitmap_offset=160155840 raw_bitmap_offset@32=160155840
+[stdout] [file::open] Mob.nx sizeof(header)=52 struct_bitmap_count=51697 raw_bitmap_count@28=51697 struct_bitmap_offset=6743792 raw_bitmap_offset@32=6743792
+[stdout] [file::open] Morph.nx sizeof(header)=52 struct_bitmap_count=1824 raw_bitmap_count@28=1824 struct_bitmap_offset=233440 raw_bitmap_offset@32=233440
+[stdout] [file::open] Npc.nx sizeof(header)=52 struct_bitmap_count=26180 raw_bitmap_count@28=26180 struct_bitmap_offset=4291056 raw_bitmap_offset@32=4291056
+[stdout] [file::open] Quest.nx sizeof(header)=52 struct_bitmap_count=0 raw_bitmap_count@28=0 struct_bitmap_offset=5014976 raw_bitmap_offset@32=5014976
+[stdout] [file::open] Reactor.nx sizeof(header)=52 struct_bitmap_count=4409 raw_bitmap_count@28=4409 struct_bitmap_offset=565040 raw_bitmap_offset@32=565040
+[stdout] [file::open] Skill.nx sizeof(header)=52 struct_bitmap_count=14777 raw_bitmap_count@28=14777 struct_bitmap_offset=5214592 raw_bitmap_offset@32=5214592
+[stdout] [file::open] Sound.nx sizeof(header)=52 struct_bitmap_count=0 raw_bitmap_count@28=0 struct_bitmap_offset=326768 raw_bitmap_offset@32=326768
+[stdout] [file::open] String.nx sizeof(header)=52 struct_bitmap_count=0 raw_bitmap_count@28=0 struct_bitmap_offset=85899345921 raw_bitmap_offset@32=85899345921
+[stdout] [file::open] TamingMob.nx sizeof(header)=52 struct_bitmap_count=0 raw_bitmap_count@28=0 struct_bitmap_offset=1344 raw_bitmap_offset@32=1344
+[stdout] [file::open] UI.nx sizeof(header)=52 struct_bitmap_count=93385 raw_bitmap_count@28=93385 struct_bitmap_offset=14902992 raw_bitmap_offset@32=14902992
+[loading] initializing
+[stdout] Unhandled stance: ghostfly
+[stdout] Warning: Unhandled body layer ()
+[stdout] Unhandled stance: ghostjump
+[stdout] Unhandled stance: ghostladder
+[stdout] Unhandled stance: ghostproneStab
+[stdout] Unhandled stance: ghostrope
+[stdout] Unhandled stance: ghostsit
+[stdout] Unhandled stance: ghoststand
+[stdout] Unhandled stance: ghostwalk
+[stdout] Login successful.
+[stdout] Intercepted local channel IP 127.0.0.1, substituting with 127.0.0.1
+[stdout] Reconnecting to channel server 127.0.0.1:7975
+[stdout] Closing connection
+[stdout] Connecting to 127.0.0.1:7975
+[stdout] Opening connection: 127.0.0.1:7975

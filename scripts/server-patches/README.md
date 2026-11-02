@@ -26,6 +26,8 @@
 | [0006-storage-30-slots-and-type-buckets.patch](0006-storage-30-slots-and-type-buckets.patch) | 仓库 30 格上限（新建默认 30、`gainSlots` 上限 48→30）；`sendStorage`/`arrangeItems` 的 `typeItems` 改为按类型过滤桶，修复多类型混存时“页签内索引→全量下标”映射错位导致的取错/取不出 | 已应用于当前 checkout 并重编入 dist（2026-11-01） |
 | [0006-cash-shop-exit-save.patch](0006-cash-shop-exit-save.patch) | `ChangeMapHandler` CS 退出分支 `open(false)` 后补 `chr.saveCharToDB(false)`：换线重连前把商城内 locker take/put/buy、CASH 余额、wishlist 落盘，修复退出商城丢档（进入侧 `EnterCashShopHandler` 本就有 save，退出侧原本缺失） | 已应用于当前 checkout 并重编入 dist（2026-10-30） |
 | [0007-cash-equips-permanent.patch](0007-cash-equips-permanent.patch) | 现金装备改永久：`CashItem.toItem()` 提取 `isEquip` 局部变量，`!isEquip && EXPIRING_ITEMS` 才盖到期戳（EQUIP 类购买保持 expiration -1，WZ Commodity Period=90 不再生效）；`expirationTask()` 对 CASH 栏遗留 Equip 带 !=-1 到期戳的迁移为 -1 落库而非到期删除 | 已应用于当前 checkout 并重编入 dist（2026-11-01） |
+| [0008-login-channel-bind-retry-and-world-cache-refresh.patch](0008-login-channel-bind-retry-and-world-cache-refresh.patch) | 登录口 8484 与频道口 bind 失败改退避重试（1/2/4/8/15s×6）后快速失败（exit(1)/RuntimeException），杜绝容器重启竞态下半活进程（频道全在、登录或单 world 死端口）；`Server.getCharacterWorldRefreshed` 按 DB 刷新 worldChars 缓存并在 CharSelectedHandler 使用，修复运行中直改 characters.world 后 SERVER_IP 仍发旧 world 端口 | 已应用于当前 checkout 并重编入 dist（2026-11-01） |
+| [0008-ranking-worker-rank-reserved-word.patch](0008-ranking-worker-rank-reserved-word.patch) | `RankingLoginWorker.updateRanking` 总榜分支（job==-1）UPDATE 列名加反引号（rank/rankMove；jobRank 分支、SELECT c.rank、resetMoveRank 均不动），修复 MySQL 8.0+ 保留字 RANK 导致每小时整点 MySQLSyntaxErrorException 事务回滚、rank/rankMove 从不落库 | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。

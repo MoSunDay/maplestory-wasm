@@ -1,0 +1,40 @@
+===== attempt 1 22:23:14 =====
+PASS  storages.slots=30（实际 30）
+PASS  DB 预备：仓库注入 30 行满仓（storageId=17，装备 1302001 + 4000001 x5 + 4000000 x28）
+INFO  进场 FM 入口，唤醒仓库 NPC（0x16 全量下发段）
+PASS  FM 仓库 NPC 1100000 Space 开仓（front=15）
+PASS  ETC tab 点击后窗口保持打开
+PASS  ETC tab 左列行0 仓库 4000001 可见（装备混存解析不串位，diff=69.6）
+PASS  ETC tab 右列行0 背包 4000003 x2 可见（diff=21.4）
+INFO  满仓存入段（30/30 格 → 0x11）
+PASS  满仓存入被拒：notice 已收（ESC x1），仓库窗口回到前台
+INFO  取出段（页签内索引映射）
+PASS  取出后仓库窗口仍在
+INFO  EQUIP tab 取出段
+PASS  EQUIP tab 点击后窗口保持打开
+PASS  EQUIP tab 左列行0 仓库 1302001 可见（diff=7.9）
+PASS  装备取出后仓库窗口仍在
+PASS  退出按钮关闭仓库窗口
+INFO  现金商城存档点，DB 断言
+PASS  取出 DB：背包出现 4000001 x5（页签内索引命中 ETC 而非装备）（期望 5 实际 5）
+PASS  取出 DB：仓库 4000001 归零（期望 0 实际 0）
+PASS  取出 DB：背包 EQUIP 出现 1302001（含 inventoryequipment 行）（期望 1 实际 1）
+PASS  满仓拒存 DB：仓库仍 28 行（30 格时 4000003 未混入）（期望 28 实际 28）
+INFO  重开仓（存入 + ESC 段）
+PASS  重开仓：ETC tab 后窗口保持打开
+PASS  存入：数量框弹出（front=12）
+INFO  存入后 front=15（dismiss x0）
+PASS  存入成功无错误 notice，仓库窗口在前（front=15，ESC x0）
+PASS  存入后左列行1 出现 4000003（diff=62.1）
+PASS  ESC 关闭仓库窗口（escape_types 含 STORAGE）
+PASS  存入 DB：仓库出现 4000003 x1（期望 1 实际 1）
+PASS  存入 DB：背包 4000003 剩 x1（期望 1 实际 1）
+INFO  产物目录 /tmp/fm-storage-flow
+INFO  [logout] ESC 后 system 弹窗未打开（第 1/3 次），重试
+INFO  [logout] 第 1 轮 ESC+Enter 登出成功（1.1s，msui_state=login）
+PASS  游戏内干净登出（msui_state=1）
+PASS  登出后 DB loggedin=0（耗时 0.5s）
+INFO  恢复 SQL 已执行（注入行删除、loggedin=0）
+ALL CHECKS PASSED
+attempt 1 rc=0 22:24:42
+ALL_CHECKS_PASSED_AT_ATTEMPT_1
