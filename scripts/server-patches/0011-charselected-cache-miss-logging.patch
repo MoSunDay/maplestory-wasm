@@ -3,13 +3,13 @@
 # 在 accountChars 缓存中查不到该 account/charId（缓存只在 boot / 角色增删
 # / 转世界时更新，直改 DB 或缓存未装载即 miss），CharSelectedHandler 直接
 # closeSession 且零日志——客户端表现为"双击角色无声掉线"，服务端日志无
-# 任何线索（docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md
-# 尾部"其他待反馈服务端的问题"第一条）。
+# 任何线索（docs/roadmap.md「服务端种子与反馈事项」，原 known-issues
+# 2026-10-31 尾部"其他待反馈服务端的问题"第一条）。
 # 本补丁仅在该静默 close 前补一条 WARN（System.err.println("[WARN] ...")，
 # 与同层 Server.java 既有日志一致），内容含 accountName/charId/world 与
 # 原因 "character cache miss"，不做任何行为修改。
 # 备注：同文件不存在"会话强杀后重放对话脚本"入口（[HACK] Item:4031008
-# 竞态发生在 NPC 对话 handler，见上述 known-issues 文档），故不涉及。
+# 竞态发生在 NPC 对话 handler，见 roadmap「观察项」），故不涉及。
 # 详情：features/changelog/2026-11-02/charselected-cache-miss-logging.md
 #
 # 应用（在 link_repos/MapleStory-Server 目录内）：

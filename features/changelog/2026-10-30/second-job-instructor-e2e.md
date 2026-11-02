@@ -48,8 +48,8 @@
    一次即恢复（复跑判据见
    docs/known-issues/2026-10-29-game-server-restart-client-freeze.md）。
 
-以上陷阱的完整排查记录与判据固化在
-docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md。
+以上陷阱的速查与判据已并入
+docs/roadmap.md「服务端种子与反馈事项」（原 known-issues 2026-10-31 已删除）。
 
 ## e2e 健壮性修正（脚本侧）
 

@@ -2,7 +2,8 @@
 
 ## 背景
 
-`docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md` 尾部
+原 `docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md`（已
+删除，要点并入 `docs/roadmap.md`「服务端种子与反馈事项」）尾部
 "其他待反馈服务端的问题"第一条：`CharSelectedHandler` 对缓存未命中走
 **静默 `closeSession`**，建议至少打日志。
 
@@ -46,4 +47,4 @@
 
 - [服务端补丁 0011](../../../scripts/server-patches/0011-charselected-cache-miss-logging.patch)
 - [服务端补丁索引](../../../scripts/server-patches/README.md)
-- [known-issues：SQL seeding 陷阱（尾部待反馈问题）](../../../docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md)
+- [roadmap：服务端种子与反馈事项（原 SQL seeding 陷阱尾部待反馈问题已并入）](../../../docs/roadmap.md)

@@ -63,7 +63,8 @@
 **种子规范**：只种无 `infoNumber` 的任务（本例 `20001-20008`，
 `queststatus` 8 条 status=1）；原生 29005/29007 与 completed 任务不受
 影响。详见
-[../../../docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md](../../../docs/known-issues/2026-10-31-game-server-sql-seeding-pitfalls.md) 陷阱六。
+[roadmap「服务端种子与反馈事项」陷阱六](../../../docs/roadmap.md)
+（原 known-issues 2026-10-31 SQL seeding 陷阱文档已删除并入）。
 
 ## 排障备忘
 
