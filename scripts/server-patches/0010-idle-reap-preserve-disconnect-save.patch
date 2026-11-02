@@ -1,0 +1,50 @@
+# 服务端源码补丁：修复空闲收割"幽灵会话"——收割时不保存角色、账号卡登录态
+# 背景：补丁 0003 让 manageIdleSessions（每 10s tick）对登记满 15s 的空闲
+# 连接确定性调用 MapleClient.testPing（MINA BOTH_IDLE 30s 登记 + 15s 阈值
+# + ≤10s tick 对齐 → 无响应连接 ~45-75s 被收割）。
+# 根因：testPing 原实现先手工执行 MapleSessionCoordinator.closeSession(session,false)
+# + updateLoginState(LOGIN_NOTLOGGEDIN) + session.removeAttribute(CLIENT_KEY)，
+# 再由 closeSession 内部的 session.close(false) 关闭传输层。MINA 的 sessionClosed
+# 回调（MapleServerHandler.java sessionClosed → closeMapleSession）是异步触发的，
+# 此时 session.getAttribute(CLIENT_KEY) 已被清空 → client==null → 跳过
+# client.disconnect() → disconnectInternal 不执行：游戏内玩家走不到
+# saveCharToDB/removePlayer（角色不落库、MapleMap 残留），登录态会话虽被
+# updateLoginState 手工归零但 online 映射清理顺序脆弱。logs SaveChar.txt 曾出现
+# 22:47:08→23:01:38 断档（粗暴杀浏览器后无落库行）。
+# 修复：testPing 主体改为单一 session.close(true)，让既有
+# sessionClosed → closeMapleSession（closeSession/closeLoginSession + 从
+# CLIENT_KEY 取回 client）→ disconnect → disconnectInternal 链路接管。
+# 该链路对 player==null 的登录态会话同样安全：disconnectInternal 内部本就有
+# 等价的 closeSession/updateLoginState(LOGIN_NOTLOGGEDIN)/removeAttribute 分支。
+# 不改任何锁顺序（补丁 0003 已验证 testPing 的 close 路径与 idleLock 无重入）。
+# 详情：features/changelog/2026-11-02/idle-reap-preserve-disconnect-save.md
+#
+# 应用（在 link_repos/MapleStory-Server 目录内）：
+#   patch -p1 < ../../../scripts/server-patches/0010-idle-reap-preserve-disconnect-save.patch
+# 验证：
+#   javap -p -c -classpath dist client.MapleClient | sed -n '/testPing/,/Exception/p'
+#     # 应只剩 IoSession.close:(Z)，无 closeSession/updateLoginState/removeAttribute
+#   bash posix-compile.sh && docker restart ms-game-server   # 8484 就绪后：
+#   # 静默死亡收割验证：systemd-run 起 headless chrome 登录进游戏后
+#   systemctl kill -s SIGSTOP --kill-who=all <unit>   # 无 WS close frame、无 TCP FIN
+#   # ~45-75s 内 logs/<日期>/players/SaveChar.txt 出现该角色新落库行，
+#   # characters.map 与冻结时刻客户端地图一致，accounts.loggedin 归零，
+#   # 随后重新登录可正常进游戏。
+--- a/src/client/MapleClient.java
++++ b/src/client/MapleClient.java
+@@ -1190,9 +1190,12 @@
+                 try {
+                         if (lastPong < timeThen) {
+                                 if (session != null && session.isConnected()) {
+-                                        MapleSessionCoordinator.getInstance().closeSession(session, false);
+-                                        updateLoginState(MapleClient.LOGIN_NOTLOGGEDIN);
+-                                        session.removeAttribute(MapleClient.CLIENT_KEY);
++                                        // 空闲收割：只关闭传输层，交由 MINA 异步 sessionClosed →
++                                        // closeMapleSession 从 CLIENT_KEY 取回 client 走 disconnect →
++                                        // disconnectInternal 完整下线链路（游戏内玩家 saveCharToDB/removePlayer，
++                                        // 登录态会话自动落入等价的 closeSession/updateLoginState/removeAttribute 分支）。
++                                        // 在此提前清属性会让 sessionClosed 拿到 null client 而跳过 disconnect（幽灵会话）。
++                                        session.close(true);
+                                 }
+                         }
+                 } catch (NullPointerException e) {
