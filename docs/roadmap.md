@@ -27,6 +27,17 @@
   高台，对步行玩家天然不可达（超出 120/80 对话射程）；以 plife 自定义
   低点刷点绕过（种子规范见下文「plife 三要素」），plime/plife 机制
   文档化以本文为初稿。
+- **PLAYER_LOGGEDIN 排序规则混用 SQLException（存量服务端疑点）**：每次
+  进图服务端日志出现 1 次 `Illegal mix of collations
+  (latin1_swedish_ci,IMPLICIT) and (utf8mb3_general_ci,IMPLICIT)`
+  SQLException，不阻塞进图、存档正常（2026-11-02 冻结回归全程复现，
+  详见 `features/changelog/2026-11-02/freeze-rebuild-regression.md`）；
+  列入 24h 观察窗看是否恶化/变频，再择期定位（疑为存量服务端字符集
+  混用，非本次交付引入）。
+- 附注：`scripts/maplestory_db_endpoint.sh` 的
+  `/data00/github/...` 陈旧硬编码路径已修复为相对脚本位置解析
+  （`SERVER_DIR` 可环境变量覆盖），见 72b1841；本文 DB 复核命令继续
+  有效。
 
 ## 交付观察窗（24h）
 
