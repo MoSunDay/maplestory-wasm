@@ -44,6 +44,7 @@ if(EMSCRIPTEN)
         "--embed-file=${CMAKE_CURRENT_SOURCE_DIR}/data/cash-shop-v83.csv@data/cash-shop-v83.csv"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs_connection.js"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs.js"
+        "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs_warmup.js"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/LazyFS/lazyfs_sync_cache.js"
     )
 
