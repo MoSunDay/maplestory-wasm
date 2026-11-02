@@ -128,6 +128,10 @@ async function loginAndEnterGame(driver) {
   await requireState('WASM module initialized', () => driver.evaluate(
     "typeof Module !== 'undefined' && Module.calledRun === true && typeof Module.ccall === 'function'"), 90);
   await requireState('login UI active', uiStateIs(driver, uiState.login), 30);
+  // 预热拆分（47550c8）后登录 UI 激活时按需资源可能仍在拉取，直接输入
+  // 会连跑第二次卡登录（reason=4，2026-11-02 冻结回归发现）；对齐 run.mjs
+  // 在此处等待 assets idle 的做法，再开始输入账号密码。
+  await requireState('login assets ready', assetsIdle(driver), 90);
   await driver.clickField(340, 260);
   await driver.typeAscii(account);
   await driver.clickField(340, 285);
