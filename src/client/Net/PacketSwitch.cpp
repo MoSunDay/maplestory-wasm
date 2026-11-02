@@ -284,12 +284,19 @@ namespace jrc
         emplace<QUERY_CASH_RESULT, QueryCashHandler>();
         emplace<CASHSHOP_OPERATION, CashShopOperationHandler>();
 
+        // Deliberately unsupported protocol groups: this port implements no
+        // memo / report / family / guild protocols (opcode inventory in
+        // docs/ms-network-protocol.md), so these five opcodes are dropped on
+        // purpose. Their NullHandler announces each opcode once on the first
+        // hit, then stays silent. Behaviour is otherwise unchanged: the
+        // packets are read and discarded exactly as before.
+        emplace<MEMO_RESULT, NullHandler>(MEMO_RESULT, "MEMO_RESULT");
+        emplace<ENABLE_REPORT, NullHandler>(ENABLE_REPORT, "ENABLE_REPORT");
+        emplace<FAMILY_INFO_RESULT, NullHandler>(FAMILY_INFO_RESULT, "FAMILY_INFO_RESULT");
+        emplace<GUILD_OPERATION, NullHandler>(GUILD_OPERATION, "GUILD_OPERATION");
+        emplace<FAMILY_PRIV_LIST, NullHandler>(FAMILY_PRIV_LIST, "FAMILY_PRIV_LIST");
+
         // TODO
-        emplace<MEMO_RESULT, NullHandler>();
-        emplace<ENABLE_REPORT, NullHandler>();
-        emplace<FAMILY_INFO_RESULT, NullHandler>();
-        emplace<GUILD_OPERATION, NullHandler>();
-        emplace<FAMILY_PRIV_LIST, NullHandler>();
         emplace<SCRIPT_PROGRESS_MESSAGE, ScriptProgressMessageHandler>();
         emplace<RECEIVE_POLICE, NullHandler>();
         emplace<FIELD_EFFECT, FieldEffectHandler>();

@@ -18,6 +18,8 @@
 #pragma once
 #include "../PacketHandler.h"
 
+#include <cstdint>
+
 namespace jrc
 {
     class PingHandler : public PacketHandler
@@ -25,8 +27,20 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    // Drops a packet without parsing it. Registrations for opcodes that this
+    // port deliberately does not support carry an (opcode, name) tag so the
+    // first hit is announced once; untagged instances stay fully silent,
+    // exactly as before.
     class NullHandler : public PacketHandler
     {
-        void handle(InPacket&) const override {}
+    public:
+        NullHandler() = default;
+        NullHandler(uint16_t opcode, const char* name);
+
+        void handle(InPacket& recv) const override;
+
+    private:
+        uint16_t opcode_ = 0;
+        const char* name_ = nullptr;
     };
 }
