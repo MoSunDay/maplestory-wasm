@@ -1,0 +1,35 @@
+# 服务端源码补丁：RankingLoginWorker 总榜 UPDATE 使用 MySQL 保留字 RANK
+# 背景：RANK 是 MySQL 8.0+ 的保留字。RankingLoginWorker.updateRanking
+# 总榜分支（job == -1）拼出的预编译语句
+# `UPDATE characters SET rank = ?, rankMove = ? WHERE id = ?` 未给 rank
+# 加反引号 → 每小时整点（Server.java 以 RANKING_INTERVAL=60min 注册，
+# 初始延迟对齐下一整点）worker 抛 MySQLSyntaxErrorException
+# "... right syntax to use near 'rank = 1, rankMove = 0 WHERE id = 1'"
+# （RankingLoginWorker.java:74），事务回滚，characters.rank / rankMove
+# 列从不更新。职业榜分支（jobRank，非保留字）、总榜 SELECT（限定名
+# c.rank，合法）与 resetMoveRank（rankMove 非保留字）均正常，不受影响。
+# 本补丁仅给总榜分支的 rank/rankMove 加反引号，其余一律不动。
+#
+# 应用（在 link_repos/MapleStory-Server 目录内）：
+#   patch -p1 < ../../../scripts/server-patches/0009-ranking-worker-rank-reserved-word.patch
+# 验证：
+#   grep -n '`rank` = ?, `rankMove` = ?' src/net/server/worker/RankingLoginWorker.java
+#   # 改前对 live DB 回滚验证（configuration.ini 的 DB_USER/DB_PASS，
+#   # export MYSQL_PWD 注入，勿打印口令）：
+#   #   mysql -h 127.0.0.1 -u $DB_USER maplestory \
+#   #     -e "START TRANSACTION; UPDATE characters SET \`rank\` = 1, \`rankMove\` = 0 WHERE id = 243; ROLLBACK;"
+#   #   （旧写法同样语句报 ERROR 1064 ... near 'rank = 1, rankMove = 0 ...'，
+#   #     与 worker 日志一致；新写法 ROW_COUNT()=1 后 ROLLBACK 原值不变）
+#   bash posix-compile.sh && docker restart ms-game-server     # 登录口 8484 就绪
+#
+--- a/src/net/server/worker/RankingLoginWorker.java
++++ b/src/net/server/worker/RankingLoginWorker.java
+@@ -58,7 +58,7 @@
+             charSelect.setInt(2, job);
+         }
+         ResultSet rs = charSelect.executeQuery();
+-        PreparedStatement ps = con.prepareStatement("UPDATE characters SET " + (job != -1 ? "jobRank = ?, jobRankMove = ? " : "rank = ?, rankMove = ? ") + "WHERE id = ?");
++        PreparedStatement ps = con.prepareStatement("UPDATE characters SET " + (job != -1 ? "jobRank = ?, jobRankMove = ? " : "`rank` = ?, `rankMove` = ? ") + "WHERE id = ?");
+         int rank = 0;
+         
+         while (rs.next()) {
