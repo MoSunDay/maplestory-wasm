@@ -108,6 +108,10 @@ namespace jrc
     {
 #ifdef MS_PLATFORM_WASM
         Console::get().print("Closing connection");
+        // Watchdog pre-hook: this is a client-initiated close, so the pending
+        // onclose/onerror must not raise the disconnect banner (a server drop
+        // still notifies). Must run before ws_closesocket().
+        sock_mark_manual_close(sock);
         int error = ws_closesocket(sock);
         return error != WS_SOCK_ERROR;
 #else

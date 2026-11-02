@@ -9,8 +9,10 @@
 #include <cstdint>
 #include <emscripten/emscripten.h>
 #include <emscripten/websocket.h>
+#include <iostream>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <sstream>
 
@@ -35,6 +37,119 @@ namespace
 	bool onerror(int eventType, const EmscriptenWebSocketErrorEvent* event, void* userData);
 	bool onclose(int eventType, const EmscriptenWebSocketCloseEvent* event, void* userData);
 	void send_transport_keepalive(void* userData);
+
+	// ---------------------------------------------------------------------------
+	// Disconnect watchdog (P1#3, minimal safe version): detection + notification
+	// only, layered on top of the existing transport.
+	//
+	// RED LINE: the suspend/spin control flow of ws_connect/ws_recv previously
+	// caused boot "null function" regressions under Asyncify. Everything below
+	// is purely additive bookkeeping: no loop condition, return value, sleep
+	// length or callback ordering is changed by this state. See
+	// docs/known-issues/2026-10-29-game-server-restart-client-freeze.md and
+	// features/changelog/2026-11-02/disconnect-watchdog.md.
+	//
+	// All state is file-scope free-function state (anonymous namespace +
+	// statics); no new classes are introduced.
+	// ---------------------------------------------------------------------------
+
+	constexpr uint64_t SOCK_STALL_NOTIFY_THRESHOLD_MS = 30000;
+
+	// Sockets the client is closing on purpose (SocketWinsock::close ->
+	// sock_mark_manual_close). Keyed by socket id so switching channels
+	// (close + immediate reconnect) is never mistaken for a server drop: the
+	// old socket's late close event still resolves against its own mark.
+	std::unordered_set<int> sock_manual_close_marks;
+
+	// Login-stall bookkeeping: how long ws_recv's existing wait loop has
+	// cumulatively waited on a socket that never delivered a single byte.
+	std::unordered_map<int, uint64_t> sock_waited_ms;
+	std::unordered_set<int> sock_ever_received;
+
+	void sock_inject_reload_banner(const char* message)
+	{
+		// One-line DOM injection: fixed top banner, idempotent by element id,
+		// inline styles only (no external resources), click reloads the page.
+		std::ostringstream script;
+		script << "(function(){var b=document.getElementById('ms-disconnect-banner');"
+			<< "if(b){return;}"
+			<< "b=document.createElement('div');"
+			<< "b.id='ms-disconnect-banner';"
+			<< "b.textContent='" << message << "';"
+			<< "b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;"
+			<< "padding:12px 16px;background:#8a1f11;color:#ffffff;"
+			<< "font:bold 14px sans-serif;text-align:center;cursor:pointer;"
+			<< "box-shadow:0 2px 8px rgba(0,0,0,0.35)';"
+			<< "b.onclick=function(){location.reload();};"
+			<< "(document.body||document.documentElement).appendChild(b);})();";
+		emscripten_run_script(script.str().c_str());
+	}
+
+	void sock_notify_disconnect(const char* reason)
+	{
+		// Idempotent: only the first trigger logs/raises the banner.
+		static bool notified = false;
+		if (notified)
+		{
+			return;
+		}
+		notified = true;
+		std::cerr << "[disconnect-watchdog] connection lost: "
+			<< (reason != nullptr ? reason : "unknown") << std::endl;
+		sock_inject_reload_banner("与服务器的连接已中断，请检查服务器后点击重新加载");
+	}
+
+	void sock_notify_stall(const char* reason)
+	{
+		// Idempotent: only the first trigger logs/raises the banner.
+		static bool notified = false;
+		if (notified)
+		{
+			return;
+		}
+		notified = true;
+		std::cerr << "[disconnect-watchdog] connection stalled: "
+			<< (reason != nullptr ? reason : "unknown") << std::endl;
+		sock_inject_reload_banner("与服务器的连接长时间无响应，请检查服务器后点击重新加载");
+	}
+
+	void sock_note_transport_data(int socket)
+	{
+		sock_ever_received.insert(socket);
+	}
+
+	void sock_forget_watchdog_state(int socket)
+	{
+		sock_manual_close_marks.erase(socket);
+		sock_waited_ms.erase(socket);
+		sock_ever_received.erase(socket);
+	}
+
+	void sock_handle_transport_closed(int socket, const char* reason)
+	{
+		const bool manual_close = sock_manual_close_marks.count(socket) > 0;
+		sock_forget_watchdog_state(socket);
+		if (!manual_close)
+		{
+			sock_notify_disconnect(reason);
+		}
+	}
+
+	void sock_accumulate_recv_wait(size_t socket, size_t slept_ms)
+	{
+		if (sock_ever_received.count(static_cast<int>(socket)) > 0)
+		{
+			// This socket delivered bytes before, so an empty buffer is just
+			// an idle moment - not the login-wedge shape we are hunting.
+			return;
+		}
+		uint64_t& waited = sock_waited_ms[static_cast<int>(socket)];
+		waited += slept_ms;
+		if (waited >= SOCK_STALL_NOTIFY_THRESHOLD_MS)
+		{
+			sock_notify_stall("ws_recv waited 30s+ without a single byte from the server");
+		}
+	}
 
 	enum class WebSockState
 	{
@@ -278,6 +393,11 @@ namespace
 
 	bool onmessage(int eventType, const EmscriptenWebSocketMessageEvent* event, void* userData)
 	{
+		if (event->numBytes > 0)
+		{
+			// Watchdog bookkeeping: this socket has delivered real bytes.
+			sock_note_transport_data(event->socket);
+		}
 		auto instance = static_cast<WebSockInstance*>(userData);
 		instance->on_received(event->data, event->numBytes);
 		return true;
@@ -293,15 +413,25 @@ namespace
 
 		// But wait, the socket ID IS in the event! event->socket
 
+		sock_handle_transport_closed(event->socket, "websocket error event");
 		WebSockManager::get().remove_instance(event->socket);
 		return true;
 	}
 
 	bool onclose(int eventType, const EmscriptenWebSocketCloseEvent* event, void* userData)
 	{
+		sock_handle_transport_closed(event->socket, "websocket close event");
 		WebSockManager::get().remove_instance(event->socket);
 		return true;
 	}
+}
+
+// Watchdog pre-hook for client-initiated closes: flag the socket before it is
+// torn down so the (asynchronous) onclose/onerror callbacks stay silent.
+// Server-side drops are unaffected and still notify the user.
+void sock_mark_manual_close(size_t socket)
+{
+	sock_manual_close_marks.insert(static_cast<int>(socket));
 }
 
 size_t ws_connect(const std::string& address, const std::string& port)
@@ -337,6 +467,11 @@ int ws_recv(size_t socket, char* bytes, size_t length, size_t timeout)
 	{
 		emscripten_sleep(sleep_len);
 		time_slept += sleep_len;
+
+		// Watchdog: accumulate the wait (detection only - the loop's control
+		// flow, return values and timing are untouched). Raises a one-shot
+		// stall banner once a never-delivered socket crosses 30s of waiting.
+		sock_accumulate_recv_wait(socket, sleep_len);
 
 		instance = WebSockManager::get().get_instance(static_cast<int>(socket));
 		if (instance == nullptr || (instance->get_state() != WebSockState::OPEN && instance->is_buffer_empty()))

@@ -28,4 +28,10 @@ int ws_send(size_t socket, const char* bytes, size_t length);
 int ws_recv(size_t socket, char* bytes, size_t length, size_t timeout);
 int ws_closesocket(size_t socket);
 
+// Disconnect watchdog (P1#3): mark `socket` as closed by the client itself so
+// the asynchronous onclose/onerror callbacks do not raise the user-facing
+// "connection lost" banner. Call immediately before ws_closesocket().
+// Purely additive bookkeeping; does not touch any control flow.
+void sock_mark_manual_close(size_t socket);
+
 #endif

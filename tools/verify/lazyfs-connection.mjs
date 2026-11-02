@@ -10,6 +10,18 @@ const connectionSource = readFileSync(
   new URL('../../src/client/LazyFS/lazyfs_connection.js', import.meta.url),
   'utf8',
 );
+// Boot warmup / item asset preload pipeline moved to lazyfs_warmup.js in
+// 47550c8; load the full pre-js chain in the src/client/CMakeLists.txt order
+// (connection -> lazyfs -> warmup -> sync_cache) so the harness matches the
+// shipped bundle.
+const warmupSource = readFileSync(
+  new URL('../../src/client/LazyFS/lazyfs_warmup.js', import.meta.url),
+  'utf8',
+);
+const syncCacheSource = readFileSync(
+  new URL('../../src/client/LazyFS/lazyfs_sync_cache.js', import.meta.url),
+  'utf8',
+);
 
 function createHarness() {
   const sockets = [];
@@ -54,9 +66,15 @@ function createHarness() {
     }
   }
 
+  // Production pre-js files locate their install target via `window.Module`
+  // (lazyfs_warmup.js / lazyfs_sync_cache.js tails), while lazyfs.js merges
+  // onto the bare `Module` global. Share one Module object between the fake
+  // window and the vm context so both lookups resolve identically.
+  const moduleObject = {};
   const window = {
     location: { protocol: 'http:', hostname: 'localhost' },
     addEventListener: (name, callback) => listeners.set(name, callback),
+    Module: moduleObject,
     MapleConnectionLost: {
       show: message => alerts.push(message),
     },
@@ -77,7 +95,7 @@ function createHarness() {
       warn() {},
     },
     Map,
-    Module: {},
+    Module: moduleObject,
     performance,
     Promise,
     setInterval: callback => {
@@ -93,6 +111,8 @@ function createHarness() {
   });
   vm.runInContext(connectionSource, context, { filename: 'lazyfs_connection.js' });
   vm.runInContext(lazyfsSource, context, { filename: 'lazyfs.js' });
+  vm.runInContext(warmupSource, context, { filename: 'lazyfs_warmup.js' });
+  vm.runInContext(syncCacheSource, context, { filename: 'lazyfs_sync_cache.js' });
   const lazyfs = context.Module.LazyFS;
   lazyfs.RECONNECT_DELAYS_MS = [0, 0, 0];
   lazyfs.delay = () => Promise.resolve();
