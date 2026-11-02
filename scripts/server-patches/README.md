@@ -14,6 +14,17 @@
    并重启容器 `ms-game-server`（`docker restart ms-game-server`，
    unless-stopped 策略，登录口 8484）。
 
+## 编号规则与消歧
+
+历史上本目录曾出现**两个 0006**：`0006-cash-shop-exit-save.patch`
+与 `0006-storage-30-slots-and-type-buckets.patch`。为不破坏既有
+changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**，两个
+0006 均原样保留。此后规则：
+
+- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0011）；
+- slug 必须唯一，禁止复用；
+- 同一编号出现不同 slug，一律视为历史遗留，不表示覆盖或替代关系。
+
 ## 已知差异（相对上游 HeavenMS checkout）
 
 | 补丁 | 内容 | 状态 |
@@ -29,6 +40,7 @@
 | [0008-login-channel-bind-retry-and-world-cache-refresh.patch](0008-login-channel-bind-retry-and-world-cache-refresh.patch) | 登录口 8484 与频道口 bind 失败改退避重试（1/2/4/8/15s×6）后快速失败（exit(1)/RuntimeException），杜绝容器重启竞态下半活进程（频道全在、登录或单 world 死端口）；`Server.getCharacterWorldRefreshed` 按 DB 刷新 worldChars 缓存并在 CharSelectedHandler 使用，修复运行中直改 characters.world 后 SERVER_IP 仍发旧 world 端口 | 已应用于当前 checkout 并重编入 dist（2026-11-01） |
 | [0009-ranking-worker-rank-reserved-word.patch](0009-ranking-worker-rank-reserved-word.patch) | `RankingLoginWorker.updateRanking` 总榜分支（job==-1）UPDATE 列名加反引号（rank/rankMove；jobRank 分支、SELECT c.rank、resetMoveRank 均不动），修复 MySQL 8.0+ 保留字 RANK 导致每小时整点 MySQLSyntaxErrorException 事务回滚、rank/rankMove 从不落库 | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
 | [0010-idle-reap-preserve-disconnect-save.patch](0010-idle-reap-preserve-disconnect-save.patch) | `MapleClient.testPing` 空闲收割主体改为单一 `session.close(true)`：删除收割时提前 `closeSession`/`updateLoginState`/`removeAttribute(CLIENT_KEY)` 的手工清理（异步 sessionClosed 因此拿到 null client 跳过 disconnect → 幽灵会话：断线角色不落库、残留地图），改由既有 `sessionClosed → closeMapleSession → disconnect → disconnectInternal` 链路接管（游戏内玩家 saveCharToDB/removePlayer，登录态会话落入等价清理分支）；不动锁序 | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
+| [0011-charselected-cache-miss-logging.patch](0011-charselected-cache-miss-logging.patch) | `CharSelectedHandler` 缓存未命中（`haveCharacterEntry` 查 accountChars 无该角色）静默 `closeSession` 前补一条 WARN（`System.err.println("[WARN] ...")`，同层 Server.java 既有日志格式），含 accountName/charId/world 与原因 "character cache miss"，纯日志零行为变更，消除"双击角色无声掉线零线索" | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。
