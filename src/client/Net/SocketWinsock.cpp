@@ -120,7 +120,7 @@ namespace jrc
     bool SocketWinsock::dispatch(const int8_t* bytes, size_t length) const
     {
 #ifdef MS_PLATFORM_WASM
-        return ws_send(sock, (char*)bytes, static_cast<int>(length), 0) != WS_SOCK_ERROR;
+        return ws_send(sock, (char*)bytes, static_cast<int>(length)) != WS_SOCK_ERROR;
 #else
         return send(sock, (char*)bytes, static_cast<int>(length), 0) != SOCKET_ERROR;
 #endif

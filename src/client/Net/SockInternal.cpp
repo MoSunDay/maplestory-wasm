@@ -309,8 +309,10 @@ size_t ws_connect(const std::string& address, const std::string& port)
 	return WebSockManager::get().connect(address, port);
 }
 
-// TODO: implement timeout
-int ws_send(size_t socket, const char* bytes, size_t length, size_t timeout)
+// No timeout parameter here on purpose: ws_send never waits (the send itself is
+// asynchronous), and adding spin/suspend logic to SockInternal previously caused
+// boot "null function" regressions under Asyncify.
+int ws_send(size_t socket, const char* bytes, size_t length)
 {
 	auto instance = WebSockManager::get().get_instance(static_cast<int>(socket));
 	if (instance == nullptr)

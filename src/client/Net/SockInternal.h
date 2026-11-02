@@ -24,7 +24,7 @@
 #define WS_SOCK_OK 0
 
 size_t ws_connect(const std::string& address, const std::string& port);
-int ws_send(size_t socket, const char* bytes, size_t length, size_t timeout);
+int ws_send(size_t socket, const char* bytes, size_t length);
 int ws_recv(size_t socket, char* bytes, size_t length, size_t timeout);
 int ws_closesocket(size_t socket);
 
