@@ -521,6 +521,58 @@ http://127.0.0.1:8000/web/index.html）、`REJECT_ACCOUNT`/`REJECT_PASSWORD`
 `REJECT_ITEM_ID`/`REJECT_SN`/`REJECT_PRICE`（默认 1002000/20000016/3700）、
 `REJECT_FAIL_FAST`（=1 阶段失败立即中止）。前置：账号 NX Credit ≥ 商品价。
 
+## 历史脚本补录（目录）
+
+以下历史脚本（均已入库、可复跑）的完整条目——说明、运行命令与环境变量
+默认值——在分册 [index-history.md](index-history.md)，此处只留速查：
+
+**登录/选角诊断探针**
+
+- `cc-probe.mjs`：建卡 OK 按钮命中区定位探针（NameCharPacket 观测）；
+- `dc-probe.mjs`：双击选卡无 CHAR_SELECT 的输入到达性探针；
+- `login-probe.mjs`：登录凭据拼接实证探针（曾实证落在账号 test1test1）；
+- `logout.mjs`：游戏内干净登出公共库（logoutToLogin /
+  waitForAccountLoggedOut，防 anti-multiclient 残留）。
+
+**战斗与技能**
+
+- `iron-body-cast-throttle.mjs`：圣甲术 1s 施放节流回归（窗内节流、
+  窗后恢复）；
+- `skill-anim-flow.mjs`：逐角色技能动画/伤害数字取证（keymap 驱动）；
+- `hero-combo-e2e.mjs`：Hero 斗气 → Slash Blast → Coma 连招端到端；
+- `equip-stat-flow.mjs`：装备 WDEF/MDEF 结算实测（EQUIPPED 对比背包）。
+
+**NPC 对话与二转**
+
+- `npc-dialog-reopen-flow.mjs`：对话 toggle 失步修复回归（重开不消失）；
+- `second-job-instructor-flow.mjs`：二转教官接受考验 → 传送全流程。
+
+**仓库**
+
+- `storage-flow.mjs`：STORAGE 开窗/布局/关窗验证（130000200）；
+- `storage-deposit-flow.mjs`：CP_Storage 取出/存入封包闭环；
+- `fm-storage-flow.mjs`：FM plife 仓库 NPC 全链路（混装备 0x16 串位回归）。
+
+**宠物**
+
+- `pet-automation-flow.mjs`：宠物自动化库（E2E_PET_OPTIONS
+  configure/runtime/pickup/follow）；
+- `pet-hunger-fixture.mjs`：饥饿数据夹具（E2E_PET_HUNGER）；
+- `pet-hunger-flow.mjs`：温饱/饥饿/罢工/喂食/复工全链路；
+- `pet-stat-boost.mjs`：-7 鞋位提速夹具（E2E_PET_SHOE_STATS）。
+
+**性能与分辨率**
+
+- `ellinia-perf-flow.mjs`：魔法密林空闲网络增量 + 帧预算采样；
+- `resolution-flow.mjs`：800x600 ↔ 1280x720 渲染面切换验收。
+
+**harness 与复用库**
+
+- `pq-harness-game/login/db/move/dialog.mjs`：pq-harness.mjs 五层拆分；
+- `png-probe.mjs`：纯函数 PNG 解码 + 对话框按钮定位；
+- `runtime-flow.mjs` / `ime-chat-flow.mjs` / `user-info-flow.mjs`：
+  run.mjs 复用库（运行时探针 / 中文 IME 聊天 / 角色信息卡）。
+
 ## support/ 辅助工具
 
 - `support/rangesrv.py [ROOT] [PORT]`：支持 HTTP Range（206）的静态服务
@@ -530,4 +582,11 @@ http://127.0.0.1:8000/web/index.html）、`REJECT_ACCOUNT`/`REJECT_PASSWORD`
   Asyncify 只读埋点（`window.__asyncLog` + `[ASYNC-STUCK]` 卡死轮询），
   幂等。私有栈搭建步骤、楔死根因与 `E2E_CDP_TIMEOUT_MS` 推荐
   （120000，勿用 900000）见
-  `docs/known-issues/2026-10-31-asyncify-wedge-and-private-e2e-stack.md`。
+  `docs/known-issues/2026-10-31-asyncify-wedge-and-private-e2e-stack.md`；
+- `support/fm-diag.mjs`：FM NPC 诊断——进场后输出玩家 x/y，走位至 NPC
+  附近再输出并截图（`CHROME_BIN`，CDP 9299，产物 /tmp/fm-diag）；
+- `support/fm-map-retry.mjs`：`waitForMapLoad(driver, expectedMapId,
+  timeoutSeconds=200)`——FM（910000000）资源量大进场偶发失败/挂起，
+  轮询 `msmap_id`，重试按钮可见或超时前主动触发客户端内置
+  `msmap_retry`（Stage::retry_loading）直到地图就绪；被 fm-storage-flow
+  等复用。

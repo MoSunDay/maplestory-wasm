@@ -12,7 +12,7 @@
 |---|------|------|-------------|
 | 1 | `open()` 回放路径 size 快照档（文件变大需重开才可见） | **已修复** | 8689c62 闭合回放路径残余 0/二次挂起缺口；根因背景见 `docs/known-issues/2026-10-31-asyncify-wedge-and-private-e2e-stack.md`「残余风险」 |
 | 2 | socket 层 `ws_recv`/`connect` 自旋与 LazyFS 共用 Asyncify 单 rewind 缓冲（并发 park/wake 无跨 chunk 保障） | **阻塞于 /emsdk 上游回归验证** | 待编译根治方案已就位（`lazyfs_sync_cache.js` 同步缓存命中不挂起、`LazyFileBackend.cpp` 同步快路径、CMakeLists pre-js 接线）。**警示：其前身热补丁版曾致 boot 期 `null function` 回归（技能名变空 + 启动崩溃），重编后必须先过 boot 冒烟，勿在无回归保障时盲动**；runbook 见上述 known-issue |
-| 3 | 断线看门狗 | **最小版已实现** | 链路三段：ws-proxy 下游 liveness（30s ping / 90s 静默即拆上游 TCP，`WS_PROXY_LIVENESS_TIMEOUT_SECS`）→ 服务端空闲收割确定性生效（补丁 0003，`features/changelog/2026-10-26/deterministic-idle-session-reaping.md`）→ 收割改走 `session.close(true)` 完整断链路、幽灵会话落库（补丁 0010，`features/changelog/2026-11-02/idle-reap-preserve-disconnect-save.md`）。**完整自动重连 / 会话恢复仍为后续**（客户端断线后无自动重进） |
+| 3 | 断线看门狗（服务端崩溃/重启期间客户端静默楔死，无提示无恢复） | **最小版已实现** | 客户端侧最小安全版（检测 + 通知，不改传输控制流）：`onclose`/`onerror` 非主动关闭 + `ws_recv` 空转 ≥30s 三触发点，浏览器顶部横幅提示并点击 reload，见 `features/changelog/2026-11-02/disconnect-watchdog.md`（排查链见 `docs/known-issues/2026-10-29-game-server-restart-client-freeze.md`）；服务端侧 ws-proxy liveness（30s ping/90s 静默拆链）+ 空闲收割确定性生效（补丁 0003）+ 收割完整断链路落库（补丁 0010）配套。**完整自动重连 / 会话恢复仍为后续** |
 | 4 | `ws_send` 的 timeout 形参被忽略 | **已修复** | 253b08e 删除从未实现的 timeout 形参，调用点同步收敛 |
 | 5 | 公会 / 家族 / 备忘录等 5 个 opcode 无处理 | **决策：显式不支持** | 95696be NullHandler 显式声明不支持备忘录/举报/家族/公会协议，收包走限频日志（避免刷屏），不再静默丢弃 |
 | 6 | 服务端 `CharSelectedHandler` 缓存未命中静默 `closeSession`（双击角色无声掉线、零日志） | **补丁 0011 已加 WARN 日志** | 41e1681：静默 close 前输出含 accountName/charId/world 的 `[WARN] character cache miss`；纯日志零行为变更。根治（缓存未命中时的补救路径）仍属服务端侧跟进 |
