@@ -23,37 +23,90 @@ namespace LazyFS
 				{
 					var fileEntry = Module.LazyFS.files.get(path);
 					// Asyncify replays the whole wasm stack from the bottom frame on
-					// wake-up, so this open() runs again. Only the read that actually
-					// suspended may go through handleSleep; every other re-executed
-					// open finds the size already cached and returns it synchronously
-					// (never both, or the replay would stop at the wrong frame).
+					// wake-up, so this open() runs again. In Rewinding state
+					// handleSleep never re-runs its closure: it only stops the
+					// rewind and hands back the recorded wakeUp value, so the
+					// frame that actually suspended MUST re-enter handleSleep to
+					// stop the replay exactly here. Every other re-executed open
+					// finds the size already cached and returns that snapshot
+					// synchronously - never handleSleep (a stray frame would stop
+					// the rewind at the wrong place) and never 0 (0 trips the C++
+					// failure branch, nl::file::open throws while the rewind is
+					// still in progress and the single rewind buffer stays
+					// wedged in state 2).
 					var asyncifyState = (typeof Asyncify !== 'undefined') ? Asyncify.state : 0;
 					var sizeKey = 'size#' + path;
 					var replayingSuspendedSize =
 						asyncifyState === 2 && Module.LazyFS.pendingSyncRead === sizeKey;
-					if (asyncifyState === 2 && !replayingSuspendedSize && fileEntry.size === null)
-					{
-						// The original size fetch failed; report it and let the
-						// caller retry in the Normal state instead of wedging the
-						// rewinder in a suspension that can never be replayed.
-						return 0;
-					}
-					if (fileEntry.size === null || replayingSuspendedSize)
-					{
-						var sizeWasRewinding = asyncifyState === 2;
-						Module.LazyFS.pendingSyncRead = sizeKey;
-						var sizeResult = Asyncify.handleSleep(function(wakeUp) {
+					// Same wakeUp hardening as fetch_data below: a wakeUp that
+					// throws (lost/stale rewind buffer) must not escape as an
+					// unhandled rejection - it gets the one-shot reload bailout.
+					var makeWakeUpOrReload = function(wakeUp) {
+						return function(value) {
+							try { wakeUp(value); }
+							catch (e) {
+								if (e === 'unwind' || (e && e.message === 'unwind')) return;
+								console.error('[LazyFS] wakeUp failed (Asyncify state ' +
+									Asyncify.state + '), reloading page:', e);
+								var reloadedBefore = false;
+								try {
+									reloadedBefore = sessionStorage.getItem('lazyfsWakeUpReloaded') === '1';
+								} catch (ignored) {}
+								if (!reloadedBefore) {
+									try { sessionStorage.setItem('lazyfsWakeUpReloaded', '1'); } catch (ignored) {}
+									location.reload();
+								}
+							}
+						};
+					};
+					var fetchSizeOnce = function() {
+						return Asyncify.handleSleep(function(wakeUp) {
+							var wakeUpOrReload = makeWakeUpOrReload(wakeUp);
 							Module.LazyFS.getFileSize(path).then(function(size) {
 								fileEntry.size = size;
-								wakeUp(size);
+								wakeUpOrReload(size);
 							}).catch(function(e) {
 								if (e === 'unwind' || (e && e.message === 'unwind')) return;
 								console.error('[LazyFS] Error fetching file size for', path, ':', e);
-								wakeUp(0);
+								wakeUpOrReload(0);
 							});
 						});
+					};
+					if (asyncifyState === 2)
+					{
+						// Replayed frame that is not the tagged suspension: the
+						// original pass already completed this open, so the
+						// cached snapshot exists and must be returned synchronously.
+						if (!replayingSuspendedSize && fileEntry.size !== null)
+						{
+							return fileEntry.size;
+						}
+						// This is - or may be - the frame that suspended. The
+						// pendingSyncRead tag is one shared slot that an
+						// interleaved suspension (ws_recv poll, another read)
+						// can overwrite between our unwind and wakeUp, and a
+						// rejected size fetch leaves size uncached, so a lost
+						// tag must not degrade into a bare `return 0`: that
+						// would throw nl::file::open from inside the replay.
+						// Going through handleSleep is the only move that both
+						// stops the rewind and recovers the recorded value; if
+						// the fetch was rejected, the rewind has already
+						// stopped when the recorded 0 surfaces, so the caller
+						// retries in Normal state instead of wedging.
+						var sizeResult = fetchSizeOnce();
 						// A rewinding call runs its tail, so only clear our own tag.
-						if (sizeWasRewinding && Module.LazyFS.pendingSyncRead === sizeKey) {
+						if (replayingSuspendedSize && Module.LazyFS.pendingSyncRead === sizeKey) {
+							Module.LazyFS.pendingSyncRead = null;
+						}
+						// If a snapshot exists it always wins over the recorded
+						// value (they are equal on the happy path anyway).
+						return fileEntry.size !== null ? fileEntry.size : sizeResult;
+					}
+					if (fileEntry.size === null)
+					{
+						Module.LazyFS.pendingSyncRead = sizeKey;
+						var sizeResult = fetchSizeOnce();
+						if (Module.LazyFS.pendingSyncRead === sizeKey) {
 							Module.LazyFS.pendingSyncRead = null;
 						}
 						return sizeResult;
