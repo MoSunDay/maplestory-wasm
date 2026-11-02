@@ -91,6 +91,17 @@ namespace jrc
             }
         }
 
+        // expiration is the raw long taken from the skillbook / update-skill
+        // packets and is never decoded on this side. The server encodes even
+        // "permanent" (-1) as the positive DEFAULT_TIME filetime
+        // (150842304000000000L, MaplePacketCreator.getTime), and cash-equip
+        // permanence (patch 0007 / 7dc8123) did not change that wire format,
+        // so for every skill the player owns expiration is a large positive
+        // value and this branch is always taken. Rendering the date is still
+        // a TODO; for now the WZ "#cAvailable until ...#" tag is simply left
+        // in the description. The else arm only runs for skills missing from
+        // the skillbook (Skillbook::get_expiration defaults to 0), where the
+        // tag is stripped instead.
         const std::string exptag = "#cAvailable until";
         if (expiration > 0)
         {
