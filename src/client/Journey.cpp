@@ -328,7 +328,14 @@ namespace jrc
 
         int64_t elapsed = frame_timing::bounded_elapsed_us(Timer::get().stop());
 
-        for (accumulator += elapsed; accumulator >= timestep; accumulator -= timestep)
+        // Clamp catch-up to two timesteps: each extra update() iteration replayed
+        // in one tick widens the Asyncify replay divergence window (cold-cache
+        // wedge), so drop the remainder instead of running a long catch-up burst.
+        constexpr int64_t MAX_CATCH_UP_STEPS = 2;
+        accumulator += elapsed;
+        if (accumulator > MAX_CATCH_UP_STEPS * timestep)
+            accumulator = MAX_CATCH_UP_STEPS * timestep;
+        for (; accumulator >= timestep; accumulator -= timestep)
             update();
 
         float alpha = static_cast<float>(accumulator) / timestep;

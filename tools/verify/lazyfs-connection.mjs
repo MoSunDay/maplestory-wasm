@@ -183,14 +183,13 @@ async function testPersistentPreloadStates() {
 	assert.equal(complete.itemAssetPreloadState, 'complete');
 	assert.equal(complete.itemAssetPreloadResult.persistent, true);
 
-	const unavailable = configurePreload(createHarness(), false);
-	let unavailablePrefetches = 0;
-	unavailable.prefetchFileRange = async () => { unavailablePrefetches += 1; };
-	await unavailable.startItemAssetPreload();
-	assert.equal(unavailable.itemAssetPreloadState, 'unavailable');
-	assert.equal(unavailable.itemAssetPreloadResult.persistent, false);
-	assert.equal(unavailable.itemAssetPreloadResult.reason, 'persistent-storage-unavailable');
-	assert.equal(unavailablePrefetches, 0);
+	const grantless = configurePreload(createHarness(), false);
+	let grantlessPrefetches = 0;
+	grantless.prefetchFileRange = async () => { grantlessPrefetches += 1; };
+	await grantless.startItemAssetPreload();
+	assert.equal(grantless.itemAssetPreloadState, 'complete');
+	assert.equal(grantless.itemAssetPreloadResult.persistent, false);
+	assert.ok(grantlessPrefetches >= 2, 'warmup must run without a persist() grant');
 
 	const failed = configurePreload(createHarness(), true);
 	let injected = false;
@@ -203,6 +202,23 @@ async function testPersistentPreloadStates() {
 	await assert.rejects(failed.startItemAssetPreload(), /cache writes failed/);
 	assert.equal(failed.itemAssetPreloadState, 'failed');
 	assert.equal(failed.cacheWriteStats.failed, 1);
+}
+
+async function testBootWarmupSchedulesOnce() {
+	const harness = createHarness();
+	const { lazyfs } = harness;
+	let starts = 0;
+	lazyfs.startItemAssetPreload = () => { starts += 1; };
+	lazyfs.scheduleBootWarmup();
+	assert.equal(starts, 0, 'sizes are unknown before registration');
+	lazyfs.files.set('String.nx', { size: 1 });
+	lazyfs.files.set('Item.nx', { size: 1 });
+	lazyfs.scheduleBootWarmup();
+	assert.equal(starts, 0, 'Character.nx size is still missing');
+	lazyfs.files.set('Character.nx', { size: 1 });
+	lazyfs.scheduleBootWarmup();
+	lazyfs.scheduleBootWarmup();
+	assert.equal(starts, 1, 'boot warmup is idempotent');
 }
 
 async function testUnloadSuppressesRecovery() {
@@ -321,6 +337,7 @@ await testReconnectReplaysPendingRequest();
 await testTerminalAssetFailureDoesNotExitGame();
 await testUnloadSuppressesRecovery();
 await testPersistentPreloadStates();
+await testBootWarmupSchedulesOnce();
 await testForegroundAssetFailureRetries();
 await testPriorityAssetDoesNotBlockGameplay();
 await testPriorityAssetFailureEscalatesToRetry();

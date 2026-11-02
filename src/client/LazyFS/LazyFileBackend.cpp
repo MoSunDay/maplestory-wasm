@@ -192,29 +192,57 @@ namespace LazyFS
 				// Use Asyncify.handleSleep directly to avoid Promise wrapper issues.
 				// Tag this read as the live suspension point; a rewinding replay
 				// clears the tag once it has resumed at the recorded frame.
+				// A failed wakeUp wedges Asyncify's single rewind buffer (state
+				// stuck; later RAF/input callbacks are then silently dropped and
+				// the UI freezes without any error): surface the failure and do a
+				// one-shot explicit reload instead of freezing silently.
+				// NOTE: must live inside the handleSleep callback so it closes
+				// over that invocation's wakeUp.
+				var makeWakeUpOrReload = function(wakeUp) {
+					return function(value) {
+						try { wakeUp(value); }
+						catch (e) {
+							// 'unwind' is emscripten_set_main_loop's normal
+							// stack-escape sentinel surfacing through the
+							// synchronous doRewind replay, not a wake failure.
+							if (e === 'unwind' || (e && e.message === 'unwind')) return;
+							console.error('[LazyFS] wakeUp failed (Asyncify state ' +
+								Asyncify.state + '), reloading page:', e);
+							var reloadedBefore = false;
+							try {
+								reloadedBefore = sessionStorage.getItem('lazyfsWakeUpReloaded') === '1';
+							} catch (ignored) {}
+							if (!reloadedBefore) {
+								try { sessionStorage.setItem('lazyfsWakeUpReloaded', '1'); } catch (ignored) {}
+								location.reload();
+							}
+						}
+					};
+				};
 				var wasRewinding = asyncifyState === 2;
 				Module.LazyFS.pendingSyncRead = pendingKey;
 				var fetched = Asyncify.handleSleep(function(wakeUp) {
+					var wakeUpOrReload = makeWakeUpOrReload(wakeUp);
 					Module.LazyFS.readFileData(path, offset, size)
 						.then(function(data) {
 							if (data) {
 								if (data.length > size) {
 									console.error('[LazyFS] OOB Write Risk! chunks:', data.length, 'vs req:', size);
-									try { wakeUp(0); } catch(e) {}
+									wakeUpOrReload(0);
 									return;
 								}
 								// Check for valid pointer and heap
 								if (bufferPtr < 0 || bufferPtr + data.length > HEAPU8.length) {
 									console.error('[LazyFS] OOB FATAL: Ptr:', bufferPtr, 'Len:', data.length, 'Heap:', HEAPU8.length);
-									try { wakeUp(0); } catch(e) {}
+									wakeUpOrReload(0);
 									return;
 								}
 								
 								HEAPU8.set(data, bufferPtr);
-								try { wakeUp(1); } catch(e) {}
+								wakeUpOrReload(1);
 							} else {
 								console.error('[LazyFS] No data returned for', path);
-								try { wakeUp(0); } catch(e) {}
+								wakeUpOrReload(0);
 							}
 						}) // Use single .then() and no .catch() for the wakeUp path to act naturally
 						.catch(function(e) {
@@ -223,7 +251,7 @@ namespace LazyFS
 							
 							console.error('[LazyFS] Error fetching data:', e);
 							console.error(e.stack);
-							try { wakeUp(0); } catch(e) {} 
+							wakeUpOrReload(0);
 						});
 				});
 				if (wasRewinding && Module.LazyFS.pendingSyncRead === pendingKey) {

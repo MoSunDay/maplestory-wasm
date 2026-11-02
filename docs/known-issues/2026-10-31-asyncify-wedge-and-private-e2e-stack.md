@@ -1,5 +1,32 @@
 # Asyncify 楔死根因与私有 e2e 栈 runbook（2026-10-31）
 
+## 状态更新（2026-11-02：冷缓存楔死三处修复已落地）
+
+随 11-02 构建落地三处修复（详见
+`features/changelog/2026-11-02/lazyfs-cold-cache-wedge-fix.md`）：
+
+1. **boot 预热解耦 persist**：`lazyfs.js` 新增 `scheduleBootWarmup`
+   （Character/Item/String 三 nx size 就绪即后台预热，幂等、不再等待
+   `requestPersistentStorage` 授权）；`characterMetadataEnd` 改走
+   后台 chunk 管线，boot 期不再依赖 Asyncify 挂起态下的
+   `readFileData`（该守卫挂起时返回 null，旧路径必失败）。
+2. **main_tick 累加器钳制**（`Journey.cpp`）：落后超过 2×timestep 即
+   丢弃，防止 rewind 回放发散造成的帧债务忙自旋。
+3. **wakeUp 异常分级**（`LazyFileBackend.cpp`）：`makeWakeUpOrReload`
+   忽略 `'unwind'` 哨兵（emscripten 主循环 `throw "unwind"` 穿过同步
+   rewind 回放是正常现象，此前被误判致命）；其余真异常走一次性
+   `sessionStorage` 防循环的 `location.reload()` 兜底。
+
+验证：3 次真·冷缓存启动（snap chromium 需 wipe
+`/tmp/snap-private-tmp/snap.chromium/tmp/lazyfs-fix`，宿主 `/tmp`
+wipe 无效）+ 暖缓存回归全部 34 PASS、0 异常、0 reload；暖启动 NET
+取块从 ~200 降至 3（22s 进图 vs 冷 68-86s）。
+
+**残余风险**：`open()` 的 size 取回仍是快照档（文件变大需重开才可
+见）；socket 层 `ws_recv`/`connect` 与 LazyFS 共享单 rewind 缓冲的
+并发 park/wake 结构未变（本文根因分析继续有效）；wakeUp 真异常现走
+一次性 reload 兜底而非根治。下文 runbook 对残余风险仍适用。
+
 ## 现象：三种楔死形态
 
 宠物温饱度 e2e（`E2E_PET_OPTIONS=hunger`）在登录后 UI 输入触发 lazy-fetch

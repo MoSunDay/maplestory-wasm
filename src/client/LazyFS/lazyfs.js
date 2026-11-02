@@ -337,7 +337,7 @@ var LazyFS = {
 		return this.request(key, {
 				type: 'get_size',
 				file: filepath
-			}, 10000);
+			}, 10000).finally(() => this.scheduleBootWarmup());
 	},
 
 	/**
@@ -544,23 +544,35 @@ var LazyFS = {
 	},
 
 	characterMetadataEnd: async function () {
-		const header = await this.readFileData('Character.nx', 0, 40, false);
-		if (!header || header.length < 40) {
-			throw new Error('Character.nx header is unavailable');
-		}
-
-		const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
+		// Background chunk pipeline only: readFileData is skipped while
+		// Asyncify is parked, which is nearly always the case at boot.
+		const fileEntry = this.files.get('Character.nx');
+		if (!fileEntry || !fileEntry.size) throw new Error('Character.nx is not registered');
+		await this.prefetchFileRange('Character.nx', 0, 40);
+		const chunk = this.chunkCache.get(this.getChunkCacheKey('Character.nx', this.getFileVersionTag(fileEntry), 0));
+		if (!chunk || chunk.length < 40) throw new Error('Character.nx header is unavailable');
+		const view = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
 		const bitmapCount = view.getUint32(28, true);
-		const bitmapOffsetLow = view.getUint32(32, true);
-		const bitmapOffsetHigh = view.getUint32(36, true);
-		const bitmapOffset = bitmapOffsetLow + bitmapOffsetHigh * 0x100000000;
+		const bitmapOffset = view.getUint32(32, true) + view.getUint32(36, true) * 0x100000000;
 		return bitmapOffset + bitmapCount * 8;
 	},
 
+	// Boot warmup: once every preload file has a size (before the login flow's
+	// first lazy reads), start the warmup once; never gated on a persist() grant.
+	scheduleBootWarmup: function () {
+		if (this.bootWarmupScheduled) return;
+		const hasSize = name => { const e = this.files.get(name); return !!e && typeof e.size === 'number' && e.size > 0; };
+		if (hasSize('String.nx') && hasSize('Item.nx') && hasSize('Character.nx')) {
+			this.bootWarmupScheduled = true;
+			this.startItemAssetPreload();
+		}
+	},
+
 	/**
-	 * Start once after entering the game. Item and String are retained in full;
-	 * Character metadata is retained up front, and normal LazyFS reads retain
-	 * every encountered equipment image chunk without an expiry timer.
+	 * Start once at boot (scheduleBootWarmup) and again after entering the
+	 * game; the second call reuses the in-flight promise. Item and String are
+	 * retained in full; Character metadata is retained up front, and normal
+	 * LazyFS reads retain every encountered equipment image chunk.
 	 */
 	startItemAssetPreload: function () {
 		if (this.itemAssetPreloadPromise) {
@@ -573,19 +585,8 @@ var LazyFS = {
 			.then(async () => {
 				const failureBaseline = this.cacheWriteStats.failed;
 				const attemptBaseline = this.cacheWriteStats.attempted;
+				// Best-effort: cold-cache first visits have no persist() grant yet.
 				const persistent = await this.requestPersistentStorage();
-				if (!persistent) {
-					this.itemAssetPreloadResult = Object.freeze({
-						persistent: false,
-						attempted: 0,
-						succeeded: 0,
-						failed: 0,
-						reason: 'persistent-storage-unavailable',
-					});
-					this.itemAssetPreloadState = 'unavailable';
-					console.warn('[LazyFS] Persistent item asset preload unavailable; bulk preload skipped');
-					return;
-				}
 				const stringEntry = this.files.get('String.nx');
 				const itemEntry = this.files.get('Item.nx');
 				if (!stringEntry || !itemEntry) {
