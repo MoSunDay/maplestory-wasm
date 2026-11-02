@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVER_DIR="/data00/github/maplestory-wasm/link_repos/MapleStory-Server"
+# 服务端 checkout 目录：默认相对本脚本定位仓库根下的 link_repos/MapleStory-Server
+# （该路径为指向真实 checkout 的符号链接），可用 SERVER_DIR 环境变量覆盖。
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SERVER_DIR="${SERVER_DIR:-${REPO_ROOT}/link_repos/MapleStory-Server}"
 
 read_env_value() {
   local pid="$1"
