@@ -1,0 +1,103 @@
+# 服务端源码补丁：非 Boss 怪血条全图广播 + 死亡伤害贡献者经验结算
+# 背景：link_repos/MapleStory-Server 是无版本控制的 linked checkout，
+# 重新 checkout/同步后以下修复会丢失，须重放本补丁。
+# 根因（多玩家同图两个症状）：
+# 1) MapleMonster.broadcastMobHpBar 非 Boss 分支的 SHOW_MONSTER_HP 包
+#    只发攻击者本人（无队伍 from.announce）或其队友（有队伍循环
+#    getCharacterById），非组队的同图玩家永远收不到 → 怪物血条不同步；
+# 2) giveExpToCharacter 整个方法体包在 if (attacker.isAlive()) 里 →
+#    打怪途中死亡的伤害贡献者拿 0 经验且不补发 → "打怪经验不共享"。
+#    （distributeExperience 的按伤害 80% 分配 + 击杀者 20% 加成、
+#    击杀者队伍全额经验定制 2026-10-22 均不动；等级门槛等防 leech
+#    设计一律保留。）
+# 修复：非 Boss 分支改为遍历 map.getCharacters() 全图广播（保留
+#       packet.clone 防 crypto，风格对齐原 party 分支）；giveExpToCharacter
+#       去掉 isAlive 门槛，方法体平铺，死亡贡献者也结算伤害经验；
+#       details: features/changelog/2026-11-03/mob-hp-broadcast-and-exp-share.md
+# 重放：cd link_repos/MapleStory-Server && patch -p1 < 本文件
+# 验证：bash posix-compile.sh（javac 全量编译退出码 0）后
+#       docker restart ms-game-server && docker logs --tail 50 ms-game-server
+#       （登录口 8484 bind 成功、无异常栈）；双账号同图打怪：非队友可见
+#       血条扣减、战斗中死亡的贡献者击杀后正常获得经验。
+--- a/src/server/life/MapleMonster.java
++++ b/src/server/life/MapleMonster.java
+@@ -359,15 +359,8 @@
+         } else if (!isBoss()) {
+             int remainingHP = (int) Math.max(1, hp.get() * 100f / getMaxHp());
+             byte[] packet = MaplePacketCreator.showMonsterHP(getObjectId(), remainingHP);
+-            if (from.getParty() != null) {
+-                for (MaplePartyCharacter mpc : from.getParty().getMembers()) {
+-                    MapleCharacter member = from.getMap().getCharacterById(mpc.getId()); // god bless
+-                    if (member != null) {
+-                        member.announce(packet.clone()); // clone it just in case of crypto
+-                    }
+-                }
+-            } else {
+-                from.announce(packet);
++            for (MapleCharacter mc : map.getCharacters()) {
++                mc.announce(packet.clone()); // broadcast to all players on the map, keeps mob HP bars in sync between non-partied damagers -- clone it just in case of crypto
+             }
+         }
+     }
+@@ -667,35 +660,34 @@
+     }
+     
+     private void giveExpToCharacter(MapleCharacter attacker, Float personalExp, Float partyExp) {
+-        if (attacker.isAlive()) {
+-            if (personalExp != null) {
+-                personalExp *= getStatusExpMultiplier(attacker);
+-                personalExp *= attacker.getExpRate();
+-            } else {
+-                personalExp = 0.0f;
+-            }
+-            
+-            Integer expBonus = attacker.getBuffedValue(MapleBuffStat.EXP_INCREASE);
+-            if (expBonus != null) {     // exp increase player buff found thanks to HighKey21
+-                personalExp += expBonus;
+-            }
++        // dead damagers still settle their damage-share exp (multi-client co-op), dying mid-fight no longer drops the contribution
++        if (personalExp != null) {
++            personalExp *= getStatusExpMultiplier(attacker);
++            personalExp *= attacker.getExpRate();
++        } else {
++            personalExp = 0.0f;
++        }
++        
++        Integer expBonus = attacker.getBuffedValue(MapleBuffStat.EXP_INCREASE);
++        if (expBonus != null) {     // exp increase player buff found thanks to HighKey21
++            personalExp += expBonus;
++        }
+ 
+-            int _personalExp = expValueToInteger(personalExp); // assuming no negative xp here
+-            
+-            if (partyExp != null) {
+-                partyExp *= getStatusExpMultiplier(attacker);
+-                partyExp *= attacker.getExpRate();
+-                partyExp *= ServerConstants.PARTY_BONUS_EXP_RATE;
+-            } else {
+-                partyExp = 0.0f;
+-            }
+-            
+-            int _partyExp = expValueToInteger(partyExp);
+-            
+-            attacker.gainExp(_personalExp, _partyExp, true, false, false);
+-            attacker.increaseEquipExp(_personalExp);
+-            attacker.updateQuestMobCount(getId());
++        int _personalExp = expValueToInteger(personalExp); // assuming no negative xp here
++        
++        if (partyExp != null) {
++            partyExp *= getStatusExpMultiplier(attacker);
++            partyExp *= attacker.getExpRate();
++            partyExp *= ServerConstants.PARTY_BONUS_EXP_RATE;
++        } else {
++            partyExp = 0.0f;
+         }
++        
++        int _partyExp = expValueToInteger(partyExp);
++        
++        attacker.gainExp(_personalExp, _partyExp, true, false, false);
++        attacker.increaseEquipExp(_personalExp);
++        attacker.updateQuestMobCount(getId());
+     }
+ 
+     public MapleCharacter killBy(final MapleCharacter killer) {

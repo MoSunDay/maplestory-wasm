@@ -60,6 +60,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **Buff 管理**: 增益/减益效果
 - **[地图机关伤害](changelog/2026-11-01/map-obstacle-damage.md)**: 地刺/陷阱等地面机关恢复伤害判定——客户端从 Obj 定义的 `obstacle`/`damage` 字段收集机关足迹，玩家踏入即受固定伤害（地铁跳跳图地刺条、忍苦树林尖刺、椰子赛陷阱洞、CWKPQ 石柱等 224 个机关定义），`TAKE_DAMAGE -2` 上报，服务端不再丢弃无怪物来源的受击；迷宫喷气/蒸汽陷阱（trap.img/steam/0/*）定义无 `damage` 字段，按 `DEFAULT_OBSTACLE_DAMAGE=100` 落伤，足迹优先取帧 `lt`/`rb` 碰撞盒
 - **[怪物仇恨战斗](mob-combat/)**: 怪物受击后按累计伤害锁定目标并持续追击，在范围内使用普通攻击或服务端授权技能，完整呈现状态、疾病和雾效果
+- **[同图怪物血条广播与死亡贡献者经验](changelog/2026-11-03/mob-hp-broadcast-and-exp-share.md)**: linked server 非 Boss 怪 `SHOW_MONSTER_HP` 改为全图广播（非组队同图玩家血条同步）；`giveExpToCharacter` 去掉 `isAlive` 门槛，打怪途中死亡的伤害贡献者照常结算伤害经验（伤害 80%+击杀 20% 分配、击杀者队伍全额经验与防 leech 等级门槛不动；服务端 patch 0012）
 
 相关模块: [游戏世界](../agents/client/Gameplay/index.md), [角色系统](../agents/client/Character/index.md)
 

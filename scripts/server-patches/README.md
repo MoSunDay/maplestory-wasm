@@ -21,7 +21,7 @@
 changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**，两个
 0006 均原样保留。此后规则：
 
-- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0011）；
+- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0012）；
 - slug 必须唯一，禁止复用；
 - 同一编号出现不同 slug，一律视为历史遗留，不表示覆盖或替代关系。
 
@@ -41,6 +41,7 @@ changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**�
 | [0009-ranking-worker-rank-reserved-word.patch](0009-ranking-worker-rank-reserved-word.patch) | `RankingLoginWorker.updateRanking` 总榜分支（job==-1）UPDATE 列名加反引号（rank/rankMove；jobRank 分支、SELECT c.rank、resetMoveRank 均不动），修复 MySQL 8.0+ 保留字 RANK 导致每小时整点 MySQLSyntaxErrorException 事务回滚、rank/rankMove 从不落库 | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
 | [0010-idle-reap-preserve-disconnect-save.patch](0010-idle-reap-preserve-disconnect-save.patch) | `MapleClient.testPing` 空闲收割主体改为单一 `session.close(true)`：删除收割时提前 `closeSession`/`updateLoginState`/`removeAttribute(CLIENT_KEY)` 的手工清理（异步 sessionClosed 因此拿到 null client 跳过 disconnect → 幽灵会话：断线角色不落库、残留地图），改由既有 `sessionClosed → closeMapleSession → disconnect → disconnectInternal` 链路接管（游戏内玩家 saveCharToDB/removePlayer，登录态会话落入等价清理分支）；不动锁序 | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
 | [0011-charselected-cache-miss-logging.patch](0011-charselected-cache-miss-logging.patch) | `CharSelectedHandler` 缓存未命中（`haveCharacterEntry` 查 accountChars 无该角色）静默 `closeSession` 前补一条 WARN（`System.err.println("[WARN] ...")`，同层 Server.java 既有日志格式），含 accountName/charId/world 与原因 "character cache miss"，纯日志零行为变更，消除"双击角色无声掉线零线索" | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
+| [0012-mob-hp-broadcast-and-dead-damager-exp.patch](0012-mob-hp-broadcast-and-dead-damager-exp.patch) | `MapleMonster.broadcastMobHpBar` 非 Boss 分支 SHOW_MONSTER_HP 改为遍历 `map.getCharacters()` 全图广播（保留 `packet.clone()` 防 crypto，Boss 分支 `broadcastBossHpMessage` 本就全图），修复非组队同图玩家怪物血条不同步；`giveExpToCharacter` 去掉 `if (attacker.isAlive())` 门槛方法体平铺，打怪途中死亡的伤害贡献者照常结算伤害经验（distributeExperience 伤害 80%+击杀 20% 加成、击杀者队伍全额经验定制与防 leech 等级门槛均不动） | 已应用于当前 checkout 并重编入 dist（2026-11-03） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。
