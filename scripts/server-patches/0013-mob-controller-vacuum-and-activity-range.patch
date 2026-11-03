@@ -1,0 +1,64 @@
+# 服务端源码补丁：怪物控制权真空窗口接管 + MoveLife rawActivity 区间判定
+# 背景：link_repos/MapleStory-Server 是无版本控制的 linked checkout，
+# 重新 checkout/同步后以下修复会丢失，须重放本补丁。
+# 根因（同图怪物冻结画面不同步，两个症状）：
+# 1) MapleMonster.aggroMoveLifeUpdate（:1942-1954）在怪物当前无有效控制器
+#    时返回 null——控制器离图/掉线到 releaseControlledMonsters 完成
+#    aggroRedirectController 之前的真空窗口内，MoveLifeHandler.java:144-145
+#    收到 null 直接 return，上报者的 MoveLife 被静默丢弃 → 没有任何人转发
+#    怪物移动，全场玩家画面里怪冻结，直到下一次 aggroUpdateController；
+# 2) MoveLifeHandler.inRangeInclusive（:170-172）`!(pVal < pMin) || (pVal > pMax)`
+#    恒真 → rawActivity ≥ 42 时 isAttack 与 isSkill 同时为 true，怪物技能/
+#    普攻动作转发分类失真（各端 MobPresentation 的 begin_attack/begin_skill
+#    选择受影响，观感不同步）。该方法为私有方法，仅本 handler 两处调用
+#    （:78-79），无其他共用者。
+# 修复：aggroMoveLifeUpdate 增加真空接管分支——无有效控制器（getActiveController
+#       == null）且上报者活着、在同图时，经 aggroSwitchController 立即接管并返回
+#       正常 aggro 结果而非 null（交接在 aggroUpdateLock 内完成，沿用该类现有
+#       锁风格；传入当前 isControllerHasAggro 保持仇恨状态不被重置，避免与
+#       aggroAutoAggroUpdate 自动接管重复触发；他人已抢先接管时照旧返回 null）；
+#       inRangeInclusive 修为 `!(pVal < pMin || pVal > pMax)`；
+#       details: features/changelog/2026-11-03/mob-controller-vacuum-fix.md
+# 重放：cd link_repos/MapleStory-Server && patch -p1 < 本文件
+# 验证：bash posix-compile.sh（javac 全量编译退出码 0）后
+#       docker restart ms-game-server && docker logs --tail 30 ms-game-server
+#       （5 频道 7575~7975 + 登录口 8484 在线、无异常栈）；双账号同图：一方
+#       离图/掉线瞬间，另一方画面里怪物不再冻结、继续移动/出招；
+#       node tools/verify/party-share-server-contract.mjs 回归 PASS。
+--- a/src/server/life/MapleMonster.java
++++ b/src/server/life/MapleMonster.java
+@@ -1948,6 +1948,23 @@
+             }
+             
+             return aggro;
++        } else if (this.getActiveController() == null && player.isAlive() && player.isLoggedinWorld() && player.getMap() == this.getMap()) {
++            // controller vacuum window: the previous controller left the map / logged out and its
++            // releaseControlledMonsters hasn't finished redirecting yet, so nobody is simulating this
++            // mob -- dropping the reporter's MoveLife freezes the mob on every client's screen until
++            // the next aggroUpdateController. Let the reporter take over right away instead. The
++            // handover itself (aggroRemoveController + re-check + controlMonster announce) runs under
++            // aggroUpdateLock inside aggroSwitchController; keeping the mob's current aggro state
++            // through the switch avoids re-flagging aggro, and no-op'ing when someone else already
++            // took over prevents clashing with the aggroAutoAggroUpdate path.
++            this.aggroSwitchController(player, this.isControllerHasAggro());
++            
++            MapleCharacter newController = this.getActiveController();
++            if (newController != null && newController.getId() == player.getId()) {
++                return this.isControllerHasAggro();
++            }
++            
++            return null;
+         } else {
+             return null;
+         }
+--- a/src/net/server/channel/handlers/MoveLifeHandler.java
++++ b/src/net/server/channel/handlers/MoveLifeHandler.java
+@@ -168,6 +168,6 @@
+ 	}
+ 
+ 	private static boolean inRangeInclusive(Byte pVal, Integer pMin, Integer pMax) {
+-		return !(pVal < pMin) || (pVal > pMax);
++		return !(pVal < pMin || pVal > pMax);   // was `!(pVal < pMin) || (pVal > pMax)` -- always true, made isAttack & isSkill overlap on rawActivity >= 42
+ 	}
+ }
+\ No newline at end of file

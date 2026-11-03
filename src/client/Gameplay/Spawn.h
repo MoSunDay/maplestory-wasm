@@ -143,6 +143,8 @@ namespace jrc
                   int16_t combo_value = 0);
 
         int32_t get_cid() const;
+        Point<int16_t> get_position() const;
+        int8_t get_stance() const;
         std::unique_ptr<MapObject> instantiate() const;
 
     private:

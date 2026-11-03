@@ -28,10 +28,8 @@ namespace jrc
         job = jb;
         set_position(pos);
 
-        lastmove.xpos = pos.x();
-        lastmove.ypos = pos.y();
-        lastmove.newstate = st;
-        timer = 0;
+        playback = mobplayback::begin(pos, {});
+        laststate = st;
 
         attackspeed = 6;
         attacking = false;
@@ -39,32 +37,36 @@ namespace jrc
 
     int8_t OtherChar::update(const Physics& physics)
     {
-        if (timer > 1)
+        const mobplayback::Sample sample =
+            mobplayback::step(playback, Constants::TIMESTEP);
+
+        // Nothing may move a remote character except fragment replay, so
+        // the local physics model never diverges from the server-side
+        // trajectory of the controlling client.
+        phobj.hforce = 0.0;
+        phobj.vforce = 0.0;
+        phobj.hspeed = 0.0;
+        phobj.vspeed = 0.0;
+
+        if (playback.started())
         {
-            timer--;
-        }
-        else if (timer == 1)
-        {
-            if (!movements.empty())
+            // The frame displacement doubles as the animation speed input,
+            // matching the per-frame velocity the local player runs with.
+            phobj.hspeed = sample.position.x() - phobj.crnt_x();
+            phobj.vspeed = sample.position.y() - phobj.crnt_y();
+            phobj.x = sample.position.x();
+            phobj.y = sample.position.y();
+
+            if (sample.state > 0)
             {
-                lastmove = movements.front();
-                movements.pop();
-            }
-            else
-            {
-                timer = 0;
+                laststate = sample.state;
             }
         }
 
         if (!attacking && !is_in_item_chair())
         {
-            uint8_t laststate = lastmove.newstate;
             set_state(laststate);
         }
-
-        phobj.hspeed = lastmove.xpos - phobj.crnt_x();
-        phobj.vspeed = lastmove.ypos - phobj.crnt_y();
-        phobj.move();
 
         physics.get_fht().update_fh(phobj);
 
@@ -79,13 +81,35 @@ namespace jrc
 
     void OtherChar::send_movement(const std::vector<Movement>& newmoves)
     {
-        movements.push(newmoves.back());
-
-        if (timer == 0)
+        if (newmoves.empty())
         {
-            constexpr uint16_t DELAY = 50;
-            timer = DELAY;
+            return;
         }
+
+        // MOVE_PLAYER carries no explicit start position, so the batch is
+        // anchored where the moving client began its first fragment: the
+        // wire 'last' position. Fragments without one keep the position
+        // the replay currently holds.
+        const Movement& first = newmoves.front();
+        Point<int16_t> start = get_position();
+        if (first.type == Movement::_ABSOLUTE || first.type == Movement::JUMPDOWN)
+        {
+            start = { first.lastx, first.lasty };
+        }
+
+        playback = mobplayback::begin(start, { newmoves.begin(), newmoves.end() });
+    }
+
+    void OtherChar::respawn(Point<int16_t> position, int8_t stance)
+    {
+        set_position(position);
+        laststate = static_cast<uint8_t>(stance);
+        if (!attacking && !is_in_item_chair())
+        {
+            set_state(laststate);
+        }
+
+        playback = mobplayback::begin(position, {});
     }
 
     void OtherChar::update_skill(int32_t skillid, uint8_t skilllevel)
@@ -102,7 +126,6 @@ namespace jrc
     {
         look = newlook;
 
-        uint8_t laststate = lastmove.newstate;
         set_state(laststate);
     }
 

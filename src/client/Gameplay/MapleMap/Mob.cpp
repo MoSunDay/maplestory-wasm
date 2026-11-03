@@ -347,6 +347,13 @@ namespace jrc
 
         if (!dying)
         {
+            if (!control)
+            {
+                // Non-controlled mobs are driven by server fragment
+                // replay instead of local physics extrapolation.
+                return update_remote(physics, aniend);
+            }
+
             if (!canfly)
             {
                 if (phobj.is_flag_not_set(PhysicsObject::TURNATEDGES))

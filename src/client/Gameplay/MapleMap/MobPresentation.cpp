@@ -54,6 +54,9 @@ namespace jrc
             suggested_skill_id = 0;
             suggested_skill_level = 0;
             cancel_action();
+            // Drop any stale fragment batch so the mob freezes where the
+            // server last saw it until the next MOB_MOVED arrives.
+            playback = mobplayback::begin(get_position(), {});
         }
     }
 
@@ -65,14 +68,18 @@ namespace jrc
         {
             return;
         }
+        // Server-authoritative re-anchor: replay restarts from 'start' and
+        // fragment positions are interpolated from there, so the mob no
+        // longer gets snapped to the batch's final position on arrival.
         set_position(start);
-        movements = std::move(incoming);
-        if (movements.empty())
+        playback = mobplayback::begin(start, std::move(incoming));
+        if (!playback.started())
         {
             return;
         }
 
-        const Movement& last = movements.back();
+        // Attacks and skills trigger on packet arrival: their timing comes
+        // from the attack/skill animations, not from the movement path.
         if (raw_activity >= 24 && raw_activity <= 41)
         {
             const uint8_t attack_index = (raw_activity - 24) / 2;
@@ -96,11 +103,50 @@ namespace jrc
                 begin_skill(static_cast<size_t>(skill - skill_actions.begin()), false);
             }
         }
-        else
+
+        // Seed the foothold until the first playback frame applies it.
+        if (const Movement* last = mobplayback::last_positioned(playback))
         {
-            set_stance(last.newstate);
+            phobj.fhid = last->fh;
         }
-        phobj.fhid = last.fh;
+    }
+
+    int8_t Mob::update_remote(const Physics& physics, bool aniend)
+    {
+        const mobplayback::Sample sample =
+            mobplayback::step(playback, Constants::TIMESTEP);
+
+        // Nothing may move a non-controlled mob except fragment replay.
+        phobj.hforce = 0.0;
+        phobj.vforce = 0.0;
+        phobj.hspeed = 0.0;
+        phobj.vspeed = 0.0;
+
+        if (playback.started())
+        {
+            phobj.x = sample.position.x();
+            phobj.y = sample.position.y();
+            if (sample.fh > 0)
+            {
+                phobj.fhid = sample.fh;
+            }
+            if (sample.state > 0 && sample.state < mobplayback::ACTIVITY_FIRST)
+            {
+                set_stance(sample.state);
+            }
+        }
+
+        // Keep derived foothold state (layer, onground) usable for draw
+        // order and combat range checks while the mob is remote.
+        physics.get_fht().update_fh(phobj);
+
+        if (action_kind != ActionKind::NONE && aniend)
+        {
+            finish_action();
+            counter = 0;
+        }
+
+        return phobj.fhlayer;
     }
 
     Rectangle<int16_t> Mob::get_bounds(Point<int16_t> position) const

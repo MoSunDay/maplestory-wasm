@@ -21,7 +21,7 @@
 changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**，两个
 0006 均原样保留。此后规则：
 
-- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0012）；
+- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0013）；
 - slug 必须唯一，禁止复用；
 - 同一编号出现不同 slug，一律视为历史遗留，不表示覆盖或替代关系。
 
@@ -42,6 +42,7 @@ changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**�
 | [0010-idle-reap-preserve-disconnect-save.patch](0010-idle-reap-preserve-disconnect-save.patch) | `MapleClient.testPing` 空闲收割主体改为单一 `session.close(true)`：删除收割时提前 `closeSession`/`updateLoginState`/`removeAttribute(CLIENT_KEY)` 的手工清理（异步 sessionClosed 因此拿到 null client 跳过 disconnect → 幽灵会话：断线角色不落库、残留地图），改由既有 `sessionClosed → closeMapleSession → disconnect → disconnectInternal` 链路接管（游戏内玩家 saveCharToDB/removePlayer，登录态会话落入等价清理分支）；不动锁序 | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
 | [0011-charselected-cache-miss-logging.patch](0011-charselected-cache-miss-logging.patch) | `CharSelectedHandler` 缓存未命中（`haveCharacterEntry` 查 accountChars 无该角色）静默 `closeSession` 前补一条 WARN（`System.err.println("[WARN] ...")`，同层 Server.java 既有日志格式），含 accountName/charId/world 与原因 "character cache miss"，纯日志零行为变更，消除"双击角色无声掉线零线索" | 已应用于当前 checkout 并重编入 dist（2026-11-02） |
 | [0012-mob-hp-broadcast-and-dead-damager-exp.patch](0012-mob-hp-broadcast-and-dead-damager-exp.patch) | `MapleMonster.broadcastMobHpBar` 非 Boss 分支 SHOW_MONSTER_HP 改为遍历 `map.getCharacters()` 全图广播（保留 `packet.clone()` 防 crypto，Boss 分支 `broadcastBossHpMessage` 本就全图），修复非组队同图玩家怪物血条不同步；`giveExpToCharacter` 去掉 `if (attacker.isAlive())` 门槛方法体平铺，打怪途中死亡的伤害贡献者照常结算伤害经验（distributeExperience 伤害 80%+击杀 20% 加成、击杀者队伍全额经验定制与防 leech 等级门槛均不动） | 已应用于当前 checkout 并重编入 dist（2026-11-03） |
+| [0013-mob-controller-vacuum-and-activity-range.patch](0013-mob-controller-vacuum-and-activity-range.patch) | `MapleMonster.aggroMoveLifeUpdate` 增加控制权真空接管分支：怪物无有效控制器（控制器离图/掉线到 `releaseControlledMonsters` 完成前）时不再返回 null 丢弃上报者 MoveLife，改为让活着且在同图的上报者经 `aggroSwitchController` 立即接管并返回正常 aggro 结果（交接沿用 `aggroUpdateLock` 锁风格、保留当前仇恨状态 不与 `aggroAutoAggroUpdate` 重复触发），修复同图怪物冻结画面不同步；`MoveLifeHandler.inRangeInclusive` 恒真表达式 `!(pVal<pMin)\|\|(pVal>pMax)` 修为 `!(pVal<pMin\|\|pVal>pMax)`，rawActivity≥42 不再 isAttack/isSkill 同时为 true（私有方法仅本 handler :78-79 两处调用） | 已应用于当前 checkout 并重编入 dist（2026-11-03） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。

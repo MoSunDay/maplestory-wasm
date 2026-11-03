@@ -23,7 +23,10 @@ namespace jrc
             Optional<OtherChar> ochar = get_char(cid);
             if (ochar)
             {
-
+                // The server re-sends SPAWN_PLAYER when the character
+                // changes map or needs correcting: refresh the known
+                // character in place instead of dropping it.
+                ochar->respawn(spawn.get_position(), spawn.get_stance());
             }
             else
             {

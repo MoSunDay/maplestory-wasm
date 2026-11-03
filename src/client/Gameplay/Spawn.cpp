@@ -135,6 +135,16 @@ namespace jrc
         return cid;
     }
 
+    Point<int16_t> CharSpawn::get_position() const
+    {
+        return position;
+    }
+
+    int8_t CharSpawn::get_stance() const
+    {
+        return stance;
+    }
+
     std::unique_ptr<MapObject> CharSpawn::instantiate() const
     {
         auto character = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);

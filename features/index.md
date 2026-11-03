@@ -31,6 +31,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **角色移动**: 行走、跳跃、攀爬、游泳等物理移动
 - **[水下世界游泳](changelog/2026-11-01/aqua-road-swim.md)**: swim 水图四方向游泳、跳跃键向上划水、水物理从落水首帧生效、移动封包用官方 swim 片段（command 5）；修复非水图坐姿按↑误入漂浮态、进水图预热水下动画
 - **[雪地滑行](changelog/2026-11-01/snow-map-slide.md)**: fs 雪图未穿防滑鞋松键后惯性滑行一小段、行走速度与普通地图不变，斜坡顺势下滑保留；穿防滑鞋完全免疫
+- **[同图人物移动片段回放与重复刷新](changelog/2026-11-03/char-remote-movement-playback.md)**: 远端玩家位置同步——MOVE_PLAYER 整包片段复用 mobplayback 内核按 duration 线性回放（位置直写 phobj、力清零、stance 随片段切换、耗尽保持末态），重复 SPAWN_PLAYER 经 respawn(position,stance) 幂等重锚不再被空 if 丢弃
 - **[角色自然恢复](character-recovery/)**: 按 v83 站立、攀爬、技能、地图倍率和椅子规则恢复 HP/MP，并与 linked server 的恢复校验及椅子状态同步
 - **传送门**: 地图间瞬移
 - **NPC 交互**: 对话、商店、仓库等
@@ -60,7 +61,9 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **Buff 管理**: 增益/减益效果
 - **[地图机关伤害](changelog/2026-11-01/map-obstacle-damage.md)**: 地刺/陷阱等地面机关恢复伤害判定——客户端从 Obj 定义的 `obstacle`/`damage` 字段收集机关足迹，玩家踏入即受固定伤害（地铁跳跳图地刺条、忍苦树林尖刺、椰子赛陷阱洞、CWKPQ 石柱等 224 个机关定义），`TAKE_DAMAGE -2` 上报，服务端不再丢弃无怪物来源的受击；迷宫喷气/蒸汽陷阱（trap.img/steam/0/*）定义无 `damage` 字段，按 `DEFAULT_OBSTACLE_DAMAGE=100` 落伤，足迹优先取帧 `lt`/`rb` 碰撞盒
 - **[怪物仇恨战斗](mob-combat/)**: 怪物受击后按累计伤害锁定目标并持续追击，在范围内使用普通攻击或服务端授权技能，完整呈现状态、疾病和雾效果
+- **[怪物远程片段回放](changelog/2026-11-03/mob-remote-fragment-playback.md)**: 非控制端怪物改为服务器移动片段回放——整批片段按 duration 线性插值、片段 0 从包内 start 重锚、stance/fh 随片段切换、队列耗尽保持末位静止，消灭收包硬拉与本地外推分叉造成的回跳/瞬移
 - **[同图怪物血条广播与死亡贡献者经验](changelog/2026-11-03/mob-hp-broadcast-and-exp-share.md)**: linked server 非 Boss 怪 `SHOW_MONSTER_HP` 改为全图广播（非组队同图玩家血条同步）；`giveExpToCharacter` 去掉 `isAlive` 门槛，打怪途中死亡的伤害贡献者照常结算伤害经验（伤害 80%+击杀 20% 分配、击杀者队伍全额经验与防 leech 等级门槛不动；服务端 patch 0012）
+- **[怪物控制权真空窗口接管](changelog/2026-11-03/mob-controller-vacuum-fix.md)**: 控制器离图/掉线到服务端重定向完成前的窗口内，同场上报者经 `aggroSwitchController` 立即接管怪物控制权（MoveLife 不再被丢弃返回 null），全场玩家画面里怪不再冻结；`MoveLifeHandler.inRangeInclusive` 恒真表达式修正后 rawActivity≥42 只归类技能，普攻/技能动作转发分类一致（服务端 patch 0013）
 
 相关模块: [游戏世界](../agents/client/Gameplay/index.md), [角色系统](../agents/client/Character/index.md)
 

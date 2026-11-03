@@ -19,9 +19,9 @@
 #include "Char.h"
 #include "Look/CharLook.h"
 
+#include "../Gameplay/MapleMap/MobMovementPlayback.h"
 #include "../Gameplay/Movement.h"
 
-#include <queue>
 #include <vector>
 
 namespace jrc
@@ -35,8 +35,10 @@ namespace jrc
 
         // Update the character.
         int8_t update(const Physics& physics) override;
-        // Add the movements which this character will go through next.
+        // Replace the movement fragments this character replays.
         void send_movement(const std::vector<Movement>& movements);
+        // Re-anchor at a repeated SPAWN_PLAYER, dropping replay fragments.
+        void respawn(Point<int16_t> position, int8_t stance);
 
         // Update a skill level.
         void update_skill(int32_t skillid, uint8_t skilllevel);
@@ -60,9 +62,11 @@ namespace jrc
     private:
         uint16_t level;
         int16_t job;
-        std::queue<Movement> movements;
-        Movement lastmove;
-        uint16_t timer;
+        // Replay cursor over the latest movement fragment batch; once the
+        // batch is exhausted the endpoint is held, so every client keeps
+        // the same position for hit checks until the next packet arrives.
+        mobplayback::State playback;
+        uint8_t laststate;
 
         std::unordered_map<int32_t, uint8_t> skilllevels;
         uint8_t attackspeed;

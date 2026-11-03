@@ -6,6 +6,7 @@
 #include "../Combat/DamageNumber.h"
 #include "../MobCombat/MobAction.h"
 #include "../Movement.h"
+#include "MobMovementPlayback.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
@@ -175,6 +176,8 @@ namespace jrc
         void next_move();
         /// Send the current position and state to the server.
         void update_movement();
+        /// Replay server movement fragments for a non-controlled mob.
+        int8_t update_remote(const Physics& physics, bool aniend);
 
         /// Calculate the hit chance.
         float calculate_hitchance(int16_t leveldelta, int32_t accuracy) const;
@@ -224,7 +227,7 @@ namespace jrc
 
         TimedBool showhp;
 
-        std::vector<Movement> movements;
+        mobplayback::State playback;
         uint16_t counter = 0;
         uint16_t moveid = 0;
 
