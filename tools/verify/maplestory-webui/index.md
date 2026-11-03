@@ -115,6 +115,42 @@ TAKE_EQUIP_ACCOUNT=test1 TAKE_EQUIP_PASSWORD=test1 TAKE_EQUIP_CARD=1 CHROME_BIN=
 
 环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`TAKE_EQUIP_DEBUG_PORT`（默认 9251）、`TAKE_EQUIP_ACCOUNT`/`TAKE_EQUIP_PASSWORD`（默认 test1/test1）、`TAKE_EQUIP_CARD`（角色卡索引 0..3，默认 1）、`TAKE_EQUIP_ITEM_ID`（默认 1002000）、`TAKE_EQUIP_SN`（默认 20000016）、`TAKE_EQUIP_PRICE`（默认 3700）、`TAKE_EQUIP_CAP_SLOT`（默认 1）、`TAKE_EQUIP_URL`（默认 http://127.0.0.1:8000/web/index.html）。
 
+## 水下游泳全流程
+
+`aqua-swim-flow.mjs` 官方水下游泳行为 1:1 实测（Aqua Road 230000000，对照 `features/changelog/2026-11-01/aqua-road-swim.md`）：落图水底站立（stance 21/22、onground=1）、水底小跳起跳回落（stance 5→3 链路）；按住↑直接起游（无需先跳）断言 physicstype=2(SWIMMING)、stance 3(FLY)、上升 |vspeed| 平台；按住 Alt 与↑等效上升；松键缓沉降终速（SWIMGRAVFORCE 0.03 / SWIMFRICTION 0.08 ⇒ 理论 0.375 px/帧）且 stance 保持 FLY；水平游 |hspeed| 平台（理论 ≈3.1 px/帧）；沉底后行走 stance 34/35。物理量全部经 `_msplayer_*` 探针（hspeed/vspeed/onground/physicstype/x/y，×100 定点单次 evaluate 原子采样），全程 mapId 守卫防止 ↑ 触发传送门。
+
+2026-11-03 收口实测（14 项断言全 PASS）：↑起游 Δy=-241px、上升 |vs| 平台 2.74 px/帧（理论 2.75）；Alt 等效上升 Δy=-292px；松键缓沉终速 0.370 px/帧（理论 0.375）；水平游 |hs| 3.12 px/帧；水底行走 stance 34。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/aqua-swim-flow.mjs
+```
+
+环境变量：`AQUA_ACCOUNT`/`AQUA_PASSWORD`（默认值见脚本头注释）、`AQUA_CHARID`（默认 129）、`AQUA_CARD`（默认 0）、`AQUA_MAP`（默认 230000000）、`AQUA_URL`（默认 http://127.0.0.1:8000/web/index.html）、`AQUA_DEBUG_PORT`（默认 9274）。产物目录 `/tmp/aqua-swim-flow/`。
+
+## 雪地滑行全流程
+
+`snow-slide-flow.mjs` 验收冰封雪域打滑物理（El Nath 211000000，info/fs=0.2，对照 `features/changelog/2026-11-01/snow-map-slide.md`）：落图 physicstype=1(ICE)、站地 stance 21/22；按住方向键 1.6s 行走水平速度收敛到平台（≈walkforce 决定的 1.2~1.5 px/帧，旧 bug ≥3.5）；松键以 SNOWFRICTION×fs 滑行一小段（数值模拟 ≈26px/≈60 帧）后停稳，期间 stance 保持 34/35(WALK) 再回 21/22(STAND)；观察项（只记录不断言）：滑行尾速趋零后按 Down 可进 prone(7) 且不再滑。物理量同样读 `_msplayer_*` 探针。
+
+2026-11-03 收口实测（6 PASS + 1 NOTE）：行走 |hs| 收敛 1.26 px/帧；松键滑行 22px（模拟≈26px）、滑行期 stance 34 保持 209ms 后停稳回 21；prone 尾速 <0.25 px/帧无额外滑行。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/snow-slide-flow.mjs
+```
+
+环境变量：`SNOW_ACCOUNT`/`SNOW_PASSWORD`（默认值见脚本头注释）、`SNOW_CHARID`（默认 129）、`SNOW_CARD`（默认 0）、`SNOW_MAP`（默认 211000000）、`SNOW_URL`（默认 http://127.0.0.1:8000/web/index.html）、`SNOW_DEBUG_PORT`（默认 9273）。产物目录 `/tmp/snow-slide-flow/`。
+
+## 现金覆盖装备外观全流程
+
+`cash-cover-look-flow.mjs` 按四阶段验收现金覆盖外观「穿戴 → 重登保持 → 卸下复原」（对照 `features/changelog/2026-11-03/cash-cover-look.md`）：① 基线——角色戴普通帽 1002047（EQUIPPED -1）、CASH 栏 slot1 现金帽 1003052 未穿，断言 look=1002047、cover=0；② 物品栏 CASH 标签双击现金帽 → 覆盖穿戴，隐藏槽 `msinventory_cover_equipped(1)`=1003052 且 look 探针（`msinventory_equipped(1)`，读 CharLook）=1003052；③ 干净登出重登后 look 必须仍为 1003052（修复前回归 1002047 的 bug 现场回归断言）；④ 装备窗 CAP 插槽双击卸下 → look 回 1002047、cover=0、现金帽回到 CASH slot1。DB fixture 要求角色 level ≥35（普通帽 reqLevel）、两行库存带 inventoryequipment 明细、`characters.world` 对准服务端公告的最后一个世界；重复运行以「穿戴→重登→卸下」自愈回 fixture 态，无需重置。
+
+2026-11-03 收口实测：39 行断言全 PASS。产物目录为 cdp 驱动的 mkdtemp 临时目录（形如 `/tmp/maplestory-webui-*/`，运行结束打印实际路径；本次收口为 `/tmp/maplestory-webui-LVPqsT/`）。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/cash-cover-look-flow.mjs
+```
+
+环境变量：`CHROME_BIN`（默认 /usr/bin/chromium-browser）、`COVER_LOOK_URL`（默认 http://127.0.0.1:8000/web/index.html）、`COVER_LOOK_ACCOUNT`/`COVER_LOOK_PASSWORD`（默认值见脚本头注释）、`COVER_LOOK_CARD`（默认 0）、`COVER_LOOK_DEBUG_PORT`（默认 9265）；可选 `--headed`。
+
 ## 现金商城购买背包格子流程
 
 `cash-shop-equip-permanent-flow.mjs` 验收现金装备永久化契约（服务端 patch 0007 + 客户端 `effective_period` 归一化）：搜索现金帽 SN `20000016` 后截取目录卡与「本期推荐」面板，OCR（tesseract chi_sim）断言期限文案为「永久」且不再出现「90天/限时」徽标；随后真实购买（3700 NX）→ 双击仓库取出 → Escape 退回游戏触发落盘，配合 SQL 断言 `inventoryitems` 中该次购买行 `inventorytype=5` 且 `expiration=-1`（永久）。遗留已购装备的到期戳迁移（`expirationTask` 就地改 -1）由手工流程覆盖：带戳角色在线停留 >60s 后进出商城触发保存，行由盖章时间戳翻转为 -1。测试会真实消耗 NX 并留下 CASH 栏数据，运行前需角色离线。

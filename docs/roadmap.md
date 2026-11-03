@@ -82,13 +82,32 @@ grep 'Attempting to save' \
 2026-10-31 事故基线（浏览器静默死亡后 14 分钟零落库，见
 `features/changelog/2026-11-02/idle-reap-preserve-disconnect-save.md`）。
 
+### 观察窗快照（2026-11-03 21:40 +0800，窗口剩约 1h 未满）
+
+窗口起点为 2026-11-02 22:59:50 +0800 容器冷启动。三条判据的当前证据：
+
+- ① 排行 Worker：24h `MySQLSyntaxErrorException` 计数 = **0**；
+  `maplestory.characters` rank 1-45 名共 **51 行**全部非零且
+  `rankMove` 非空（51/51）。
+- ② 容器连续在网：`ms-game-server` **Up 23 hours、RestartCount=0**。
+- ③ SaveChar 落库：`Attempting to save` 共 **41 条**、覆盖 **4 个
+  会话**，相邻落库行时间差秒级、无 14 分钟级断档（唯一 >1h 间隙为
+  冻结冷重启空窗，非事故基线）。
+
+窗口未满前不宣告交付稳定；满窗（2026-11-03 22:59:50 +0800 之后）按
+上述三条判据原样复核一次再下结论。
+
 ## 明确范围外
 
-- **并发会话在途工作**：aqua 道路游泳 / snow 地图滑行 / cash 装备覆盖
-  外观（`tools/verify/maplestory-webui/aqua-swim-flow.mjs`、
-  `snow-slide-flow.mjs`、`cash-cover-look-flow.mjs`，均 untracked）及
-  `src/client/Character/Look/CharLook` 系列改动——归并发会话收口，
-  本页不跟踪其状态。
+- **并发会话在途工作（已收口，2026-11-03）**：aqua 道路游泳
+  （`features/changelog/2026-11-01/aqua-road-swim.md`）、snow 地图滑行
+  （`features/changelog/2026-11-01/snow-map-slide.md`）、cash 装备覆盖
+  外观（`features/changelog/2026-11-03/cash-cover-look.md`）三特性已于
+  2026-11-03 完成 Docker WASM 全量重建（75s、零告警）与 e2e 3/3 PASS
+  （`tools/verify/maplestory-webui/aqua-swim-flow.mjs`、
+  `snow-slide-flow.mjs`、`cash-cover-look-flow.mjs`，均已入册主册），
+  `src/client/Character/Look/CharLook` 系列改动一并落地——本页不再将其
+  列为范围外在途项。
 - **新版本地图数据源 gate**：079 wz 无数据源，新版本地图复刻在获得
   数据源前不排期。
 - **现金装备边界**：现金装备为「纯装饰覆盖、不影响属性」，属设计边界
