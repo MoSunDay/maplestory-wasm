@@ -31,6 +31,7 @@ namespace jrc
 
         cash = src["cash"].get_bool();
         tradeblock = src["tradeBlock"].get_bool();
+        snowshoe = src["fs"].get_bool();
         slots = src["tuc"];
         reqstats[Maplestat::LEVEL] = src["reqLevel"];
         reqstats[Maplestat::JOB] = src["reqJob"];
@@ -123,6 +124,11 @@ namespace jrc
     bool EquipData::is_cash() const
     {
         return cash;
+    }
+
+    bool EquipData::is_snowshoe() const
+    {
+        return snowshoe;
     }
 
     int16_t EquipData::get_reqstat(Maplestat::Id stat) const

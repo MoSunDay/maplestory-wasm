@@ -30,6 +30,7 @@
 #include "../../Gameplay/Pet/PetCapabilityPolicy.h"
 #include "../../Gameplay/Pet/PetVitalityPolicy.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/PetPackets.h"
 #include "../../Net/Packets/PlayerPackets.h"
@@ -114,11 +115,13 @@ namespace jrc
         // column and the border; its arrows span the six socket rows.
         slider = {
             11, iteminv_nodes::slider_vertical(), iteminv_nodes::slider_x(),
-            6, 1 + inventory.get_slotmax(tab) / 4,
+            6, iteminv_nodes::slot_rows(inventory.get_slotmax(tab)),
             [&](bool upwards) {
             int16_t shift = upwards ? -4 : 4;
             bool above = slotrange.first + shift > 0;
-            bool below = slotrange.second + shift < inventory.get_slotmax(tab) + 1 + 4;
+            bool below = slotrange.second + shift
+                <= iteminv_nodes::last_visible_slot(
+                    inventory.get_slotmax(tab));
             if (above && below)
             {
                 slotrange.first += shift;
@@ -150,6 +153,15 @@ namespace jrc
             }
         }
 
+        // Sockets beyond the tab's slot limit are locked: dim them and draw a
+        // cross so they are not mistaken for usable space.
+        const int16_t slotmax = inventory.get_slotmax(tab);
+        for (int16_t slot = slotrange.first; slot <= slotrange.second; ++slot)
+        {
+            if (slot > slotmax)
+                draw_slot_lock(position + get_slotpos(slot));
+        }
+
         int16_t bulletslot = inventory.get_bulletslot();
         if (tab == InventoryType::USE && is_visible(bulletslot))
         {
@@ -171,6 +183,14 @@ namespace jrc
 
         Point<int16_t> mesopos = position + iteminv_nodes::meso_label_pos();
         mesolabel.draw(mesopos);
+    }
+
+    void UIItemInventory::draw_slot_lock(Point<int16_t> slotpos) const
+    {
+        ColorBox(32, 32, Geometry::BLACK, 0.5f).draw({ slotpos });
+        const ColorBox stroke(4, 4, Geometry::WHITE, 0.85f);
+        for (const Point<int16_t>& offset : iteminv_nodes::lock_x_offsets())
+            stroke.draw({ slotpos + offset });
     }
 
     void UIItemInventory::update()
@@ -264,7 +284,9 @@ namespace jrc
             slotrange.first = 1;
             slotrange.second = 24;
 
-            slider.setrows(6, 1 + inventory.get_slotmax(tab) / 4);
+            slider.setrows(
+                6, iteminv_nodes::slot_rows(inventory.get_slotmax(tab))
+            );
 
             buttons[button_by_tab(oldtab)]->set_state(Button::NORMAL);
 
@@ -571,13 +593,14 @@ namespace jrc
     int16_t UIItemInventory::slot_by_position(Point<int16_t> cursorpos) const
     {
         // Socket hit test against the generation's grid geometry (see
-        // iteminv_nodes).
+        // iteminv_nodes). Locked sockets beyond the tab's slot limit are
+        // not valid click / drop targets either.
         const int16_t offset = iteminv_nodes::page_offset_at(cursorpos);
         if (offset < 0)
             return 0;
 
         const int16_t slot = slotrange.first + offset;
-        return is_visible(slot) ? slot : 0;
+        return is_visible(slot) && slot <= inventory.get_slotmax(tab) ? slot : 0;
     }
 
     Point<int16_t> UIItemInventory::get_slotpos(int16_t slot) const
@@ -657,6 +680,11 @@ namespace jrc
     void UIItemInventory::ItemIcon::drop_on_items(InventoryType::Id tab, Equipslot::Id, int16_t slot, bool) const
     {
         if (tab != sourcetab || slot == source)
+            return;
+
+        // Locked sockets beyond the tab's slot limit can never hold
+        // items, so do not request a move there.
+        if (slot > Stage::get().get_player().get_inventory().get_slotmax(tab))
             return;
 
         MoveItemPacket(tab, source, slot, 1).dispatch();

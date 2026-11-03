@@ -38,6 +38,8 @@ namespace jrc
         bool is_weapon() const;
         // Returns whether this is a cash (NX) equip.
         bool is_cash() const;
+        // Returns whether this equip prevents slipping on snow maps.
+        bool is_snowshoe() const;
         // Returns a required base stat.
         int16_t get_reqstat(Maplestat::Id stat) const;
         // Returns a default stat.
@@ -66,5 +68,6 @@ namespace jrc
         uint8_t slots;
         bool cash;
         bool tradeblock;
+        bool snowshoe = false;
     };
 }

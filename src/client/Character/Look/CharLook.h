@@ -49,6 +49,7 @@ namespace jrc
             Stance::Id stance, Expression::Id expression) const;
         std::vector<Stance::Id> prepare_attack_assets(uint8_t attacktype) const;
         void prepare_movement_assets() const;
+        void prepare_water_assets() const;
         bool update(uint16_t timestep);
 
         void set_hair(int32_t hairid);

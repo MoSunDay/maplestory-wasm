@@ -62,7 +62,7 @@ namespace jrc
         void set_state(State stance) override;
 
         /// Respawn the player at the given position.
-        void respawn(Point<int16_t> position, bool underwater);
+        void respawn(Point<int16_t> position, bool underwater, bool slippery);
         /// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
         void send_action(KeyAction::Id action, bool pressed) override;
         /// Recalculates the total stats from base stats, inventories and skills.
@@ -146,6 +146,10 @@ namespace jrc
 
         /// Return wether the player is underwater.
         bool is_underwater() const;
+        /// Return whether the player wears slip-resistant snowshoes.
+        bool has_snowshoes() const;
+        /// Return whether the player slides on the current snow map.
+        bool on_slick_ground() const;
         /// Returns if a Keyaction is currently active.
         bool is_key_down(KeyAction::Id action) const;
         /// Return a pointer to the ladder the player is on.
@@ -204,6 +208,7 @@ namespace jrc
 
         Optional<const Ladder> ladder;
         bool underwater;
+        bool slippery_map = false;
         bool gm_hidden = false;
         natural_recovery::State recovery_state;
         float recovery_rate = 1.0f;

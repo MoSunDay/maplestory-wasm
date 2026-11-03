@@ -43,6 +43,8 @@
 
 #include "nlnx/nx.hpp"
 
+#include <array>
+
 namespace jrc
 {
     namespace iteminv_nodes
@@ -180,6 +182,37 @@ namespace jrc
                 grid_origin().x() + (absslot % 4) * column_pitch(),
                 grid_origin().y() + (absslot / 4) * row_pitch()
                 );
+        }
+
+        // Number of 4-socket rows that contain at least one usable socket.
+        inline int16_t slot_rows(int16_t slotmax)
+        {
+            return static_cast<int16_t>((slotmax + 3) / 4);
+        }
+
+        // Last slot number the scrollbar may reveal: the six visible rows plus
+        // one row per scroll step, but never below the 24 sockets baked into
+        // the window background.
+        inline int16_t last_visible_slot(int16_t slotmax)
+        {
+            const int16_t rows = slot_rows(slotmax);
+            return rows <= 6 ? 24 : static_cast<int16_t>(24 + (rows - 6) * 4);
+        }
+
+        // Offsets of the 4x4 squares forming the diagonal cross drawn over a
+        // locked socket (32x32 cell), relative to the socket's top-left corner.
+        inline const std::array<Point<int16_t>, 14>& lock_x_offsets()
+        {
+            static const std::array<Point<int16_t>, 14> offsets = {
+                Point<int16_t>(2, 2),   Point<int16_t>(2, 26),
+                Point<int16_t>(6, 6),   Point<int16_t>(6, 22),
+                Point<int16_t>(10, 10), Point<int16_t>(10, 18),
+                Point<int16_t>(14, 14), Point<int16_t>(14, 14),
+                Point<int16_t>(18, 18), Point<int16_t>(18, 10),
+                Point<int16_t>(22, 22), Point<int16_t>(22, 6),
+                Point<int16_t>(26, 26), Point<int16_t>(26, 2)
+            };
+            return offsets;
         }
 
         // 0-based page offset of the socket under a window-relative cursor

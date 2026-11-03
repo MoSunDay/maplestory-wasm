@@ -67,6 +67,10 @@ namespace jrc
 
         bool is_underwater() const;
         float get_recovery_rate() const;
+        // Return whether the map is a slippery snow map ('fs' set).
+        bool is_slippery() const;
+        // Return the slip factor of the map. 0.0 if not slippery.
+        float get_slip_factor() const;
         std::string get_bgm() const;
         Range<int16_t> get_walls() const;
         Range<int16_t> get_borders() const;
@@ -88,6 +92,7 @@ namespace jrc
         bool town;
         bool hideminimap;
         float recovery = 1.0f;
+        float slip = 0.0f;
         Range<int16_t> mapwalls;
         Range<int16_t> mapborders;
         std::vector<Seat> seats;

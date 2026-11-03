@@ -21,6 +21,7 @@
 
 #include "../Audio/Audio.h"
 #include "../Constants.h"
+#include "../Data/EquipData.h"
 #include "../Data/WeaponData.h"
 #include "../Data/ItemData.h"
 #include "../Data/SkillData.h"
@@ -80,14 +81,17 @@ namespace jrc
     Player::Player()
         : Char(0, {}, "") {}
 
-    void Player::respawn(Point<int16_t> pos, bool uw)
+    void Player::respawn(Point<int16_t> pos, bool uw, bool slippery)
     {
         set_position(pos.x(), pos.y());
         underwater = uw;
+        slippery_map = slippery;
         keysdown.clear();
         attacking = false;
         ladder = nullptr;
-        phobj.type = PhysicsObject::NORMAL;
+        phobj.type = underwater ? PhysicsObject::SWIMMING
+            : on_slick_ground() ? PhysicsObject::ICE
+                                : PhysicsObject::NORMAL;
         phobj.clear_flags();
         // Drop stale foothold state: update_fh re-acquires the ground under
         // the respawn point (with its grounding tolerance band) instead of
@@ -276,7 +280,9 @@ namespace jrc
         }
 
         uint8_t stancebyte = flip ? state : state + 1;
-        Movement newmove(phobj, stancebyte);
+        // Swimming reports the official swim fragment command.
+        uint8_t command = state == SWIM ? Movement::CMD_SWIM : 0;
+        Movement newmove(phobj, stancebyte, command);
         bool needupdate = lastmove.hasmoved(newmove);
         if (needupdate)
         {
@@ -735,6 +741,14 @@ namespace jrc
     {
         return underwater;
     }
+
+    bool Player::has_snowshoes() const
+    {
+        int32_t shoes = get_inventory().get_item_id(InventoryType::EQUIPPED, Equipslot::SHOES);
+        return shoes > 0 && EquipData::get(shoes).is_snowshoe();
+    }
+
+    bool Player::on_slick_ground() const { return slippery_map && !has_snowshoes(); }
 
     bool Player::is_key_down(KeyAction::Id action) const
     {

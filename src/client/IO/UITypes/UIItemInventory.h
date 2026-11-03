@@ -73,6 +73,7 @@ namespace jrc
         bool is_visible(int16_t slot) const;
         bool is_not_visible(int16_t slot) const;
         bool is_hungry_pet_slot(int16_t slot) const;
+        void draw_slot_lock(Point<int16_t> slotpos) const;
         int16_t slot_by_position(Point<int16_t> position) const;
         uint16_t button_by_tab(InventoryType::Id tab) const;
         Point<int16_t> get_slotpos(int16_t slot) const;

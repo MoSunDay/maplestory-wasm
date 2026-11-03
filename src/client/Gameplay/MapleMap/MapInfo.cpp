@@ -57,6 +57,7 @@ namespace jrc
         swim = info["swim"].get_bool();
         town = info["town"].get_bool();
         recovery = static_cast<float>(info["recovery"].get_real(1.0));
+        slip = static_cast<float>(info["fs"].get_real(0.0));
 
         for (auto seat : src["seat"])
         {
@@ -79,6 +80,16 @@ namespace jrc
     float MapInfo::get_recovery_rate() const
     {
         return recovery;
+    }
+
+    bool MapInfo::is_slippery() const
+    {
+        return slip > 0.0f;
+    }
+
+    float MapInfo::get_slip_factor() const
+    {
+        return slip;
     }
 
     std::string MapInfo::get_bgm() const

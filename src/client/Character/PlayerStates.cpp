@@ -20,6 +20,8 @@
 #include "../Audio/Audio.h"
 #include "../Gameplay/Input/ActionTrigger.h"
 
+#include <cmath>
+
 
 namespace jrc
 {
@@ -96,7 +98,9 @@ namespace jrc
     // Standing
     void PlayerStandState::initialize(Player& player) const
     {
-        player.get_phobj().type = PhysicsObject::NORMAL;
+        player.get_phobj().type = player.on_slick_ground()
+            ? PhysicsObject::ICE
+            : PhysicsObject::NORMAL;
     }
 
     void PlayerStandState::send_action(Player& player, KeyAction::Id ka, bool down) const
@@ -117,6 +121,13 @@ namespace jrc
             case KeyAction::RIGHT:
                 player.set_direction(true);
                 player.set_state(Char::WALK);
+                break;
+            case KeyAction::UP:
+                // Underwater the up key starts swimming directly from the floor.
+                if (player.is_underwater() && !player.get_ladder())
+                {
+                    player.set_state(Char::SWIM);
+                }
                 break;
             case KeyAction::JUMP:
                 play_jumpsound();
@@ -162,7 +173,9 @@ namespace jrc
     // Walking
     void PlayerWalkState::initialize(Player& player) const
     {
-        player.get_phobj().type = PhysicsObject::NORMAL;
+        player.get_phobj().type = player.on_slick_ground()
+            ? PhysicsObject::ICE
+            : PhysicsObject::NORMAL;
     }
 
     void PlayerWalkState::send_action(Player& player, KeyAction::Id ka, bool down) const
@@ -181,6 +194,13 @@ namespace jrc
                 break;
             case KeyAction::RIGHT:
                 player.set_direction(true);
+                break;
+            case KeyAction::UP:
+                // Underwater the up key starts swimming directly from the floor.
+                if (player.is_underwater() && !player.get_ladder())
+                {
+                    player.set_state(Char::SWIM);
+                }
                 break;
             case KeyAction::JUMP:
                 play_jumpsound();
@@ -226,7 +246,11 @@ namespace jrc
     {
         if (player.get_phobj().onground)
         {
-            if (!haswalkinput(player) || player.get_phobj().hspeed == 0.0f)
+            // On slippery ground the player keeps sliding (and playing the
+            // walk animation) for a while after the input is released.
+            bool sliding = player.on_slick_ground()
+                && std::abs(player.get_phobj().hspeed) > 0.25;
+            if (!sliding && (!haswalkinput(player) || player.get_phobj().hspeed == 0.0f))
             {
                 if (!haswalkinput(player) && player.is_key_down(KeyAction::DOWN))
                 {
@@ -247,7 +271,14 @@ namespace jrc
     // Falling
     void PlayerFallState::initialize(Player& player) const
     {
-        player.get_phobj().type = PhysicsObject::NORMAL;
+        // Entering water swaps in the weak swim gravity from the first
+        // frame on, so drops into water and hops off the sea floor stay
+        // floaty like in the official client.
+        player.get_phobj().type = player.is_underwater()
+            ? PhysicsObject::SWIMMING
+            : player.on_slick_ground()
+                ? PhysicsObject::ICE
+                : PhysicsObject::NORMAL;
     }
 
     void PlayerFallState::send_action(Player& player, KeyAction::Id ka, bool down) const
@@ -397,7 +428,15 @@ namespace jrc
                 player.set_state(Char::STAND);
                 break;
             case KeyAction::UP:
-                player.set_state(Char::SWIM);
+                // Standing up from the chair; only water maps swim.
+                if (player.is_underwater())
+                {
+                    player.set_state(Char::SWIM);
+                }
+                else
+                {
+                    player.set_state(Char::STAND);
+                }
                 break;
             default:
                 break;
@@ -448,7 +487,12 @@ namespace jrc
             player.get_phobj().hforce = player.get_flyforce();
         }
 
-        if (player.is_key_down(KeyAction::UP))
+        // Underwater the jump key doubles as an upward swim stroke, like
+        // the up arrow in the official control scheme.
+        bool swimup = player.is_key_down(KeyAction::UP)
+            || (player.is_underwater()
+                && player.is_key_down(KeyAction::JUMP));
+        if (swimup)
         {
             player.get_phobj().vforce = -player.get_flyforce();
         }

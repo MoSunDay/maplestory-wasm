@@ -46,7 +46,10 @@ namespace jrc
         if (warp.intramap)
         {
             const Point<int16_t> spawn = portals.get_portal_by_name(warp.toname);
-            player.respawn(physics.get_y_below(spawn), mapinfo.is_underwater());
+            player.respawn(
+                physics.get_y_below(spawn),
+                mapinfo.is_underwater(),
+                mapinfo.is_slippery());
         }
         else if (warp.valid)
         {

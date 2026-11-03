@@ -49,10 +49,16 @@ namespace jrc
             add_equip(equip.second, load_mode);
         }
 
-        // Cash equips are worn for the look only and mask ordinary equips.
+        // The masked list holds equips hidden under cash covers: their slot
+        // is already present (and covered) in the visible list, so applying
+        // them would overwrite the cash look. Only entries without a visible
+        // counterpart apply - the cash weapon, sent separately as -111.
         for (auto& masked : entry.maskedequips)
         {
             if (masked.second <= 0)
+                continue;
+
+            if (entry.equips.find(masked.first) != entry.equips.end())
                 continue;
 
             if (equip_observer)
@@ -131,9 +137,11 @@ namespace jrc
             case CharEquips::HALFCOVER:
                 hair->draw(interstance, Hair::BELOWCAP, interframe, args);
                 equips.draw(Equipslot::CAP, interstance, Clothing::CAP, interframe, args);
+                equips.draw(Equipslot::CAP, interstance, Clothing::CAP_OVER_HAIR, interframe, args);
                 break;
             case CharEquips::FULLCOVER:
                 equips.draw(Equipslot::CAP, interstance, Clothing::CAP, interframe, args);
+                equips.draw(Equipslot::CAP, interstance, Clothing::CAP_OVER_HAIR, interframe, args);
                 break;
             }
 
@@ -203,9 +211,11 @@ namespace jrc
             case CharEquips::HALFCOVER:
                 hair->draw(interstance, Hair::DEFAULT, interframe, args);
                 equips.draw(Equipslot::CAP, interstance, Clothing::CAP, interframe, args);
+                equips.draw(Equipslot::CAP, interstance, Clothing::CAP_OVER_HAIR, interframe, args);
                 break;
             case CharEquips::FULLCOVER:
                 equips.draw(Equipslot::CAP, interstance, Clothing::CAP, interframe, args);
+                equips.draw(Equipslot::CAP, interstance, Clothing::CAP_OVER_HAIR, interframe, args);
                 break;
             }
 
@@ -327,6 +337,17 @@ namespace jrc
             face->prepare(Expression::DEFAULT);
             face->prepare(Expression::BLINK);
         }
+    }
+
+    void CharLook::prepare_water_assets() const
+    {
+        // Swimming reuses the fly stance; warm it when entering water maps
+        // so the first stroke does not hit the on-demand loader.
+        if (body)
+            body->prepare(Stance::FLY);
+        if (hair)
+            hair->prepare(Stance::FLY);
+        equips.prepare(Stance::FLY);
     }
 
     bool CharLook::update(uint16_t timestep)

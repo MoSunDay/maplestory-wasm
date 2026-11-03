@@ -23,14 +23,19 @@ namespace jrc
     const double GRAVFORCE     = Physics::GRAVITY;
     const double SWIMGRAVFORCE = 0.03;
     const double FRICTION      = 0.3;
+    const double SNOWFRICTION  = 0.1;
     const double SLOPEFACTOR   = 0.1;
     const double GROUNDSLIP    = 3.0;
     const double FLYFRICTION   = 0.05;
     const double SWIMFRICTION  = 0.08;
 
     Physics::Physics(nl::node src)
+        : Physics(src, 0.0) {}
+
+    Physics::Physics(nl::node src, double slipfactor)
     {
-        fht = src;
+        fht  = src;
+        slip = slipfactor;
     }
 
     Physics::Physics() = default;
@@ -62,7 +67,8 @@ namespace jrc
         case PhysicsObject::FIXATED:
             break;
         case PhysicsObject::ICE:
-            // TODO
+            move_ice(phobj);
+            result.horizontal_collision = fht.limit_movement(phobj);
             break;
         }
 
@@ -98,6 +104,53 @@ namespace jrc
                     slopef = -0.5;
                 }
                 phobj.hacc -= (FRICTION + SLOPEFACTOR * (1.0 + slopef * -inertia)) * inertia;
+            }
+        }
+        else if (phobj.is_flag_not_set(PhysicsObject::NOGRAVITY))
+        {
+            phobj.vacc += GRAVFORCE;
+        }
+        phobj.hforce = 0.0;
+        phobj.vforce = 0.0;
+
+        phobj.hspeed += phobj.hacc;
+        phobj.vspeed += phobj.vacc;
+    }
+
+    void Physics::move_ice(PhysicsObject& phobj) const
+    {
+        // Snow maps only change how objects come to a stop: while a
+        // horizontal force is applied the ground grips like normal ground,
+        // so walking speed stays the same. Once the input is released, the
+        // map's slip factor scales the ground friction down and the object
+        // slides on for a short distance before stopping. Snowshoes keep
+        // NORMAL physics, so they stop the slide entirely.
+        phobj.vacc = 0.0;
+        phobj.hacc = 0.0;
+        if (phobj.onground)
+        {
+            phobj.vacc += phobj.vforce;
+            phobj.hacc += phobj.hforce;
+
+            bool walking = phobj.hacc != 0.0;
+            if (!walking && phobj.hspeed < 0.1 && phobj.hspeed > -0.1)
+            {
+                phobj.hspeed = 0.0;
+            }
+            else
+            {
+                double inertia = phobj.hspeed / GROUNDSLIP;
+                double slopef = phobj.fhslope;
+                if (slopef > 0.5)
+                {
+                    slopef = 0.5;
+                }
+                else if (slopef < -0.5)
+                {
+                    slopef = -0.5;
+                }
+                double groundfriction = walking ? FRICTION : SNOWFRICTION * slip;
+                phobj.hacc -= (groundfriction + SLOPEFACTOR * (1.0 + slopef * -inertia)) * inertia;
             }
         }
         else if (phobj.is_flag_not_set(PhysicsObject::NOGRAVITY))

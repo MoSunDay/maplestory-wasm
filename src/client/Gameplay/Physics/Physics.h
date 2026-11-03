@@ -37,6 +37,10 @@ namespace jrc
         };
 
         Physics(nl::node src);
+        // 'slipfactor' is the map's 'fs' value. It scales down ground
+        // friction for ICE physics on snow maps, but only while no walk
+        // force is applied, i.e. it causes sliding after the player stops.
+        Physics(nl::node src, double slipfactor);
         Physics();
 
         // Move the specified object over the specified game-time.
@@ -48,9 +52,11 @@ namespace jrc
 
     private:
         void move_normal(PhysicsObject&) const;
+        void move_ice(PhysicsObject&) const;
         void move_flying(PhysicsObject&) const;
         void move_swimming(PhysicsObject&) const;
 
         Footholdtree fht;
+        double slip = 0.0;
     };
 }

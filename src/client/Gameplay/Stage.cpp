@@ -126,7 +126,9 @@ namespace jrc
         tilesobjs   = MapTilesObjs(src);
         hazards     = collect_map_hazards(src);
         backgrounds = MapBackgrounds(src["back"]);
-        physics     = Physics(src["foothold"]);
+        // 'fs' marks snow maps where players slide without snowshoes.
+        double slipfactor = src["info"]["fs"].get_real(0.0);
+        physics     = Physics(src["foothold"], slipfactor);
         mapinfo     = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
         // Audio data is part of the map safety set. Web Audio decoding remains
         // asynchronous, but the NX range itself is resident before gameplay.
@@ -142,7 +144,11 @@ namespace jrc
         Point<int16_t> spawnpoint = portals.get_portal_by_id(static_cast<uint8_t>(portalid));
         Point<int16_t> startpos   = physics.get_y_below(spawnpoint);
 
-        player.respawn(startpos, mapinfo.is_underwater());
+        player.respawn(startpos, mapinfo.is_underwater(), mapinfo.is_slippery());
+        if (mapinfo.is_underwater())
+        {
+            player.get_look().prepare_water_assets();
+        }
         camera.set_position(startpos);
         camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
     }
