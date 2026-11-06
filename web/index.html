@@ -329,11 +329,28 @@
                     return;
                 }
                 connectionLost = true;
-                window.alert(
-                    typeof message === 'string' && message.trim()
-                        ? message
-                        : '连接已断开，游戏已经退出，请刷新页面重试。'
-                );
+                const text = typeof message === 'string' && message.trim()
+                    ? message
+                    : '连接已断开，游戏已经退出，请刷新页面重试。';
+                console.error('[connection-lost] ' + text);
+                // 非阻塞提示条（与 SockInternal 断线看门狗注入的
+                // #ms-disconnect-banner 同一元素/文案样式）：window.alert 会
+                // 同步阻塞渲染进程主线程，既冻结游戏画面，也会让 CDP 驱动
+                // 的 Runtime.evaluate 全部超时（UI 验收曾被此楔死）。
+                const existing = document.getElementById('ms-disconnect-banner');
+                if (existing) {
+                    existing.textContent = text;
+                    return;
+                }
+                const banner = document.createElement('div');
+                banner.id = 'ms-disconnect-banner';
+                banner.textContent = text;
+                banner.style.cssText = 'position:fixed;top:0;left:0;right:0;'
+                    + 'z-index:2147483647;padding:12px 16px;background:#8a1f11;'
+                    + 'color:#ffffff;font:bold 14px sans-serif;text-align:center;'
+                    + 'cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.35)';
+                banner.onclick = function () { location.reload(); };
+                (document.body || document.documentElement).appendChild(banner);
             }
 
             function isLost() {

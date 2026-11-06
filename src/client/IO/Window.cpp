@@ -120,6 +120,19 @@ namespace jrc
 
     namespace
     {
+        // The scene is rendered shifted down by Constants::VIEWYOFFSET (see
+        // GraphicsGL's yoffset uniform), so a pixel drawn at design y appears
+        // on screen at y + VIEWYOFFSET. Cursor input must use the same
+        // mapping in reverse, or every click lands VIEWYOFFSET pixels above
+        // the element the player aimed at.
+        Point<int16_t> to_design_position(double xpos, double ypos)
+        {
+            return Point<int16_t>(
+                static_cast<int16_t>(xpos),
+                static_cast<int16_t>(ypos - Constants::VIEWYOFFSET)
+            );
+        }
+
         Point<int16_t> event_cursor_position(GLFWwindow* window)
         {
             // Browser mouse events can outrun the GLFW cursor callback, so
@@ -128,10 +141,7 @@ namespace jrc
             double xpos = 0.0;
             double ypos = 0.0;
             glfwGetCursorPos(window, &xpos, &ypos);
-            return Point<int16_t>(
-                static_cast<int16_t>(xpos),
-                static_cast<int16_t>(ypos)
-            );
+            return to_design_position(xpos, ypos);
         }
     }
 
@@ -178,10 +188,7 @@ namespace jrc
 
     void cursor_callback(GLFWwindow*, double xpos, double ypos)
     {
-        auto x = static_cast<int16_t>(xpos);
-        auto y = static_cast<int16_t>(ypos);
-        Point<int16_t> pos = Point<int16_t>(x, y);
-        UI::get().send_cursor(pos);
+        UI::get().send_cursor(to_design_position(xpos, ypos));
     }
 
     void scroll_callback(GLFWwindow*, double, double yoffset)

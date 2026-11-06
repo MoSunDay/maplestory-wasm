@@ -144,8 +144,9 @@ async function mouseWheel(driver, gameX, gameY, deltaY) {
   const point = await driver.evaluate(`(() => {
     const canvas = document.getElementById('canvas');
     const bounds = canvas.getBoundingClientRect();
+    // scene renders VIEWYOFFSET(10) lower than design space (see cdp.mjs)
     return { x: bounds.left + ${gameX} * bounds.width / canvas.width,
-      y: bounds.top + ${gameY} * bounds.height / canvas.height };
+      y: bounds.top + (${gameY} + 10) * bounds.height / canvas.height };
   })()`);
   await driver.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y, button: 'none' });
   await driver.send('Input.dispatchMouseEvent', {

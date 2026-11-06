@@ -5,6 +5,13 @@ import path from 'path';
 
 const sleep = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
+// The client renders the scene shifted down by VIEWYOFFSET (Constants.h)
+// and maps mouse input back the same way (Window.cpp), so a game-space
+// target at design (x, y) is physically painted at (x, y + VIEW_Y_OFFSET)
+// on the canvas. Drivers keep aiming at design-space hitboxes; the pointer
+// dispatch translates to the on-canvas position.
+const VIEW_Y_OFFSET = 10;
+
 export class BrowserDriver {
   constructor(options) {
     this.binary = options.binary;
@@ -188,8 +195,20 @@ export class BrowserDriver {
   }
 
   async evaluate(expression) {
-    const result = await this.send('Runtime.evaluate', { expression, returnByValue: true });
-    return result.result.value;
+    const attempts = Number(process.env.E2E_EVAL_ATTEMPTS || 3);
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        const result = await this.send('Runtime.evaluate', { expression, returnByValue: true });
+        // 共享主机上 CDP 回包偶发延迟会先触发 send 的硬超时；晚到的响应
+        // 会因 id 已从 pending 移除而被 onMessage 忽略，重发即可恢复。
+        this.dead = false;
+        return result.result.value;
+      } catch (error) {
+        const transient = /command timed out: Runtime\.evaluate/.test(String(error.message));
+        if (!transient || attempt >= attempts) throw error;
+        await sleep(1500);
+      }
+    }
   }
 
   async navigate(url) {
@@ -219,7 +238,7 @@ export class BrowserDriver {
       const bounds = canvas.getBoundingClientRect();
       return {
         x: bounds.left + ${gameX} * bounds.width / canvas.width,
-        y: bounds.top + ${gameY} * bounds.height / canvas.height
+        y: bounds.top + (${gameY} + ${VIEW_Y_OFFSET}) * bounds.height / canvas.height
       };
     })()`);
     await this.send('Input.dispatchMouseEvent', {
@@ -245,7 +264,7 @@ export class BrowserDriver {
       const bounds = canvas.getBoundingClientRect();
       return {
         x: bounds.left + ${gameX} * bounds.width / canvas.width,
-        y: bounds.top + ${gameY} * bounds.height / canvas.height
+        y: bounds.top + (${gameY} + ${VIEW_Y_OFFSET}) * bounds.height / canvas.height
       };
     })()`);
     await this.send('Input.dispatchMouseEvent', {
@@ -267,7 +286,7 @@ export class BrowserDriver {
       const bounds = canvas.getBoundingClientRect();
       return {
         x: bounds.left + ${gameX} * bounds.width / canvas.width,
-        y: bounds.top + ${gameY} * bounds.height / canvas.height
+        y: bounds.top + (${gameY} + ${VIEW_Y_OFFSET}) * bounds.height / canvas.height
       };
     })()`);
     await this.send('Input.dispatchMouseEvent', {
@@ -289,7 +308,7 @@ export class BrowserDriver {
       const bounds = canvas.getBoundingClientRect();
       const point = (x, y) => ({
         x: bounds.left + x * bounds.width / canvas.width,
-        y: bounds.top + y * bounds.height / canvas.height
+        y: bounds.top + (y + ${VIEW_Y_OFFSET}) * bounds.height / canvas.height
       });
       return { from: point(${fromX}, ${fromY}), to: point(${toX}, ${toY}) };
     })()`);

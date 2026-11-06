@@ -73,7 +73,8 @@ async function wheelAt(driver, gameX, gameY, deltaY) {
     const bounds = canvas.getBoundingClientRect();
     return {
       x: bounds.left + ${gameX} * bounds.width / canvas.width,
-      y: bounds.top + ${gameY} * bounds.height / canvas.height
+      // scene renders VIEWYOFFSET(10) lower than design space (see cdp.mjs)
+      y: bounds.top + (${gameY} + 10) * bounds.height / canvas.height
     };
   })()`);
   await driver.send('Input.dispatchMouseEvent', {
