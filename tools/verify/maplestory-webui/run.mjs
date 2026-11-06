@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { cleanupResidualCharacter } from './support/char-cleanup-fixture.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { assertCharSelectModernLayout, assertWorldSelectNovaTopSlot } from './layout-pixels.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
@@ -110,6 +111,15 @@ const restorePetHunger = petHunger && petOptionsMode === 'hunger'
 const restoreShoeStats = shoeStats && verifyPetOptions
   ? boostShoeStats({ configPath: process.env.MS_SERVER_CONFIG, account, speed: shoeStats.speed, jump: shoeStats.jump }).restore
   : null;
+
+// 前置夹具清理（逻辑在 support/char-cleanup-fixture.mjs）：清理历次验收残留
+// 的同名角色，避免建角重名假失败；E2E_SKIP_CHAR_CLEANUP=1 可跳过。
+
+if (createCharacter && process.env.E2E_SKIP_CHAR_CLEANUP === '1') {
+  console.log('fixture: E2E_SKIP_CHAR_CLEANUP=1，跳过同名角色残留清理');
+} else if (createCharacter) {
+  cleanupResidualCharacter(account, characterName);
+}
 
 try {
   const pageUrl = await resolvePageUrl();

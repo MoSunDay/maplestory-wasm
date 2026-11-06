@@ -23,7 +23,8 @@
   收割节奏不变；已重编 dist 并重启容器）。
 - 客户端页面：`web/index.html` 断线提示改非阻塞 `#ms-disconnect-banner`
   （随 8f3ff27 提交），CDP/自动化与真实用户均不再被 alert 冻结。
-- 根因与复跑注意事项：docs/known-issues/2026-11-06-ui-hit-offset-and-idle-reaper.md。
+- 根因与复跑注意事项：docs/known-issues/2026-11-06-ui-hit-offset-and-idle-reaper.md（08a0b52）。
+- 复跑闭环：run.mjs 前置钩子（support/char-cleanup-fixture.mjs）自动清理同名残留角色。
 
 ## 验收
 
