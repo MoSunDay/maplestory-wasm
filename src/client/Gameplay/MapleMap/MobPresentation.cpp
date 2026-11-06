@@ -47,6 +47,7 @@ namespace jrc
 
     void Mob::set_control(int8_t mode)
     {
+        const bool was_controlled = control;
         control = mode > 0;
         aggro = mode == 2;
         if (!control)
@@ -58,6 +59,27 @@ namespace jrc
             // server last saw it until the next MOB_MOVED arrives.
             playback = mobplayback::begin(get_position(), {});
         }
+        else if (!was_controlled)
+        {
+            // A fresh controller must not keep replaying another client's
+            // movement batch; local physics takes over from the last
+            // server-authoritative position.
+            cancel_action();
+            playback = mobplayback::begin(get_position(), {});
+        }
+
+        last_net_position = get_position();
+        last_net_elapsed = net_elapsed;
+    }
+
+    void Mob::respawn(Point<int16_t> position, uint8_t stancebyte, uint16_t fh)
+    {
+        set_position(position);
+        phobj.fhid = fh;
+        set_stance(stancebyte);
+        playback = mobplayback::begin(position, {});
+        last_net_position = position;
+        last_net_elapsed = net_elapsed;
     }
 
     void Mob::send_movement(Point<int16_t> start, uint8_t raw_activity,
@@ -68,6 +90,11 @@ namespace jrc
         {
             return;
         }
+        // The server subtracts two pixels from the reported start position
+        // before broadcasting MOVE_MONSTER; undo that so observer and
+        // controller coordinates stay identical.
+        start = { start.x(), static_cast<int16_t>(start.y() + 2) };
+
         // Server-authoritative re-anchor: replay restarts from 'start' and
         // fragment positions are interpolated from there, so the mob no
         // longer gets snapped to the batch's final position on arrival.
@@ -196,11 +223,11 @@ namespace jrc
             active = false;
             break;
         case 1:
-            dying = true;
-            if (awaitdeath)
-            {
-                apply_death();
-            }
+            // Observers never receive the controller's local knockback
+            // state, so animation 1 must always advance into the death
+            // animation. Otherwise dying is set without dead ever being
+            // reached, leaving a ghost mob on the map.
+            apply_death();
             break;
         case 2:
             fading = true;

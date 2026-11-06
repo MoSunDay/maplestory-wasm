@@ -53,6 +53,27 @@ E2E_URL=http://127.0.0.1:8001/web/index.html \
 node tools/verify/maplestory-webui/social-flow.mjs
 ```
 
+`SOCIAL_MODE=actions` 复用同一双账号启动与选角流程，只验证同图动作同步，且不再用探针注入动作：副账号真实按 `F1`，断言本地/远端都进入 `HIT` 并保存前后截图；等待服务端 5 秒回退后远端表情恢复默认；再让副账号真实按 Ctrl 攻击，断言主账号侧远端 `mschar_stance` 进入攻击姿态（`social-remote-attack.png` 为攻击帧证据）。该模式约 30 秒完成，不触碰好友/组队持久状态。
+
+```bash
+SOCIAL_MODE=actions PRIMARY_ACCOUNT=... PRIMARY_PASSWORD=... PRIMARY_CHARACTER=... \
+SOCIAL_ACCOUNT=... SOCIAL_PASSWORD=... SOCIAL_CHARACTER=... \
+E2E_URL=http://127.0.0.1:8000/web/index.html \
+node tools/verify/maplestory-webui/social-flow.mjs
+```
+
+- `SOCIAL_MODE=mobs` 双账号怪物位置/动作同步回归：主账号真实按住 `ArrowLeft`/`ArrowRight` 行走期间每 250ms 采样一次，比较两端 `msmob_state` 的 oid/x/y/action/action_pos，断言 oid 集合一致、位移差 ≤32px、动作字段一致，且全程最差位移 ≤48px 并输出数值与前后截图（`mobs-sync-before-*`/`mobs-sync-after-*`）。采样必须在页面内用单个 `evaluate()` 原子完成（一次循环读完 `msmob_count` 与全部字段，两端用 `Promise.all` 并发）；**不得逐字段跨 CDP 往返采样**，那会把不同游戏帧的字段拼在一起，正是旧「漂移」假象的来源。命令：
+
+```bash
+SOCIAL_MODE=mobs PRIMARY_ACCOUNT=test1 PRIMARY_PASSWORD=test1 PRIMARY_CHARACTER=test1Warr PRIMARY_CARD=0 SOCIAL_ACCOUNT=accept1 SOCIAL_PASSWORD=accept1 SOCIAL_CHARACTER=accept1Hero SOCIAL_CARD=0 E2E_URL=http://127.0.0.1:8000/web/index.html CHROME_BIN=/usr/bin/google-chrome node tools/verify/maplestory-webui/social-flow.mjs
+```
+
+- `SOCIAL_MODE=coop` 双账号真实 UI 协作验收：先等两端互相可见、同图落地（y 差 ≤6px），再让双方真实按住方向键交替行走与同时行走，以 100ms 间隔采样本地/远端坐标，并在页面内用 rAF 采集帧间隔；断言远端同步差 ≤48px、单步 ≤80px，运动窗口至少 30 帧且远端 p95 步进 ≤12px、最大步进 ≤24px、帧 p95 ≤40ms。随后用 F1 验证表情中继与 5 秒复位，再用双向 Ctrl 验证远端攻击姿态。产物含前后截图与 `coop-acceptance.json`，不触碰好友/组队持久状态。门限可用 `COOP_SYNC_TOLERANCE`、`COOP_MAX_STEP`、`COOP_MAX_P95_FRAME_MS` 覆盖。命令：
+
+```bash
+SOCIAL_MODE=coop PRIMARY_ACCOUNT=test1 PRIMARY_PASSWORD=test1 PRIMARY_CHARACTER=test1Warr PRIMARY_CARD=0 SOCIAL_ACCOUNT=accept1 SOCIAL_PASSWORD=accept1 SOCIAL_CHARACTER=accept1Hero SOCIAL_CARD=0 E2E_URL=http://127.0.0.1:8000/web/index.html CHROME_BIN=/usr/bin/google-chrome node tools/verify/maplestory-webui/social-flow.mjs
+```
+
 ## 交易入口与交易室取证
 
 交易入口另做过一轮独立双浏览器验收：经地图右键菜单「交易」行发起并进入交易室，截图留档双方形象、铭牌、物品格栅、金币行与聊天面板的呈现。该轮由一次性临时驱动完成，未沉淀为可复用脚本，且只覆盖入口与房间呈现，不构成完整交易事务；交易状态机与客户端封包解析由 `tools/verify/trade-state.cpp`、`trade-item-parser.cpp` 覆盖，交易室几何由 `trade-ui-nx.cpp`/`trade-layout.cpp` 校验；完整交易提交语义不在该浏览器轮次内，最终以 linked server 校验为准。

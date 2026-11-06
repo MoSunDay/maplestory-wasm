@@ -42,7 +42,7 @@ namespace jrc::spawn_mob
             }
         }
 
-        void parse_fixed_state(InPacket& recv, bool make_real)
+        void parse_fixed_state(InPacket& recv)
         {
             for (uint8_t i = 0; i < 15; ++i)
             {
@@ -55,7 +55,7 @@ namespace jrc::spawn_mob
                 "mob spawn state marker"
             );
 
-            const uint8_t trailing_padding = make_real ? 12 : 6;
+            const uint8_t trailing_padding = 6;
             for (uint8_t i = 0; i < trailing_padding; ++i)
             {
                 require_byte(recv, 0, "mob spawn state padding");
@@ -155,7 +155,7 @@ namespace jrc::spawn_mob
     Payload parse_payload(InPacket& recv, Layout layout)
     {
         const bool make_real = layout == Layout::MAKE_REAL;
-        parse_fixed_state(recv, make_real);
+        parse_fixed_state(recv);
 
         Payload payload{
             recv.read_point(),

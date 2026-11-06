@@ -93,6 +93,7 @@ namespace jrc
         CLOSE_ATTACK  = 44,
         RANGED_ATTACK = 45,
         MAGIC_ATTACK  = 46,
+        FACE_EXPRESSION = 0x33,
         TAKE_DAMAGE   = 48,
 
         // Messaging

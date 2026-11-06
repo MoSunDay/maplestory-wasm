@@ -73,6 +73,7 @@ namespace jrc
         uint16_t get_attackdelay(size_t no, uint8_t first_frame) const;
         uint8_t get_frame() const;
         Stance::Id get_stance() const;
+        Expression::Id get_expression() const;
 
         const Body* get_body() const;
         const Hair* get_hair() const;

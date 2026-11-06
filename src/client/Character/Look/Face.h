@@ -18,6 +18,8 @@
 #pragma once
 #include "BodyDrawInfo.h"
 
+#include <cstdint>
+
 #include "../../Graphics/Texture.h"
 #include "../../Template/EnumMap.h"
 
@@ -35,6 +37,10 @@ namespace jrc
             LENGTH
         };
 
+        // Convert a key action id (FACE1..FACE7) to its v83 wire emote id.
+        static int32_t emote_byaction(size_t action);
+        // Convert a v83 FACE_EXPRESSION wire id to a face expression.
+        static Id byemote(int32_t emote);
         static Id byaction(size_t action);
 
         static const EnumMap<Id, std::string> names;

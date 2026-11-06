@@ -439,11 +439,22 @@ namespace jrc
         }
 
         ++moveid;
+        const int32_t elapsed = net_elapsed - last_net_elapsed;
+        const int16_t duration = static_cast<int16_t>(
+            std::clamp<int32_t>(elapsed, 1, 1000));
+        Movement fragment(phobj, raw_activity);
+        fragment.duration = duration;
+        fragment.lastx = last_net_position.x();
+        fragment.lasty = last_net_position.y();
+
         MoveMobPacket(
             oid, static_cast<int16_t>(moveid), 0,
             static_cast<int8_t>(raw_activity), static_cast<int8_t>(skill_id),
             static_cast<int8_t>(skill_level), 0, 0,
-            get_position(), Movement(phobj, raw_activity)
+            last_net_position, fragment
         ).dispatch();
+
+        last_net_position = get_position();
+        last_net_elapsed = net_elapsed;
     }
 }

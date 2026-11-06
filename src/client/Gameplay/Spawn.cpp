@@ -54,6 +54,21 @@ namespace jrc
         return oid;
     }
 
+    int8_t MobSpawn::get_stance() const
+    {
+        return stance;
+    }
+
+    uint16_t MobSpawn::get_foothold() const
+    {
+        return fh;
+    }
+
+    Point<int16_t> MobSpawn::get_position() const
+    {
+        return position;
+    }
+
     std::unique_ptr<MapObject> MobSpawn::instantiate() const
     {
         return std::make_unique<Mob>(oid, id, mode, stance, fh, newspawn, team, position);

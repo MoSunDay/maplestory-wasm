@@ -20,8 +20,10 @@
 #include "Mob.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <map>
 
@@ -54,7 +56,12 @@ namespace jrc
 
             if (Optional<Mob> mob = mobs.get(spawn.get_oid()))
             {
-                int8_t mode = spawn.get_mode();
+                const int8_t mode = spawn.get_mode();
+                mob->respawn(
+                    spawn.get_position(),
+                    spawn.get_stance(),
+                    spawn.get_foothold()
+                );
                 if (mode > 0)
                 {
                     mob->set_control(mode);
@@ -118,6 +125,48 @@ namespace jrc
                 start, raw_activity, skill_id, skill_level,
                 std::move(movements)
             );
+        }
+    }
+
+    int MapMobs::probe_state(size_t index, int field) const
+    {
+        if (index >= mobs.size())
+        {
+            return -1;
+        }
+
+        auto entry = mobs.begin();
+        std::advance(entry, static_cast<std::ptrdiff_t>(index));
+        Optional<const Mob> mob = entry->second.get();
+        if (!mob)
+        {
+            return -1;
+        }
+
+        switch (field)
+        {
+        case 0:
+            return mob->get_oid();
+        case 1:
+            return mob->get_position().x();
+        case 2:
+            return mob->get_position().y();
+        case 3:
+            return mob->probe_stance();
+        case 4:
+            return mob->probe_controlled() ? 1 : 0;
+        case 5:
+            return mob->is_active() ? 1 : 0;
+        case 6:
+            return mob->probe_dying() ? 1 : 0;
+        case 7:
+            return mob->probe_action();
+        case 8:
+            return mob->probe_action_pos();
+        case 9:
+            return mob->probe_dead() ? 1 : 0;
+        default:
+            return -1;
         }
     }
 

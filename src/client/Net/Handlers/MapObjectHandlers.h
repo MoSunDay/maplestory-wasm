@@ -72,6 +72,13 @@ namespace jrc
         void handle(InPacket& recv) const override;
     };
 
+    // Update a character's face expression.
+    // Opcode: FACIAL_EXPRESSION(193)
+    class FacialExpressionHandler : public PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
     // Display an effect on a character.
     // Opcode: SHOW_FOREIGN_EFFECT(198)
     class ShowForeignEffectHandler : public PacketHandler

@@ -16,22 +16,26 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.    //
 //////////////////////////////////////////////////////////////////////////////
 #include "Face.h"
-
-#include "../../Console.h"
+#include "ExpressionMapping.h"
 
 #include "nlnx/nx.hpp"
 #include "nlnx/node.hpp"
 
 namespace jrc
 {
+    int32_t Expression::emote_byaction(size_t action)
+    {
+        return faceemote::from_action(action);
+    }
+
+    Expression::Id Expression::byemote(int32_t emote)
+    {
+        return faceemote::from_wire(emote);
+    }
+
     Expression::Id Expression::byaction(size_t action)
     {
-        action -= 98;
-        if (action < LENGTH)
-            return static_cast<Id>(action);
-
-        Console::get().print("Unhandled expression id: " + std::to_string(action));
-        return DEFAULT;
+        return byemote(emote_byaction(action));
     }
 
     const EnumMap<Expression::Id, std::string> Expression::names =

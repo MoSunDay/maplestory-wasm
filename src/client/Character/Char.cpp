@@ -1,4 +1,5 @@
 #include "Char.h"
+#include "Look/ExpressionMapping.h"
 
 #include <algorithm>
 #include <math.h>
@@ -333,10 +334,9 @@ namespace jrc
         set_state(newstate);
     }
 
-    void Char::set_expression(int32_t expid)
+    void Char::set_expression(int32_t emote)
     {
-        Expression::Id expression = Expression::byaction(expid);
-        look.set_expression(expression);
+        look.set_expression(faceemote::from_wire(emote));
     }
 
     void Char::set_chair(int32_t item_id)

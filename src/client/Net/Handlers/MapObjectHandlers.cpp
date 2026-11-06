@@ -22,7 +22,7 @@
 #include "Helpers/MovementParser.h"
 #include "../Protocol/DropRemovalPayload.h"
 #include "../Protocol/SpawnMobPayload.h"
-#include "../Protocol/SpawnPlayerHeader.h"
+#include "../Protocol/SpawnPlayerPayload.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Character/SkillId.h"
@@ -87,87 +87,17 @@ namespace jrc
 
     void SpawnCharHandler::handle(InPacket& recv) const
     {
-        const spawn_player::Header header = spawn_player::parse_header(recv);
-
-        recv.read_string(); // guildname
-        recv.read_short(); // guildlogobg
-        recv.read_byte(); // guildlogobgcolor
-        recv.read_short(); // guildlogo
-        recv.read_byte(); // guildlogocolor
-
-        recv.skip(8);
-
-        bool morphed = recv.read_int() == 2;
-        int32_t buffmask1 = recv.read_int();
-        int16_t combo_value = 0;
-        if (buffmask1 != 0)
-        {
-            if (morphed)
-                recv.read_short();
-            else
-            {
-                int8_t value = recv.read_byte();
-                constexpr int32_t COMBO_HIGH_MASK = 0x00200000;
-                if (buffmask1 & COMBO_HIGH_MASK)
-                    combo_value = value;
-            }
-        }
-        recv.read_int(); // buffmask 2
-
-        recv.skip(43);
-
-        recv.read_int(); // 'mount'
-
-        recv.skip(61);
-
-        int16_t job = recv.read_short();
-        LookEntry look = LoginParser::parse_look(recv);
-
-        recv.read_int(); //count of 5110000
-        recv.read_int(); // 'itemeffect'
-        recv.read_int(); // 'chair'
-
-        Point<int16_t> position = recv.read_point();
-        int8_t stance = recv.read_byte();
-
-        recv.skip(3);
-
-        for (size_t i = 0; i < 3; i++)
-        {
-            int8_t available = recv.read_byte();
-            if (available == 1)
-            {
-                recv.read_byte(); // 'byte2'
-                recv.read_int(); // petid
-                recv.read_string(); // name
-                recv.read_int(); // unique id
-                recv.read_int();
-                recv.read_point(); // pos
-                recv.read_byte(); // stance
-                recv.read_int(); // fhid
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        recv.read_int(); // mountlevel
-        recv.read_int(); // mountexp
-        recv.read_int(); // mounttiredness
-
-        //shop stuff, TO DO
-        recv.read_byte();
-        //shop stuff end
-
-        bool chalkboard = recv.read_bool();
-        std::string chalktext = chalkboard ? recv.read_string() : "";
-
-        recv.skip(3);
-        recv.read_byte(); // team
+        const spawn_player::Payload payload = spawn_player::parse_payload(recv);
 
         Stage::get().get_chars().spawn({
-            header.cid, look, header.level, job, header.name, stance, position, combo_value
+            payload.header.cid,
+            payload.look,
+            payload.header.level,
+            payload.job,
+            payload.header.name,
+            payload.stance,
+            payload.position,
+            payload.combo_value
         });
     }
 
@@ -256,6 +186,14 @@ namespace jrc
             character->set_chair(item_id);
             character->set_state(item_id > 0 ? Char::SIT : Char::STAND);
         }
+    }
+
+    void FacialExpressionHandler::handle(InPacket& recv) const
+    {
+        int32_t cid = recv.read_int();
+        int32_t emote = recv.read_int();
+        if (auto character = Stage::get().get_character(cid))
+            character->set_expression(emote);
     }
 
     void ShowForeignEffectHandler::handle(InPacket& recv) const

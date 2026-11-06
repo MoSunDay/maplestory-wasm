@@ -2,6 +2,7 @@
 #include "Input/ActionTrigger.h"
 
 #include "../Audio/Audio.h"
+#include "../Character/Look/ExpressionMapping.h"
 #include "../IO/KeyAction.h"
 #include "../Net/Packets/GameplayPackets.h"
 
@@ -191,7 +192,18 @@ namespace jrc
         }
         case KeyType::SKILL: combat.use_move(action); break;
         case KeyType::ITEM: player.use_item(action); break;
-        case KeyType::FACE: player.set_expression(action); break;
+        case KeyType::FACE:
+            if (down)
+            {
+                const int32_t emote = faceemote::from_action(
+                    static_cast<size_t>(action));
+                if (emote != 0)
+                {
+                    player.set_expression(emote);
+                    FaceExpressionPacket(emote).dispatch();
+                }
+            }
+            break;
         default: break;
         }
     }

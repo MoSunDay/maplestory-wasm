@@ -218,7 +218,6 @@ namespace jrc
         dying        = false;
         dead         = false;
         fading       = false;
-        awaitdeath   = false;
         this->stance = STAND;
         set_stance(stancebyte);
         flydirection = STRAIGHT;
@@ -235,6 +234,9 @@ namespace jrc
         status_first_mask = 0;
         status_second_mask = 0;
         aggro_target = position;
+        last_net_position = position;
+        net_elapsed = 0;
+        last_net_elapsed = 0;
 
         namelabel = { Text::A13M, Text::CENTER, Text::WHITE, Text::NAMETAG, name };
 
@@ -298,6 +300,8 @@ namespace jrc
         {
             return phobj.fhlayer;
         }
+
+        net_elapsed += Constants::TIMESTEP;
 
         for (uint16_t& cooldown : attack_cooldowns)
         {
@@ -473,6 +477,16 @@ namespace jrc
                     update_movement();
                     counter = 0;
                 }
+
+                // Even non-aggro wandering is sent periodically. The
+                // outgoing batch carries the previous network position and
+                // the elapsed time, so observers can interpolate instead of
+                // freezing on the last waypoint between packets.
+                if (net_elapsed - last_net_elapsed >= 240
+                    && get_position() != last_net_position)
+                {
+                    update_movement();
+                }
             }
         }
         else
@@ -616,7 +630,6 @@ namespace jrc
         });
 
         update_movement();
-        awaitdeath = false;
 
         return result;
     }
@@ -670,7 +683,6 @@ namespace jrc
             set_stance(HIT);
 
             update_movement();
-            awaitdeath = true;
         }
     }
 

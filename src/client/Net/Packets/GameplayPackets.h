@@ -50,6 +50,17 @@ namespace jrc
         }
     };
 
+    /// Plays a face expression for nearby players.
+    /// Opcode: FACE_EXPRESSION(0x33)
+    class FaceExpressionPacket : public OutPacket
+    {
+    public:
+        explicit FaceExpressionPacket(int32_t emote) : OutPacket(FACE_EXPRESSION)
+        {
+            write_int(emote);
+        }
+    };
+
     /// Selects a map seat, or stops sitting when seat_id is -1.
     class CancelChairPacket : public OutPacket
     {

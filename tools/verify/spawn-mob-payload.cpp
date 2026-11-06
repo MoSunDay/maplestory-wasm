@@ -20,11 +20,11 @@ namespace
         }
     }
 
-    void append_fixed_state(Bytes& bytes, bool make_real = false)
+    void append_fixed_state(Bytes& bytes)
     {
         bytes.insert(bytes.end(), 15, 0);
         bytes.push_back(static_cast<int8_t>(0x88));
-        bytes.insert(bytes.end(), make_real ? 12 : 6, 0);
+        bytes.insert(bytes.end(), 6, 0);
     }
 
     void append_position(
@@ -171,7 +171,7 @@ namespace
         assert(hidden_effect.new_spawn);
 
         Bytes make_real;
-        append_fixed_state(make_real, true);
+        append_fixed_state(make_real);
         append_position(make_real, 1126, 193, 5, 126);
         append_number<int16_t>(make_real, -1);
         append_number<int32_t>(make_real, 0);

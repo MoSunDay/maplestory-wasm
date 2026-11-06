@@ -161,6 +161,32 @@ extern "C"
         return character ? character->get_position().y() : MISSING_COORDINATE;
     }
 
+    int msplayer_expression()
+    {
+        return static_cast<int>(
+            jrc::Stage::get().get_player().get_look().get_expression());
+    }
+
+    int mschar_expression(int32_t character_id)
+    {
+        auto character = jrc::Stage::get().get_chars().get_char(character_id);
+        return character ? static_cast<int>(
+            character->get_look().get_expression()) : -1;
+    }
+
+    int mschar_stance(int32_t character_id)
+    {
+        auto character = jrc::Stage::get().get_chars().get_char(character_id);
+        return character ? static_cast<int>(
+            character->get_look().get_stance()) : -1;
+    }
+
+    int mschar_frame(int32_t character_id)
+    {
+        auto character = jrc::Stage::get().get_chars().get_char(character_id);
+        return character ? character->get_look().get_frame() : -1;
+    }
+
     int mschar_screen_x(int32_t character_id)
     {
         auto& stage = jrc::Stage::get();
@@ -180,6 +206,16 @@ extern "C"
     int msmob_count()
     {
         return static_cast<int>(jrc::Stage::get().get_mobs().size());
+    }
+
+    int msmob_state(int index, int field)
+    {
+        if (index < 0)
+        {
+            return -1;
+        }
+        return jrc::Stage::get().get_mobs().probe_state(
+            static_cast<size_t>(index), field);
     }
 
     int msnearest_mob_x()

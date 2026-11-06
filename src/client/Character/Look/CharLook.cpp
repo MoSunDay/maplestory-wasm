@@ -726,6 +726,11 @@ namespace jrc
         return stance.get();
     }
 
+    Expression::Id CharLook::get_expression() const
+    {
+        return expression.get();
+    }
+
     const Body* CharLook::get_body() const
     {
         return body;

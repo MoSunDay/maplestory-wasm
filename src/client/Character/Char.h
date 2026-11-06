@@ -107,8 +107,8 @@ namespace jrc
         void change_look(Maplestat::Id stat, int32_t id);
         /// Change the character's state by id.
         void set_state(uint8_t statebyte);
-        /// Change the character's face expression by id.
-        void set_expression(int32_t expression);
+        /// Change the character's face expression by v83 FACE_EXPRESSION id.
+        void set_expression(int32_t emote);
         /// Change the item-chair visual; zero clears it.
         void set_chair(int32_t item_id);
 

@@ -81,6 +81,8 @@ namespace jrc
         void send_movement(Point<int16_t> start, uint8_t raw_activity,
                            uint8_t skill_id, uint8_t skill_level,
                            std::vector<Movement>&& movements);
+        /// Snap to a server-authoritative spawn/controller position.
+        void respawn(Point<int16_t> position, uint8_t stancebyte, uint16_t fh);
         /// Kill the mob with the appropriate type:
         /// 0 - make inactive 1 - death animation 2 - fade out
         void kill(int8_t killtype);
@@ -117,6 +119,14 @@ namespace jrc
         {
             return status_first_mask;
         }
+
+        // Read-only test hooks used by the browser sync probes.
+        uint8_t probe_stance() const { return stance; }
+        bool probe_controlled() const { return control; }
+        bool probe_dying() const { return dying; }
+        bool probe_dead() const { return dead; }
+        uint8_t probe_action() const { return static_cast<uint8_t>(action_kind); }
+        uint8_t probe_action_pos() const { return active_action_pos; }
 
     private:
         enum FlyDirection
@@ -235,6 +245,9 @@ namespace jrc
         std::vector<SkillAction> skill_actions;
         std::vector<uint16_t> attack_cooldowns;
         Point<int16_t> aggro_target;
+        Point<int16_t> last_net_position;
+        int32_t net_elapsed = 0;
+        int32_t last_net_elapsed = 0;
         uint8_t suggested_skill_id = 0;
         uint8_t suggested_skill_level = 0;
         size_t next_attack = 0;
@@ -252,7 +265,6 @@ namespace jrc
         int8_t team = 0;
         bool dying = false;
         bool dead = false;
-        bool awaitdeath = false;
         bool control = false;
         bool aggro = false;
         Stance stance = STAND;

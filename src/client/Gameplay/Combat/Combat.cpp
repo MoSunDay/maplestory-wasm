@@ -579,7 +579,11 @@ namespace jrc
 
     void Combat::push_attack(const AttackResult& attack)
     {
-        attackresults.push(400, attack);
+        // The broadcast already arrives after the attacker's client sent the
+        // attack and the server processed it. Deferring it again would make
+        // the remote swing start after the effects it produced. Hit delays
+        // are scheduled separately by the DamageEffect queue.
+        attackresults.push(0, attack);
     }
 
     void Combat::apply_attack(const AttackResult& attack)
