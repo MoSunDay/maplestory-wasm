@@ -1,0 +1,40 @@
+# 服务端源码补丁：修复空闲收割 PONG 基准错杀（testPing 应与 ping 时刻比较）
+# 背景：0003 引入的确定性空闲收割里，manageIdleSessions 原以
+# `timeThen = timeNow - 15000`（检查 tick 时刻）为基准调 MapleClient.testPing，
+# 而 lastPong 只在 ping 后数百毫秒内更新 → 10s 周期的检查 tick 落在登记后
+# 15~25s 时，正常应答的 PONG 也满足 `lastPong < timeThen` 被判过期，健康
+# 登录连接在 ~45-55s 空闲（如 run.mjs 角色创建素材等待）后被错杀；客户端
+# 侧随即弹阻塞 alert 楔死渲染主线程，UI 验收必挂在 character creation。
+# 修复：改传登记时刻 mc.getValue()（即 PING 下发时刻），语义变为"本次 ping
+# 后始终无 PONG 才关闭"；≥15000ms 的等待窗口由既有判据保证，不响应的连接
+# 仍在原节奏被收割（0003 的设计意图不变）。
+# 详情：docs/known-issues/2026-11-06-ui-hit-offset-and-idle-reaper.md（父仓 08a0b52）
+#
+# 应用（在 link_repos/MapleStory-Server 目录内）：
+#   patch -p1 < ../../../scripts/server-patches/0015-idle-reaper-pong-baseline.patch
+# 验证：
+#   grep -n "testPing(mc.getValue())" src/net/MapleServerHandler.java
+#   bash posix-compile.sh && bash scripts/game_server_restart.sh
+#   E2E_URL=http://127.0.0.1:8000/web/index.html node tools/verify/maplestory-webui/run.mjs   # 全绿（44 PASS）
+--- a/src/net/MapleServerHandler.java
++++ b/src/net/MapleServerHandler.java
+@@ -270,7 +270,6 @@
+ 
+     private void manageIdleSessions() {
+         long timeNow = Server.getInstance().getCurrentTime();
+-        long timeThen = timeNow - 15000;
+ 
+         idleLock.lock();
+ 
+@@ -281,7 +280,10 @@
+                 Entry<MapleClient, Long> mc = idleIterator.next();
+ 
+                 if (timeNow - mc.getValue() >= 15000) {
+-                    mc.getKey().testPing(timeThen);
++                    // 与 ping 时刻比较而非检查时刻：正常客户端在 ping 后数百毫秒内回 PONG，
++                    // 若与 now-15s 比较会在检查 tick 落后时把刚应答的 PONG 误判为过期，
++                    // 错杀仅在角色创建等长空闲阶段的健康登录会话。
++                    mc.getKey().testPing(mc.getValue());
+                     idleIterator.remove();
+                 } else if (mc.getKey().getSession() == null || !mc.getKey().getSession().isConnected()) {
+                     idleIterator.remove();
