@@ -167,6 +167,15 @@ namespace jrc
         {
             player.set_state(Char::PRONE);
         }
+        else if (player.on_slick_ground()
+            && std::abs(player.get_phobj().hspeed) > 0.05)
+        {
+            // Snow slopes keep pulling a resting player downhill; show the
+            // gliding walk stance (facing the drift) like the official
+            // client instead of standing still while moving.
+            player.set_direction(player.get_phobj().hspeed > 0.0);
+            player.set_state(Char::WALK);
+        }
     }
 
 
@@ -247,9 +256,11 @@ namespace jrc
         if (player.get_phobj().onground)
         {
             // On slippery ground the player keeps sliding (and playing the
-            // walk animation) for a while after the input is released.
+            // walk animation) until the physics stop threshold: snow maps
+            // scale the ground friction by fs, and slopes keep pulling the
+            // player downhill, so the glide lasts as long as it moves.
             bool sliding = player.on_slick_ground()
-                && std::abs(player.get_phobj().hspeed) > 0.25;
+                && std::abs(player.get_phobj().hspeed) > 0.05;
             if (!sliding && (!haswalkinput(player) || player.get_phobj().hspeed == 0.0f))
             {
                 if (!haswalkinput(player) && player.is_key_down(KeyAction::DOWN))

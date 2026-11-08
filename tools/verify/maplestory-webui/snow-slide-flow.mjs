@@ -1,10 +1,12 @@
-// /雪地物理 e2e：行走不加速、松键后雪鞋滑行一小段（El Nath 211000000, fs=0.2）。
+// /雪地物理 e2e：行走不加速、松键后按官方 fs 摩擦乘数惯性滑行（El Nath
+// 211000000, fs=0.2）。官方逻辑：fs 缩放整个地面摩擦（滑行≈旧版 1.5 倍
+// 距离）、斜坡恒定下滑力（平地走廊无坡度，不影响本用例）。
 //
 // 场景与断言（对照 features/changelog/2026-11-01/snow-map-slide.md）：
 //   1. 落图 211000000（El Nath 镇）后 physicstype=1(ICE)、站地 stance 21/22；
 //   2. 按住 ArrowRight 1.6s：水平速度收敛到平台（≈1.2~1.5 px/帧，速度上限的
 //      walkforce 决定），断言平台中位数 0.7~2.4 px/帧 —— 旧 bug 为 ≥3.5；
-//   3. 松键：以 SNOWFRICTION 滑行一小段（数值模拟 ~26px/~60 帧）后停止，
+//   3. 松键：以 fs×全摩擦 滑行（数值模拟 ≈42px/760ms，约旧版 1.5 倍）停止，
 //      断言滑行距离 8~90px、期间 stance 保持 34/35(WALK) 再回 21/22(STAND)；
 //   4. 观察项（问五第 5 项）：滑行尾速趋零后按住 Down 可进 prone(7)，
 //      且 prone 态 |hspeed|=0 不再滑 —— 只记录不断言。
@@ -194,7 +196,7 @@ async function main() {
     report.samples.slide = slideRows;
     report.slidePx = slidePx; report.walkAfterReleaseMs = walkAfterReleaseMs;
     await driver.screenshot('02-after-slide');
-    check('slide distance 8~90px', slidePx >= 8 && slidePx <= 90, `slide=${slidePx.toFixed(1)}px (模拟 ≈26px)`);
+    check('slide distance 8~90px', slidePx >= 8 && slidePx <= 90, `slide=${slidePx.toFixed(1)}px (模拟 ≈42px, 旧版实测 22px)`);
     check('keeps walk stance while sliding', walkAfterReleaseMs >= 150, `walk stance until t=${walkAfterReleaseMs}ms`);
     check('comes to full stop', Math.abs(finalRow.hs) === 0 && stance.stand.includes(finalRow.stance),
       `final hs=${finalRow.hs} stance=${finalRow.stance}`);
@@ -209,7 +211,7 @@ async function main() {
     report.observations.prone = { sawProne, proneStill,
       stances: [...new Set(proneRows.map(r => r.stance))] };
     console.log(`  NOTE  prone-on-snow: sawProne=${sawProne} staysStill=${proneStill}`
-      + ` (prone 只能从静止进入，雪面尾速 0.25px/f 以下，无额外滑行 —— 观察项不作断言)`);
+      + ` (prone 从静止进入；斜坡上会被下滑力持续拖行，本走廊为平地 —— 观察项不作断言)`);
     await driver.screenshot('03-prone');
   } finally {
     fs.writeFileSync(`${outDir}/report.json`, JSON.stringify(report, null, 2));

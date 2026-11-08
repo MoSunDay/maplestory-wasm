@@ -23,8 +23,12 @@ namespace jrc
     const double GRAVFORCE     = Physics::GRAVITY;
     const double SWIMGRAVFORCE = 0.03;
     const double FRICTION      = 0.3;
-    const double SNOWFRICTION  = 0.1;
     const double SLOPEFACTOR   = 0.1;
+    // Constant downhill pull per unit foothold slope on snow maps. Positive
+    // slope descends to the right (screen-y grows downward), so a resting
+    // object keeps gaining downhill speed until fs-scaled friction balances
+    // it -- the official El Nath slopes cannot be stood on without snowshoes.
+    const double SNOWSLOPE     = 0.02;
     const double GROUNDSLIP    = 3.0;
     const double FLYFRICTION   = 0.05;
     const double SWIMFRICTION  = 0.08;
@@ -119,12 +123,18 @@ namespace jrc
 
     void Physics::move_ice(PhysicsObject& phobj) const
     {
-        // Snow maps only change how objects come to a stop: while a
-        // horizontal force is applied the ground grips like normal ground,
-        // so walking speed stays the same. Once the input is released, the
-        // map's slip factor scales the ground friction down and the object
-        // slides on for a short distance before stopping. Snowshoes keep
-        // NORMAL physics, so they stop the slide entirely.
+        // Official snow maps ('info/fs', 0.2 on every El Nath field) work as
+        // a friction multiplier plus a slope pull, replicating the official
+        // behaviour:
+        //  - while a walk force is applied, full ground grip keeps walking
+        //    exactly like on normal ground (snow never changes walk speed);
+        //  - once the input is released, the map's slip factor scales the
+        //    whole ground friction down (fs=0.2 -> one fifth of the normal
+        //    grip), so the object glides on much longer before stopping;
+        //  - on sloped ground a constant downhill pull keeps the object
+        //    sliding and drags a resting object downhill, so slopes cannot
+        //    be stood on (or climbed after stopping) without snowshoes.
+        // Snowshoes keep NORMAL physics, which cancels all of this.
         phobj.vacc = 0.0;
         phobj.hacc = 0.0;
         if (phobj.onground)
@@ -133,24 +143,30 @@ namespace jrc
             phobj.hacc += phobj.hforce;
 
             bool walking = phobj.hacc != 0.0;
-            if (!walking && phobj.hspeed < 0.1 && phobj.hspeed > -0.1)
+            double slopef = phobj.fhslope;
+            if (slopef > 0.5)
+            {
+                slopef = 0.5;
+            }
+            else if (slopef < -0.5)
+            {
+                slopef = -0.5;
+            }
+
+            phobj.hacc += SNOWSLOPE * slopef;
+
+            bool resting = !walking
+                && slopef == 0.0
+                && phobj.hspeed < 0.1 && phobj.hspeed > -0.1;
+            if (resting)
             {
                 phobj.hspeed = 0.0;
             }
             else
             {
                 double inertia = phobj.hspeed / GROUNDSLIP;
-                double slopef = phobj.fhslope;
-                if (slopef > 0.5)
-                {
-                    slopef = 0.5;
-                }
-                else if (slopef < -0.5)
-                {
-                    slopef = -0.5;
-                }
-                double groundfriction = walking ? FRICTION : SNOWFRICTION * slip;
-                phobj.hacc -= (groundfriction + SLOPEFACTOR * (1.0 + slopef * -inertia)) * inertia;
+                double grip = FRICTION + SLOPEFACTOR * (1.0 + slopef * -inertia);
+                phobj.hacc -= (walking ? grip : slip * grip) * inertia;
             }
         }
         else if (phobj.is_flag_not_set(PhysicsObject::NOGRAVITY))

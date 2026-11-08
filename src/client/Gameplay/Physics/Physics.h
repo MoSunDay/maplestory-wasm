@@ -37,9 +37,11 @@ namespace jrc
         };
 
         Physics(nl::node src);
-        // 'slipfactor' is the map's 'fs' value. It scales down ground
-        // friction for ICE physics on snow maps, but only while no walk
-        // force is applied, i.e. it causes sliding after the player stops.
+        // 'slipfactor' is the map's 'fs' value (0.2 on all official snow
+        // maps). For ICE physics it scales the whole ground friction down
+        // while no walk force is applied (the inertia slide after the input
+        // is released) -- walk-force-driven movement keeps full grip so
+        // walking stays identical to normal ground.
         Physics(nl::node src, double slipfactor);
         Physics();
 
