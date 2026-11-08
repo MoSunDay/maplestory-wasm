@@ -48,7 +48,8 @@ namespace jrc
             int16_t style,
             bool has_navigation_flags,
             int8_t speaker,
-            const std::string& text
+            const std::string& text,
+            const std::vector<int32_t>& style_ids = {}
         );
 
         const std::string& get_prompt_text() const
@@ -75,7 +76,13 @@ namespace jrc
             UNKNOWN
         };
 
-        static DialogueMode resolve_dialogue_mode(int8_t msgtype, bool has_navigation_flags);
+        // `has_style_list` marks msgtype 7 packets that carried a style id
+        // array; only those render as a selection menu.
+        static DialogueMode resolve_dialogue_mode(
+            int8_t msgtype,
+            bool has_navigation_flags,
+            bool has_style_list
+        );
         void refresh_selection_styles();
         int16_t get_selection_text_height() const;
         int16_t get_dialogue_content_height() const;

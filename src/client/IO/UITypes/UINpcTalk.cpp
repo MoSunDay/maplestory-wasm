@@ -27,6 +27,7 @@
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
 #include "UINpcTalkNodes.h"
+#include "UINpcTalkStyles.h"
 #include "UINpcTalkText.h"
 
 #include "nlnx/nx.hpp"
@@ -175,8 +176,20 @@ namespace jrc
         active = false;
     }
 
-    UINpcTalk::DialogueMode UINpcTalk::resolve_dialogue_mode(int8_t msgtype, bool has_navigation_flags)
+    UINpcTalk::DialogueMode UINpcTalk::resolve_dialogue_mode(
+        int8_t msgtype,
+        bool has_navigation_flags,
+        bool has_style_list
+    )
     {
+        if (npctalk_styles::is_style_dialogue_type(msgtype))
+        {
+            // sendStyle (msgtype 7) is only a menu when the packet carried
+            // a style array; a bare type 7 stays UNKNOWN so OK keeps the
+            // dialogue usable.
+            return has_style_list ? DialogueMode::SELECTION : DialogueMode::UNKNOWN;
+        }
+
         if (npctalk_text::is_selection_dialogue_type(msgtype))
         {
             return DialogueMode::SELECTION;
@@ -374,12 +387,14 @@ namespace jrc
         int16_t style,
         bool has_navigation_flags,
         int8_t speakerbyte,
-        const std::string& tx
+        const std::string& tx,
+        const std::vector<int32_t>& style_ids
     )
     {
         std::string processed_tx = npctalk_text::replace_macros(
             tx, npctalk_text::EmbedImages::KEEP);
-        dialogue_mode = resolve_dialogue_mode(msgtype, has_navigation_flags);
+        dialogue_mode = resolve_dialogue_mode(
+            msgtype, has_navigation_flags, !style_ids.empty());
 
         selections.clear();
         selection_texts.clear();
@@ -392,8 +407,16 @@ namespace jrc
 
         if (dialogue_mode == DialogueMode::SELECTION)
         {
-            const npctalk_text::SelectionList parsed = npctalk_text::parse_selections(
-                processed_tx, npctalk_text::EmbedImages::KEEP);
+            // sendStyle (msgtype 7) lists arrive as a raw id array, so swap
+            // in the style list builder; #L..#l text menus keep the parser.
+            const bool style_menu = npctalk_styles::is_style_dialogue_type(msgtype);
+            const npctalk_text::SelectionList parsed = style_menu
+                ? npctalk_styles::build_style_selection(
+                      npctalk_text::strip_npc_tokens(
+                          processed_tx, npctalk_text::EmbedImages::KEEP),
+                      style_ids)
+                : npctalk_text::parse_selections(
+                      processed_tx, npctalk_text::EmbedImages::KEEP);
             selections = parsed.option_ids;
             selection_texts = parsed.option_texts;
             prompttext.clear();

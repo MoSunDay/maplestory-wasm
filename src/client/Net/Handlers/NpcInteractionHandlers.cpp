@@ -19,6 +19,7 @@
 
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UINpcTalk.h"
+#include "../../IO/UITypes/UINpcTalkStyles.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIStorage.h"
@@ -216,6 +217,20 @@ namespace jrc
             has_navigation_flags = true;
         }
 
+        // sendStyle (msgtype 7) appends a style id array after the text:
+        // one byte count followed by int32 ids. Length checks keep a
+        // malformed count from reading past the packet.
+        std::vector<int32_t> style_ids;
+        if (npctalk_styles::is_style_dialogue_type(msgtype) && recv.length() > 0)
+        {
+            int8_t count = recv.read_byte();
+            style_ids.reserve(static_cast<size_t>(count < 0 ? 0 : count));
+            for (int8_t i = 0; i < count && recv.length() >= 4; i++)
+            {
+                style_ids.push_back(recv.read_int());
+            }
+        }
+
         UI::get().emplace<UINpcTalk>();
         UI::get().enable();
 
@@ -223,7 +238,8 @@ namespace jrc
         {
             // emplace 对已存在元素是 toggle 语义，每页对话包必须确保窗口处于打开状态，否则会与服务器会话失步
             npctalk->makeactive();
-            npctalk->change_text(npcid, msgtype, style, has_navigation_flags, speaker, text);
+            npctalk->change_text(
+                npcid, msgtype, style, has_navigation_flags, speaker, text, style_ids);
         }
     }
 
