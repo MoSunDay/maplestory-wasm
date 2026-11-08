@@ -74,6 +74,12 @@ SOCIAL_MODE=mobs PRIMARY_ACCOUNT=test1 PRIMARY_PASSWORD=test1 PRIMARY_CHARACTER=
 SOCIAL_MODE=coop PRIMARY_ACCOUNT=test1 PRIMARY_PASSWORD=test1 PRIMARY_CHARACTER=test1Warr PRIMARY_CARD=0 SOCIAL_ACCOUNT=accept1 SOCIAL_PASSWORD=accept1 SOCIAL_CHARACTER=accept1Hero SOCIAL_CARD=0 E2E_URL=http://127.0.0.1:8000/web/index.html CHROME_BIN=/usr/bin/google-chrome node tools/verify/maplestory-webui/social-flow.mjs
 ```
 
+`remote-pet-desync-flow.mjs` 是 `remote-pet-desync-source-contract.mjs` 源码契约的双浏览器实测（默认 test1/test1Hero 与 test2/test2ILA，双双落图 40001，两个 debug 端口 `E2E_DEBUG_PORT`/`+1`），按顺序验收四类场景：①基线——DB 幂等注入宠物 5000001（清旧 `inventoryitems`/孤儿 `pets` 行、重置 `summoned`）后 A 双击 CASH 栏召唤，B 进图断言 `mschar_pet_count==1`、`mschar_pet_itemid` 与 A 的 `mspet_item_id` 一致且宠物坐标非 `-32768`；②召唤竞态——A 干净登出→DB 清账→重登后立即 召唤→收回→再召唤（约 300ms 间隔），B 侧 10s 内收敛且连续两拍（间隔 300ms）稳定，3 轮取多数（≥2/3 通过）；③幽灵竞态——A/B 双双登出后并行重登、A 进图立即再登出与 B 地图加载竞速，B 侧 250ms×5s 连续采样断言 `mschar_visible(A)==0` 且 `mschar_pet_count(A)==-1` 无幽灵残留（`msother_character_count` 仅记录），同样 3 轮取多数；④回归——A 回图等双端互见后复用 `runCoopSync` 走完整协作（行走/表情/攻击），并断言两端无浏览器异常。收尾写 `a/b-browser-console.log`/`-errors.log`、停双浏览器并把两账号 `loggedin` 归零，输出 `SUMMARY remote-pet-desync-flow <passed>/4 scenarios OK`。环境变量：`E2E_URL`（默认 http://127.0.0.1:8000/web/index.html）、`E2E_DEBUG_PORT`（默认 9261）、`E2E_ARTIFACT_DIR`（默认 /tmp/remote-pet-desync-flow）、`PRIMARY_*`/`SECONDARY_*`（账号/密码/角色名/卡索引）。命令：
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/remote-pet-desync-flow.mjs
+```
+
 ## 交易入口与交易室取证
 
 交易入口另做过一轮独立双浏览器验收：经地图右键菜单「交易」行发起并进入交易室，截图留档双方形象、铭牌、物品格栅、金币行与聊天面板的呈现。该轮由一次性临时驱动完成，未沉淀为可复用脚本，且只覆盖入口与房间呈现，不构成完整交易事务；交易状态机与客户端封包解析由 `tools/verify/trade-state.cpp`、`trade-item-parser.cpp` 覆盖，交易室几何由 `trade-ui-nx.cpp`/`trade-layout.cpp` 校验；完整交易提交语义不在该浏览器轮次内，最终以 linked server 校验为准。

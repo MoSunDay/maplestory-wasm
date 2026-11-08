@@ -1,7 +1,7 @@
 #!/bin/bash
 # End-to-end regression: create accounts -> manifest -> keymap prep -> protocol
 # skill verification -> (optional) client animation verification -> report.
-# Usage: verify_all.sh {setup|proto [<suffix...>]|visual <suffix...>|report|restore|all} [--skip-visual]
+# Usage: verify_all.sh {setup|proto [<suffix...>]|visual <suffix...>]|equip|cooppet|report|restore|all} [--skip-visual] [--skip-equip] [--skip-cooppet]
 #   ./verify_all.sh visual DK   # re-run a single character (no manual result copying)
 set -u
 cd "$(dirname "$0")"
@@ -87,6 +87,19 @@ phase_equip() {
   reset_login
 }
 
+phase_cooppet() {
+  # 双客户端远端宠物同步/幽灵竞态 + 协作回归（remote-pet-desync-flow）。
+  # 帧预算放宽到 60ms：双浏览器 + 共享 game-server 负载下 rAF 间隔常态高于
+  # 单测的 40ms；移动平滑步长（maxStep/p95Step）等同步断言仍按 coop-sync 原值。
+  # 注意：game-server 长跑后若互见/宠物断言大面积超时，先 docker restart
+  # ms-game-server 再判定失败（2026-11-09 回归归因记录见 changelog）。
+  reset_login
+  rm -rf /tmp/remote-pet-desync-flow
+  CHROME_BIN=/usr/bin/chromium-browser COOP_MAX_P95_FRAME_MS=60 \
+    timeout 900 node "$ROOT/tools/verify/maplestory-webui/remote-pet-desync-flow.mjs" 2>&1 | tail -5
+  reset_login
+}
+
 phase_report() {
   python3 - "$ROOT" <<'PY'
 import glob, json, os, sys, time
@@ -152,6 +165,7 @@ case "${1:-all}" in
   visual) shift; phase_visual "$@" ;;
   report) shift; phase_report ;;
   equip)  shift; phase_equip ;;
+  cooppet) shift; phase_cooppet ;;
   all)
     shift
     phase_setup && phase_proto
@@ -161,7 +175,10 @@ case "${1:-all}" in
     if ! printf '%s\n' "$@" | grep -q -- --skip-equip; then
       phase_equip
     fi
+    if ! printf '%s\n' "$@" | grep -q -- --skip-cooppet; then
+      phase_cooppet
+    fi
     phase_report ;;
   restore) shift; phase_restore ;;
-  *) echo "usage: $0 {setup|proto [<suffix...>]|visual <suffix...>|equip|report|restore|all} [--skip-visual] [--skip-equip]"; exit 64 ;;
+  *) echo "usage: $0 {setup|proto [<suffix...>]|visual <suffix...>|equip|cooppet|report|restore|all} [--skip-visual] [--skip-equip] [--skip-cooppet]"; exit 64 ;;
 esac

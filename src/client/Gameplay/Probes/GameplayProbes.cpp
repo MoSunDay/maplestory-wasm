@@ -203,6 +203,48 @@ extern "C"
             MISSING_COORDINATE;
     }
 
+    int mschar_pet_itemid(int32_t character_id, int index)
+    {
+        auto character = jrc::Stage::get().get_character(character_id);
+        const auto* pet = character ?
+            character->get_pet(static_cast<uint8_t>(index)) : nullptr;
+        return pet ? pet->get_itemid() : 0;
+    }
+
+    int mschar_pet_x(int32_t character_id, int index)
+    {
+        auto character = jrc::Stage::get().get_character(character_id);
+        const auto* pet = character ?
+            character->get_pet(static_cast<uint8_t>(index)) : nullptr;
+        return pet ? pet->get_position().x() : MISSING_COORDINATE;
+    }
+
+    int mschar_pet_y(int32_t character_id, int index)
+    {
+        auto character = jrc::Stage::get().get_character(character_id);
+        const auto* pet = character ?
+            character->get_pet(static_cast<uint8_t>(index)) : nullptr;
+        return pet ? pet->get_position().y() : MISSING_COORDINATE;
+    }
+
+    int mschar_pet_count(int32_t character_id)
+    {
+        auto character = jrc::Stage::get().get_character(character_id);
+        if (!character)
+        {
+            return -1;
+        }
+        int count = 0;
+        for (uint8_t index = 0; index < 3; ++index)
+        {
+            if (character->get_pet(index))
+            {
+                ++count;
+            }
+        }
+        return count;
+    }
+
     int msmob_count()
     {
         return static_cast<int>(jrc::Stage::get().get_mobs().size());

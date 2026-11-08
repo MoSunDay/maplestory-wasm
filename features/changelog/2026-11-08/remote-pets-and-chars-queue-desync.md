@@ -55,3 +55,60 @@ tools/verify/index.md）；5 个改动 cpp 经 clang++ -std=gnu++17 -fsyntax-onl
 
 双人联机：A 召唤宠物后 B 进图 → B 应立即看到 A 的宠物；A 在 B 换图瞬间快速进出
 图/召唤收回宠物 → 两端无幽灵角色、宠物状态一致。
+
+## 双客户端 E2E 验收（2026-11-08 补充）
+
+- 新增 `tools/verify/maplestory-webui/remote-pet-desync-flow.mjs`（双浏览器、双测试
+  账号 test1/test2，地图 40001）：四场景全绿——
+  1. **基础可见性**：A 先召唤宠物，B 后进图 → B 侧 `mschar_pet_count(A)==1`
+     且坐标跟随；
+  2. **召唤竞态**：B 进图瞬间 A 召唤（SPAWN_PLAYER 同批 SPAWN_PET 竞态）→ 3/3
+     次宠物立即可见（暂存重放生效）；
+  3. **幽灵竞态**：A 在 B 换图瞬间快速进出图+召唤/收回 → 3/3 次 18 采样两端
+     `visible==expected && pets==-1`，无跨图/永久幽灵；
+  4. **协作回归**：双人同图跑图+技能动作采样，帧预算阈值放宽
+     （`COOP_MAX_P95_FRAME_MS=60`，双浏览器负载），同步与步态断言不变。
+- 配套 CDP 探针：`mschar_pet_itemid/x/y(cid,idx)`、`mschar_pet_count(cid)`（角色
+  不在图返回 -1），经 `-sEXPORTED_FUNCTIONS` 导出。
+- 注册于 `tools/verify/index.md`、`tools/verify/maplestory-webui/index.md`，并纳入
+  `scripts/test_accounts/verify_all.sh` `cooppet` 阶段（`--skip-cooppet` 可跳过）。
+
+## 回归期间的故障归因记录（2026-11-09 凌晨，非本修复回归）
+
+`verify_all.sh all` 全量回归（setup→proto→visual×4→equip→cooppet）在本轮收尾时出现
+大面积 visual/equip/cooppet 失败，逐项归因如下（均有复跑证据）：
+
+1. **game-server 会话/地图注册表过载僵死（主因）**：连续约 120 次登录/换图后
+   （server 容器 `ms-game-server` 已运行 2 天），同图双端互相收不到 SPAWN_PLAYER
+   （"互见超时"），怪物伤害数字不广播（visual 大面积 `Δluma=0`），偶发登录握手
+   卡死（"WASM did not reach calledRun"，客户端 console 停在 LazyFS 缓存行）。
+   `docker restart ms-game-server` 后：cooppet **4/4 全绿**、test1DK visual
+   0/5 → **4/5**。运营结论：连续大批量 e2e 后若互见/伤害断言异常，先重启
+   game-server 再判定回归失败。
+2. **equip 断言依赖遗留手工 fixture**：`equip-stat-flow.mjs` 的"数据库事实"
+   （已穿 8 件含 1062000、背包 4 件 1302000/1002067/1302000/1052155）来自
+   setup 工具化之前的旧角色（现快照于 `test1hold` 账号）。本轮首次重跑
+   `create_accounts.py` 重建 test1-3 后，新角色蓝图（1052155 上身、无背包装备）
+   与断言不符 → FAIL。已按旧 fixture 修复 DB（换装 1062000@-6、补背包 4 件）
+   后 equip 两断言全 PASS。待办：把背包 4 件与 -6 裤子并入 create_accounts.py
+   蓝图，否则每次 setup 后 equip 必红。
+3. **test1hold 同名角色计数陷阱**：test1Hero/Pala/DK/FPA 各存在两份（旧
+   `test1hold` 账号 + 新 `test1` 账号），按名字 GROUP BY 会得出"装备行翻倍"
+   的假象；排查 DB 时需带 accountid 过滤。
+4. **宠物物品行累积（服务端行为）**：服务端在召唤/存档回写时会为宠物新增
+   `pets`+`inventoryitems` 行而非复用（历史 char 215/239 各累积 14 行
+   Brown Puppy）。本次 e2e 高频召唤也触发同型累积，已在 injectPet 的幂等
+   清理之外手动清账（summoned 全归零、幻影行删除）。不阻塞断言，但长跑
+   e2e 前建议清一次 CASH 栏 5000001 幻影行。
+5. **Rush 类位移技伤害探针局限**：1221007/1321003（Rush 冲锋）在重启后仍
+   `Δluma=0`——位移技不保证在探针区域产生伤害数字，属 skill-anim-flow 已知
+   边界（2026-10-26 基线 test1Pala 2/4 fail 同源）；test1Pala 为慢性失败项，
+   与本次改动无关。
+
+## 观察窗口（未定位，非本修复回归）
+
+- 快速连续重登（登出→立即重登→立刻进图）偶发客户端**半进图冻结**：
+  `msui_state==5` 但 `msmap_id` 仍为旧图/0，画面停在加载后首帧不再推进。等待
+  8 秒重登冷却 + `resetLogin` 后复现率显著下降；本轮证据（登录握手卡死、console
+  停在 LazyFS 行）提示部分案例可能是 server 过载侧症状，重启 server 后未再复现。
+  与本次远端宠物/队列修复无因果（单客户端即可复现）。
