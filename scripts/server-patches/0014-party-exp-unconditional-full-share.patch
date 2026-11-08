@@ -1,0 +1,23 @@
+--- a/src/server/life/MapleMonster.java
++++ b/src/server/life/MapleMonster.java
+@@ -601,17 +601,11 @@
+         
+         MapleCharacter killer = map.getCharacterById(killerId);
+         if (killer != null && killer.getParty() != null) {
+-            // Party kills share the monster's full base experience instead of
+-            // splitting damage contribution or applying party bonus weights.
++            // Party kills share the monster's full base experience 1:1 among
++            // all same-map members, ignoring level-range and leech gates.
+             partyExp.remove(killer.getParty().getId());
+-            int killerPartyLevel = killer.getLevel();
+             for (MapleCharacter mc : killer.getPartyMembersOnSameMap()) {
+-                if (mc.getLevel() >= minThresholdLevel
+-                        && Math.abs(killerPartyLevel - mc.getLevel()) < ServerConstants.MIN_RANGELEVEL_TO_EXP_LEECH) {
+-                    personalExpReward.put(mc, (float) exp);
+-                } else {
+-                    underleveled.add(mc);
+-                }
++                personalExpReward.put(mc, (float) exp);
+             }
+         }
+ 
