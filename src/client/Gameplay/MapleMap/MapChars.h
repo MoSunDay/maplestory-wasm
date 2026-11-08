@@ -5,10 +5,13 @@
 #include "../Spawn.h"
 #include "../Targeting/PlayerTargeting.h"
 
+#include "../../Character/Look/PetSpawnEntry.h"
 #include "../../Character/OtherChar.h"
 
+#include <map>
 #include <queue>
 #include <optional>
+#include <vector>
 
 namespace jrc
 {
@@ -28,6 +31,19 @@ namespace jrc
         void remove(int32_t cid);
         // Remove all characters.
         void clear();
+
+        // A pet update parsed from SPAWN_PET, replayed once the owner exists.
+        struct PetUpdate
+        {
+            uint8_t index;
+            bool despawn;
+            bool hunger;
+            PetSpawnEntry pet;
+        };
+
+        // Stash a pet update for a character that is still queued for
+        // instantiation; dropped when the cid is not pending after all.
+        void stash_pet(int32_t cid, const PetUpdate& update);
 
         // Update a characters movement.
         void send_movement(int32_t cid, const std::vector<Movement>& movements);
@@ -69,8 +85,12 @@ namespace jrc
             Point<int16_t> view_position,
             const PlayerTarget* additional_target
         ) const;
+        bool has_pending_spawn(int32_t cid) const;
+        void apply_pets(Char& character, const PetSpawnEntry* pets, uint8_t count);
+        void replay_pending_pets(int32_t cid, Char& character);
         MapObjects chars;
 
         std::queue<CharSpawn> spawns;
+        std::map<int32_t, std::vector<PetUpdate>> pending_pets;
     };
 }

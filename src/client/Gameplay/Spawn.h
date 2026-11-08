@@ -18,6 +18,7 @@
 #pragma once
 #include "MapleMap/MapObject.h"
 
+#include "../Character/Look/PetSpawnEntry.h"
 #include "../Graphics/Animation.h"
 #include "../Net/Login.h"
 
@@ -150,6 +151,11 @@ namespace jrc
         int8_t get_stance() const;
         std::unique_ptr<MapObject> instantiate() const;
 
+        // Adopt the pet slots carried by SPAWN_PLAYER.
+        void set_pets(const PetSpawnEntry* entries, uint8_t count);
+        const PetSpawnEntry* get_pets() const;
+        uint8_t get_pet_count() const;
+
     private:
         int32_t cid;
         uint16_t level;
@@ -159,5 +165,7 @@ namespace jrc
         Point<int16_t> position;
         int16_t combo_value;
         LookEntry look;
+        PetSpawnEntry pets[3];
+        uint8_t petcount = 0;
     };
 }

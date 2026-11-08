@@ -115,12 +115,17 @@ namespace jrc::spawn_player
             {
                 break;
             }
-            recv.read_int();    // item id
-            recv.read_string(); // name
-            recv.read_long();   // unique id
-            recv.read_point();  // position
-            recv.read_byte();   // stance
-            recv.read_int();    // foothold
+            PetSpawnEntry& pet =
+                payload.pets[payload.pet_count < 3 ? payload.pet_count : 2];
+            pet.itemid = recv.read_int();
+            pet.name = recv.read_string();
+            // The wire unique id is 8 bytes; the low half identifies the pet.
+            pet.uniqueid = static_cast<int32_t>(recv.read_long());
+            pet.position = recv.read_point();
+            pet.stance = recv.read_byte();
+            pet.foothold = recv.read_int();
+            if (payload.pet_count < 3)
+                ++payload.pet_count;
         }
 
         recv.read_int(); // mount level

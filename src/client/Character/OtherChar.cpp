@@ -104,6 +104,9 @@ namespace jrc
     {
         set_position(position);
         laststate = static_cast<uint8_t>(stance);
+        // A server correction must also cancel a stale attack gate, or the
+        // corrected stance is suppressed until the old animation ends.
+        attacking = false;
         if (!attacking && !is_in_item_chair())
         {
             set_state(laststate);

@@ -4,6 +4,7 @@
 
 #include "../Login.h"
 
+#include "../../Character/Look/PetSpawnEntry.h"
 #include "../../Template/Point.h"
 
 #include <cstdint>
@@ -18,6 +19,8 @@ namespace jrc::spawn_player
         int8_t stance = 0;
         Point<int16_t> position;
         int16_t combo_value = 0;
+        PetSpawnEntry pets[3];
+        uint8_t pet_count = 0;
     };
 
     /// Parse the body of SPAWN_PLAYER after the fixed spawn header.

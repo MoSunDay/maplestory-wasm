@@ -89,7 +89,7 @@ namespace jrc
     {
         const spawn_player::Payload payload = spawn_player::parse_payload(recv);
 
-        Stage::get().get_chars().spawn({
+        CharSpawn charspawn({
             payload.header.cid,
             payload.look,
             payload.header.level,
@@ -99,6 +99,8 @@ namespace jrc
             payload.position,
             payload.combo_value
         });
+        charspawn.set_pets(payload.pets, payload.pet_count);
+        Stage::get().get_chars().spawn(std::move(charspawn));
     }
 
 
@@ -113,35 +115,50 @@ namespace jrc
     void SpawnPetHandler::handle(InPacket& recv) const
     {
         int32_t cid = recv.read_int();
-        Optional<Char> character = Stage::get()
-            .get_character(cid);
-        if (!character)
-            return;
-
         uint8_t petindex = recv.read_byte();
         int8_t mode = recv.read_byte();
 
+        // Parse the body before resolving the owner so the update survives
+        // the owner still being queued for instantiation.
+        MapChars::PetUpdate update{};
+        update.index = petindex;
         if (mode == 1)
         {
             recv.skip(1);
 
-            int32_t itemid = recv.read_int();
-            std::string name = recv.read_string();
-            int32_t uniqueid = recv.read_int();
+            update.despawn = false;
+            update.pet.itemid = recv.read_int();
+            update.pet.name = recv.read_string();
+            update.pet.uniqueid = recv.read_int();
 
             recv.skip(4);
 
-            Point<int16_t> pos = recv.read_point();
-            uint8_t stance = recv.read_byte();
-            int32_t fhid = recv.read_int();
-
-            character->add_pet(petindex, itemid, name, uniqueid, pos, stance, fhid);
+            update.pet.position = recv.read_point();
+            update.pet.stance = recv.read_byte();
+            update.pet.foothold = recv.read_int();
         }
         else if (mode == 0)
         {
-            bool hunger = recv.read_bool();
+            update.despawn = true;
+            update.hunger = recv.read_bool();
+        }
+        else
+        {
+            return;
+        }
 
-            character->remove_pet(petindex, hunger);
+        if (Optional<Char> character = Stage::get().get_character(cid))
+        {
+            if (update.despawn)
+                character->remove_pet(update.index, update.hunger);
+            else
+                character->add_pet(update.index, update.pet.itemid,
+                    update.pet.name, update.pet.uniqueid, update.pet.position,
+                    update.pet.stance, update.pet.foothold);
+        }
+        else
+        {
+            Stage::get().get_chars().stash_pet(cid, update);
         }
     }
 

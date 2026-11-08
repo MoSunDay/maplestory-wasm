@@ -160,6 +160,25 @@ namespace jrc
         return stance;
     }
 
+    void CharSpawn::set_pets(const PetSpawnEntry* entries, uint8_t count)
+    {
+        petcount = count < 3 ? count : 3;
+        for (uint8_t i = 0; i < petcount; ++i)
+        {
+            pets[i] = entries[i];
+        }
+    }
+
+    const PetSpawnEntry* CharSpawn::get_pets() const
+    {
+        return pets;
+    }
+
+    uint8_t CharSpawn::get_pet_count() const
+    {
+        return petcount;
+    }
+
     std::unique_ptr<MapObject> CharSpawn::instantiate() const
     {
         auto character = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);

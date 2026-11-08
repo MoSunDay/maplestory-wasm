@@ -27,12 +27,19 @@ namespace jrc
                 // changes map or needs correcting: refresh the known
                 // character in place instead of dropping it.
                 ochar->respawn(spawn.get_position(), spawn.get_stance());
+                apply_pets(*ochar, spawn.get_pets(), spawn.get_pet_count());
+                replay_pending_pets(cid, *ochar);
             }
             else
             {
                 chars.add(
                     spawn.instantiate()
                 );
+                if (Optional<OtherChar> added = get_char(cid))
+                {
+                    apply_pets(*added, spawn.get_pets(), spawn.get_pet_count());
+                    replay_pending_pets(cid, *added);
+                }
             }
         }
 
@@ -47,12 +54,81 @@ namespace jrc
 
     void MapChars::remove(int32_t cid)
     {
+        // A REMOVE_CHAR can arrive in the same network batch as the queued
+        // SPAWN_PLAYER; drop pending spawns for this cid so a character
+        // that left the map cannot be brought back by a stale entry.
+        std::queue<CharSpawn> retained;
+        for ( ; !spawns.empty(); spawns.pop())
+        {
+            if (spawns.front().get_cid() != cid)
+                retained.emplace(std::move(spawns.front()));
+        }
+        spawns = std::move(retained);
+
         chars.remove(cid);
+
+        pending_pets.erase(cid);
     }
 
     void MapChars::clear()
     {
         chars.clear();
+
+        // Cross-map packets can queue spawns from the previous map; a fresh
+        // map must not instantiate stale spawn entries.
+        spawns = std::queue<CharSpawn>{};
+
+        pending_pets.clear();
+    }
+
+    bool MapChars::has_pending_spawn(int32_t cid) const
+    {
+        // The queue has no iteration API; copies stay tiny (map enter batches).
+        std::queue<CharSpawn> scan = spawns;
+        for (; !scan.empty(); scan.pop())
+        {
+            if (scan.front().get_cid() == cid)
+                return true;
+        }
+        return false;
+    }
+
+    void MapChars::stash_pet(int32_t cid, const PetUpdate& update)
+    {
+        // SPAWN_PET can share a network batch with the owner's SPAWN_PLAYER;
+        // keep the update for the instantiation pass instead of dropping it.
+        if (has_pending_spawn(cid))
+            pending_pets[cid].push_back(update);
+    }
+
+    void MapChars::apply_pets(Char& character, const PetSpawnEntry* pets, uint8_t count)
+    {
+        // SPAWN_PLAYER carries the owner's full summon state: sync all slots.
+        for (uint8_t i = 0; i < 3; ++i)
+            character.remove_pet(i, false);
+        for (uint8_t i = 0; i < count && i < 3; ++i)
+        {
+            const PetSpawnEntry& pet = pets[i];
+            character.add_pet(i, pet.itemid, pet.name, pet.uniqueid,
+                pet.position, pet.stance, pet.foothold);
+        }
+    }
+
+    void MapChars::replay_pending_pets(int32_t cid, Char& character)
+    {
+        auto iter = pending_pets.find(cid);
+        if (iter == pending_pets.end())
+            return;
+        for (const PetUpdate& update : iter->second)
+        {
+            if (update.despawn)
+                character.remove_pet(update.index, update.hunger);
+            else
+                character.add_pet(update.index, update.pet.itemid,
+                    update.pet.name, update.pet.uniqueid, update.pet.position,
+                    update.pet.stance, update.pet.foothold);
+        }
+        pending_pets.erase(iter);
     }
 
     void MapChars::send_movement(int32_t cid, const std::vector<Movement>& movements)
