@@ -21,13 +21,39 @@
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/Misc.h"
 
 #include "nlnx/nx.hpp"
 
+#include <algorithm>
+
 namespace jrc
 {
+    namespace
+    {
+        // MapLink 子节点按名称数字排序（"0","1",...,"12"）；NX 的字符串
+        // 排序（"0","1","10","11","12","2",...）会让按钮错位、并把
+        // "7"/"8"/"9" 挤出 BT_LINK 上限之外导致区域不可点击。
+        bool link_node_order(const nl::node& a, const nl::node& b)
+        {
+            const std::string an = a.name();
+            const std::string bn = b.name();
+            const auto numeric = [](const std::string& name) {
+                return !name.empty() && name.find_first_not_of("0123456789")
+                    == std::string::npos;
+            };
+            const bool anum = numeric(an);
+            const bool bnum = numeric(bn);
+            if (anum && bnum)
+                return std::stol(an) < std::stol(bn);
+            if (anum != bnum)
+                return anum;
+            return an < bn;
+        }
+    }
+
     UIWorldMap::UIWorldMap()
         : UIDragElement<PosMAP>(Point<int16_t>()),
           search(true),
@@ -259,7 +285,75 @@ namespace jrc
             }
         }
 
-        return UIDragElement::send_cursor(clicked, cursorpos);
+        // 区域链接矩形大面积互相重叠（如 ElNath 的 278x217 高亮盖住
+        // 玩具城岛屿），基类"首个命中矩形获胜"的分发会点错区域。这里
+        // 先按 linkImg 的 alpha 形状精确判定；未命中任何形状时临时屏蔽
+        // 链接按钮再走基类分发，避免矩形吞掉关闭/搜索等按钮的点击。
+        const uint64_t press_id = UI::get().get_cursor_press_id();
+        const int16_t hit = link_hit(cursorpos);
+        if (hit >= 0)
+        {
+            Button& button = *buttons[hit];
+            if (clicked)
+            {
+                if (handled_button_press_id == press_id)
+                {
+                    return { Cursor::CLICKING, true };
+                }
+
+                handled_button_press_id = press_id;
+                if (button.get_state() == Button::NORMAL)
+                {
+                    Sound(Sound::BUTTONOVER).play();
+                }
+
+                Sound(Sound::BUTTONCLICK).play();
+                button.set_state(button_pressed(hit));
+                return { Cursor::CLICKING, true };
+            }
+
+            for (const auto& entry : link_maps)
+            {
+                auto iter = buttons.find(entry.first);
+                if (iter == buttons.end() || !iter->second)
+                {
+                    continue;
+                }
+                if (entry.first == hit)
+                {
+                    if (iter->second->get_state() == Button::NORMAL)
+                    {
+                        Sound(Sound::BUTTONOVER).play();
+                        iter->second->set_state(Button::MOUSEOVER);
+                    }
+                }
+                else if (iter->second->get_state() == Button::MOUSEOVER)
+                {
+                    iter->second->set_state(Button::NORMAL);
+                }
+            }
+            return { Cursor::CANCLICK, true };
+        }
+
+        for (const auto& entry : link_maps)
+        {
+            auto iter = buttons.find(entry.first);
+            if (iter != buttons.end() && iter->second)
+            {
+                iter->second->set_active(false);
+            }
+        }
+        const UIElement::CursorResult result =
+            UIDragElement::send_cursor(clicked, cursorpos);
+        for (const auto& entry : link_maps)
+        {
+            auto iter = buttons.find(entry.first);
+            if (iter != buttons.end() && iter->second)
+            {
+                iter->second->set_active(true);
+            }
+        }
+        return result;
     }
 
     void UIWorldMap::send_key(int32_t, bool pressed, bool escape)
@@ -326,7 +420,82 @@ namespace jrc
         dimension = enable ? bg_dimensions + Point<int16_t>(bg_search_dimensions.x(), 0) : bg_dimensions;
     }
 
-    void UIWorldMap::update_world(const std::string& map)
+    std::vector<uint8_t> UIWorldMap::link_alpha_mask(nl::node image)
+    {
+        std::vector<uint8_t> mask;
+        if (image.data_type() != nl::node::type::bitmap)
+        {
+            return mask;
+        }
+
+        const nl::bitmap bmp = image;
+        if (!bmp)
+        {
+            return mask;
+        }
+
+        const uint16_t width = bmp.width();
+        const uint16_t height = bmp.height();
+        const uint8_t* data = static_cast<const uint8_t*>(bmp.data());
+        if (!data)
+        {
+            // 位图数据尚未就绪时返回空掩码，命中判定退回矩形。
+            return mask;
+        }
+
+        const size_t count = static_cast<size_t>(width) * height;
+        mask.resize(count);
+        for (size_t i = 0; i < count; ++i)
+        {
+            mask[i] = data[i * 4 + 3] > 0 ? 1 : 0;
+        }
+        return mask;
+    }
+
+    int16_t UIWorldMap::link_hit(Point<int16_t> cursorpos) const
+    {
+        int16_t best = -1;
+        int32_t best_area = 0;
+        for (const auto& entry : link_maps)
+        {
+            auto iter = buttons.find(entry.first);
+            if (iter == buttons.end() || !iter->second || !iter->second->is_active())
+            {
+                continue;
+            }
+
+            const Rectangle<int16_t> bounds = iter->second->bounds(position);
+            if (!bounds.contains(cursorpos))
+            {
+                continue;
+            }
+
+            auto mask = link_masks.find(entry.first);
+            if (mask != link_masks.end() && !mask->second.empty())
+            {
+                const int16_t local_x = cursorpos.x() - bounds.l();
+                const int16_t local_y = cursorpos.y() - bounds.t();
+                const int32_t width = bounds.width();
+                const size_t index =
+                    static_cast<size_t>(local_y) * width + local_x;
+                if (index >= mask->second.size() || !mask->second[index])
+                {
+                    continue;
+                }
+            }
+
+            const int32_t area =
+                static_cast<int32_t>(bounds.width()) * bounds.height();
+            if (best < 0 || area < best_area)
+            {
+                best = entry.first;
+                best_area = area;
+            }
+        }
+        return best;
+    }
+
+    void UIWorldMap::update_world(std::string map)
     {
         nl::node world_map = worldmap_nodes::worldmap_data()[map + ".img"];
         if (!world_map["BaseImg"]["0"])
@@ -338,6 +507,7 @@ namespace jrc
 
         base_img = world_map["BaseImg"][0];
         parent_map = world_map["info"]["parentMap"].get_string();
+        resolved_map = map;
 
         // v83 world-map images are origin-less; markers are positioned
         // relative to the image center instead of the post-Chaos frame.
@@ -353,6 +523,7 @@ namespace jrc
 
         link_images.clear();
         link_maps.clear();
+        link_masks.clear();
 
         for (auto& button : buttons)
         {
@@ -362,10 +533,17 @@ namespace jrc
             }
         }
 
-        uint16_t link_id = BT_LINK0;
+        std::vector<nl::node> link_nodes;
         for (nl::node link : world_map["MapLink"])
         {
-            if (link_id > BT_LINK9)
+            link_nodes.push_back(link);
+        }
+        std::sort(link_nodes.begin(), link_nodes.end(), link_node_order);
+
+        uint16_t link_id = BT_LINK0;
+        for (const nl::node& link : link_nodes)
+        {
+            if (link_id > BT_LINK15)
             {
                 break;
             }
@@ -375,6 +553,7 @@ namespace jrc
 
             link_images[link_id] = link_image;
             link_maps[link_id] = link_info["linkMap"].get_string();
+            link_masks[link_id] = link_alpha_mask(link_info["linkImg"]);
             buttons[link_id] = std::make_unique<AreaButton>(
                 base_position - link_image.get_origin(),
                 link_image.get_dimensions()
@@ -427,5 +606,101 @@ namespace jrc
     Point<int16_t> UIWorldMap::get_search_pos() const
     {
         return position + background_dimensions + Point<int16_t>(13, 25);
+    }
+
+    int16_t UIWorldMap::debug_geometry(int which) const
+    {
+        switch (which)
+        {
+        case 0:
+            return position.x();
+        case 1:
+            return position.y();
+        case 2:
+            return dimension.x();
+        default:
+            return dimension.y();
+        }
+    }
+
+    size_t UIWorldMap::debug_link_count() const
+    {
+        return link_maps.size();
+    }
+
+    int32_t UIWorldMap::debug_link_bounds(int index, int corner) const
+    {
+        auto iter = buttons.find(static_cast<uint16_t>(BT_LINK0 + index));
+        if (iter == buttons.end() || !iter->second)
+        {
+            return -1;
+        }
+
+        Rectangle<int16_t> bounds = iter->second->bounds(position);
+        switch (corner)
+        {
+        case 0:
+            return bounds.l();
+        case 1:
+            return bounds.t();
+        case 2:
+            return bounds.r();
+        default:
+            return bounds.b();
+        }
+    }
+
+    int32_t UIWorldMap::debug_link_state(int index) const
+    {
+        auto iter = buttons.find(static_cast<uint16_t>(BT_LINK0 + index));
+        if (iter == buttons.end() || !iter->second)
+        {
+            return -1;
+        }
+        return static_cast<int32_t>(iter->second->get_state());
+    }
+
+    uint32_t UIWorldMap::debug_name_hash(const std::string& name)
+    {
+        uint32_t hash = 2166136261u;
+        for (char c : name)
+        {
+            hash = (hash ^ static_cast<uint8_t>(c)) * 16777619u;
+        }
+        return hash;
+    }
+
+    uint32_t UIWorldMap::debug_resolved_hash() const
+    {
+        return debug_name_hash(resolved_map);
+    }
+
+    uint32_t UIWorldMap::debug_user_hash() const
+    {
+        return debug_name_hash(user_map);
+    }
+
+    uint32_t UIWorldMap::debug_parent_hash() const
+    {
+        return debug_name_hash(parent_map);
+    }
+
+    uint32_t UIWorldMap::debug_link_target_hash(int index) const
+    {
+        auto iter = link_maps.find(static_cast<uint16_t>(BT_LINK0 + index));
+        return iter != link_maps.end() ? debug_name_hash(iter->second) : 0;
+    }
+
+    bool UIWorldMap::debug_search() const
+    {
+        return search;
+    }
+
+    int16_t UIWorldMap::debug_link_hit(int32_t x, int32_t y) const
+    {
+        const int16_t hit = link_hit(
+            { static_cast<int16_t>(x), static_cast<int16_t>(y) }
+        );
+        return hit >= BT_LINK0 ? static_cast<int16_t>(hit - BT_LINK0) : -1;
     }
 }

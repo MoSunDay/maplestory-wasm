@@ -23,6 +23,7 @@
 
 #include "../../Graphics/Texture.h"
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <vector>
@@ -46,6 +47,20 @@ namespace jrc
         CursorResult send_cursor(bool clicked, Point<int16_t> cursorpos) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
 
+public:
+        // Read-only introspection for e2e probes (UIWorldMapProbes.cpp).
+        int16_t debug_geometry(int which) const;
+        size_t debug_link_count() const;
+        int32_t debug_link_bounds(int index, int corner) const;
+        int32_t debug_link_state(int index) const;
+        static uint32_t debug_name_hash(const std::string& name);
+        uint32_t debug_resolved_hash() const;
+        uint32_t debug_user_hash() const;
+        uint32_t debug_parent_hash() const;
+        uint32_t debug_link_target_hash(int index) const;
+        bool debug_search() const;
+        int16_t debug_link_hit(int32_t x, int32_t y) const;
+
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
 
@@ -64,8 +79,12 @@ namespace jrc
         };
 
         void set_search(bool enable);
-        void update_world(const std::string& parent_map);
+        void update_world(std::string map);
         Point<int16_t> get_search_pos() const;
+        // 返回命中的链接按钮 id（无命中返回 -1）：按 linkImg 的 alpha 形状
+        // 精确判定，多个形状重叠时取包围盒最小者。
+        int16_t link_hit(Point<int16_t> cursorpos) const;
+        static std::vector<uint8_t> link_alpha_mask(nl::node image);
 
         enum Buttons
         {
@@ -84,7 +103,13 @@ namespace jrc
             BT_LINK6,
             BT_LINK7,
             BT_LINK8,
-            BT_LINK9
+            BT_LINK9,
+            BT_LINK10,
+            BT_LINK11,
+            BT_LINK12,
+            BT_LINK13,
+            BT_LINK14,
+            BT_LINK15
         };
 
         bool search;
@@ -92,6 +117,7 @@ namespace jrc
         int32_t mapid;
         std::string parent_map;
         std::string user_map;
+        std::string resolved_map;
 
         Texture search_background;
         Texture search_notice;
@@ -105,6 +131,8 @@ namespace jrc
 
         std::map<uint16_t, Texture> link_images;
         std::map<uint16_t, std::string> link_maps;
+        // 每个链接 linkImg 的 alpha>0 掩码（w*h 字节），按像素做命中判定。
+        std::map<uint16_t, std::vector<uint8_t>> link_masks;
         std::vector<std::pair<Point<int16_t>, MapSpot>> map_spots;
 
         Point<int16_t> bg_dimensions;

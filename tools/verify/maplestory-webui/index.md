@@ -630,6 +630,14 @@ http://127.0.0.1:8000/web/index.html）、`REJECT_ACCOUNT`/`REJECT_PASSWORD`
 - `runtime-flow.mjs` / `ime-chat-flow.mjs` / `user-info-flow.mjs`：
   run.mjs 复用库（运行时探针 / 中文 IME 聊天 / 角色信息卡）。
 
+## 世界地图区域链接命中
+
+`worldmap-region-links.mjs` 验证世界地图（W 键）区域链接修复（数值序迭代 + alpha 掩码逐像素命中，详见 features/changelog/2026-11-08/worldmap-region-link-hit.md）：W 落在用户区域、ESC 链经 021→020 回根图、根图 13 个区域链接逐个点击断言 resolved 命中目标、海域点击不导航、子区域递归、关闭/重开。内部测试点由 `msworldmap_link_hit` 在单次 evaluate 内扫描得到（5x5 腐蚀吸收 ~2px 坐标舍入）；前置 fmflow1 card0 位于 211000000。
+
+```bash
+CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/worldmap-region-links.mjs
+```
+
 ## support/ 辅助工具
 
 - `support/rangesrv.py [ROOT] [PORT]`：支持 HTTP Range（206）的静态服务
