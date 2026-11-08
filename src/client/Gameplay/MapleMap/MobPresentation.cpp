@@ -80,6 +80,13 @@ namespace jrc
         playback = mobplayback::begin(position, {});
         last_net_position = position;
         last_net_elapsed = net_elapsed;
+
+        // A server respawn for an existing oid must fully revive the
+        // instance; leftover death/fade state would keep it untargetable.
+        dying = false;
+        dead = false;
+        fading = false;
+        hppercent = 0;
     }
 
     void Mob::send_movement(Point<int16_t> start, uint8_t raw_activity,

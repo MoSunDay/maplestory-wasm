@@ -1,5 +1,7 @@
 # 验证工具索引
 
+- 幽灵怪/画面不同步/表情卡闭眼修复源码契约（CharLook::update 三处动画计时钳制无 unsigned 下溢且不再出现裸 `delay - stelapsed`/`expdelay - expelapsed`、MapMobs::remove 以 retained 队列过滤同 oid 待实例化 spawns 且 clear 清空队列、Mob::respawn 复位 dying/dead/fading/hppercent、linked server killMonster 每分支恰一次 KILL 广播且紧随 removeKilledMonsterObject、先于 killBy/dropFromMonster/dispatchMonsterKilled、末尾不再残留广播）：`node tools/verify/mob-ghost-sync-source-contract.mjs`
+- 远端宠物与角色队列偶发不同步修复源码契约（MapChars::remove 以 retained 队列过滤同 cid 待实例化 spawns 且 clear 清空队列与 pending_pets、instantiate_spawns 两分支 apply_pets+replay_pending_pets、SPAWN_PLAYER 宠物块逐字段存储进 Payload.pets/pet_count、SpawnCharHandler set_pets 后入队、SpawnPetHandler 先解析后投递且未实例化走 stash_pet、OtherChar::respawn 在姿态刷新前复位 attacking）：`node tools/verify/remote-pet-desync-source-contract.mjs`
 - 商城宠物分类策略（分类栏第 8 格宠物底边 302 不压图例面板 308/480/600、category_for_item 行为表 5000xxx 与 1812000-1812007 归宠物、8 分类名、filter_catalog 在售/性别/分类/SN 与名称搜索、commodity_badge 徽标优先级、34 只在售宠物分 3 页）：`c++ -std=c++17 -Wall -Wextra -Werror -Wno-narrowing -Isrc/client -Isrc tools/verify/cash-shop-pet-category.cpp src/client/IO/CashShop/CashShopView.cpp -o /tmp/cash-shop-pet-category && /tmp/cash-shop-pet-category`
 - [MapleStory WebUI 全流程](maplestory-webui/index.md)
 - 2023 年度版技能双侧落地审计（76 wrapper、调校值、GM 携带、二分有序）：`c++ -std=c++17 -Isrc/client -Isrc -Isrc/nlnx tools/verify/skill-2023-port-nx.cpp src/nlnx/file.cpp src/nlnx/node.cpp src/nlnx/audio.cpp -o /tmp/skill-2023-port-nx && /tmp/skill-2023-port-nx assets/Skill.nx`

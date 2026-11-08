@@ -26,6 +26,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <utility>
 
 
 namespace jrc
@@ -87,6 +88,16 @@ namespace jrc
 
     void MapMobs::remove(int32_t oid, int8_t animation)
     {
+        // A kill can arrive in the same network batch as the queued spawn;
+        // drop pending spawns for this oid so a dead mob cannot resurrect.
+        std::queue<MobSpawn> retained;
+        for ( ; !spawns.empty(); spawns.pop())
+        {
+            if (spawns.front().get_oid() != oid)
+                retained.emplace(std::move(spawns.front()));
+        }
+        spawns = std::move(retained);
+
         if (Optional<Mob> mob = mobs.get(oid))
         {
             mob->kill(animation);
@@ -96,6 +107,10 @@ namespace jrc
     void MapMobs::clear()
     {
         mobs.clear();
+
+        // Cross-map packets can queue spawns from the previous map; a fresh
+        // map must not instantiate stale spawn entries.
+        spawns = std::queue<MobSpawn>{};
     }
 
     void MapMobs::set_control(int32_t oid, bool control)

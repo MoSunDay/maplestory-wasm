@@ -31,9 +31,11 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **角色移动**: 行走、跳跃、攀爬、游泳等物理移动
 - **[水下世界游泳](changelog/2026-11-01/aqua-road-swim.md)**: swim 水图四方向游泳、跳跃键向上划水、水物理从落水首帧生效、移动封包用官方 swim 片段（command 5）；修复非水图坐姿按↑误入漂浮态、进水图预热水下动画
 - **[雪地滑行](changelog/2026-11-01/snow-map-slide.md)**: fs 雪图未穿防滑鞋松键后惯性滑行一小段、行走速度与普通地图不变，斜坡顺势下滑保留；穿防滑鞋完全免疫
+- **[冰封雪域滑动 1:1 修正](changelog/2026-11-08/snow-slide-official-fs.md)**: 按官方语义重写 fs 物理——fs(0.2) 缩放整个地面摩擦（松键滑行 1.5 倍距离）、新增斜坡恒定下滑力（静止下溜/上坡滑回/坡上站不住），滑行全程保持走路姿态；行走步速与防滑鞋免疫不变
 - **[同图人物移动片段回放与重复刷新](changelog/2026-11-03/char-remote-movement-playback.md)**: 远端玩家位置同步——MOVE_PLAYER 整包片段复用 mobplayback 内核按 duration 线性回放（位置直写 phobj、力清零、stance 随片段切换、耗尽保持末态），重复 SPAWN_PLAYER 经 respawn(position,stance) 幂等重锚不再被空 if 丢弃
 - **[同图远端表情与攻击动作同步](changelog/2026-11-06/remote-action-sync.md)**: FACE1..FACE7（默认 F1/F2/F3/F5/F6/F7/F8）表情走 v83 FACE_EXPRESSION(0x33) 上行、FACIAL_EXPRESSION(193) 下行，服务端 5 秒回退默认；远端攻击广播不再额外延迟 400ms，挥砍与命中特效同步
 - **[带宠物远端角色可见性与怪物位置/动作同步](changelog/2026-11-06/remote-visibility-mob-sync.md)**: SPAWN_PLAYER 全量解析（宠物块无 byte2、尾 0 终止、条件 buff/ring/announce box/new-year card 跳过），修复带宠物角色整包丢弃导致的「隐身」；怪移动片段带上一网络锚点+实际耗时（钳制 1..1000ms）、观察端 y+2、重复生成 respawn 恢复位置/姿态/foothold、击杀动画直进死亡，双账号 27 怪位置/动作一致且残余 ≤15px 有界
+- **[同图幽灵怪/画面不同步/表情卡闭眼修复](changelog/2026-11-06/ghost-mob-desync-and-expression-stuck.md)**: 切图清空待实例化 spawns 队列、remove 同步过滤同 oid 队列（同批次 SPAWN+KILL 不再丢 KILL）、respawn 复位 dying/dead/fading/hppercent（复活体可选中）；CharLook 动画/表情计时钳制无符号下溢（表情不再卡闭眼帧）；linked server killMonster 击杀广播提前到 removeKilledMonsterObject 之后立即执行（服务端 patch 0017），结算异常不再产生打不死的服务端幽灵怪
 - **[角色自然恢复](character-recovery/)**: 按 v83 站立、攀爬、技能、地图倍率和椅子规则恢复 HP/MP，并与 linked server 的恢复校验及椅子状态同步
 - **传送门**: 地图间瞬移
 - **NPC 交互**: 对话、商店、仓库等

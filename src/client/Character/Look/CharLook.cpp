@@ -368,7 +368,7 @@ namespace jrc
         if (action == nullptr)
         {
             uint16_t delay = get_delay(stance.get(), stframe.get());
-            uint16_t delta = delay - stelapsed;
+            uint16_t delta = stelapsed < delay ? delay - stelapsed : 0;
             if (timestep >= delta)
             {
                 stelapsed = timestep - delta;
@@ -393,7 +393,7 @@ namespace jrc
         else
         {
             uint16_t delay = action->get_delay();
-            uint16_t delta = delay - stelapsed;
+            uint16_t delta = stelapsed < delay ? delay - stelapsed : 0;
             if (timestep >= delta)
             {
                 stelapsed = timestep - delta;
@@ -425,7 +425,7 @@ namespace jrc
         }
 
         uint16_t expdelay = face->get_delay(expression.get(), expframe.get());
-        uint16_t expdelta = expdelay - expelapsed;
+        uint16_t expdelta = expelapsed < expdelay ? expdelay - expelapsed : 0;
         if (timestep >= expdelta)
         {
             expelapsed = timestep - expdelta;
