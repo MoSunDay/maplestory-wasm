@@ -36,13 +36,16 @@ namespace jrc
         // MapLink 子节点按名称数字排序（"0","1",...,"12"）；NX 的字符串
         // 排序（"0","1","10","11","12","2",...）会让按钮错位、并把
         // "7"/"8"/"9" 挤出 BT_LINK 上限之外导致区域不可点击。
+        // 限长 <=9 位纯数字才数值比较：损坏 NX 的超长数字名会让
+        // std::stol 抛 out_of_range，回退字符串序即可。
         bool link_node_order(const nl::node& a, const nl::node& b)
         {
             const std::string an = a.name();
             const std::string bn = b.name();
             const auto numeric = [](const std::string& name) {
-                return !name.empty() && name.find_first_not_of("0123456789")
-                    == std::string::npos;
+                return !name.empty() && name.length() <= 9
+                    && name.find_first_not_of("0123456789")
+                        == std::string::npos;
             };
             const bool anum = numeric(an);
             const bool bnum = numeric(bn);
@@ -51,6 +54,70 @@ namespace jrc
             if (anum != bnum)
                 return anum;
             return an < bn;
+        }
+
+        // mapid 前缀节点（"WorldMap0" + mapid/10000000）在 NX 中缺失时，
+        // 扫描各区域节点的 MapList 反查包含该地图的最深归属：深度 = 沿
+        // info/parentMap 链回到 "WorldMap" 根的跳数（环保护上限 8）。
+        // 22x/23x/24x 等无专属前缀节点的地图由此落到玩具城/水下/神木等
+        // 真实区域，而不是渲染根图却在 resolved/user 里记一个假名。
+        std::string deepest_region_map(int32_t mapid)
+        {
+            const nl::node root = worldmap_nodes::worldmap_data();
+            std::string best;
+            int32_t best_depth = -1;
+            for (nl::node region : root)
+            {
+                const std::string name = region.name();
+                if (name.length() < 5
+                    || name.compare(name.length() - 4, 4, ".img") != 0
+                    || name == "WorldMap.img")
+                {
+                    continue;
+                }
+
+                bool contains = false;
+                for (nl::node list : region["MapList"])
+                {
+                    for (nl::node map_no : list["mapNo"])
+                    {
+                        if (static_cast<int32_t>(map_no) == mapid)
+                        {
+                            contains = true;
+                            break;
+                        }
+                    }
+                    if (contains)
+                    {
+                        break;
+                    }
+                }
+                if (!contains)
+                {
+                    continue;
+                }
+
+                int32_t depth = 0;
+                std::string parent
+                    = region["info"]["parentMap"].get_string();
+                while (depth < 8 && !parent.empty() && parent != "WorldMap")
+                {
+                    nl::node parent_node = root[parent + ".img"];
+                    if (!parent_node)
+                    {
+                        break;
+                    }
+                    parent = parent_node["info"]["parentMap"].get_string();
+                    ++depth;
+                }
+
+                if (depth > best_depth)
+                {
+                    best_depth = depth;
+                    best = name.substr(0, name.length() - 4);
+                }
+            }
+            return best;
         }
     }
 
@@ -199,6 +266,13 @@ namespace jrc
 
             int32_t prefix = mapid / 10000000;
             user_map = "WorldMap0" + std::to_string(prefix);
+            if (!worldmap_nodes::worldmap_data()[user_map + ".img"]["BaseImg"]["0"])
+            {
+                // 前缀节点缺失（22x/23x/24x 等无对应节点）：按 MapList
+                // 反查真实归属区域，查不到才回落世界根图。
+                const std::string region = deepest_region_map(mapid);
+                user_map = region.empty() ? "WorldMap" : region;
+            }
             update_world(user_map);
         }
 

@@ -27,9 +27,17 @@
 //   ccall 返回有符号 int32，哈希须 `>>> 0` 再比较。
 //
 // 运行：node tools/verify/maplestory-webui/worldmap-region-links.mjs
-//   （可用 WORLDMAP_DEBUG_PORT / E2E_URL / CHROME_BIN 覆盖默认值）
+//   （可用 WORLDMAP_ACCOUNT/PASSWORD/CHARID、WORLDMAP_DEBUG_PORT、
+//    E2E_URL、CHROME_BIN 覆盖默认值）
+//
+// WORLDMAP_FALLBACK=1 追加区域归属回退段（默认关闭，标准跑法 21 项
+// 不变）：主流程后经 DB 把 card0 挪到 220000000（前缀 22 无专属
+// "WorldMap022" 节点），登出重进，断言首个 W 的 resolved==WorldMap030
+// （deepest_region_map 按 MapList 反查玩具城区域）及 ESC 链回根图；
+// finally 恢复 211000000（登出存档后写回，防覆盖）。
 import fs from 'node:fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { sqlExec, waitAccountFree } from './pq-harness-db.mjs';
 
 const debugPort = Number(process.env.WORLDMAP_DEBUG_PORT || 9287);
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
@@ -41,14 +49,21 @@ const H = { 'WorldMap': 0x9a5b5d43, 'WorldMap000': 0xdae471d1, 'WorldMap010': 0x
   'WorldMap100': 0x5b0fd726, 'WorldMap140': 0xe3061fe2, 'WorldMap142': 0xe1061cbc };
 const hex = x => '0x' + (x >>> 0).toString(16);
 
+const account = process.env.WORLDMAP_ACCOUNT || 'fmflow1';
+const password = process.env.WORLDMAP_PASSWORD || 'fmflow1';
+const charId = Number(process.env.WORLDMAP_CHARID ?? 129); // fmflow1 card0
+const pageUrl = process.env.E2E_URL || 'http://127.0.0.1:8000/web/index.html';
+const runFallback = process.env.WORLDMAP_FALLBACK === '1';
+const homeMap = 211000000;
+
 const probe = (driver, name, args = '[]') => driver.evaluate(`Module.ccall(${JSON.stringify(name)}, 'number', [], ${args})`);
 const evalx = (driver, expr) => driver.evaluate(expr);
 async function waitFor(predicate, seconds = 45) { for (let i = 0; i < seconds * 4; i += 1) { if (await predicate()) return true; await sleep(250); } return false; }
 async function enterGame(driver) {
   await waitFor(() => evalx(driver, "typeof Module !== 'undefined' && Module.calledRun === true && typeof Module.ccall === 'function'"), 90);
   await waitFor(async () => await probe(driver, 'msui_state') === uiState.login, 30);
-  await driver.clickField(340, 260); await driver.typeAscii('fmflow1');
-  await driver.clickField(340, 285); await driver.typeAscii('fmflow1');
+  await driver.clickField(340, 260); await driver.typeAscii(account);
+  await driver.clickField(340, 285); await driver.typeAscii(password);
   await driver.key('Enter', 'Enter', 13);
   await waitFor(async () => await probe(driver, 'msui_state') === uiState.world, 45);
   await driver.retryClick(510, 216, async () => await probe(driver, 'msui_state') === uiState.characters);
@@ -76,7 +91,7 @@ let pass = 0, fail = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`); ok ? pass++ : fail++; };
 try {
   await driver.start();
-  await driver.navigate(process.env.E2E_URL || 'http://127.0.0.1:8000/web/index.html');
+  await driver.navigate(pageUrl);
   await enterGame(driver);
   console.log('map id:', await probe(driver, 'msmap_id'));
   await waitFor(async () => (await probe(driver, 'msstage_loading')) === 0, 60);
@@ -186,10 +201,40 @@ try {
 
   for (let a = 0; a < 3 && (await active(driver)) !== 1; a += 1) { await driver.key('w', 'KeyW', 87); await sleep(2200); }
   check('reopen after close', (await active(driver)) === 1 && (await resolved(driver)) === H.WorldMap021);
+
+  // --- WORLDMAP_FALLBACK=1：前缀无专属节点的区域归属回退（22x→玩具城）
+  if (runFallback) {
+    await driver.navigate(pageUrl); // 断开会话，让服务端把账号登出
+    const free = await waitAccountFree(account);
+    check('fallback: account logged out', free);
+    if (free) {
+      sqlExec(`update characters set map=220000000, spawnpoint=0 where id=${charId};`);
+      await enterGame(driver);
+      const mid = await probe(driver, 'msmap_id');
+      check('fallback: relocated to 220000000', mid === 220000000, `map=${mid}`);
+      await waitFor(async () => (await probe(driver, 'msstage_loading')) === 0, 60);
+      await sleep(1500);
+      for (let a = 0; a < 3 && (await active(driver)) !== 1; a += 1) { await driver.key('w', 'KeyW', 87); await sleep(2500); }
+      const fb = await resolved(driver);
+      check('fallback: W resolves to WorldMap030', fb === H.WorldMap030, hex(fb));
+      await driver.key('Escape', 'Escape', 27); await sleep(1300); // 关搜索面板
+      await driver.key('Escape', 'Escape', 27); await sleep(1300); // 030 → 根图
+      check('fallback: ESC 030→WorldMap', (await resolved(driver)) === H.WorldMap, hex(await resolved(driver)));
+    }
+  }
   console.log(`\n${pass} passed, ${fail} failed`);
 } catch (error) {
   console.error('flow aborted:', error.message);
 } finally {
+  if (runFallback) {
+    // 恢复出生图：先断开会话等登出存档落库，再写回 211000000。
+    try { await driver.navigate(pageUrl); } catch { /* 页面可能已不可用 */ }
+    await waitAccountFree(account, 30);
+    try {
+      sqlExec(`update characters set map=${homeMap}, spawnpoint=0 where id=${charId};`);
+      console.log(`fallback map restored to ${homeMap}`);
+    } catch (error) { console.log('fallback map restore failed:', error.message); }
+  }
   if (driver.errors.length) fs.writeFileSync(`${driver.artifactDir}/browser-errors.log`, `${driver.errors.join('\n')}\n`);
   fs.writeFileSync(`${driver.artifactDir}/browser-console.log`, `${driver.logs.join('\n')}\n`);
   console.log('artifacts:', driver.artifactDir);

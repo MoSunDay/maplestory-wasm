@@ -54,7 +54,29 @@ search）新增于 `src/client/Gameplay/Probes/UIWorldMapProbes.cpp` 并经
   命中各自目标（000/010/020/030/040/050/060/070/080/090/100/140/142）；
   海域点击不导航；Victoria 区域图内子链接递归可点；关闭按钮生效、重开正常。
 
+## 后续打磨（同日收尾）
+
+- **区域归属回退**：mapid 前缀无对应 WorldMap 节点时（22x/23x/24x…），
+  `update()` 不再拼出假名（如 "WorldMap022"）后靠 `update_world` 内部
+  回退渲染根图，而是先经新增纯函数 `deepest_region_map(mapid)` 反查：
+  扫描各区域节点 `MapList/*/mapNo` 找包含该地图的候选，深度 = 沿
+  `info/parentMap` 链回到 "WorldMap" 根的跳数（环保护上限 8），取最深者；
+  无归属才回落 "WorldMap"。`resolved_map`/`user_map` 从此只记录真实节点。
+  数据映射（NX 全量 dump，运行时反查而非硬编码）：22x→WorldMap030（玩具
+  城）、23x→WorldMap040（水下）、24x→WorldMap050（神木）、25x→WorldMap060
+  （武陵）、26x→WorldMap070（阿里安特）、28x→WorldMap021、682000000→
+  WorldMap142；241000000 全库不存在。前缀节点存在的路径（0/10/11/12/13/
+  20/21/30/31/32/40/50/51/60/70/80/90/100/140/141/142）行为零变化。
+- **e2e 扩展**：`worldmap-region-links.mjs` 新增 `WORLDMAP_FALLBACK=1`
+  门控段（默认关闭，标准 21 项断言不变）——主流程后经 DB 把 fmflow1
+  card0 挪到 220000000，登出重进，断言首个 W 的 resolved==WorldMap030、
+  ESC 链回根图；`finally` 断开会话待登出存档后恢复 211000000。账密改经
+  `WORLDMAP_ACCOUNT`/`WORLDMAP_PASSWORD` 环境变量注入（对齐 snow-slide
+  惯例，默认 fmflow1），`WORLDMAP_CHARID` 可覆盖角色 id。
+- **防御**：`link_node_order` 的数值比较限长（纯数字且 <=9 位才
+  `stol`，超长回退字符串序），消除损坏 NX 名触发 `out_of_range` 的崩溃面。
+
 ## 备注
 
-- 已知边界：mapid 前缀 22/23/24（玩具城/水下世界/神木村）的 user_map 无
-  对应 WorldMap 节点时仍回退世界根图，后续可按 MapList 反查最深层区域。
+- 前缀无专属节点的地图曾回退世界根图且记录假名——已在上节「区域归属
+  回退」修复，e2e 以 `WORLDMAP_FALLBACK=1` 覆盖。
