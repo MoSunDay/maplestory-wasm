@@ -85,6 +85,7 @@ namespace jrc
             TRADE,
             GAMEOPTIONS,
             QUESTLOG,
+            QUESTDIALOG,
             PROGRESSBANNER,
             NUM_TYPES
         };

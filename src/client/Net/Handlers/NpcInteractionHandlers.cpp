@@ -24,6 +24,8 @@
 #include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIStorage.h"
 
+#include "../../Character/QuestInteraction.h"
+
 #include <vector>
 
 namespace jrc
@@ -202,6 +204,10 @@ namespace jrc
 
     void NpcDialogueHandler::handle(InPacket& recv) const
     {
+        // The server really opened a dialog: cancel the local quest-offer
+        // fallback armed with the TalkToNPC packet.
+        quest_interaction::cancel_npc_talk();
+
         recv.skip(1);
 
         int32_t npcid = recv.read_int();
@@ -246,6 +252,10 @@ namespace jrc
 
     void OpenNpcShopHandler::handle(InPacket& recv) const
     {
+        // The server really opened a shop: cancel the local quest-offer
+        // fallback armed with the TalkToNPC packet.
+        quest_interaction::cancel_npc_talk();
+
         int32_t npcid = recv.read_int();
         auto oshop = UI::get().get_element<UIShop>();
 

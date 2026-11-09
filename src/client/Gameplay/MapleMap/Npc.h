@@ -62,6 +62,13 @@ namespace jrc
             return func;
         }
 
+        // Template id from the map data (server dialogs key on the oid,
+        // quest data keys on this id).
+        int32_t get_npcid() const
+        {
+            return npcid;
+        }
+
     private:
         std::map<std::string, Animation> animations;
         std::map<std::string, std::vector<std::string>> lines;

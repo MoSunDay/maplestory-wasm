@@ -40,6 +40,7 @@
 
 #include "../Constants.h"
 #include "../Character/Inventory/InventoryType.h"
+#include "../Character/QuestInteraction.h"
 #include "../Gameplay/Stage.h"
 #include <algorithm>
 
@@ -120,6 +121,10 @@ namespace jrc
 
     void UIStateGame::update()
     {
+        // Local quest-offer fallback: decide silently-answered TalkToNPC
+        // requests once their wait timed out.
+        quest_interaction::update();
+
         int16_t new_width = Constants::viewwidth();
         int16_t new_height = Constants::viewheight();
         bool screen_changed = new_width != view_width || new_height != view_height;
@@ -339,6 +344,12 @@ namespace jrc
             if (auto npctalk = get(UIElement::NPCTALK))
             {
                 if (npctalk->is_active())
+                    break;
+            }
+            // 本地任务对话框同样阻断游戏层输入
+            if (auto questdialog = get(UIElement::QUESTDIALOG))
+            {
+                if (questdialog->is_active())
                     break;
             }
             Stage::get().send_key(type, action, pressed);

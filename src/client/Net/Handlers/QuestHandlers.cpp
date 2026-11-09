@@ -18,9 +18,12 @@
 #include "QuestHandlers.h"
 
 #include "../../Character/Char.h"
+#include "../../Character/QuestCheck.h"
 #include "../../Console.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/Animation.h"
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UINotice.h"
 
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
@@ -103,14 +106,26 @@ namespace jrc
         }
         case 8:
         {
-            // Quest npc location hint. Trailing bytes differ between the
-            // server variants, so they are deliberately not read.
+            // updateQuestFinish (MaplePacketCreator.updateQuestFinish, sent
+            // by the server's NextQuestAction): [short quest][int npc]
+            // [short nextquest]. The questlog itself is already updated by
+            // the SHOW_STATUS_INFO notification; only the player visible
+            // hint is added here.
             const int16_t quest_id = recv.read_short();
             const int32_t npc_id = recv.read_int();
+            const int16_t nextquest = recv.read_short();
             Console::get().print(
                 "[UpdateQuestInfo] Quest " + std::to_string(quest_id) +
                 " npc " + std::to_string(npc_id) + " location updated"
             );
+            std::string message =
+                "任务【" + quest_name(quest_id) + "】完成！";
+            if (nextquest > 0)
+            {
+                message += " 新任务【" + quest_name(nextquest)
+                    + "】可以接取了。";
+            }
+            UI::get().emplace<UIOk>(message, []() {});
             break;
         }
         case 0x0A:
@@ -120,13 +135,27 @@ namespace jrc
                 "[UpdateQuestInfo] Notice for quest " +
                 std::to_string(quest_id)
             );
+            UI::get().emplace<UIOk>(
+                "任务【" + quest_name(quest_id)
+                    + "】暂时无法完成，请确认任务条件。",
+                []() {});
             break;
         }
         case 0x0B:
-        case 0x0D:
-        case 0x0E:
-            // No payload.
+            // questFailure: not enough meso.
             Console::get().print("[UpdateQuestInfo] Quest notice updated");
+            UI::get().emplace<UIOk>("金币不足，无法完成任务。", []() {});
+            break;
+        case 0x0D:
+            // questFailure: the required item is worn by the character.
+            Console::get().print("[UpdateQuestInfo] Quest notice updated");
+            UI::get().emplace<UIOk>(
+                "任务所需的物品正穿在身上，请先卸下。", []() {});
+            break;
+        case 0x0E:
+            // questFailure: the required item is missing.
+            Console::get().print("[UpdateQuestInfo] Quest notice updated");
+            UI::get().emplace<UIOk>("没有任务所需的物品。", []() {});
             break;
         case 0x0F:
         {

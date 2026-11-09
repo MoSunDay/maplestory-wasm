@@ -19,6 +19,7 @@
 
 #include "Npc.h"
 
+#include "../../Character/QuestInteraction.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
 #include <limits>
@@ -86,6 +87,9 @@ namespace jrc
                 if (pressed)
                 {
                     // TODO: try finding dialogue first
+                    // Arm the local quest-offer fallback for silent quest
+                    // NPCs; a real server dialog cancels it.
+                    quest_interaction::arm_npc_talk(npc->get_npcid());
                     TalkToNPCPacket(npc->get_oid())
                         .dispatch();
                     return Cursor::IDLE;
@@ -149,6 +153,8 @@ namespace jrc
             return false;
         }
 
+        // Arm the local quest-offer fallback (see send_cursor above).
+        quest_interaction::arm_npc_talk(nearest->get_npcid());
         TalkToNPCPacket(nearest->get_oid()).dispatch();
         return true;
     }

@@ -308,6 +308,7 @@ namespace jrc
                 UIElement::WORLDMAP,
                 UIElement::KEYCONFIG,
                 UIElement::NPCTALK,
+                UIElement::QUESTDIALOG,
                 UIElement::SHOP,
                 UIElement::STORAGE,
                 UIElement::ITEMINVENTORY,
