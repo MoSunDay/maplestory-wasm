@@ -20,7 +20,7 @@ services:
       dockerfile: docker/rust-web.Dockerfile
     command: ["ws-proxy", "--ws-port", "8080"]
     ports:
-      - "8080:8080"
+      - "8090:8080"
     environment:
       - IS_DOCKER=true
       - WS_PROXY_LOCALHOST_TARGET=host.docker.internal

@@ -10,6 +10,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY ws-proxy ./ws-proxy
 COPY assets-server ./assets-server
 COPY web-server ./web-server
+COPY web-common ./web-common
 
 RUN cargo build --release --workspace
 
