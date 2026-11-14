@@ -442,6 +442,50 @@ namespace jrc
         selected_skill = 0;
     }
 
+    Point<int16_t> UISkillbook::tab_button_center(uint16_t index) const
+    {
+        if (index > Job::FOURTH)
+        {
+            return { -1, -1 };
+        }
+
+        auto iter = buttons.find(BT_TAB0 + index);
+        if (iter == buttons.end() || !iter->second)
+        {
+            return { -1, -1 };
+        }
+
+        Rectangle<int16_t> rect = iter->second->bounds(position);
+        return {
+            static_cast<int16_t>(rect.l() + rect.width() / 2),
+            static_cast<int16_t>(rect.t() + rect.height() / 2)
+        };
+    }
+
+    int32_t UISkillbook::visible_skill_id(uint16_t row) const
+    {
+        if (row >= ROWS)
+        {
+            return 0;
+        }
+
+        size_t index = static_cast<size_t>(offset + row);
+        return index < icons.size() ? icons[index].get_id() : 0;
+    }
+
+    Point<int16_t> UISkillbook::visible_icon_center(uint16_t row) const
+    {
+        if (visible_skill_id(row) == 0)
+        {
+            return { -1, -1 };
+        }
+
+        Point<int16_t> hit = position + SKILL_OFFSET + ICON_OFFSET +
+            SKILL_ICON_HIT_ADJUST;
+        hit.shift_y(static_cast<int16_t>(row * ROW_HEIGHT));
+        return hit + Point<int16_t>(16, 16);
+    }
+
     void UISkillbook::update_stat(Maplestat::Id stat, int16_t value)
     {
         switch (stat)

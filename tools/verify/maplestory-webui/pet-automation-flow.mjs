@@ -22,13 +22,10 @@ const OPTIONS_MP_SLIDER = [489, 304];
 const OPTIONS_HP_POTION_Y = 230;
 const OPTIONS_MP_POTION_Y = 374;
 const OPTIONS_OK = [345, 560];
-// Skill book opens at (175,20); tab row is local y 27 and the fourth skill
-// row icon center is local (11+2+16, 93+33+3*40-16). Tab widths come from
-// UIWindow.img/Skill/Tab/enabled: 7,5,9,13,13 with 4px gaps.
-const SKILLBOOK_TAB_Y = 53;
-const SKILLBOOK_TAB_FIRST_X = 198;
-const SKILLBOOK_TAB_FOURTH_X = 241;
-const SKILLBOOK_ICON_ROW3 = [204, 250];
+// Skill book geometry comes from the msskillbook_* probes: the window
+// position is loaded from user Settings, so tab and icon targets must be
+// queried instead of hard-coded.
+const SKILLBOOK_ROWS = 4;
 
 async function moveToX(driver, probes, targetX, tolerance = 70) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -233,14 +230,38 @@ async function closeSkillbook(driver, probes) {
   await sleep(300);
 }
 
-async function dragSkillToBuffSlot(driver, probes, requireState, tabX, skillId, slot) {
-  await driver.click(tabX, SKILLBOOK_TAB_Y);
-  await sleep(350);
+async function visibleSkillRow(probes, skillId) {
+  for (let row = 0; row < SKILLBOOK_ROWS; row += 1) {
+    if (await probes.skillbookRowSkill(row) === skillId) return row;
+  }
+  return -1;
+}
+
+async function selectSkillTab(driver, probes, tab, skillId) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tabX = await probes.skillbookTabX(tab);
+    const tabY = await probes.skillbookTabY(tab);
+    if (tabX < 0 || tabY < 0)
+      throw new Error(`skill book tab ${tab} unavailable: ${tabX},${tabY}`);
+    await driver.click(tabX, tabY);
+    await sleep(350);
+    const row = await visibleSkillRow(probes, skillId);
+    if (row >= 0) return row;
+  }
+  throw new Error(`skill ${skillId} not visible on tab ${tab}`);
+}
+
+async function dragSkillToBuffSlot(driver, probes, requireState, tab, skillId, slot) {
+  const row = await selectSkillTab(driver, probes, tab, skillId);
   const x = await probes.petOptionsBuffSlotX(slot);
   const y = await probes.petOptionsBuffSlotY(slot);
   if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0)
     throw new Error(`buff slot ${slot} unavailable: ${x},${y}`);
-  await driver.drag(SKILLBOOK_ICON_ROW3[0], SKILLBOOK_ICON_ROW3[1], x, y);
+  const iconX = await probes.skillbookIconX(row);
+  const iconY = await probes.skillbookIconY(row);
+  if (iconX < 0 || iconY < 0)
+    throw new Error(`skill ${skillId} icon unavailable: ${iconX},${iconY}`);
+  await driver.drag(iconX, iconY, x, y);
   await sleep(350);
   const stored = await probes.petAutoBuffSkill(slot);
   if (stored !== skillId)
@@ -253,9 +274,9 @@ async function dragSkillToBuffSlot(driver, probes, requireState, tabX, skillId, 
 async function configureBuffs(driver, probes, requireState) {
   await openSkillbook(driver, probes, requireState);
   await dragSkillToBuffSlot(driver, probes, requireState,
-    SKILLBOOK_TAB_FIRST_X, IRON_BODY, 0);
+    1, IRON_BODY, 0);
   await dragSkillToBuffSlot(driver, probes, requireState,
-    SKILLBOOK_TAB_FOURTH_X, MAPLE_WARRIOR, 1);
+    4, MAPLE_WARRIOR, 1);
   await requireState('two auto buff skills configured', async () =>
     await probes.petAutoBuffCount() === 2, 10);
 
@@ -269,7 +290,7 @@ async function configureBuffs(driver, probes, requireState) {
     throw new Error('right-click did not clear auto buff slot 0');
   console.log('PASS  right-click clears an auto buff slot');
   await dragSkillToBuffSlot(driver, probes, requireState,
-    SKILLBOOK_TAB_FIRST_X, IRON_BODY, 0);
+    1, IRON_BODY, 0);
   await closeSkillbook(driver, probes);
   return {
     count: await probes.petAutoBuffCount(),

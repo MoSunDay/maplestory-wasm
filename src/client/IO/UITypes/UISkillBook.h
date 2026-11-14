@@ -84,6 +84,12 @@ namespace jrc
         int32_t get_selected_skill() const;
         void clear_selected_skill();
 
+        // Read-only geometry used by the E2E probes. Invalid indices
+        // return (-1, -1) or 0, matching the panel's hidden state.
+        Point<int16_t> tab_button_center(uint16_t tab) const;
+        int32_t visible_skill_id(uint16_t row) const;
+        Point<int16_t> visible_icon_center(uint16_t row) const;
+
     protected:
         Button::State button_pressed(uint16_t id) override;
 

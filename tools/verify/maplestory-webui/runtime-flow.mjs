@@ -126,6 +126,11 @@ export function createRuntimeProbes(driver) {
     }),
     skillbookSelected: () => number('msskillbook_selected'),
     skillbookActive: () => number('msskillbook_active'),
+    skillbookTabX: tab => numberArgument('msskillbook_tab_x', tab),
+    skillbookTabY: tab => numberArgument('msskillbook_tab_y', tab),
+    skillbookRowSkill: row => numberArgument('msskillbook_row_skill', row),
+    skillbookIconX: row => numberArgument('msskillbook_icon_x', row),
+    skillbookIconY: row => numberArgument('msskillbook_icon_y', row),
     cashShopProbe: name => number(name)
   };
 }
