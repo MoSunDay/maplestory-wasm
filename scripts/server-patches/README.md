@@ -21,7 +21,8 @@
 changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**，两个
 0006 均原样保留。此后规则：
 
-- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0018）；
+- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0020；0018 之后曾直接落过
+  0019-expression-throttle，本行按实际最大编号维护）；
 - slug 必须唯一，禁止复用；
 - 同一编号出现不同 slug，一律视为历史遗留，不表示覆盖或替代关系。
 
@@ -53,6 +54,8 @@ changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**�
 | [0018-quest-complete-reject-feedback.patch](0018-quest-complete-reject-feedback.patch) | `QuestActionHandler` action 2（标准完成）/action 5（脚本完成）在 `quest.canComplete` 为 false 时不再静默 return，补 else `c.announce(MaplePacketCreator.questError(questid))` 下发 UPDATE_QUEST_INFO 0x0A，客户端弹「任务【名】暂时无法完成」；action 1/4（接取）不动——客户端 QuestCheck 已前置过滤且 0x0A 文案语义为"无法完成" | 已应用于当前 checkout 并重编入 dist，容器已重启（2026-11-09） |
 
 | [0019-expression-throttle.patch](0019-expression-throttle.patch) | `MapleCharacter.changeFaceExpression` 表情广播节流 `timeNow - lastExpression > 2000` → `> 300`：客户端按键表情本地即时播放而远端被 2s 节流丢弃造成动作不同步；修复后客户端自身表情回落计时约 2-4s，300ms 足以防刷屏；`Channel.registerFaceExpression`/`FaceExpressionScheduler`（5s emote 0 回落广播）不动；影响 dist，需 `bash posix-compile.sh` 并 `docker restart ms-game-server` 生效 | 已应用于当前 checkout（2026-11-14） |
+
+| [0020-quest-uplink-hardening.patch](0020-quest-uplink-hardening.patch) | 任务上行链路五项加固：① `MapleCharacter.updateQuest` STARTED 分支删除多余的 `updateQuestInfo`（mode 8 STARTED 变体）announce，客户端已区分两种 mode-8 封包，该变体会走多余的"任务完成"提示路径（方法保留，`updateQuestInfo(int,String)` 仍调用）；② `ItemAction` prop=-1 选择奖励在 action 2 不带 selection（extSelection=null）时 `selectList.get`/`extSelection != extNum++` 拆箱 NPE、任务永远完不成——check()/run() 统一 null 缺省 0，check() 索引夹进 [0,size-1]（空列表由既有 !isEmpty() 守卫兜底）；③ `QuestActionHandler` action 1/4（接取）在 `canStart` 为 false 时补 else `questError`（0x0A），与 0018 的 action 2/5 对齐；④ `QuestScriptManager.start/end` 脚本缺失（含 medal 兜底后仍 null）时降级走标准非脚本路径 `quest.start/complete(player, npc)`，任务不再卡死，脚本任务不动；⑤ 条件失败封包 `questFailure`：canStart 的 MESO 静默失败 → 0x0B，`ItemRequirement.check` 两处静默失败（类型 UNDEFINED/数量不足）→ 0x0E；已有 dropMessage 反馈的站点（完成侧 MESO、装备穿着中）不动，故 0x0D 未另行下发；影响 dist，需 `bash posix-compile.sh` 并重启容器生效 | 已应用于当前 checkout 并重编入 dist，容器已重启（2026-11-14） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。

@@ -1,0 +1,191 @@
+# 服务端源码补丁：任务上行链路加固（接取反馈 / 选择奖励 NPE / 缺脚本降级 / 失败封包）
+# 背景：客户端任务闭环继续收口（QuestHandlers 已区分 UPDATE_QUEST_INFO 两种
+#       mode-8 变体并实现 0x0A/0x0B/0x0D/0x0E 的 UIOk 提示）后，服务端上行
+#       链路仍有五处缺口，本补丁一次性补齐：
+#       ① MapleCharacter.updateQuest STARTED 分支不再补发 updateQuestInfo
+#         （mode 8 STARTED 变体）：客户端已区分两种 mode-8 封包，该变体会走
+#         多余的"任务完成"提示路径；任务日志更新（updateQuest false/true，
+#         SHOW_STATUS_INFO）已覆盖状态同步。updateQuestInfo 方法本身保留
+#         （updateQuestInfo(int,String) 仍在调用）。
+#       ② ItemAction 的 prop=-1 选择奖励：客户端 action 2 可能不携带
+#         selection（extSelection=null），check() 的 selectList.get(extSelection)
+#         与 run() 的 extSelection != extNum++ 都会因自动拆箱 NPE 中断在
+#         forceComplete 之前，任务永远完不成且无任何封包。两处统一改为
+#         null 缺省取 0，check() 再把索引夹进 [0, size-1]（空列表由既有
+#         !selectList.isEmpty() 外层守卫兜底，跳过不取）。
+#       ③ QuestActionHandler action 1（标准接取）/action 4（脚本接取）在
+#         quest.canStart 为 false 时不再静默 return，补 else
+#         c.announce(MaplePacketCreator.questError(questid))，与补丁 0018
+#         给 action 2/5 的处理对齐（0018 头注中"action 1/4 不动"的说明由
+#         本补丁取代——客户端 QuestCheck 不再前置过滤接取分支）。
+#       ④ QuestScriptManager.start/end 在任务脚本文件缺失（getInvocable
+#         返回 null，含 medal 兜底后仍为 null）时不再只打日志静默返回，
+#         降级走标准非脚本路径：start → quest.start(player, npc)，
+#         end → quest.complete(player, npc)（与 QuestActionHandler
+#         action 1/2 的调用方式一致），任务不再卡死；脚本存在的任务不受影响。
+#       ⑤ 任务条件失败封包（MaplePacketCreator.questFailure，
+#         UPDATE_QUEST_INFO）：接取侧 MESO 检查（MapleQuest.canStart）此前
+#         完全静默 → 下发 0x0B（金币不足）；ItemRequirement.check 的两处
+#         静默失败（物品类型 UNDEFINED、数量不足）→ 下发 0x0E（缺少所需
+#         物品）。已有 dropMessage 反馈的站点不动（完成侧 MESO 的
+#         "not enough mesos"、装备穿在身上的 "Unequip the required ..."），
+#         因此 0x0D 未另行下发——唯一 equipped 检查站点已有可见反馈。
+#
+# 应用（在 link_repos/MapleStory-Server 检出根目录内；该目录可能是指向
+#   /data/MapleStory-Server 的符号链接，直接用父仓补丁的绝对路径）：
+#   patch -p1 < /data/maplestory-wasm/scripts/server-patches/0020-quest-uplink-hardening.patch
+# 验证：
+#   改动影响 dist：需重编并重启容器生效——
+#   bash posix-compile.sh && bash /data/maplestory-wasm/scripts/game_server_restart.sh
+#   - 接取条件不满足的任务：弹「任务【名】暂时无法完成，请确认任务条件。」
+#   - prop=-1 选择奖励任务不带 selection 提交：不再无声失败，正常完成并给第 0 项
+#   - 脚本缺失的任务经 action 4/5 触发：按标准非脚本路径接取/完成
+#   - 接取缺金币 → 「金币不足」；接取/完成缺物品 → 「没有任务所需的物品。」
+#   grep -n "questError(questid)" src/net/server/channel/handlers/QuestActionHandler.java  # 应有 4 处
+#   grep -n "questFailure" src/server/quest/MapleQuest.java src/server/quest/requirements/ItemRequirement.java  # 应有 3 处
+#   grep -c "updateQuestInfo" src/client/MapleCharacter.java  # 应为 3（方法名+1 处调用+注释）
+#
+--- a/src/client/MapleCharacter.java
++++ b/src/client/MapleCharacter.java
+@@ -9649,7 +9649,9 @@
+             if (quest.getQuest().getInfoNumber() > 0)
+                 announce(MaplePacketCreator.updateQuest(quest, true));
+ 
+-            announce(MaplePacketCreator.updateQuestInfo((short) quest.getQuest().getId(), quest.getNpc()));
++            // 不再补发 updateQuestInfo(mode 8) STARTED 变体：客户端已区分
++            // 两种 mode-8 封包，该变体会走一次多余的"任务完成"提示路径；
++            // SHOW_STATUS_INFO 的任务日志更新(updateQuest false/true)已覆盖状态同步。
+         } else if (quest.getStatus().equals(MapleQuestStatus.Status.COMPLETED)) {
+             MapleQuest mquest = quest.getQuest();
+             short questid = mquest.getId();
+--- a/src/server/quest/actions/ItemAction.java
++++ b/src/server/quest/actions/ItemAction.java
+@@ -92,6 +92,10 @@
+                 List<Pair<Integer, Integer>> takeItem = new LinkedList<>();
+                 List<Pair<Integer, Integer>> giveItem = new LinkedList<>();
+             
++                // prop=-1 选择奖励：客户端 action 2 可能不带 selection（extSelection 为 null），
++                // 参与与 int 的比较会因自动拆箱 NPE，导致 forceComplete 前中断且无任何封包；
++                // 缺省取第 0 项
++                int selection = extSelection != null ? extSelection : 0;
+                 int props = 0, rndProps = 0, accProps = 0;
+ 		for(ItemData item : items) {
+ 			if(item.getProp() != null && item.getProp() != -1 && canGetItem(item, chr)) {
+@@ -109,7 +113,7 @@
+ 			}
+ 			if(iEntry.getProp() != null) {
+ 				if(iEntry.getProp() == -1) {
+-					if(extSelection != extNum++)
++					if(selection != extNum++)
+ 						continue;
+ 				} else {
+                                         accProps += iEntry.getProp();
+@@ -223,7 +227,14 @@
+                 }
+                 
+                 if(!selectList.isEmpty()) {
+-                        Pair<Item, MapleInventoryType> selected = selectList.get(extSelection);
++                        // 同 run()：extSelection 可能为 null（action 2 未携带 selection），
++                        // 也可能越界；缺省取第 0 项并把索引夹在 [0, size-1]，
++                        // 避免拆箱 NPE / IndexOutOfBounds。空列表由外层 !isEmpty() 兜底（跳过）。
++                        int selection = extSelection != null ? extSelection : 0;
++                        if (selection < 0) selection = 0;
++                        if (selection >= selectList.size()) selection = selectList.size() - 1;
++
++                        Pair<Item, MapleInventoryType> selected = selectList.get(selection);
+                         gainList.add(selected);
+                 }
+                 
+--- a/src/server/quest/requirements/ItemRequirement.java
++++ b/src/server/quest/requirements/ItemRequirement.java
+@@ -33,6 +33,7 @@
+ import client.inventory.Item;
+ import client.inventory.MapleInventoryType;
+ import constants.ItemConstants;
++import tools.MaplePacketCreator;
+ 
+ /**
+  *
+@@ -68,6 +69,8 @@
+ 			MapleInventoryType iType = ItemConstants.getInventoryType(itemId);
+ 			
+ 			if (iType.equals(MapleInventoryType.UNDEFINED)) {
++				// 静默失败改为下发 UPDATE_QUEST_INFO 0x0E（没有任务所需的物品）
++				chr.getClient().announce(MaplePacketCreator.questFailure((byte) 0x0E));
+ 				return false;
+ 			}
+ 			for (Item item : chr.getInventory(iType).listById(itemId)) {
+@@ -90,6 +93,9 @@
+ 			}
+ 			
+ 			if(count < countNeeded || countNeeded <= 0 && count > 0) {
++				// 静默失败改为下发 UPDATE_QUEST_INFO 0x0E（没有任务所需的物品）；
++				// "所需装备穿在身上"分支已有 dropMessage 反馈，维持不动
++				chr.getClient().announce(MaplePacketCreator.questFailure((byte) 0x0E));
+ 				return false;
+ 			}
+ 		}
+--- a/src/server/quest/MapleQuest.java
++++ b/src/server/quest/MapleQuest.java
+@@ -247,6 +247,10 @@
+             if (!r.check(c, npcid)) {
+                 if(r.getType().getType() == MapleQuestRequirementType.INTERVAL.getType()) {
+                     c.message("This quest will become available again in approximately " + getIntervalTimeLeft(c, (IntervalRequirement)r) + ".");
++                } else if(r.getType() == MapleQuestRequirementType.MESO) {
++                    // 接取侧金币检查此前完全静默：下发 UPDATE_QUEST_INFO 0x0B（金币不足），
++                    // 完成侧 MESO 已有 dropMessage 反馈，不重复下发
++                    c.getClient().announce(MaplePacketCreator.questFailure((byte) 0x0B));
+                 }
+                 return false;
+             }
+--- a/src/net/server/channel/handlers/QuestActionHandler.java
++++ b/src/net/server/channel/handlers/QuestActionHandler.java
+@@ -75,6 +75,9 @@
+             
+             if(quest.canStart(player, npc)) {
+                 quest.start(player, npc);
++            } else {
++                // 同 action 2/5：接取条件不满足时给客户端一个可见反馈
++                c.announce(MaplePacketCreator.questError(questid));
+             }
+         } else if (action == 2) { // Complete Quest
+             int npc = slea.readInt();
+@@ -104,6 +107,9 @@
+             
+             if(quest.canStart(player, npc)) {
+                 QuestScriptManager.getInstance().start(c, questid, npc);
++            } else {
++                // 同 action 1：脚本接取条件不满足时给客户端一个可见反馈
++                c.announce(MaplePacketCreator.questError(questid));
+             }
+         } else if (action == 5) { // scripted end quests
+             int npc = slea.readInt();
+--- a/src/scripting/quest/QuestScriptManager.java
++++ b/src/scripting/quest/QuestScriptManager.java
+@@ -72,6 +72,10 @@
+                                 }
+                                 if (iv == null || QuestScriptManager.getInstance() == null) {
+                                         qm.dispose();
++
++                                        // 脚本缺失时不再静默返回导致任务卡死：降级走标准非脚本接取，
++                                        // 与 QuestActionHandler action 1 的 quest.start(player, npc) 一致
++                                        quest.start(c.getPlayer(), npc);
+                                         return;
+                                 }
+                                 engine.put("qm", qm);
+@@ -121,9 +125,14 @@
+ 				if (iv == null) {
+                                         if(GameConstants.isMedalQuest(questid)) {   // start generic medal quest
+                                                 iv = getInvocable("quest/medalQuest.js", c);
+-                                        } else {
++                                        }
++                                        if (iv == null) {
+                                                 FilePrinter.printError(FilePrinter.QUEST_UNCODED, "END Quest " + questid + " is uncoded.");
+                                                 qm.dispose();
++
++                                                // 脚本缺失时不再静默返回导致任务卡死：降级走标准非脚本完成，
++                                                // 与 QuestActionHandler action 2 的 quest.complete(player, npc) 一致
++                                                quest.complete(c.getPlayer(), npc);
+                                                 return;
+                                         }
+ 				}
