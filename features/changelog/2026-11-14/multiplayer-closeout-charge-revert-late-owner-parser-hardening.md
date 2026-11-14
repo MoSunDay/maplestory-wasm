@@ -100,6 +100,11 @@
   已应用补丁
   [0019-expression-throttle](../../../scripts/server-patches/0019-expression-throttle.patch)
   并 `posix-compile.sh` 重编 + `docker restart ms-game-server`。
+- **构建可复现性**：在 `b6d224e` 的干净检出上以
+  `scripts/docker_build_wasm.sh -j 36`（emsdk 4.0.21）复编成功，产物
+  `build/JourneyClient.wasm` 与门 1–3 所用交付件逐字节一致
+  （md5 `49faf86b627418d32c34dab75f048cae`），确认验证对象即提交源码
+  产物。
 
 ## 影响面（Impact Surface）
 
