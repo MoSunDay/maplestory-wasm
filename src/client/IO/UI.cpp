@@ -321,7 +321,8 @@ namespace jrc
                 UIElement::USERINFO,
                 UIElement::STATSINFO,
                 UIElement::NOTICE,
-                UIElement::GAMEOPTIONS
+                UIElement::GAMEOPTIONS,
+                UIElement::PETOPTIONS
             };
 
             if (UIElement* front = state->get_front(escape_types))

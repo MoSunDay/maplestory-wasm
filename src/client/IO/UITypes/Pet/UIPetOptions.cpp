@@ -8,6 +8,7 @@
 #include "../../../Gameplay/Pet/PetVitalityPolicy.h"
 #include "../../../Gameplay/Stage.h"
 #include "../../../Data/ItemData.h"
+#include "../../../Data/SkillData.h"
 #include "../../../Net/Packets/PlayerPackets.h"
 
 #include <algorithm>
@@ -27,6 +28,16 @@ namespace jrc
         constexpr int16_t POTION_LEFT = 42;
         constexpr int16_t POTION_WIDTH = 200;
         constexpr int16_t POTION_HEIGHT = 38;
+        constexpr int16_t PANEL_WIDTH = 283;
+        constexpr int16_t PANEL_HEIGHT = 580;
+        constexpr int16_t BUTTON_Y = 536;
+        constexpr int16_t BUFF_DIVIDER_Y = 420;
+        constexpr int16_t BUFF_TITLE_Y = 428;
+        constexpr int16_t BUFF_SLOT_SIZE = 32;
+        constexpr int16_t BUFF_SLOT_GAP = 4;
+        constexpr int16_t BUFF_COLUMNS = 6;
+        constexpr int16_t BUFF_GRID_LEFT = 35;
+        constexpr int16_t BUFF_GRID_TOP = 448;
 
         std::vector<int32_t> potion_candidates(const Inventory& inventory, bool hp)
         {
@@ -64,18 +75,20 @@ namespace jrc
     }
 
     UIPetOptions::UIPetOptions()
-        : UIElement({}, { 283, 492 }),
+        : UIElement({}, { PANEL_WIDTH, PANEL_HEIGHT }),
           hp_threshold(Stage::get().get_pet_automation().get_hp_threshold()),
           mp_threshold(Stage::get().get_pet_automation().get_mp_threshold()),
           hp_item(Stage::get().get_pet_automation().get_hp_item()),
           mp_item(Stage::get().get_pet_automation().get_mp_item()),
-          panel_background(283, 492, Geometry::BLACK, 0.92f),
-          panel_header(283, 54, Geometry::WHITE, 0.12f),
+          buff_skills(Stage::get().get_pet_automation().get_buff_skills()),
+          panel_background(PANEL_WIDTH, PANEL_HEIGHT, Geometry::BLACK, 0.92f),
+          panel_header(PANEL_WIDTH, 54, Geometry::WHITE, 0.12f),
           section_divider(235, 1, Geometry::WHITE, 0.28f),
           slider_track(SLIDER_WIDTH, 8, Geometry::WHITE, 0.30f),
           hp_fill(1, 8, Geometry::HPBAR_LIGHTRED, 1.0f),
           mp_fill(1, 8, Geometry::HPBAR_LIGHTGREEN, 1.0f),
           potion_background(POTION_WIDTH, POTION_HEIGHT, Geometry::WHITE, 0.10f),
+          buff_slot_background(BUFF_SLOT_SIZE, BUFF_SLOT_SIZE, Geometry::WHITE, 0.10f),
           button_background(85, 28, Geometry::WHITE, 0.16f),
           pet_status(Text::A11M, Text::CENTER, Text::WHITE, ""),
           title(Text::A13B, Text::CENTER, Text::WHITE, "宠物自动恢复"),
@@ -91,6 +104,8 @@ namespace jrc
           next_arrow(Text::A13B, Text::CENTER, Text::YELLOW, ">"),
           potion_help(Text::A11M, Text::CENTER, Text::LIGHTGREY,
               "点击左/右切换；OFF 为关闭"),
+          buff_title(Text::A11M, Text::CENTER, Text::LIGHTGREY,
+              "自动 BUFF（拖入技能，右键移除）"),
           ok_label(Text::A12B, Text::CENTER, Text::WHITE, "确定"),
           cancel_label(Text::A12B, Text::CENTER, Text::WHITE, "取消")
     {
@@ -101,9 +116,9 @@ namespace jrc
         mp_item = available_selection(inventory, mp_item, false);
 
         buttons[BT_OK] = std::make_unique<AreaButton>(
-            Point<int16_t>(45, 448), Point<int16_t>(85, 28));
+            Point<int16_t>(45, BUTTON_Y), Point<int16_t>(85, 28));
         buttons[BT_CANCEL] = std::make_unique<AreaButton>(
-            Point<int16_t>(153, 448), Point<int16_t>(85, 28));
+            Point<int16_t>(153, BUTTON_Y), Point<int16_t>(85, 28));
         sync_labels();
         sync_potion_labels();
     }
@@ -155,6 +170,7 @@ namespace jrc
         section_divider.draw(position + Point<int16_t>(24, 96));
         section_divider.draw(position + Point<int16_t>(24, 240));
         section_divider.draw(position + Point<int16_t>(24, 384));
+        section_divider.draw(position + Point<int16_t>(24, BUFF_DIVIDER_Y));
 
         slider_track.draw(position + Point<int16_t>(SLIDER_LEFT, HP_SLIDER_Y));
         slider_track.draw(position + Point<int16_t>(SLIDER_LEFT, MP_SLIDER_Y));
@@ -176,11 +192,24 @@ namespace jrc
         previous_arrow.draw(position + Point<int16_t>(56, 358));
         next_arrow.draw(position + Point<int16_t>(228, 214));
         next_arrow.draw(position + Point<int16_t>(228, 358));
-        potion_help.draw(position + Point<int16_t>(141, 413));
-        button_background.draw(position + Point<int16_t>(45, 448));
-        button_background.draw(position + Point<int16_t>(153, 448));
-        ok_label.draw(position + Point<int16_t>(87, 456));
-        cancel_label.draw(position + Point<int16_t>(195, 456));
+        potion_help.draw(position + Point<int16_t>(141, 405));
+        buff_title.draw(position + Point<int16_t>(141, BUFF_TITLE_Y));
+        for (size_t slot = 0; slot < buff_skills.size(); ++slot)
+            buff_slot_background.draw(position + buff_slot_offset(slot));
+        for (size_t slot = 0; slot < buff_skills.size(); ++slot)
+        {
+            const int32_t skill_id = buff_skills[slot];
+            if (skill_id <= 0)
+                continue;
+            const SkillData& skill = SkillData::get(skill_id);
+            const Texture& icon = skill.get_icon(SkillData::NORMAL);
+            if (skill.get_masterlevel() > 0 && icon.is_valid())
+                icon.draw(position + buff_slot_offset(slot) + Point<int16_t>(0, 32));
+        }
+        button_background.draw(position + Point<int16_t>(45, BUTTON_Y));
+        button_background.draw(position + Point<int16_t>(153, BUTTON_Y));
+        ok_label.draw(position + Point<int16_t>(87, BUTTON_Y + 8));
+        cancel_label.draw(position + Point<int16_t>(195, BUTTON_Y + 8));
 
         if (hp_item > 0)
             ItemData::get(hp_item).get_icon(false).draw(position + Point<int16_t>(76, 205));
@@ -238,6 +267,44 @@ namespace jrc
     {
         if (pressed && escape)
             deactivate();
+    }
+
+    void UIPetOptions::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+    {
+        const int32_t skill_id = icon.get_skill_id();
+        if (skill_id <= 0)
+            return;
+
+        const int slot = buff_slot_at(cursorpos);
+        if (slot < 0)
+            return;
+
+        const int32_t level = Stage::get().get_player().get_skilllevel(skill_id);
+        const SkillData& skill = SkillData::get(skill_id);
+        if (level <= 0 || skill.is_passive() || skill.is_invisible() ||
+            skill.is_attack() || skill.get_stats(level).recoverytime <= 0)
+            return;
+
+        Stage::get().set_pet_buff_skill(static_cast<size_t>(slot), skill_id);
+        buff_skills = Stage::get().get_pet_automation().get_buff_skills();
+    }
+
+    void UIPetOptions::rightclick(Point<int16_t> cursorpos)
+    {
+        const int slot = buff_slot_at(cursorpos);
+        if (slot < 0 || buff_skills[static_cast<size_t>(slot)] <= 0)
+            return;
+
+        Stage::get().set_pet_buff_skill(static_cast<size_t>(slot), 0);
+        buff_skills = Stage::get().get_pet_automation().get_buff_skills();
+    }
+
+    Point<int16_t> UIPetOptions::buff_slot_center(size_t slot) const
+    {
+        if (slot >= pet_automation::MAX_BUFF_SKILLS)
+            return { -1, -1 };
+        return position + buff_slot_offset(slot) +
+            Point<int16_t>(BUFF_SLOT_SIZE / 2, BUFF_SLOT_SIZE / 2);
     }
 
     int32_t UIPetOptions::selected_hp_item() const
@@ -347,5 +414,37 @@ namespace jrc
             position + Point<int16_t>(POTION_LEFT + POTION_WIDTH,
                 static_cast<int16_t>(y + POTION_HEIGHT))
         };
+    }
+
+    Point<int16_t> UIPetOptions::buff_slot_offset(size_t slot) const
+    {
+        if (slot >= pet_automation::MAX_BUFF_SKILLS)
+            return {};
+
+        const int16_t column = static_cast<int16_t>(slot % BUFF_COLUMNS);
+        const int16_t row = static_cast<int16_t>(slot / BUFF_COLUMNS);
+        return {
+            static_cast<int16_t>(BUFF_GRID_LEFT + column * (BUFF_SLOT_SIZE + BUFF_SLOT_GAP)),
+            static_cast<int16_t>(BUFF_GRID_TOP + row * (BUFF_SLOT_SIZE + BUFF_SLOT_GAP))
+        };
+    }
+
+    Rectangle<int16_t> UIPetOptions::buff_slot_bounds(size_t slot) const
+    {
+        Point<int16_t> offset = buff_slot_offset(slot);
+        return {
+            position + offset,
+            position + offset + Point<int16_t>(BUFF_SLOT_SIZE, BUFF_SLOT_SIZE)
+        };
+    }
+
+    int UIPetOptions::buff_slot_at(Point<int16_t> cursorpos) const
+    {
+        for (size_t slot = 0; slot < pet_automation::MAX_BUFF_SKILLS; ++slot)
+        {
+            if (buff_slot_bounds(slot).contains(cursorpos))
+                return static_cast<int>(slot);
+        }
+        return -1;
     }
 }

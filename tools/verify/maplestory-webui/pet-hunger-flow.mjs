@@ -155,7 +155,7 @@ async function openOptionsRobust(driver, probes, requireState) {
         console.log('INFO  hunger shot: capturing 20b');
         await driver.screenshot('20b-pet-hungry-options');
         console.log('INFO  hunger shot: 20b captured');
-        await driver.click(345, 516);
+        await driver.click(345, 560);
         await requireState('hungry options panel closed', async () =>
           await probes.petOptionsActive() === 0);
         return;

@@ -36,11 +36,11 @@ const railEntry = i => [49, 58 + 22 * i + 11];
 const rail = Object.freeze({ all: railEntry(0), equip: railEntry(1), pet: railEntry(7) });
 const weaponSub = [49, 60 + 21 * 16 + 10];
 const pager = Object.freeze({ next: [488, 557], prev: [115, 557] });  // 30x47 @(473/100,534)
-// UIPetOptions 283x492 居中 position(258,54)：HP 滑条 y=208、MP y=352，track x∈[310,490]，
+// UIPetOptions 283x580 居中 position(258,10)：HP 滑条 y=160、MP 滑条 y=304，track x∈[310,490]，
 // value=1+(x-310)*98/179 → 反解 sliderX(percent)（20%→345、30%→363、40%→381、50%→400）。
-const HP_SLIDER_Y = 208, MP_SLIDER_Y = 352;
+const HP_SLIDER_Y = 164, MP_SLIDER_Y = 308;
 const sliderX = percent => Math.round(310 + (percent - 1) * 179 / 98);
-const opt = Object.freeze({ hpPrev: [350, 275], hpNext: [450, 275], ok: [345, 516], cancel: [453, 516] });
+const opt = Object.freeze({ hpPrev: [350, 231], hpNext: [450, 231], ok: [345, 560], cancel: [453, 560] });
 const SEARCH_BOX = [300, 50];
 const clickPt = (driver, [x, y]) => driver.click(x, y);
 

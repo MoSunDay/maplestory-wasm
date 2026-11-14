@@ -60,6 +60,80 @@ int main()
     inactive.set_hp_item(2000000);
     ok &= expect(inactive.decide(inputs).count == 0, "inactive pet blocks auto potion");
 
+    Controller feeder;
+    feeder.set_food_item(2120000);
+    ok &= expect(feeder.decide_feed({ true, true, true }) == 2120000,
+        "hungry pet eats the configured food");
+    ok &= expect(feeder.decide_feed({ true, true, true }) == 0,
+        "feeding respects the local cooldown");
+    for (int frame = 0; frame < 120; ++frame)
+        feeder.tick();
+    ok &= expect(feeder.decide_feed({ true, true, true }) == 2120000,
+        "feeding resumes after the cooldown");
+    Controller unfed;
+    unfed.set_food_item(2120000);
+    ok &= expect(unfed.decide_feed({ true, false, true }) == 0,
+        "a satisfied pet is not fed");
+    ok &= expect(unfed.decide_feed({ true, true, false }) == 0,
+        "missing food blocks feeding");
+    ok &= expect(unfed.decide_feed({ false, true, true }) == 0,
+        "inactive pet does not feed");
+
+    Controller buffs;
+    ok &= expect(buffs.get_buff_skill_count() == 0,
+        "buff slots start empty");
+    buffs.set_buff_skill(0, 1001003);
+    ok &= expect(buffs.get_buff_skill(0) == 1001003,
+        "buff skill is stored in its slot");
+    ok &= expect(buffs.get_buff_skill_count() == 1,
+        "buff slot count tracks assignments");
+    AutoBuffInputs buff_inputs = { true, true, false, true };
+    ok &= expect(buffs.decide_buff(0, buff_inputs),
+        "missing buff is recast");
+    ok &= expect(!buffs.decide_buff(0, buff_inputs),
+        "buff cast is debounced while the packet is in flight");
+    for (int frame = 0; frame < 60; ++frame)
+        buffs.tick();
+    ok &= expect(!buffs.decide_buff(0, { true, true, true, true }),
+        "active buff is not recast");
+    ok &= expect(!buffs.decide_buff(0, { true, true, false, false }),
+        "skill cooldown blocks the recast");
+    ok &= expect(buffs.decide_buff(0, buff_inputs),
+        "buff recast resumes after the debounce");
+    ok &= expect(!buffs.decide_buff(1, buff_inputs),
+        "empty buff slot never casts");
+    ok &= expect(!buffs.decide_buff(0, { false, true, false, true }),
+        "inactive pet blocks buff casts");
+    ok &= expect(!buffs.decide_buff(0, { true, false, false, true }),
+        "dead owner blocks buff casts");
+    buffs.set_buff_skill(3, 1001003);
+    ok &= expect(buffs.get_buff_skill(0) == 0 &&
+        buffs.get_buff_skill(3) == 1001003,
+        "moving a buff skill clears its previous slot");
+    ok &= expect(buffs.get_buff_skill_count() == 1,
+        "moved buff skill is not counted twice");
+    buffs.set_buff_skill(0, 1001003);
+    ok &= expect(buffs.get_buff_skill(0) == 1001003 &&
+        buffs.get_buff_skill(3) == 0,
+        "buff skills keep a single slot when moved back");
+    BuffSkillSlots slots{};
+    slots[0] = 1001003;
+    slots[1] = 1101006;
+    slots[11] = 1121000;
+    buffs.set_buff_skills(slots);
+    ok &= expect(buffs.get_buff_skill_count() == 3,
+        "all configured buff skills are loaded");
+    ok &= expect(buffs.get_buff_skill(11) == 1121000,
+        "last buff slot accepts a skill");
+    buffs.set_buff_skill(12, 1101007);
+    ok &= expect(buffs.get_buff_skill(0) == 1001003 &&
+        buffs.get_buff_skill(11) == 1121000,
+        "out-of-range buff slot is ignored");
+    buffs.set_buff_skill(1, 0);
+    ok &= expect(buffs.get_buff_skill(1) == 0 &&
+        buffs.get_buff_skill_count() == 2,
+        "clearing a buff skill frees its slot");
+
     using jrc::pet_capability::Capabilities;
     using jrc::pet_capability::EquippedAbilities;
     ok &= expect(jrc::pet_capability::is_pet_item(
@@ -242,8 +316,8 @@ int main()
         "out-of-range pet cannot request pickup");
     ok &= expect(jrc::pet_loot::attempts_exhausted(3),
         "failed target is eventually abandoned");
-    ok &= expect(jrc::pet_loot::BATCH_RANGE == 50,
-        "pet pickup sweep stays inside the server range check");
+    ok &= expect(jrc::pet_loot::BATCH_RANGE == 250,
+        "pet pickup sweep covers the expanded loot range");
     ok &= expect(jrc::pet_loot::batch_count(0) == 0 &&
         jrc::pet_loot::batch_count(2) == 2 &&
         jrc::pet_loot::batch_count(9) ==
@@ -253,10 +327,14 @@ int main()
         "adjacent drop below the foothold is in reach");
     ok &= expect(jrc::pet_loot::in_reach({ 0, 0 }, { 10, 96 }, 88),
         "drop one ledge below the pet is in reach");
-    ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 10, 97 }, 88),
+    ok &= expect(jrc::pet_loot::in_reach({ 0, 0 }, { 10, 480 }, 88),
+        "drop at the reach window limit is in reach");
+    ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 10, 481 }, 88),
         "drop deeper than the reach window is out of reach");
-    ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 51, 16 }, 88),
+    ok &= expect(jrc::pet_loot::in_reach({ 0, 0 }, { 250, 16 }, 88),
         "horizontal reach ends at the sweep window");
+    ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 251, 16 }, 88),
+        "horizontal sweep window is enforced");
     ok &= expect(jrc::pet_loot::in_reach({ 0, 0 }, { 10, -88 }, 88),
         "drop at the pursuit height limit is in reach");
     ok &= expect(!jrc::pet_loot::in_reach({ 0, 0 }, { 10, -89 }, 88),

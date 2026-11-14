@@ -22,6 +22,7 @@
 
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Pet/PetAutomation.h"
+#include "../../Gameplay/Pet/PetVitalityPolicy.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 
@@ -103,6 +104,7 @@ namespace jrc
             const auto& automation = Stage::get().get_pet_automation();
             draw_pet_item(automation.get_hp_item(), equipinv_nodes::pet_hp_pos());
             draw_pet_item(automation.get_mp_item(), equipinv_nodes::pet_mp_pos());
+            draw_pet_item(automation.get_food_item(), equipinv_nodes::pet_food_pos());
 
             constexpr std::array<int32_t, 5> ABILITIES = {
                 pet_automation::MESO_MAGNET,
@@ -229,9 +231,16 @@ namespace jrc
 
     void UIEquipInventory::send_icon(const Icon& icon, Point<int16_t> cursorpos)
     {
-        if (int8_t potion = pet_potion_by_position(cursorpos))
+        if (int8_t consumable = pet_consumable_by_position(cursorpos))
         {
-            icon.drop_on_pet_potion(potion == 1);
+            if (consumable == 3)
+            {
+                const int32_t item_id = icon.get_item_id();
+                if (pet_vitality::is_pet_food(item_id))
+                    Stage::get().set_pet_food_item(item_id);
+                return;
+            }
+            icon.drop_on_pet_potion(consumable == 1);
             return;
         }
         if (Equipslot::Id slot = slot_by_position(cursorpos))
@@ -240,12 +249,13 @@ namespace jrc
         }
     }
 
-    int8_t UIEquipInventory::pet_potion_by_position(Point<int16_t> cursorpos) const
+    int8_t UIEquipInventory::pet_consumable_by_position(Point<int16_t> cursorpos) const
     {
         if (!showpetequips)
             return 0;
         return equipinv_nodes::pet_hp_bounds(position).contains(cursorpos) ? 1
              : equipinv_nodes::pet_mp_bounds(position).contains(cursorpos) ? 2
+             : equipinv_nodes::pet_food_bounds(position).contains(cursorpos) ? 3
              : 0;
     }
 

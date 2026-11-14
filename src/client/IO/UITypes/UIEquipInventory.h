@@ -56,7 +56,8 @@ namespace jrc
         void load_icons();
         void update_slot(Equipslot::Id slot);
         Equipslot::Id slot_by_position(Point<int16_t> position) const;
-        int8_t pet_potion_by_position(Point<int16_t> position) const;
+        // 1 = HP potion, 2 = MP potion, 3 = pet food.
+        int8_t pet_consumable_by_position(Point<int16_t> position) const;
         void draw_pet_item(int32_t item_id, Point<int16_t> relative) const;
 
         class EquipIcon : public Icon::Type

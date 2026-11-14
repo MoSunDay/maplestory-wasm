@@ -4,6 +4,7 @@
 
 #include "../../../Graphics/Geometry.h"
 #include "../../../Graphics/Text.h"
+#include "../../../Gameplay/Pet/PetAutomation.h"
 
 #include <cstdint>
 #include <string>
@@ -15,7 +16,7 @@ namespace jrc
     {
     public:
         static constexpr Type TYPE = PETOPTIONS;
-        static constexpr bool FOCUSED = true;
+        static constexpr bool FOCUSED = false;
         static constexpr bool TOGGLED = false;
 
         UIPetOptions();
@@ -25,8 +26,11 @@ namespace jrc
         void update_screen(int16_t width, int16_t height) override;
         CursorResult send_cursor(bool pressed, Point<int16_t> cursorpos) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
+        void send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
+        void rightclick(Point<int16_t> cursorpos) override;
         int32_t selected_hp_item() const;
         int32_t selected_mp_item() const;
+        Point<int16_t> buff_slot_center(size_t slot) const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
@@ -39,6 +43,9 @@ namespace jrc
         void sync_pet_status();
         Rectangle<int16_t> slider_bounds(bool hp) const;
         Rectangle<int16_t> potion_bounds(bool hp) const;
+        Point<int16_t> buff_slot_offset(size_t slot) const;
+        Rectangle<int16_t> buff_slot_bounds(size_t slot) const;
+        int buff_slot_at(Point<int16_t> cursorpos) const;
 
         enum Buttons : uint16_t
         {
@@ -50,6 +57,7 @@ namespace jrc
         uint8_t mp_threshold;
         int32_t hp_item;
         int32_t mp_item;
+        pet_automation::BuffSkillSlots buff_skills;
         std::vector<int32_t> hp_candidates;
         std::vector<int32_t> mp_candidates;
         ColorBox panel_background;
@@ -59,6 +67,7 @@ namespace jrc
         ColorBox hp_fill;
         ColorBox mp_fill;
         ColorBox potion_background;
+        ColorBox buff_slot_background;
         ColorBox button_background;
         Text pet_status;
         std::string pet_status_cache;
@@ -73,6 +82,7 @@ namespace jrc
         Text previous_arrow;
         Text next_arrow;
         Text potion_help;
+        Text buff_title;
         Text ok_label;
         Text cancel_label;
     };

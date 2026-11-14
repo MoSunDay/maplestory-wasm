@@ -132,6 +132,13 @@ namespace jrc
             return post_chaos() ? Point<int16_t>(228, 27) : Point<int16_t>(221, 44);
         }
 
+        // Third consumable socket: pet food sits to the right of the
+        // auto HP/MP potions, on the same first grid row.
+        inline Point<int16_t> pet_food_pos()
+        {
+            return post_chaos() ? Point<int16_t>(261, 27) : Point<int16_t>(254, 44);
+        }
+
         // Sockets of the five pet ability items.  post-Chaos follows the
         // 3x3 cell grid of UIWindow2.img/Equip/pet/backgrnd3 (98x108 at
         // origin (-11,-27), cells 32px wide with 1px slits): columns
@@ -186,6 +193,17 @@ namespace jrc
                 : Rectangle<int16_t>(
                     position + Point<int16_t>(221, 44),
                     position + Point<int16_t>(253, 76));
+        }
+
+        inline Rectangle<int16_t> pet_food_bounds(Point<int16_t> position)
+        {
+            return post_chaos()
+                ? Rectangle<int16_t>(
+                    position + Point<int16_t>(261, 27),
+                    position + Point<int16_t>(293, 59))
+                : Rectangle<int16_t>(
+                    position + Point<int16_t>(254, 44),
+                    position + Point<int16_t>(286, 76));
         }
     }
 }

@@ -121,6 +121,8 @@ namespace jrc
 
         void set_pet_auto_hp_item(int32_t item_id);
         void set_pet_auto_mp_item(int32_t item_id);
+        void set_pet_food_item(int32_t item_id);
+        void set_pet_buff_skill(size_t slot, int32_t skill_id);
         bool set_pet_auto_thresholds(uint8_t hp, uint8_t mp);
         const pet_automation::Controller& get_pet_automation() const;
         pet_capability::Capabilities get_pet_capabilities() const;
@@ -144,6 +146,7 @@ namespace jrc
         void update_directional_context();
         void check_drops();
         void clear_pet_loot_target(PetLook* pet);
+        void update_pet_buffs();
         void update_pet_automation();
         void update_pet_movement();
         void update_intro_warp();

@@ -610,6 +610,19 @@ namespace jrc
         return buffs[stat].value > 0;
     }
 
+    bool Player::has_skill_buff(int32_t skill_id) const
+    {
+        if (skill_id <= 0)
+            return false;
+
+        for (const Buff& buff : buffs.values())
+        {
+            if (buff.value > 0 && buff.skillid == skill_id)
+                return true;
+        }
+        return false;
+    }
+
     int16_t Player::get_visual_buff_value(Buffstat::Id stat) const
     {
         return buffs[stat].value;

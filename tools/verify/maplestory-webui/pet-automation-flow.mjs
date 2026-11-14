@@ -12,6 +12,23 @@ const PET_JUMP_STANCE = 2;
 const PET_MOVE_LEFT = 1;
 const PET_MOVE_RIGHT = 2;
 const HORIZONTAL_WALL = 1;
+const IRON_BODY = 1001003;
+const MAPLE_WARRIOR = 1121000;
+// Pet options panel is 283x580, centered at (258,10). Slider local y
+// 150/294 and potion rows at 202/346, so the absolute targets shift by +10;
+// the OK/CANCEL row sits at local y 536.
+const OPTIONS_HP_SLIDER = [489, 160];
+const OPTIONS_MP_SLIDER = [489, 304];
+const OPTIONS_HP_POTION_Y = 230;
+const OPTIONS_MP_POTION_Y = 374;
+const OPTIONS_OK = [345, 560];
+// Skill book opens at (175,20); tab row is local y 27 and the fourth skill
+// row icon center is local (11+2+16, 93+33+3*40-16). Tab widths come from
+// UIWindow.img/Skill/Tab/enabled: 7,5,9,13,13 with 4px gaps.
+const SKILLBOOK_TAB_Y = 53;
+const SKILLBOOK_TAB_FIRST_X = 198;
+const SKILLBOOK_TAB_FOURTH_X = 241;
+const SKILLBOOK_ICON_ROW3 = [204, 250];
 
 async function moveToX(driver, probes, targetX, tolerance = 70) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -202,20 +219,83 @@ async function selectPotion(driver, readSelection, target, y) {
     throw new Error(`Could not select potion ${target}; selected=${selected}`);
 }
 
+async function openSkillbook(driver, probes, requireState) {
+  if (await probes.skillbookActive() === 1) return;
+  await driver.key('k', 'KeyK', 75, 'k');
+  await sleep(400);
+  await requireState('skill book opened', async () =>
+    await probes.skillbookActive() === 1, 10);
+}
+
+async function closeSkillbook(driver, probes) {
+  if (await probes.skillbookActive() !== 1) return;
+  await driver.key('k', 'KeyK', 75, 'k');
+  await sleep(300);
+}
+
+async function dragSkillToBuffSlot(driver, probes, requireState, tabX, skillId, slot) {
+  await driver.click(tabX, SKILLBOOK_TAB_Y);
+  await sleep(350);
+  const x = await probes.petOptionsBuffSlotX(slot);
+  const y = await probes.petOptionsBuffSlotY(slot);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0)
+    throw new Error(`buff slot ${slot} unavailable: ${x},${y}`);
+  await driver.drag(SKILLBOOK_ICON_ROW3[0], SKILLBOOK_ICON_ROW3[1], x, y);
+  await sleep(350);
+  const stored = await probes.petAutoBuffSkill(slot);
+  if (stored !== skillId)
+    throw new Error(`buff slot ${slot} expected ${skillId}, got ${stored}`);
+  if (await probes.skillbookSelected() !== skillId)
+    throw new Error(`skill book selected mismatch after dragging ${skillId}`);
+  console.log(`PASS  buff slot ${slot} accepts skill ${skillId}`);
+}
+
+async function configureBuffs(driver, probes, requireState) {
+  await openSkillbook(driver, probes, requireState);
+  await dragSkillToBuffSlot(driver, probes, requireState,
+    SKILLBOOK_TAB_FIRST_X, IRON_BODY, 0);
+  await dragSkillToBuffSlot(driver, probes, requireState,
+    SKILLBOOK_TAB_FOURTH_X, MAPLE_WARRIOR, 1);
+  await requireState('two auto buff skills configured', async () =>
+    await probes.petAutoBuffCount() === 2, 10);
+
+  const slot0 = {
+    x: await probes.petOptionsBuffSlotX(0),
+    y: await probes.petOptionsBuffSlotY(0)
+  };
+  await driver.rightClick(slot0.x, slot0.y);
+  await sleep(300);
+  if (await probes.petAutoBuffSkill(0) !== 0)
+    throw new Error('right-click did not clear auto buff slot 0');
+  console.log('PASS  right-click clears an auto buff slot');
+  await dragSkillToBuffSlot(driver, probes, requireState,
+    SKILLBOOK_TAB_FIRST_X, IRON_BODY, 0);
+  await closeSkillbook(driver, probes);
+  return {
+    count: await probes.petAutoBuffCount(),
+    slots: [await probes.petAutoBuffSkill(0), await probes.petAutoBuffSkill(1)]
+  };
+}
+
 async function configureOptions(driver, probes, requireState, hpItem, mpItem, configure) {
   await openOptions(driver, probes, requireState);
   if (configure) {
-    await driver.click(489, 204);
-    await driver.click(489, 348);
-    await selectPotion(driver, probes.petOptionsHpItem, hpItem, 274);
-    await selectPotion(driver, probes.petOptionsMpItem, mpItem, 418);
+    await driver.click(...OPTIONS_HP_SLIDER);
+    await driver.click(...OPTIONS_MP_SLIDER);
+    await selectPotion(driver, probes.petOptionsHpItem, hpItem, OPTIONS_HP_POTION_Y);
+    await selectPotion(driver, probes.petOptionsMpItem, mpItem, OPTIONS_MP_POTION_Y);
+    await configureBuffs(driver, probes, requireState);
   }
   const selected = {
     hp: await probes.petOptionsHpItem(),
-    mp: await probes.petOptionsMpItem()
+    mp: await probes.petOptionsMpItem(),
+    buffs: {
+      count: await probes.petAutoBuffCount(),
+      slots: [await probes.petAutoBuffSkill(0), await probes.petAutoBuffSkill(1)]
+    }
   };
   await driver.screenshot('08g-pet-automation-options');
-  await driver.click(345, 516);
+  await driver.click(...OPTIONS_OK);
   await requireState('pet automation options saved and closed', async () =>
     await probes.petOptionsActive() === 0);
   return selected;
@@ -530,7 +610,9 @@ export async function verifyPetAutomationFlow(driver, probes, requireState, mode
     hpThreshold: await probes.petAutoHpThreshold(), mpThreshold: await probes.petAutoMpThreshold(),
     hpQuantity: await probes.inventoryQuantity(hpItem), mpQuantity: await probes.inventoryQuantity(mpItem),
     hp: await probes.playerHp(), maxHp: await probes.playerMaxHp(),
-    mp: await probes.playerMp(), maxMp: await probes.playerMaxMp()
+    mp: await probes.playerMp(), maxMp: await probes.playerMaxMp(),
+    buffCount: await probes.petAutoBuffCount(),
+    buffSkills: [await probes.petAutoBuffSkill(0), await probes.petAutoBuffSkill(1)]
   };
   if ((mode === 'configure' || mode === 'runtime') &&
       (configured.hpItem !== hpItem || configured.mpItem !== mpItem))
@@ -545,6 +627,24 @@ export async function verifyPetAutomationFlow(driver, probes, requireState, mode
     throw new Error(`Pet thresholds were not saved: ${JSON.stringify(configured)}`);
   if (mode === 'runtime' && (configured.hp <= 1 || configured.mp <= 1))
     throw new Error(`Pet auto recovery did not restore resources: ${JSON.stringify(configured)}`);
+  if (mode === 'configure' &&
+      (configured.buffCount !== 2 ||
+       configured.buffSkills[0] !== IRON_BODY ||
+       configured.buffSkills[1] !== MAPLE_WARRIOR))
+    throw new Error(`Pet auto buffs were not saved: ${JSON.stringify(configured)}`);
+  if (mode === 'runtime' &&
+      (configured.buffCount !== 2 ||
+       configured.buffSkills[0] !== IRON_BODY ||
+       configured.buffSkills[1] !== MAPLE_WARRIOR))
+    throw new Error(`Persisted pet auto buffs mismatch: ${JSON.stringify(configured)}`);
+  if (mode === 'runtime') {
+    if (await probes.petHungry() === 1) {
+      console.log('SKIP  auto buff cast check while the pet is hungry');
+    } else {
+      await requireState('pet auto buff cast without manual input', async () =>
+        await probes.petBuffActive(IRON_BODY) === 1, 30);
+    }
+  }
 
   const loot = mode === 'runtime' || mode === 'pickup'
     ? await verifyRuntimePickup(driver, probes)

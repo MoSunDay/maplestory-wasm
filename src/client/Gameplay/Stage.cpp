@@ -68,6 +68,8 @@ namespace jrc
         pet_settings::Thresholds thresholds = pet_settings::load();
         pet_automation.set_hp_threshold(thresholds.hp);
         pet_automation.set_mp_threshold(thresholds.mp);
+        pet_automation.set_food_item(pet_settings::load_food_item());
+        pet_automation.set_buff_skills(pet_settings::load_buff_skills());
     }
 
     void Stage::init()
@@ -337,15 +339,29 @@ namespace jrc
             return;
         }
 
+        const Inventory& inventory = player.get_inventory();
+        const bool hungry = is_pet_hungry();
+
+        // Feed the pet before the hunger strike check so a hungry pet is
+        // topped up automatically instead of staying on strike forever.
+        const int32_t food_item = pet_automation.get_food_item();
+        const int16_t food_slot = inventory.find_item(InventoryType::USE, food_item);
+        const int32_t feed_item = pet_automation.decide_feed({
+            true, hungry, food_slot > 0
+        });
+        if (feed_item > 0)
+            PetFoodPacket(food_slot, feed_item).dispatch();
+
         // A hungry pet goes on strike: it keeps following its owner but
-        // stops looting and auto-potting until it is fed.
-        if (is_pet_hungry())
+        // stops looting, auto-potting and auto-buffing until it is fed.
+        if (hungry)
         {
             clear_pet_loot_target(pet);
             return;
         }
 
-        const Inventory& inventory = player.get_inventory();
+        update_pet_buffs();
+
         const pet_capability::Capabilities capabilities = get_pet_capabilities();
         const CharStats& stats = player.get_stats();
         int16_t hp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_hp_item());
@@ -598,6 +614,42 @@ namespace jrc
     void Stage::set_pet_auto_mp_item(int32_t item_id)
     {
         pet_automation.set_mp_item(item_id);
+    }
+
+    void Stage::set_pet_food_item(int32_t item_id)
+    {
+        pet_automation.set_food_item(item_id);
+        pet_settings::save_food_item(item_id);
+    }
+
+    void Stage::set_pet_buff_skill(size_t slot, int32_t skill_id)
+    {
+        pet_automation.set_buff_skill(slot, skill_id);
+        pet_settings::save_buff_skill(slot, skill_id);
+    }
+
+    void Stage::update_pet_buffs()
+    {
+        const pet_automation::BuffSkillSlots& skills =
+            pet_automation.get_buff_skills();
+        const bool alive = !player.is_dead();
+        for (size_t slot = 0; slot < skills.size(); ++slot)
+        {
+            int32_t skill_id = skills[slot];
+            if (skill_id <= 0)
+                continue;
+
+            int32_t level = player.get_skilllevel(skill_id);
+            bool skill_ready = level > 0 && !player.has_cooldown(skill_id);
+            bool cast = pet_automation.decide_buff(slot, {
+                true,
+                alive,
+                player.has_skill_buff(skill_id),
+                skill_ready
+            });
+            if (cast)
+                UseSkillPacket(skill_id, level).dispatch();
+        }
     }
 
     bool Stage::set_pet_auto_thresholds(uint8_t hp, uint8_t mp)

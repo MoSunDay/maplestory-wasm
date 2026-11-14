@@ -107,6 +107,8 @@ namespace jrc
         void cancel_buff(Buffstat::Id stat);
         /// Return wether the buff is active.
         bool has_buff(Buffstat::Id stat) const;
+        /// Return whether an active buff was granted by the given skill.
+        bool has_skill_buff(int32_t skill_id) const;
 
         /// Change a skill.
         void change_skill(int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration);

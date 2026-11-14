@@ -148,8 +148,10 @@ int main(int argc, char** argv)
 
     const bool hp_on_cell = equipinv_nodes::pet_hp_pos() == cells[0][0];
     const bool mp_on_cell = equipinv_nodes::pet_mp_pos() == cells[0][1];
+    const bool food_on_cell = equipinv_nodes::pet_food_pos() == cells[0][2];
     expect(hp_on_cell, "auto HP socket is cell (0,0) top-left");
     expect(mp_on_cell, "auto MP socket is cell (1,0) top-left");
+    expect(food_on_cell, "pet food socket is cell (2,0) top-right");
 
     const auto abilities = equipinv_nodes::pet_ability_positions();
     bool abilities_ok = true;
@@ -168,6 +170,7 @@ int main(int argc, char** argv)
     // Hitboxes: 32px squares anchored at the socket corner.
     const auto hp_bounds = equipinv_nodes::pet_hp_bounds(window);
     const auto mp_bounds = equipinv_nodes::pet_mp_bounds(window);
+    const auto food_bounds = equipinv_nodes::pet_food_bounds(window);
     expect(hp_bounds.l() == abs[0][0].x() && hp_bounds.t() == abs[0][0].y()
         && hp_bounds.r() == abs[0][0].x() + 32
         && hp_bounds.b() == abs[0][0].y() + 32,
@@ -176,16 +179,26 @@ int main(int argc, char** argv)
         && mp_bounds.r() == abs[0][1].x() + 32
         && mp_bounds.b() == abs[0][1].y() + 32,
         "auto MP hitbox is the 32px cell (1,0)");
+    expect(food_bounds.l() == abs[0][2].x() && food_bounds.t() == abs[0][2].y()
+        && food_bounds.r() == abs[0][2].x() + 32
+        && food_bounds.b() == abs[0][2].y() + 32,
+        "pet food hitbox is the 32px cell (2,0)");
     expect(!hp_bounds.overlaps(mp_bounds), "HP and MP hitboxes are disjoint");
+    expect(!hp_bounds.overlaps(food_bounds) && !mp_bounds.overlaps(food_bounds),
+        "HP, MP and food hitboxes are disjoint");
 
     const Rectangle<int16_t> hp_cell(abs[0][0], abs[0][0] + Point<int16_t>(32, 32));
     const Rectangle<int16_t> mp_cell(abs[0][1], abs[0][1] + Point<int16_t>(32, 32));
+    const Rectangle<int16_t> food_cell(abs[0][2], abs[0][2] + Point<int16_t>(32, 32));
     expect(hp_cell.contains(Point<int16_t>(hp_bounds.l(), hp_bounds.t()))
         && hp_cell.contains(Point<int16_t>(hp_bounds.r(), hp_bounds.b())),
         "auto HP hitbox stays inside cell (0,0)");
     expect(mp_cell.contains(Point<int16_t>(mp_bounds.l(), mp_bounds.t()))
         && mp_cell.contains(Point<int16_t>(mp_bounds.r(), mp_bounds.b())),
         "auto MP hitbox stays inside cell (1,0)");
+    expect(food_cell.contains(Point<int16_t>(food_bounds.l(), food_bounds.t()))
+        && food_cell.contains(Point<int16_t>(food_bounds.r(), food_bounds.b())),
+        "pet food hitbox corners stay inside cell (2,0)");
 
     const std::array<int32_t, 5> ABILITY_ITEMS = {
         1812000, 1812001, 1812002, 1812003, 1812004
@@ -220,17 +233,20 @@ int main(int argc, char** argv)
     const auto target_at = [&](Point<int16_t> point) {
         return equipinv_nodes::pet_hp_bounds(window).contains(point) ? 1
              : equipinv_nodes::pet_mp_bounds(window).contains(point) ? 2
+             : equipinv_nodes::pet_food_bounds(window).contains(point) ? 3
              : 0;
     };
     const int hp_target = target_at(abs[0][0] + Point<int16_t>(16, 16));
     const int mp_target = target_at(abs[0][1] + Point<int16_t>(16, 16));
+    const int food_target = target_at(abs[0][2] + Point<int16_t>(16, 16));
     bool empty_targets = true;
-    for (const auto& cell : { abs[0][2], abs[1][0], abs[1][1], abs[1][2],
+    for (const auto& cell : { abs[1][0], abs[1][1], abs[1][2],
              abs[2][0], abs[2][1], abs[2][2] })
         empty_targets &= target_at(cell + Point<int16_t>(16, 16)) == 0;
-    expect(hp_target == 1 && mp_target == 2,
-        "cell centres resolve to HP / MP drops");
-    expect(empty_targets, "the other seven cell centres are not potion targets");
+    expect(hp_target == 1 && mp_target == 2 && food_target == 3,
+        "cell centres resolve to HP / MP / food drops");
+    expect(empty_targets,
+        "the six ability/empty cell centres are not consumable targets");
 
     expect(inside(Point<int16_t>(hp_bounds.l(), hp_bounds.t()), abs[0][0], 33, 33)
         && inside(Point<int16_t>(hp_bounds.r(), hp_bounds.b()), abs[0][0], 33, 33),
