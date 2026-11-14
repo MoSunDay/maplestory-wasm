@@ -61,6 +61,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 - **[任务日志窗口](changelog/2026-10-25/quest-log-window.md)**: Q 键或状态栏菜单打开的 In Progress/Completed 双页任务列表（双代 UI.nx 素材自动适配），实时反映服务端任务状态：放弃、进度数据更新、完成与过期；任务相关的道具特效与状态提示同步接入
 - **[任务系统接取/完成闭环](changelog/2026-11-08/quest-system-restore.md)**: 客户端驱动的任务全链路——QUEST_ACTION 1/2/4/5 出站封包（接取/完成/脚本接取/脚本交付）、Check.img 可用性判定（lvmin/前置/可重复/击杀与物品进度）、Say.img 任务对话滚动框（文本已从服务端 wz XML 回填，15,103 节点）、无脚本 NPC 的 600ms 兜底触发（服务端脚本/商店优先零冲突）、任务完成链与失败原因的玩家可见提示
+- **[任务系统加固](changelog/2026-11-14/quest-system-hardening.md)**: 任务链收尾——UPDATE_QUEST_INFO mode-8 双变体区分（接取不再误弹完成提示）、0x0A–0x0E 失败原因玩家可见、Check.img 全量判定（lvmin/lvmax/职业/meso/精确前置状态/重复冷却）、任务计时器与日志倒计时、选一奖励（Act.img prop=-1）图标格与 `selection` 上行、NPC conditionN 姿态/隐藏；服务端补丁 0020 补齐接取失败反馈/选择奖励 NPE/缺脚本降级/条件失败封包，并以 e2e 验证接取→选奖励完成→拒绝全链路
 - **新版本地图数据源 gate**: 252/262/271-273/300-305 等新版本地图区段在现有 079 wz 数据源中不存在，注入整体暂缓（[结论记录](changelog/2026-10-25/new-era-maps-gate.md)），不阻塞任务 UI 与玩法枢纽
 
 ### 战斗系统
