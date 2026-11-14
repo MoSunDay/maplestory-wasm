@@ -200,6 +200,13 @@ namespace jrc
         /// the map.
         void drop_stashed(SummonPool& pool, int32_t owner_cid);
 
+        /// Cancel every stashed SPAWN/MOVE of one summon oid, e.g. when its
+        /// REMOVE arrives while the owner is still queued in MapChars. Ids
+        /// only: the live entity is never touched, and an owner left with no
+        /// events is erased.
+        void drop_stashed_oid(SummonPool& pool, int32_t owner_cid,
+            int32_t oid);
+
         /// Number of tracked summons, dying ones included.
         size_t size(const SummonPool& pool);
 

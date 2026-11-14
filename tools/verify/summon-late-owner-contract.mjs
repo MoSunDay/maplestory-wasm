@@ -90,9 +90,10 @@ assert.ok(poolStruct.includes("pending_events"),
 // C. SummonPool.cpp — override, cap, replay and drop semantics.
 // ---------------------------------------------------------------------------
 const poolSource = readSource("src/client/Gameplay/Summon/SummonPool.cpp");
+const stashSource = readSource("src/client/Gameplay/Summon/SummonStash.cpp");
 
 const stashFn = sliceBetween(
-  poolSource,
+  stashSource,
   "void stash_event(",
   "void replay_stashed("
 );
@@ -108,7 +109,7 @@ assert.ok(stashFn.includes("events.erase(events.begin())"),
   "stash_event must drop the oldest event when the cap is exceeded");
 
 const replayFn = sliceBetween(
-  poolSource,
+  stashSource,
   "void replay_stashed(",
   "void drop_stashed("
 );
@@ -122,18 +123,28 @@ assert.ok(replayFn.includes("pending_events.erase(iter)"),
 const clearFn = sliceBetween(
   poolSource,
   "void clear(SummonPool& pool)",
-  "void stash_event("
+  "size_t size("
 );
 assert.ok(clearFn.includes("pending_events.clear()"),
   "clear must also drop the stashed events (map change drops the stash)");
 
 const dropFn = sliceBetween(
-  poolSource,
+  stashSource,
   "void drop_stashed(",
-  "size_t size("
+  "void drop_stashed_oid("
 );
 assert.ok(dropFn.includes("pending_events.erase(owner_cid)"),
   "drop_stashed must erase the owner's stash by cid");
+
+const dropOidFn = sliceFrom(stashSource, "void drop_stashed_oid(");
+assert.ok(dropOidFn.includes("std::remove_if"),
+  "drop_stashed_oid must filter the owner's events with std::remove_if");
+assert.ok(dropOidFn.includes("entry.oid == oid"),
+  "drop_stashed_oid must cancel only the events of the removed oid");
+assert.ok(dropOidFn.includes("events.empty()"),
+  "drop_stashed_oid must detect an owner left without events");
+assert.ok(dropOidFn.includes("pending_events.erase(owner)"),
+  "drop_stashed_oid must erase an owner whose stash became empty");
 
 // ---------------------------------------------------------------------------
 // D. Stage + RemoveCharHandler — replay after instantiation, drop on leave.
@@ -174,4 +185,34 @@ const publicSection = sliceBetween(mapCharsHeader, "public:", "private:");
 assert.ok(publicSection.includes("has_pending_spawn"),
   "has_pending_spawn must live in the public section (needed by summon handlers)");
 
-console.log("PASS summon late-owner stash source contract (owner-late SPAWN/MOVE replay, same-kind override, cap 4, clear-on-leave)");
+// ---------------------------------------------------------------------------
+// F. RemoveSummonHandler — a REMOVE racing the owner's spawn cancels the
+//    stashed SPAWN/MOVE so the replay cannot resurrect the summon.
+// ---------------------------------------------------------------------------
+const removeSummon = sliceBetween(
+  handlers,
+  "void RemoveSummonHandler::handle",
+  "void MoveSummonHandler::handle"
+);
+assert.ok(removeSummon.includes("switch (owner_state(payload.owner_cid))"),
+  "RemoveSummonHandler must dispatch on the three-state owner gate");
+assert.ok(removeSummon.includes("case OwnerState::PENDING:"),
+  "RemoveSummonHandler must special-case a queued owner");
+assert.ok(removeSummon.includes("summon::drop_stashed_oid("),
+  "RemoveSummonHandler must cancel the queued owner's stashed events");
+assert.ok(removeSummon.includes("payload.owner_cid"),
+  "drop_stashed_oid must be called with the packet's owner cid");
+assert.ok(removeSummon.includes("payload.oid"),
+  "drop_stashed_oid must be called with the packet's summon oid");
+assert.ok(removeSummon.includes("case OwnerState::GONE:"),
+  "RemoveSummonHandler must keep the GONE early exit");
+assert.ok(removeSummon.includes("return;"),
+  "RemoveSummonHandler must return early for GONE (owner never visible)");
+assert.equal(occurrences(removeSummon, "summon::remove("), 1,
+  "RemoveSummonHandler must keep exactly one idempotent live remove");
+const dropAt = removeSummon.indexOf("summon::drop_stashed_oid(");
+const removeLiveAt = removeSummon.indexOf("summon::remove(");
+assert.ok(dropAt >= 0 && removeLiveAt > dropAt,
+  "the stash must be cancelled before the idempotent live remove fallback");
+
+console.log("PASS summon late-owner stash source contract (owner-late SPAWN/MOVE replay, same-kind override, cap 4, clear-on-leave, remove-cancels-stash)");

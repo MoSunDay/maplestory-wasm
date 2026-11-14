@@ -112,6 +112,27 @@ namespace jrc
     {
         const summon_packets::RemovePayload payload =
             summon_packets::parse_remove(recv);
+        switch (owner_state(payload.owner_cid))
+        {
+            case OwnerState::PRESENT:
+                // The owner is visible, so its stash was replayed on an
+                // earlier update; only the live entity needs removing.
+                break;
+            case OwnerState::PENDING:
+                // The owner is still queued, so its SPAWN/MOVE may sit in
+                // the stash: cancel them before they can be replayed and
+                // resurrect a summon the server already removed.
+                summon::drop_stashed_oid(
+                    Stage::get().get_summons(), payload.owner_cid,
+                    payload.oid);
+                break;
+            case OwnerState::GONE:
+                // The owner never became visible; RemoveCharHandler clears
+                // the stash on leave, so there is nothing left to undo.
+                return;
+        }
+
+        // Idempotent fallback: no-op when the entity does not exist yet.
         summon::remove(
             Stage::get().get_summons(), payload.oid, payload.animated);
     }
