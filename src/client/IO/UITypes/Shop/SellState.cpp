@@ -38,17 +38,17 @@ namespace jrc
 
     void UIShop::SellItem::draw(Point<int16_t> pos) const
     {
-        icon.draw(pos + Point<int16_t>(0, 32));
+        icon.draw(pos + shop_nodes::icon_offset());
         if (showcount)
         {
             static const Charset countset = {
                 nl::nx::ui["Basic.img"]["ItemNo"], Charset::LEFT
             };
-            countset.draw(std::to_string(sellable), pos + Point<int16_t>(0, 20));
+            countset.draw(std::to_string(sellable), pos + shop_nodes::count_offset());
         }
-        namelabel.draw(pos + Point<int16_t>(40, -1));
-        currency.draw(pos + Point<int16_t>(38, 20));
-        pricelabel.draw(pos + Point<int16_t>(53, 17));
+        namelabel.draw(pos + shop_nodes::name_offset());
+        currency.draw(pos + shop_nodes::currency_offset());
+        pricelabel.draw(pos + shop_nodes::price_offset());
     }
 
     int32_t UIShop::SellItem::get_id() const

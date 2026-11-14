@@ -158,7 +158,10 @@ namespace jrc
         sellstate.draw(position, selection);
 
         buyslider.draw(position);
-        sellslider.draw(position);
+        if (shop_nodes::sell_slider_visible())
+        {
+            sellslider.draw(position);
+        }
     }
 
     void UIShop::update()
@@ -247,7 +250,7 @@ namespace jrc
             return true;
         }
 
-        if (sellslider.remove_cursor(clicked))
+        if (shop_nodes::sell_slider_visible() && sellslider.remove_cursor(clicked))
         {
             return true;
         }
@@ -270,7 +273,7 @@ namespace jrc
             }
         }
 
-        if (sellslider.isenabled())
+        if (shop_nodes::sell_slider_visible() && sellslider.isenabled())
         {
             Cursor::State sstate = sellslider.send_cursor(cursoroffset, clicked);
             if (sstate != Cursor::IDLE)
@@ -310,7 +313,7 @@ namespace jrc
     {
         int16_t xoff = last_cursor_pos.x();
         int16_t yoff = last_cursor_pos.y();
-        if (yoff < 115 || yoff > 308)
+        if (yoff < shop_nodes::scroll_y_min() || yoff > shop_nodes::scroll_y_max())
         {
             return;
         }
@@ -335,7 +338,7 @@ namespace jrc
             return;
         }
 
-        if (cursoroffset.x() > 241 && cursoroffset.x() < 443)
+        if (shop_nodes::cursor_over_sell_list(cursoroffset.x()))
         {
             clear_tooltip();
             buystate.selection = -1;
@@ -462,7 +465,10 @@ namespace jrc
     {
         if (row < 0 || row >= 5)
             return { -32768, -32768 };
-        return position + Point<int16_t>(108, static_cast<int16_t>(134 + 42 * row));
+        return position + shop_nodes::buy_itempos(row)
+            + Point<int16_t>(
+                static_cast<int16_t>(shop_nodes::row_width() / 2),
+                static_cast<int16_t>(shop_nodes::row_height() / 2));
     }
 
     int32_t UIShop::visible_sell_item(int16_t row) const
@@ -598,22 +604,10 @@ namespace jrc
 
     void UIShop::BuyItem::draw(Point<int16_t> pos) const
     {
-        if (shop_nodes::post_chaos())
-        {
-            icon.draw(pos + Point<int16_t>(0, 32));
-            namelabel.draw(pos + Point<int16_t>(40, -1));
-            currency.draw(pos + Point<int16_t>(38, 20));
-            pricelabel.draw(pos + Point<int16_t>(53, 17));
-        }
-        else
-        {
-            // v83 rows are 35px tall with the icon slot flush at the row
-            // origin and origin-less item icons.
-            icon.draw(pos + Point<int16_t>(2, 2));
-            namelabel.draw(pos + Point<int16_t>(38, 1));
-            currency.draw(pos + Point<int16_t>(36, 20));
-            pricelabel.draw(pos + Point<int16_t>(51, 18));
-        }
+        icon.draw(pos + shop_nodes::icon_offset());
+        namelabel.draw(pos + shop_nodes::name_offset());
+        currency.draw(pos + shop_nodes::currency_offset());
+        pricelabel.draw(pos + shop_nodes::price_offset());
     }
 
     int32_t UIShop::BuyItem::get_id() const

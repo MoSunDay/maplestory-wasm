@@ -5,18 +5,23 @@
 // (260000000) 的武器店老板 NPC 2100002（x≈1052，2100002.js 直接
 // openShopNPC→sendShop），并把 e2e 角色迁到该地图走过去交易。
 //
-// 前置（操作者执行，凭据不入代码仓库）：
+// 前置（操作者执行，凭据不入代码仓库；自增 id 随 DB 重建漂移，按名取）：
 //   mysql ... maplestory <<'SQL'
-//     UPDATE characters SET map=260000000 WHERE id=5;  -- e2eaccept1(card0)
-//     DELETE FROM inventoryitems WHERE characterid=5 AND inventorytype=2
-//       AND itemid=2000000;
+//     SET @cid := (SELECT c.id FROM characters c
+//       JOIN accounts a ON a.id = c.accountid
+//       WHERE c.name = 'test1Hero' AND a.name = 'test1' LIMIT 1);
+//     UPDATE characters SET map = 260000000, spawnpoint = 0 WHERE id = @cid;
+//     UPDATE inventoryitems SET position = position + 1
+//       WHERE characterid = @cid AND inventorytype = 2 AND position >= 1;
 //     INSERT INTO inventoryitems (type, characterid, accountid, itemid,
 //         inventorytype, position, quantity, owner, petid, flag, expiration,
 //         giftFrom)
-//       VALUES (1, 5, 25, 2000000, 2, 1, 37, '', -1, 0, -1, '');
+//       VALUES (1, @cid, (SELECT accountid FROM characters WHERE id = @cid),
+//               2000000, 2, 1, 37, '', -1, 0, -1, '');
 //   SQL
-// 运行：E2E_NPC_SHOP=1 CHROME_BIN=/usr/bin/chromium-browser node run.mjs
-//   （run.mjs 以 card0=e2eaccept1 进图后转入本流程）
+// 运行：E2E_NPC_SHOP=1 E2E_CREATE_CHARACTER=0
+//   CHROME_BIN=/usr/bin/chromium-browser node run.mjs
+//   （run.mjs 以 test1/test1 登录既有角色 test1Hero 后转入本流程）
 //
 // 断言：入图 260000000 → 右行至 NPC → 双击 → msshop_active → USE 页签
 // （截图留档：SellState 图标列/文本列错位的上游行为证据）→ row0 选中 →
