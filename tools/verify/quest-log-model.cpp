@@ -256,6 +256,56 @@ int main(int argc, char** argv)
     check(plain.is_started(20000),
         "repeated id without a distinct parent stays started");
 
+    // Insertion-order pairing: 10331 and 10332 both carry infoNumber
+    // 10330 (Check.img). Starting 10332 first and 10331 second must pair
+    // the trailing info entry with the most recently STARTED parent
+    // (10331), not the highest id (the old key-sorted heuristic).
+    Questlog insert_order;
+    insert_order.add_started(10332, "");
+    insert_order.add_started(10331, "");
+    insert_order.add_questlog_entry(10330, "000");
+    check(insert_order.list_in_progress().count(10331) == 1
+        && insert_order.list_in_progress().at(10331).first == 10330,
+        "info entry pairs with the most recently started parent");
+    check(insert_order.is_started(10332),
+        "the earlier-started sibling keeps its own started row");
+
+    // Reverse insertion flips the pairing: the newest start wins even
+    // though its id sorts last.
+    Questlog insert_order_rev;
+    insert_order_rev.add_started(10331, "");
+    insert_order_rev.add_started(10332, "");
+    insert_order_rev.add_questlog_entry(10330, "000");
+    check(insert_order_rev.list_in_progress().count(10332) == 1
+        && insert_order_rev.list_in_progress().at(10332).first == 10330,
+        "info entry follows the later start even for a larger id");
+
+    // Multi-slot forfeit guard: two different info numbers must both stay
+    // suppressed (the old single-slot guard let the first echo through).
+    Questlog multi_forfeit;
+    multi_forfeit.forfeit(10331); // infoNumber 10330
+    multi_forfeit.forfeit(10037); // infoNumber 10041
+    multi_forfeit.update_data(10330, "echo");
+    multi_forfeit.update_data(10041, "echo");
+    check(!multi_forfeit.is_started(10330)
+        && !multi_forfeit.is_started(10041)
+        && multi_forfeit.list_in_progress().empty(),
+        "every forfeited info number suppresses its trailing echo");
+
+    // Timers: deadline storage, removal and forfeit cleanup.
+    Questlog timed;
+    timed.add_timer(1000, 60000);
+    const int64_t remaining = timed.timer_remaining_ms(1000);
+    check(remaining > 0 && remaining <= 60000,
+        "add_timer stores a ticking deadline");
+    timed.remove_timer(1000);
+    check(timed.timer_remaining_ms(1000) == -1,
+        "remove_timer clears the deadline");
+    timed.add_timer(1001, 60000);
+    timed.forfeit(1001);
+    check(timed.timer_remaining_ms(1001) == -1,
+        "forfeit clears the quest timer");
+
     if (failures == 0)
     {
         std::cout << "ALL CHECKS PASSED\n";

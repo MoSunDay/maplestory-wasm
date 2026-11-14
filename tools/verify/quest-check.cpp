@@ -1,6 +1,7 @@
 // Standalone verifier for the QuestCheck module: the Check.img reverse
-// npc index, the script/autoStart/interval flags, QuestInfo names, and the
-// accept/deliver offer resolution (mob progress decoding plus item stubs)
+// npc index, the script/autoStart/interval flags, QuestInfo names, the
+// lvmin/lvmax/job/quest-state/interval accept gates, and the accept/deliver
+// offer resolution (mob progress decoding plus item stubs)
 // against the shipped Quest.nx. Data facts cross-checked with
 // link_repos/MapleStory-Server/wz/Quest.wz/Check.img.xml and QuestInfo.img.xml.
 //
@@ -188,6 +189,94 @@ int main(int argc, char** argv)
     found = jrc::quest_offer_at(12100, closed, novice, offer);
     check(!found || !offer.completing,
         "completed quest is not offered for delivery");
+
+    // --- level ceiling: Check/0/lvmax (quest 1201, npc 9020000,
+    // lvmin 21 / lvmax 30, no job/prereq gates). ---
+    jrc::QuestCheckContext in_band;
+    in_band.level = 25;
+    in_band.item_count = novice.item_count;
+    found = jrc::quest_offer_at(9020000, empty, in_band, offer);
+    check(same_offer(found, offer, 1201, false, false),
+        "quest 1201 is offered inside its lvmin..lvmax band");
+
+    jrc::QuestCheckContext over_band = in_band;
+    over_band.level = 31;
+    found = jrc::quest_offer_at(9020000, empty, over_band, offer);
+    check(!found, "quest 1201 is hidden above lvmax 30");
+
+    jrc::QuestCheckContext under_band = in_band;
+    under_band.level = 20;
+    found = jrc::quest_offer_at(9020000, empty, under_band, offer);
+    check(!found, "quest 1201 is hidden below lvmin 21");
+
+    // --- job gate: Check/0/job (quest 20010, npc 1102004, jobs [1000],
+    // lvmax 10, startscript -> scripted offer). ---
+    jrc::QuestCheckContext warrior;
+    warrior.level = 10;
+    warrior.job = 1000;
+    warrior.item_count = novice.item_count;
+    found = jrc::quest_offer_at(1102004, empty, warrior, offer);
+    check(same_offer(found, offer, 20010, false, true),
+        "quest 20010 is offered to a level-10 job-1000 character");
+
+    jrc::QuestCheckContext mage = warrior;
+    mage.job = 200;
+    found = jrc::quest_offer_at(1102004, empty, mage, offer);
+    check(!found, "quest 20010 is hidden from another job family");
+
+    jrc::QuestCheckContext over_job_cap = warrior;
+    over_job_cap.level = 11;
+    found = jrc::quest_offer_at(1102004, empty, over_job_cap, offer);
+    check(!found, "quest 20010 lvmax 10 also gates the upper bound");
+
+    // --- quest-state prerequisite: Check/0/quest id+state
+    // (quest 4014, npc 9330028, requires 4013 in state 1 = STARTED;
+    // quest 1001 requires 1000 in state 2 = COMPLETED). ---
+    found = jrc::quest_offer_at(9330028, empty, novice, offer);
+    check(!found, "quest 4014 needs quest 4013 in the STARTED state");
+
+    Questlog ref_started;
+    ref_started.add_started(4013, "");
+    found = jrc::quest_offer_at(9330028, ref_started, novice, offer);
+    check(same_offer(found, offer, 4014, false, false),
+        "quest 4014 unlocks while quest 4013 is started");
+
+    Questlog ref_done;
+    ref_done.add_completed(4013, 1);
+    found = jrc::quest_offer_at(9330028, ref_done, novice, offer);
+    check(!found, "a completed prerequisite does not satisfy state 1");
+
+    Questlog done_1000;
+    done_1000.add_completed(1000, 1);
+    found = jrc::quest_offer_at(2100, done_1000, novice, offer);
+    check(same_offer(found, offer, 1001, false, false),
+        "quest 1001 unlocks once quest 1000 is completed (state 2)");
+
+    // --- interval cooldown: Check/0/interval minutes since completion
+    // (quest 3205, npc 2040023, lvmin 20, interval 1440). ---
+    const int64_t wall_now = 1800000000000LL;
+    jrc::QuestCheckContext timed;
+    timed.level = 25;
+    timed.now_ms = wall_now;
+    timed.item_count = novice.item_count;
+
+    Questlog recent;
+    recent.add_completed(3205, wall_now - 60LL * 60LL * 1000LL);
+    found = jrc::quest_offer_at(2040023, recent, timed, offer);
+    check(!found, "quest 3205 stays locked inside its 1440min interval");
+
+    Questlog elapsed;
+    elapsed.add_completed(3205, wall_now - 25LL * 60LL * 60LL * 1000LL);
+    found = jrc::quest_offer_at(2040023, elapsed, timed, offer);
+    check(same_offer(found, offer, 3205, false, false),
+        "quest 3205 is re-offered after the interval elapsed");
+
+    jrc::QuestCheckContext no_clock = timed;
+    no_clock.now_ms = 0;
+    found = jrc::quest_offer_at(2040023, recent, no_clock, offer);
+    check(found && offer.quest_id == 3205,
+        "without a wall clock the interval gate stays open (server "
+        "remains authoritative)");
 
     if (failures == 0)
     {
