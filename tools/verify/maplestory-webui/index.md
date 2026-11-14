@@ -335,36 +335,46 @@ CHROME_BIN=/usr/bin/chromium-browser node tools/verify/maplestory-webui/gohome-f
 
 ## 自由市场服务 NPC（佩里传送 / 科皮商店）
 
-`fm-service-npcs.mjs` 验证 910000000 新增的两个服务 NPC（服务端 life
-index 4/5）：从 sp 出生后走到 x≈300 打开佩里 9110000 的主菜单，
+`fm-service-npcs.mjs` 验证 910000000 的两个服务 NPC（佩里 life index 2、
+科皮 life index 3）：从 sp 出生后走到 x≈300 打开佩里 9110000 的主菜单，
 点击首分类进入维多利亚子菜单，确认文本含「维多利亚」；Escape 关闭后
 走到 x≈600 打开科皮 9201116 的商店（shopid 1339），断言可见行含
 飞镖/子弹/药水等本店物品，并真实点击购买宠物饲料 2120000 或回城石 2030000，
-库存 +1；最后再次打开佩里，选维多利亚→射手村，断言 warp 到
-100000000。
+库存 +1；最后再次打开佩里，选维多利亚→射手村，断言 warp 到 100000000。
+
+`FM_SERVICE_DEST` 可改测佩里「东方都市与海外」第三分类的海外目的地：
+`thai`（500000000 水上市场，NEXT×4）、`shanghai`（701000000 上海外滩，
+NEXT×8）、`shaolin`（702000000 嵩山镇，NEXT×9）、`shaolin-hall`
+（702100000 大雄宝殿，NEXT×10）；默认 `henesys`，也可用 `ant-park`
+（105070001 蚂蚁广场，NEXT×6）。海外目的地先进入第三分类，再用
+NEXT/PREV 循环移动 selected（只移动不发包）后点 OK 提交；脚本会等待
+服务端回包后的对话变化/关闭，避免读取旧 prompt 的竞态。
 
 对话选项由脚本从 y=140 起逐行物理点击，命中首项（默认 selected=0）
-即确认。运行前需重置测试角色：
+即确认。运行前需重置测试角色（card0 为 test2ILA，character id=281）：
 
 ```sql
 update accounts set loggedin=0 where name='test2';
-update characters set map=910000000, spawnpoint=0 where id=219;
+update characters set map=910000000, spawnpoint=0 where id=281;
 ```
 
+与其他 e2e 并发时改用独立账号 fmflow1/fmflow1（character id=129，
+world=4）并设置 `FM_SERVICE_DEBUG_PORT=9266`，避免同账号登录互踢。
+
 ```bash
-CHROME_BIN=/usr/bin/chromium-browser \
+FM_SERVICE_DEST=thai CHROME_BIN=/usr/bin/chromium-browser \
 node tools/verify/maplestory-webui/fm-service-npcs.mjs
 ```
 
 环境变量：`FM_SERVICE_ACCOUNT/PASSWORD/CARD/URL/DEBUG_PORT`（默认
-test2/test2、卡 0、本地 8000、9255）；产物在
-`/tmp/maplestory-webui-*/`（perry-main、victoria、kopee-shop、
-henesys 截图 + browser-console.log）。
+test2/test2、卡 0、本地 8000、9255）与 `FM_SERVICE_DEST`（默认
+henesys）；产物在 `/tmp/maplestory-webui-*/`（perry-main、victoria、
+kopee-shop、fm-service-<dest> 截图 + browser-console.log）。
 
 ## 自由市场玩法向导（PQ 招募 / BOSS 入口传送）
 
-`fm-gameplay-guides.mjs` 验证 910000000 新增的两个向导 NPC（服务端 life
-index 6/7）：从 sp 出生后走到 x≈850 打开 9010000「玩法向导」的组队任务
+`fm-gameplay-guides.mjs` 验证 910000000 的两个向导 NPC（服务端 life
+index 4/5）：从 sp 出生后走到 x≈850 打开 9010000「玩法向导」的组队任务
 招募菜单，断言提示含「玩法向导」与「组队任务」；Escape 关闭后走到
 x≈1150 打开 9010005「BOSS 向导」的入口菜单，断言提示含「BOSS 向导」与
 「入口」；随后点击首选项「扎昆入口(50级+)」——211042300 不在脚本的
@@ -377,8 +387,10 @@ NPC 脚本为 `scripts/npc/9010000.js` / `9010005.js`（支持热更新），对
 
 ```sql
 update accounts set loggedin=0 where name='test2';
-update characters set map=910000000, spawnpoint=0 where id=219;
+update characters set map=910000000, spawnpoint=0 where id=281;
 ```
+
+test2 的 card0 是 test2ILA（281, accountid 128）。
 
 ```bash
 CHROME_BIN=/usr/bin/chromium-browser \

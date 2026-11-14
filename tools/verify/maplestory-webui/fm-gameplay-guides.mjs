@@ -1,23 +1,23 @@
 // 自由市场(910000000) 新增两个玩法向导 NPC 的端到端验证。
 //
-//   * 9010000「玩法向导」x=850（wz life index 6）：Space 打开组队任务(PQ)
+//   * 9010000「玩法向导」x=850（wz life index 4）：Space 打开组队任务(PQ)
 //     招募菜单，断言提示含「玩法向导」与「组队任务」，Escape 关闭。
-//   * 9010005「BOSS 向导」x=1150（wz life index 7）：Space 打开 BOSS 入口
+//   * 9010005「BOSS 向导」x=1150（wz life index 5）：Space 打开 BOSS 入口
 //     菜单，断言提示含「BOSS 向导」与「入口」；点击首选项「扎昆入口(50级+)」
 //     对应 211042300，不在脚本的 DANGEROUS_MAPS 危险名单内 → 单击直接
 //     cm.warp 落图、对话关闭，断言 msmap_id === 211042300。
 //
 // NPC 脚本为 scripts/npc/9010000.js / 9010005.js（服务端支持热更新），life
 // 注入位于 wz/Map.wz/Map/Map9/910000000.img.xml 的 <imgdir name="life">
-// index 6/7。对话选项是真实鼠标点击：UINpcTalk 的 SELECTION 模式默认
+// index 4/5。对话选项是真实鼠标点击：UINpcTalk 的 SELECTION 模式默认
 // selected=0，点中首行会发送 selection(type, 首项 id)。
 //
 // 前置（操作者执行，凭据不入代码仓库）：
 //   update accounts set loggedin=0 where name='test2';
-//   update characters set map=910000000, spawnpoint=0 where id=219;
-//   test2 的 card0 是 test2ILA（character id=219, accountid=64）。
-//   keymap 需有 Space/Alt/Ctrl/Q（本机已写入 57→5/54、56→5/53、29→5/52、
-//   16(Q)→4/8。注意：keymap 的 `key` 列是客户端 Keytable 的 MS 扫描码
+//   update characters set map=910000000, spawnpoint=0 where id=281;
+//   test2 的 card0 是 test2ILA（character id=281, accountid=128）。
+//   keymap：281 已有 13 条 keymap（57→5/54、56→5/53、29→5/52、16→4/8）。
+//   注意：keymap 的 `key` 列是客户端 Keytable 的 MS 扫描码
 //   下标（Q=16，GLFW 键码 81 对应的是 PAGE_DOWN 槽位），而客户端
 //   KeyType 枚举 MENU=4/ACTION=5——打开任务日志必须用 MENU 类型，
 //   ACTION/8 不会触发任何分支）。

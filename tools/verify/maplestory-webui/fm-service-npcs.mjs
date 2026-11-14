@@ -3,32 +3,40 @@
 //   * 9110000「佩里 / 次元空间的帮手」x=300：Space 开传送菜单 →
 //     第一分类「维多利亚岛及周边」→ 第一目的地 100000000（射手村）→
 //     cm.warp 落图。菜单选项用默认选中项 0，通过点击首行选项直接确认。
+//     海外目的地（FM_SERVICE_DEST=thai/shanghai/shaolin/shaolin-hall）走
+//     第三分类「东方都市与海外」，用循环按钮移动 selected 后点 OK，再等
+//     服务端回包（OK 只发包，新对话晚一拍到达）。
 //   * 9201116「Kopee Relicseeker」x=600：Space 开商店（服务端 shops.shopid=1339），
 //     断言 msshop_buy_item 至少 2 行命中本店物品，并买下宠物饲料 2120000/回城石 2030000
 //     之一（价格 200/400 mesos，库存数量 +1）。
 //
 // 客户端不读 Map.nx 的 life，NPC 全部由服务端 SPAWN_NPC 包生成；两条 life
-// 位于 wz/Map.wz/Map/Map9/910000000.img.xml 的 index 4/5，商店数据位于
+// 位于 wz/Map.wz/Map/Map9/910000000.img.xml 的 index 2/3，商店数据位于
 // sql/custom_fm_service_npcs.sql。对话选项是真实鼠标点击：UINpcTalk 的
 // SELECTION 模式默认 selected=0，点中首行会发送 selection(type, 首项 id)。
 //
 // testWarp 的目的地由 FM_SERVICE_DEST 选择：henesys（默认，首项 射手村
 // 100000000，点首行选项直接确认）或 ant-park（第 7 项 蚂蚁广场 105070001）。
-// 维多利亚子菜单共 12 项（index 11 为「返回主菜单」），按钮 NEXT/PREV 只循环
-// 移动 selected 不发包，OK 才发送 selections[selected]；从 selected=0 出发
-// ±6 ≡ 6 (mod 12)，NEXT×6 与 PREV×6 同落 index 6，故实测第 7 项时不依赖
-// 按钮方向（按钮几何经 msnpctalk_button_field/element_field 探针直读）。
+// 子菜单最后一项固定是「返回主菜单」（selections 里为 99），所以地图行号即
+// CATEGORY_MAPS 下标。按钮 NEXT/PREV 只循环移动 selected 不发包，OK 才发送
+// selections[selected]；从 selected=0 出发 NEXT×n 落 index n（按钮几何经
+// msnpctalk_button_field/element_field 探针直读）。海外分类共 13 张图 + 返回，
+// index：泰国 500000000=4、上海 701000000=8、嵩山 702000000=9、大雄宝殿
+// 702100000=10。
 //
 // 前置（操作者执行，凭据不入代码仓库）：
 //   update accounts set loggedin=0 where name='test2';
-//   update characters set map=910000000, spawnpoint=0 where id=219;
-//   test2 的 card0 是 test2ILA（character id=219, accountid=64）。
+//   update characters set map=910000000, spawnpoint=0 where id=281;
+//   test2 的 card0 是 test2ILA（character id=281, accountid=128）。
+//   与其他 e2e 并发时改用独立账号（如 fmflow1/fmflow1, character id=129）
+//   和 FM_SERVICE_DEBUG_PORT，避免同账号登录互踢。
 //   keymap 需有 Space/Alt/Ctrl（本机已写入 57→5/54、56→5/53、29→5/52）。
 // 运行：
 //   FM_SERVICE_ACCOUNT=test2 FM_SERVICE_PASSWORD=test2 \
 //   FM_SERVICE_CARD=0 CHROME_BIN=/usr/bin/chromium-browser \
 //   node tools/verify/maplestory-webui/fm-service-npcs.mjs
 //   # 实测蚂蚁广场：上面再追加 FM_SERVICE_DEST=ant-park
+//   # 实测东方神州/泰国：FM_SERVICE_DEST=thai|shanghai|shaolin|shaolin-hall
 
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
@@ -40,11 +48,15 @@ const account = process.env.FM_SERVICE_ACCOUNT || 'test2';
 const password = process.env.FM_SERVICE_PASSWORD || 'test2';
 const cardIndex = Number(process.env.FM_SERVICE_CARD ?? 0);
 
-// testWarp 目的地配置：optionIndex 是维多利亚子菜单的选项序号（0 起）。
+// testWarp 目的地配置：optionIndex 是所属子菜单的选项序号（0 起）。
 const warpDestName = process.env.FM_SERVICE_DEST || 'henesys';
 const WARP_DESTS = Object.freeze({
   henesys: { mapId: 100000000, label: '射手村', optionIndex: 0, shot: 'fm-service-henesys' },
-  'ant-park': { mapId: 105070001, label: '蚂蚁广场', optionIndex: 6, shot: 'fm-service-ant-park' }
+  'ant-park': { mapId: 105070001, label: '蚂蚁广场', optionIndex: 6, shot: 'fm-service-ant-park' },
+  thai: { mapId: 500000000, label: '水上市场', categoryIndex: 2, optionIndex: 4, shot: 'fm-service-thai' },
+  shanghai: { mapId: 701000000, label: '上海外滩', categoryIndex: 2, optionIndex: 8, shot: 'fm-service-shanghai' },
+  shaolin: { mapId: 702000000, label: '嵩山镇', categoryIndex: 2, optionIndex: 9, shot: 'fm-service-shaolin' },
+  'shaolin-hall': { mapId: 702100000, label: '大雄宝殿', categoryIndex: 2, optionIndex: 10, shot: 'fm-service-shaolin-hall' }
 });
 const warpDest = WARP_DESTS[warpDestName];
 if (!warpDest)
@@ -310,22 +322,44 @@ async function confirmByButtons(driver, optionIndex, label) {
   }
   const ok = await probeDialogButton(driver, 3);
   if (!ok) throw new Error('佩里: 未探到 OK 按钮（which=3）');
+  const before = await promptText(driver);
   await driver.click(ok.x, ok.y);
+  // OK 只发包；新对话/传送要等服务端回包，不能立刻读 prompt。
+  const replied = await waitFor(async () => {
+    if (await probe(driver, 'msnpc_active') === 0) return true;
+    return await promptText(driver) !== before;
+  }, 10);
+  if (!replied) throw new Error(`佩里: 提交「${label}」后未收到服务端响应`);
+  // 关闭旧对话与打开新对话之间有一帧 active=0，稍等再读稳定状态。
+  await sleep(350);
   console.log(`INFO  佩里: 循环 ${optionIndex} 次选中「${label}」，已点 OK`);
+  return { active: await probe(driver, 'msnpc_active') === 1,
+    prompt: await promptText(driver) };
 }
 
 async function testWarp(driver) {
   await openNpc(driver, PERRY_X, '佩里 9110000');
   const main = await promptText(driver);
   report(main.includes('佩里'), '佩里: 再次打开主菜单');
-  const category = await clickFirstOption(driver);
-  report(category.active && category.after.includes('维多利亚'),
-    '佩里: 再次进入维多利亚分类');
+  const categoryIndex = warpDest.categoryIndex || 0;
+  if (categoryIndex === 0) {
+    const category = await clickFirstOption(driver);
+    report(category.active && category.after.includes('维多利亚'),
+      '佩里: 再次进入维多利亚分类');
+  } else {
+    const sub = await confirmByButtons(
+      driver, categoryIndex, `分类 ${categoryIndex + 1}`);
+    const entered = sub.active && sub.prompt.includes('目的地');
+    report(entered, `佩里: 进入第三分类（prompt=${JSON.stringify(sub.prompt).slice(0, 60)}）`);
+    if (!entered) throw new Error('佩里: 第三分类未打开，无法继续选择目的地');
+  }
   if (warpDest.optionIndex === 0) {
     const destination = await clickFirstOption(driver);
-    report(!destination.active, '佩里: 选择射手村后对话关闭');
+    report(!destination.active, `佩里: 选择${warpDest.label}后对话关闭`);
   } else {
-    await confirmByButtons(driver, warpDest.optionIndex, warpDest.label);
+    const destination = await confirmByButtons(
+      driver, warpDest.optionIndex, warpDest.label);
+    report(!destination.active, `佩里: 选择${warpDest.label}后对话关闭`);
   }
   const warped = await waitFor(async () =>
     await probe(driver, 'msnpc_active') === 0 &&

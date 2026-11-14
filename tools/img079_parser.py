@@ -29,6 +29,7 @@ import zlib
 
 HEADER_MAGIC = bytes.fromhex("73f851bc8ad8ac1093c2")
 LIST_PREAMBLE = bytes.fromhex("1b010000000000")  # 1b 01 00 00 00 00 00
+NEW_CANVAS_MARK = b"\x02\x00\x00\x00"  # newer canvas payload tag (see read_canvas)
 
 # WZ "key_kms" XOR-cipher key (2048-byte prefix) -- see img079_key.py for
 # provenance; String/Map.img needs >64 bytes for long UTF-16 event dialogs.
@@ -127,7 +128,24 @@ def read_canvas(data: bytes, pos: int) -> tuple[dict, int]:
     if fmt not in BPP:
         raise ValueError(f"unsupported canvas format {fmt} at 0x{pos:x}")
     need = width * height * BPP[fmt]
-    raw = zlib.decompressobj().decompress(payload)
+    if payload[:4] == NEW_CANVAS_MARK:
+        # Newer payload layout (reverse engineered from the 2023 annual pack;
+        # miniMap canvases of maps 701000000/701000100/701010320/702000000/
+        # 500000000 and every canvas of Npc/9310060, Npc/9330078, Mob/9600013):
+        #   [u32 = 2][2 key-XOR'd zlib header bytes][u16 body_len][u16 zero]
+        #   [body_len key-XOR'd zlib body bytes]
+        # The XOR key restarts at offset 0 for the header and body separately
+        # (a classic stream starts d3 f9 because KMS_KEY[0:2] = ab 65), and
+        # the zlib stream is stored without the final end-of-block marker, so
+        # it inflates exactly the w*h*bpp pixel bytes and then stops mid-block.
+        if payload[8:10] != b"\x00\x00" or struct.unpack_from("<H", payload, 6)[0] != len(payload) - 10:
+            raise ValueError(f"malformed new canvas payload at 0x{pos:x}")
+        body = payload[10:]
+        stream = bytes(b ^ KMS_KEY[i] for i, b in enumerate(payload[4:6]))
+        stream += bytes(b ^ KMS_KEY[i] for i, b in enumerate(body))
+    else:
+        stream = payload
+    raw = zlib.decompressobj().decompress(stream)
     if len(raw) < need:
         raise ValueError(f"canvas {width}x{height}: got {len(raw)} px bytes, want {need}")
     # Map-family imgs inflate to exactly 2*w*h*4 with the image in the first

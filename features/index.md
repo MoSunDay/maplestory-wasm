@@ -50,10 +50,12 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **[自由市场玩法向导 NPC](changelog/2026-10-25/fm-gameplay-guide-npcs.md)**: 910000000 内的 PQ 招募/BOSS 入口向导（9010000/9010005），一键传送到 13 个组队任务招募点与 12 个 BOSS 入口，危险地图先二次确认
 - **[自由市场科皮药水价格](changelog/2026-10-25/fm-kopee-potion-prices.md)**: 超级药水 5 万、特殊药水 2 万（shopid 1339 shopitems，重启生效）
 - **[自由市场科皮商店换货](changelog/2026-11-01/fm-kopee-shop-pet-food.md)**: 下架射手村回城券（2030004），上架宠物饲料 2120000（200 金）、棒棒冰 2001001（2300 金，HP+2000）与红豆刨冰 2001002（4000 金，MP+2000），货架 32→34 项（shopid 1339 shopitems，改后需重启服务端）
+- **[自由市场世界旅行 NPC 与佩里海外目的地](changelog/2026-11-14/fm-world-tour-npcs-and-perry-destinations.md)**: 910000000 移除导游妮妮（9000020）与工作人员G（9000021），life 重编号 0..6；佩里 9110000「东方都市与海外」补齐泰国水上市场 500000000、上海外滩 701000000、嵩山镇 702000000、大雄宝殿 702100000（分类共 13 项），六目的地（射手村/蚂蚁广场/泰国/上海/嵩山/大雄宝殿）浏览器 e2e 全部落图通过
 - **[场景机关/进度横幅/BGM 切换](changelog/2026-10-25/field-obstacles-progress-banner.md)**: 服务端可开/关/批量/重置具名地图机关对象（OrbisPQ 陷阱、CWKPQ 石阵等），下发 PQ 进度横幅并运行时切换 BGM
 - **反应器**: 可交互物体（如采集物）
 - **掉落物**: 物品/meso 的拾取
 - **小地图/世界地图**: 地图导航
+- **[东方神州与泰国地图素材](changelog/2026-11-14/orient-thailand-maps-and-canvas-format.md)**: 079MAX4 年包补齐 37 张海外地图（泰国 500xxx 9 张、上海 701 16 张、嵩山 702 12 张）与 Tile/ShanghaiNJL、Tile/thai、Back/YuyuanCN 三个 library、63 个 NPC 与 13 个 Mob；客户端 Map/Npc/Mob/String.nx 与服务端 wz 双侧落地，破解 2023 新 canvas 载荷后 miniMap/画布逐像素校验一致，进图 e2e 全部通过
 
 相关模块: [游戏世界](../agents/client/Gameplay/index.md), [图形渲染](../agents/client/Graphics/index.md)
 
