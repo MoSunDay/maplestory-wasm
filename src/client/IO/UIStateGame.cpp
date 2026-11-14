@@ -369,6 +369,9 @@ namespace jrc
                 drop_icon(*draggedicon, pos);
                 draggedicon->reset();
                 draggedicon = {};
+                // The global drag icon consumes the mouse-up, so release the source
+                // window's capture here; otherwise the next click is swallowed by it.
+                cursor_captured = UIElement::NONE;
                 return mst;
             default:
                 return Cursor::GRABBING;

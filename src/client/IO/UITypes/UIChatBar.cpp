@@ -320,15 +320,15 @@ namespace jrc
 
     bool UIChatbar::is_in_range(Point<int16_t> cursorpos) const
     {
+        // collapsed: nothing interactive floats above the bar, so skip the
+        // log bounds. the statusbar's own statusbar_range still covers the
+        // bottom strip, letting clicks on the log area fall through to the
+        // game world instead of being swallowed here.
+        if (!chatopen)
+            return false;
+
         if (statusbar::prechaos())
         {
-            // collapsed: nothing interactive floats above the bar, so skip
-            // the log bounds. the statusbar's own statusbar_range still
-            // covers the bottom strip, letting clicks on the log area fall
-            // through to the game world instead of being swallowed here.
-            if (!chatopen)
-                return false;
-
             const Rectangle<int16_t> bounds(
                 0,
                 statusbar::chat_log_width(),

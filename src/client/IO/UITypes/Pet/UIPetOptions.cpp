@@ -281,7 +281,9 @@ namespace jrc
 
         const int32_t level = Stage::get().get_player().get_skilllevel(skill_id);
         const SkillData& skill = SkillData::get(skill_id);
-        if (level <= 0 || skill.is_passive() || skill.is_invisible() ||
+        // "invisible" only hides the skill book icon until learned; learned/castable buffs
+        // (e.g. Maple Warrior) must still be assignable to pet auto-buff slots.
+        if (level <= 0 || skill.is_passive() ||
             skill.is_attack() || skill.get_stats(level).recoverytime <= 0)
             return;
 
