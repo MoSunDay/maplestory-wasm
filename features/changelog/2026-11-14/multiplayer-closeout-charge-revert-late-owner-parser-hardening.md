@@ -39,14 +39,25 @@
   （两类均携带幂等状态），每 owner 封顶 `MAX_STASHED_SUMMON_EVENTS=4`
   超出丢最旧；`replay_stashed` 在 owner 已存在于地图时按到达顺序重放
   （SPAWN 实例化、MOVE 替换回放批次）；`drop_stashed` 在 REMOVE_CHARACTER
-  时清该 cid；`summon::clear` 随换图一并清空。
+  时清该 cid；`summon::clear` 随换图一并清空。暂存实现拆至
+  `SummonStash.cpp`（`stash_event`/`replay_stashed`/`drop_stashed`/
+  `drop_stashed_oid`），`SummonPool.cpp` 只保留实体、动画与绘制，两个
+  文件均回到行数预算内。
+- **REMOVE 取消暂存**：`RemoveSummonHandler` 与出生包同样按
+  `OwnerState` 三态分派——PRESENT 删除已存在实体；PENDING 先
+  `drop_stashed_oid(owner_cid, oid)` 取消该 oid 的暂存 SPAWN/MOVE，再走
+  幂等 `summon::remove` 兜底；GONE 直接返回。此前 REMOVE 与 owner 出生
+  同批到达时，暂存 SPAWN 仍会在 owner 实例化后被重放，形成服务端已删除
+  的幽灵召唤兽。
 - `SummonHandlers` 的 `owner_on_map` 布尔升级为三态
   `OwnerState{PRESENT,PENDING,GONE}`：PRESENT 立即应用、PENDING 入
   stash、GONE 丢弃；`MapChars::has_pending_spawn` 提升为公开只读查询；
   `Stage::update` 在 `chars.update(physics)`（含 instantiate_spawns）之后、
   `summon::update` 之前调用 `summon::replay_stashed`。
 - 新源码契约 `tools/verify/summon-late-owner-contract.mjs`：覆盖三态
-  分派、同类同 oid 覆盖、封顶 4、实例化后重放顺序、离图清理与换图清空。
+  分派、同类同 oid 覆盖、封顶 4、实例化后重放顺序、离图清理、换图清空，
+  以及 REMOVE 在 PENDING 时按 oid 取消暂存、空 owner 擦除、`remove`
+  幂等兜底仍在（Section F）。
 
 ### D3：移动解析未知命令整包截断
 
@@ -64,20 +75,29 @@
   `remote-pet-desync-source-contract`、`foreign-buff-mask`、
   `spawn-player-parser`、`face-expression-sync`、
   `charge-zero-delay-source-contract`、`summon-late-owner-contract` 全部
-  PASS。
-- **门 2（双端 e2e）**：
+  PASS；`summon-late-owner-contract` 在收尾后新增 Section F（REMOVE 三态
+  分派、PENDING 按 oid 取消暂存、空 owner 擦除、`remove` 幂等兜底）。
+- **门 2（双端 e2e，收尾后独立重跑）**：
   - `remote-pet-desync-flow`：`SUMMARY 4/4 scenarios OK`
-    （base-visibility / summon-race / ghost-race / coop-regression）。
-  - `social-flow` 三模式：`actions`（远端 F1→HIT、5s 复位、远端攻击
-    stance/frame 断言）、`mobs`（oid 集合一致、worst maxDelta=15px ≤48px）、
-    `coop`（远端同步差 13/16px ≤48px、远端 p95 步进 6/6px ≤12px、
-    落地 y 差 ≤6px、双端零浏览器异常）全 PASS。
-- **环境类失败记录**：首跑 `3/4`（ghost-race r3 失败）与次跑
-  `base-visibility` 超时（残留浏览器会话导致 page=null），清理
-  chromium 进程/调试端口并重置账号 `loggedin` 后一次通过 4/4；属
-  known-issues 的 idle-reaper/重启冻结类环境噪声，非逻辑回归。
-- WASM 由 `scripts/docker_build_wasm.sh`（emsdk 4.0.21）重编成功；
-  linked server 已应用补丁
+    （base-visibility：B 看到 A 的唯一宠物、itemid 5000001、坐标已解析；
+    summon-race：3/3 轮收敛稳定；ghost-race：3/3 轮 18 次采样无幽灵
+    角色/宠物；coop-regression 通过）。
+  - `social-flow` 三模式：`actions`（远端 F1→HIT、超时复位、远端攻击
+    stance/frame 断言）、`mobs`（27/27 oid 一致、worst maxDelta=15px
+    ≤48px、无 missing/action 偏差）、`coop`（双向行走 sync=17/9/11px、
+    p95 步进 6-7px ≤12px、落地 yDelta=0、表情/双向攻击中继与双端零
+    浏览器异常）全 PASS。
+- **门 3（CDP 抽查）**：收尾构建单客户端登录进图，`msui_state=5`、
+  `msmap_id=40001`、`msplayer_id=277`（与 DB 一致）、
+  `msasset_blocking=0`、浏览器异常 0，截图落盘。
+- **环境类失败记录**：并行任务批次 e2e 共用测试账号并重启服务端，
+  首跑出现 `game UI did not activate`/ESC 菜单不弹等干扰；待其结束后
+  清理 chromium 进程、重置 `loggedin` 并独立重跑一次，remote-pet 4/4、
+  social 三模式全绿。属 known-issues 的会话/输入焦点环境噪声，非逻辑
+  回归。
+- WASM 由 `scripts/docker_build_wasm.sh`（emsdk 4.0.21）在拆分
+  `SummonStash.cpp`、改完 RemoveSummonHandler 后重编成功；linked server
+  已应用补丁
   [0019-expression-throttle](../../../scripts/server-patches/0019-expression-throttle.patch)
   并 `posix-compile.sh` 重编 + `docker restart ms-game-server`。
 

@@ -191,7 +191,7 @@ server `run.sh`。种子/复核 SQL 一律经该端点连接，不写死回环�
   （独立账号/DB 种子）尚未稳定，单列跟进。
 - **e2e 长跑稳定性**：idle-reaper/重启绑定冻结等 known-issues 仍会造成
   偶发环境类失败；重试策略与告警记录见
-  `docs/known-issues/2026-11-06-idle-reaper-pong-baseline.md` 等条目。
+  [`features/changelog/2026-11-06/idle-reaper-pong-baseline.md`](../features/changelog/2026-11-06/idle-reaper-pong-baseline.md) 等条目。
 
 ## 任务系统加固遗留边界（2026-11-14）
 
