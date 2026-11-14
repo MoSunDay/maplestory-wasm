@@ -26,6 +26,12 @@ namespace
     {
         return row >= 0 && row < SKILLBOOK_ROWS;
     }
+
+    bool row_has_skill(const jrc::UISkillbook& skillbook, int row)
+    {
+        return valid_row(row) &&
+            skillbook.visible_skill_id(static_cast<uint16_t>(row)) != 0;
+    }
 }
 
 extern "C"
@@ -65,7 +71,7 @@ extern "C"
     int msskillbook_icon_x(int row)
     {
         auto skillbook = active_skillbook();
-        return skillbook && valid_row(row)
+        return skillbook && row_has_skill(*skillbook, row)
             ? skillbook->visible_icon_center(static_cast<uint16_t>(row)).x()
             : MISSING_COORDINATE;
     }
@@ -75,7 +81,7 @@ extern "C"
     int msskillbook_icon_y(int row)
     {
         auto skillbook = active_skillbook();
-        return skillbook && valid_row(row)
+        return skillbook && row_has_skill(*skillbook, row)
             ? skillbook->visible_icon_center(static_cast<uint16_t>(row)).y()
             : MISSING_COORDINATE;
     }
