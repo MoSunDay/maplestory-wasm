@@ -8,6 +8,8 @@
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
 #include "UITypes/UIStatusBar.h"
+#include "UITypes/UINotice.h"
+#include "UITypes/Quest/UIQuestDialog.h"
 #include "UITypes/Quest/UIQuestLog.h"
 #include "../Gameplay/Stage.h"
 #include "../Character/Inventory/InventoryType.h"
@@ -18,6 +20,8 @@
 #include <emscripten.h>
 
 #include <GLFW/glfw3.h>
+
+#include <cstdint>
 
 namespace jrc
 {
@@ -253,6 +257,65 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE int msui_notice_active()
     {
         return jrc::UI::get().is_element_active(jrc::UIElement::NOTICE) ? 1 : 0;
+    }
+
+    // 任务失败/完成提示落在共享 NOTICE 槽里；只认单按钮 UIOk，
+    // 避免把 UIYesNo/UIEnterNumber 误判成任务结果弹窗。
+    EMSCRIPTEN_KEEPALIVE int msui_uiok_active()
+    {
+        auto notice = jrc::UI::get().get_element<jrc::UINotice>();
+        return notice && notice->is_active() && notice->probe_is_ok()
+            ? 1
+            : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_uiok_message_hash()
+    {
+        auto notice = jrc::UI::get().get_element<jrc::UINotice>();
+        if (!notice || !notice->is_active() || !notice->probe_is_ok())
+        {
+            return 0;
+        }
+        // FNV-1a 32 over the UTF-8 message, matching the JS-side helper.
+        uint32_t hash = 2166136261u;
+        for (const unsigned char ch : notice->probe_question())
+        {
+            hash ^= ch;
+            hash *= 16777619u;
+        }
+        return static_cast<int>(hash);
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_questdialog_active()
+    {
+        return jrc::UI::get().is_element_active(
+            jrc::UIElement::QUESTDIALOG) ? 1 : 0;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_questdialog_button_field(
+        int which, int field)
+    {
+        auto dialog = jrc::UI::get().get_element<jrc::UIQuestDialog>();
+        return dialog && dialog->is_active()
+            ? dialog->probe_button(which, field)
+            : -9999;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_questdialog_element_field(int field)
+    {
+        auto dialog = jrc::UI::get().get_element<jrc::UIQuestDialog>();
+        return dialog && dialog->is_active()
+            ? dialog->probe_element(field)
+            : -9999;
+    }
+
+    EMSCRIPTEN_KEEPALIVE int msui_questdialog_reward_field(
+        int index, int field)
+    {
+        auto dialog = jrc::UI::get().get_element<jrc::UIQuestDialog>();
+        return dialog && dialog->is_active()
+            ? dialog->probe_reward(index, field)
+            : -9999;
     }
 
     EMSCRIPTEN_KEEPALIVE int msui_questlog_active()

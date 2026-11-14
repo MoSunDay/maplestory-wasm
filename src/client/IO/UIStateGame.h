@@ -67,6 +67,7 @@ namespace jrc
         UIElement* get_front(Point<int16_t> pos) override;
 
     private:
+        bool modal_dialog_open();
         void clear_cursors(bool clicked, Point<int16_t> pos, UIElement::Type except);
         void drop_icon(const Icon& icon, Point<int16_t> pos);
         void select_player_target(const PlayerTarget& target);

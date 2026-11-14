@@ -17,14 +17,17 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "UIQuestLog.h"
 
+#include "../../Components/AreaButton.h"
 #include "../../Components/TwoSpriteButton.h"
 #include "../../Components/MapleButton.h"
 #include "QuestLogNodes.h"
 
+#include "../../../Character/QuestCheck.h"
 #include "../../../Console.h"
 #include "../../../Net/Packets/QuestPackets.h"
 
 #include "nlnx/node.hpp"
+#include "nlnx/nx.hpp"
 
 #include <algorithm>
 
@@ -47,6 +50,38 @@ namespace jrc
         // Give-up button sits at the bottom-right of the info pane art.
         constexpr int16_t GIVEUP_RIGHT_MARGIN = 16;
         constexpr int16_t GIVEUP_BOTTOM_MARGIN = 12;
+
+        // Geometry of the programmatic tab fallback: the labels are the
+        // only visuals, invisible hit areas over them carry the clicks.
+        constexpr int16_t TAB_HEIGHT = 24;
+        constexpr int16_t TAB_LABEL_PAD = 8;
+
+        // Mob display name from the String.nx Mob.img table (the same
+        // lookup Mob.cpp uses for its name tag); the generic label keeps
+        // the line readable when the table has no entry.
+        std::string mob_name_of(int32_t mobid)
+        {
+            const nl::node name =
+                nl::nx::string["Mob.img"][std::to_string(mobid)]["name"];
+            return name ? name.get_string() : std::string("怪物");
+        }
+
+        // Human-readable kill lines for a running quest's progress
+        // string; empty when the string is not the server's padded
+        // per-mob counter format (the caller then keeps the raw data).
+        std::vector<std::string> kill_lines(int16_t qid,
+            const std::string& progress)
+        {
+            std::vector<std::string> lines;
+            for (const QuestMobProgress& mob : decoded_progress(qid, progress))
+            {
+                lines.push_back(
+                    "击杀 " + mob_name_of(mob.mobid) + " "
+                    + std::to_string(mob.killed) + "/"
+                    + std::to_string(mob.required));
+            }
+            return lines;
+        }
     }
 
     constexpr Point<int16_t> UIQuestLog::LIST_OFFSET;
@@ -93,10 +128,7 @@ namespace jrc
         last_rev = quests.revision();
         rebuild_rows(false);
 
-        if (tabs_from_assets)
-        {
-            buttons[BT_TAB0]->set_state(Button::PRESSED);
-        }
+        buttons[BT_TAB0]->set_state(Button::PRESSED);
     }
 
     void UIQuestLog::initialize_sprites()
@@ -170,6 +202,27 @@ namespace jrc
         tabs_from_assets = tabd0 && tabe0 && tabd1 && tabe1;
         if (!tabs_from_assets)
         {
+            // No tab art in this UI.nx generation: invisible hit areas
+            // over the drawn labels keep both tabs clickable without
+            // assets. The geometry mirrors the label draw positions.
+            const int16_t tab1_x = static_cast<int16_t>(
+                TAB_X + tab0_label.width() + TAB_LABEL_PAD);
+            buttons[BT_TAB0] = std::make_unique<AreaButton>(
+                Point<int16_t>(TAB_X, TAB_Y),
+                Point<int16_t>(
+                    static_cast<int16_t>(tab0_label.width()
+                        + TAB_LABEL_PAD),
+                    TAB_HEIGHT
+                )
+            );
+            buttons[BT_TAB1] = std::make_unique<AreaButton>(
+                Point<int16_t>(tab1_x, TAB_Y),
+                Point<int16_t>(
+                    static_cast<int16_t>(tab1_label.width()
+                        + TAB_LABEL_PAD),
+                    TAB_HEIGHT
+                )
+            );
             return;
         }
 
@@ -280,6 +333,10 @@ namespace jrc
                     ? "任务"
                     : summary
             );
+            // Per-mob kill lines decoded from the raw progress data;
+            // empty for completed quests or when the string is not the
+            // server's padded counter format.
+            std::vector<std::string> kill_rows;
             if (row.completed_time > 0)
             {
                 selected_state.change_text(
@@ -290,7 +347,13 @@ namespace jrc
             }
             else if (!row.progress.empty())
             {
-                selected_state.change_text("进行中 · " + row.progress);
+                kill_rows = kill_lines(row.id, row.progress);
+                // Undecodable progress stays verbatim instead of a
+                // misleading or empty state line.
+                selected_state.change_text(kill_rows.empty()
+                    ? "进行中 · " + row.progress
+                    : "进行中"
+                );
             }
             else
             {
@@ -308,8 +371,13 @@ namespace jrc
             const uint16_t wrap_width = static_cast<uint16_t>(
                 std::max<int16_t>(info_width - 40, 100));
 
-            const std::vector<std::string> story =
+            // Kill requirements lead the story block so the current
+            // goal reads before the flavour text; both share the wrap
+            // and clip layout of the info pane.
+            std::vector<std::string> story =
                 quest_log_model::quest_paragraphs(row.id);
+            story.insert(
+                story.begin(), kill_rows.begin(), kill_rows.end());
             std::vector<Text> lines;
             lines.reserve(story.size());
             std::vector<int16_t> heights;
@@ -433,6 +501,35 @@ namespace jrc
                 selection_box.draw(row_position - Point<int16_t>(4, 4));
             }
             row_labels[index].draw(row_position);
+            // Live quest timer (server addQuestTimeLimit): rebuilt every
+            // draw so the countdown ticks; only running rows carry one.
+            if (rows[index].completed_time == 0)
+            {
+                const int64_t remaining =
+                    quests.timer_remaining_ms(rows[index].id);
+                if (remaining >= 0)
+                {
+                    const int32_t total =
+                        static_cast<int32_t>(remaining / 1000);
+                    const std::string seconds =
+                        total % 60 < 10
+                            ? "0" + std::to_string(total % 60)
+                            : std::to_string(total % 60);
+                    const Text countdown(
+                        Text::A11L,
+                        Text::LEFT,
+                        Text::WHITE,
+                        "剩余 " + std::to_string(total / 60) + ":" + seconds
+                    );
+                    countdown.draw(
+                        row_position
+                            + Point<int16_t>(
+                                row_labels[index].width() + 6,
+                                0
+                            )
+                    );
+                }
+            }
             row_position.shift_y(quest_log_model::ROW_HEIGHT);
         }
 
@@ -486,6 +583,22 @@ namespace jrc
             last_rev = quests.revision();
             rebuild_rows(true);
         }
+    }
+
+    void UIQuestLog::toggle_active()
+    {
+        UIDragElement::toggle_active();
+        if (!is_active())
+        {
+            return;
+        }
+
+        // Instant refresh on (re)open: rows must reflect the live quest
+        // log on the frame the window comes back. While inactive the
+        // revision poll never ran, so any bumps it missed are folded in
+        // here; the poll keeps driving live updates while open.
+        last_rev = quests.revision();
+        rebuild_rows(true);
     }
 
     bool UIQuestLog::remove_cursor(bool clicked, Point<int16_t> cursorpos)

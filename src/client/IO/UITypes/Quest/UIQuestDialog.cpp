@@ -22,7 +22,9 @@
 
 #include "../../../Console.h"
 #include "../../../Constants.h"
+#include "../../../Data/ItemData.h"
 #include "../../../Gameplay/Stage.h"
+#include "../../../Graphics/GraphicsGL.h"
 #include "../../../Net/Packets/QuestPackets.h"
 
 #include "../UINpcTalkNodes.h"
@@ -47,6 +49,16 @@ namespace jrc
         constexpr int16_t DIALOG_TEXT_X = 156;
         constexpr int16_t DIALOG_TEXT_Y_OFFSET = 16;
 
+        // Choose-one reward block on the final page of a completing offer:
+        // a flowing grid of icon cells below the speech text, plus the
+        // hint line introducing it.
+        constexpr int16_t REWARD_TEXT_GAP = 6;
+        constexpr int16_t HINT_GAP = 4;
+        constexpr int16_t REWARD_CELL_WIDTH = 64;
+        constexpr int16_t REWARD_CELL_HEIGHT = 40;
+        constexpr int16_t REWARD_ICON_WIDTH = 32;
+        constexpr int16_t REWARDS_PER_ROW = TEXT_WIDTH / REWARD_CELL_WIDTH;
+
         // Name plate strip, mirroring the UINpcTalk speaker name row.
         constexpr Point<int16_t> NAMETAG_OFFSET = { 25, 100 };
         constexpr Point<int16_t> TITLE_OFFSET = { 80, 99 };
@@ -58,6 +70,10 @@ namespace jrc
           npc_id(npc_template_id),
           content(quest_dialog_model::collect(
               quest_offer.quest_id, quest_offer.completing)),
+          rewards(quest_offer.completing
+              ? quest_dialog_model::selectable_rewards(quest_offer.quest_id)
+              : std::vector<quest_dialog_model::RewardChoice>()),
+          reward_selection(0),
           height(0),
           vtile(0),
           page_index(0),
@@ -77,6 +93,9 @@ namespace jrc
 
         // The quest name replaces the NPC name on the name plate.
         title = { Text::A11M, Text::CENTER, Text::WHITE, content.title };
+        // Selection page caption for prop == -1 completion rewards.
+        hint = { Text::A12M, Text::LEFT, Text::DARKGREY,
+                 "请选择一项奖励：", TEXT_WIDTH, false };
 
         show_page();
 
@@ -100,6 +119,69 @@ namespace jrc
         return !declining && page_index + 1 >= content.pages.size();
     }
 
+    bool UIQuestDialog::on_selection_page() const
+    {
+        // Only the completing flow renders the choose-one reward row;
+        // accept offers carry no selectable Act.img rewards.
+        return offer.completing && !rewards.empty() && on_last_page();
+    }
+
+    int16_t UIQuestDialog::rewards_height() const
+    {
+        if (!on_selection_page())
+        {
+            return 0;
+        }
+
+        const std::size_t rows =
+            (rewards.size() + REWARDS_PER_ROW - 1) / REWARDS_PER_ROW;
+        return static_cast<int16_t>(
+            REWARD_TEXT_GAP + hint.height() + HINT_GAP
+            + static_cast<int16_t>(rows) * REWARD_CELL_HEIGHT);
+    }
+
+    Point<int16_t> UIQuestDialog::rewards_origin() const
+    {
+        const int16_t block = static_cast<int16_t>(
+            text.height() + rewards_height());
+        const int16_t content_y = static_cast<int16_t>(
+            DIALOG_TEXT_Y_OFFSET
+                + ((vtile * fill.height() - block) / 2));
+        return { DIALOG_TEXT_X,
+            static_cast<int16_t>(content_y + text.height()
+                + REWARD_TEXT_GAP) };
+    }
+
+    int16_t UIQuestDialog::reward_at(Point<int16_t> relative) const
+    {
+        if (!on_selection_page())
+        {
+            return -1;
+        }
+
+        // The grid starts under the hint line inside the reward block.
+        const Point<int16_t> origin = rewards_origin()
+            + Point<int16_t>(0,
+                static_cast<int16_t>(hint.height() + HINT_GAP));
+        for (std::size_t i = 0; i < rewards.size(); ++i)
+        {
+            const int16_t cell_x = static_cast<int16_t>(
+                origin.x()
+                + (i % REWARDS_PER_ROW) * REWARD_CELL_WIDTH);
+            const int16_t cell_y = static_cast<int16_t>(
+                origin.y()
+                + (i / REWARDS_PER_ROW) * REWARD_CELL_HEIGHT);
+            const Rectangle<int16_t> cell(
+                cell_x, cell_x + REWARD_CELL_WIDTH,
+                cell_y, cell_y + REWARD_CELL_HEIGHT);
+            if (cell.contains(relative))
+            {
+                return static_cast<int16_t>(i);
+            }
+        }
+        return -1;
+    }
+
     void UIQuestDialog::show_page()
     {
         // The Say.img text carries #b/#p/#t/#r/#k marker tokens; STRIP drops
@@ -109,13 +191,15 @@ namespace jrc
         text = { Text::A12M, Text::LEFT, Text::DARKGREY, processed,
                  TEXT_WIDTH, false };
 
-        // Fill-height math mirrored from UINpcTalk::change_text.
+        // Fill-height math mirrored from UINpcTalk::change_text, plus the
+        // choose-one reward block when the final page renders one.
         const int16_t minimum_fill_height =
             MIN_DIALOGUE_TILES * fill.height();
         const int16_t required_fill_height = std::max<int16_t>(
             minimum_fill_height,
             static_cast<int16_t>(
-                text.height() + TEXT_VERTICAL_PADDING * 2)
+                text.height() + rewards_height()
+                + TEXT_VERTICAL_PADDING * 2)
         );
         vtile = std::max<int16_t>(
             MIN_DIALOGUE_TILES,
@@ -192,6 +276,14 @@ namespace jrc
             {
                 QuestScriptEndPacket(offer.quest_id, npc_id, pos).dispatch();
             }
+            else if (!rewards.empty())
+            {
+                // Selection reward: the trailing [short selection] indexes
+                // the prop == -1 Act.img list; the dialog keeps the list
+                // in the server's selectList order.
+                QuestCompletePacket(offer.quest_id, npc_id, pos,
+                    static_cast<int16_t>(reward_selection)).dispatch();
+            }
             else
             {
                 QuestCompletePacket(offer.quest_id, npc_id, pos).dispatch();
@@ -227,10 +319,54 @@ namespace jrc
         nametag.draw(position + NAMETAG_OFFSET);
         title.draw(position + TITLE_OFFSET);
 
+        const int16_t block = static_cast<int16_t>(
+            text.height() + rewards_height());
         const int16_t text_y = static_cast<int16_t>(
             DIALOG_TEXT_Y_OFFSET
-                + ((vtile * fill.height() - text.height()) / 2));
+                + ((vtile * fill.height() - block) / 2));
         text.draw(position + Point<int16_t>(DIALOG_TEXT_X, text_y));
+
+        // Choose-one reward row on the final page of a completing offer:
+        // hint line, then a grid of icon cells (icon + xCount), the
+        // selected cell highlighted.
+        if (on_selection_page())
+        {
+            const Point<int16_t> origin = rewards_origin();
+            hint.draw(position + origin);
+
+            const int16_t grid_y = static_cast<int16_t>(
+                origin.y() + hint.height() + HINT_GAP);
+            for (std::size_t i = 0; i < rewards.size(); ++i)
+            {
+                const int16_t cell_x = static_cast<int16_t>(
+                    origin.x()
+                    + (i % REWARDS_PER_ROW) * REWARD_CELL_WIDTH);
+                const int16_t cell_y = static_cast<int16_t>(
+                    grid_y + (i / REWARDS_PER_ROW) * REWARD_CELL_HEIGHT);
+
+                if (i == reward_selection)
+                {
+                    GraphicsGL::get().drawrectangle(
+                        static_cast<int16_t>(position.x() + cell_x),
+                        static_cast<int16_t>(position.y() + cell_y),
+                        REWARD_CELL_WIDTH, REWARD_CELL_HEIGHT,
+                        1.0f, 0.5f, 0.0f, 0.35f);
+                }
+
+                const ItemData& item = ItemData::get(rewards[i].itemid);
+                item.get_icon(false).draw(
+                    position + Point<int16_t>(
+                        cell_x + (REWARD_CELL_WIDTH - REWARD_ICON_WIDTH) / 2,
+                        cell_y));
+
+                Text countlabel(Text::A11M, Text::RIGHT, Text::DARKGREY,
+                    "x" + std::to_string(rewards[i].count));
+                countlabel.draw(position + Point<int16_t>(
+                    cell_x + REWARD_CELL_WIDTH - 2,
+                    static_cast<int16_t>(cell_y + REWARD_CELL_HEIGHT
+                        - countlabel.height() - 2)));
+            }
+        }
     }
 
     void UIQuestDialog::update_screen(int16_t, int16_t)
@@ -303,5 +439,124 @@ namespace jrc
 
         // ESC closes the offer without sending any packet.
         active = false;
+    }
+
+    UIElement::CursorResult UIQuestDialog::send_cursor(bool clicked,
+        Point<int16_t> cursorpos)
+    {
+        if (on_selection_page())
+        {
+            const int16_t index = reward_at(cursorpos - position);
+            if (index >= 0)
+            {
+                // Clicking a reward cell selects it (index 0 stays the
+                // default); confirming still runs through the YES button.
+                if (clicked)
+                {
+                    reward_selection = static_cast<std::size_t>(index);
+                }
+                return { clicked ? Cursor::CLICKING : Cursor::CANCLICK,
+                    true };
+            }
+        }
+
+        return UIElement::send_cursor(clicked, cursorpos);
+    }
+
+    int32_t UIQuestDialog::probe_button(int which, int field) const
+    {
+        if (which < 0 || which > 3)
+        {
+            return -9998;
+        }
+        const auto it = buttons.find(static_cast<uint16_t>(which));
+        if (it == buttons.end())
+        {
+            return -9997;
+        }
+        const Button& button = *it->second;
+        switch (field)
+        {
+        case 0:
+            return button.get_position().x();
+        case 1:
+            return button.get_position().y();
+        case 2:
+            return button.width();
+        case 3:
+            return button.height();
+        case 4:
+            return button.is_active() ? 1 : 0;
+        default:
+            return -9996;
+        }
+    }
+
+    int32_t UIQuestDialog::probe_element(int field) const
+    {
+        switch (field)
+        {
+        case 0:
+            return position.x();
+        case 1:
+            return position.y();
+        case 2:
+            return dimension.x();
+        case 3:
+            return dimension.y();
+        case 4:
+            return on_last_page() ? 1 : 0;
+        case 5:
+            return static_cast<int32_t>(rewards.size());
+        case 6:
+            return rewards.empty()
+                ? -1
+                : static_cast<int32_t>(reward_selection);
+        case 7:
+            return static_cast<int32_t>(page_index);
+        case 8:
+            return declining ? 1 : 0;
+        case 9:
+            return offer.quest_id;
+        case 10:
+            return offer.completing ? 1 : 0;
+        case 11:
+            return offer.scripted ? 1 : 0;
+        default:
+            return -9996;
+        }
+    }
+
+    int32_t UIQuestDialog::probe_reward(int index, int field) const
+    {
+        if (index < 0 || static_cast<std::size_t>(index) >= rewards.size())
+        {
+            return -9998;
+        }
+        if (!on_selection_page())
+        {
+            return -9997;
+        }
+
+        const Point<int16_t> grid = rewards_origin()
+            + Point<int16_t>(0,
+                static_cast<int16_t>(hint.height() + HINT_GAP));
+        const int16_t cell_x = static_cast<int16_t>(
+            grid.x() + (index % REWARDS_PER_ROW) * REWARD_CELL_WIDTH);
+        const int16_t cell_y = static_cast<int16_t>(
+            grid.y() + (index / REWARDS_PER_ROW) * REWARD_CELL_HEIGHT);
+        switch (field)
+        {
+        case 0:
+            return cell_x;
+        case 1:
+            return cell_y;
+        case 2:
+            return REWARD_CELL_WIDTH;
+        case 3:
+            return REWARD_CELL_HEIGHT;
+        default:
+            return -9996;
+        }
     }
 }

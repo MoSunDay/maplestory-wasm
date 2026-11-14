@@ -241,6 +241,10 @@ namespace jrc
 
     void SetfieldHandler::parse_questlog(InPacket& recv, Questlog& quests) const
     {
+        // A fresh parse rebuilds every row from the wire, so any forfeit
+        // guard left over from the previous field must go first.
+        quests.clear_forfeited();
+
         int16_t size = recv.read_short();
         for (int16_t i = 0; i < size; ++i)
         {

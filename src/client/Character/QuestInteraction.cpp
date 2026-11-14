@@ -59,6 +59,20 @@ namespace jrc
             return value;
         }
 
+        int32_t& armed_map()
+        {
+            static int32_t value = 0;
+            return value;
+        }
+
+        // Pure guard: an armed talk belongs to the field it was armed on,
+        // so a map change between arm and timeout must not fire the offer
+        // against an npc of the new map.
+        bool armed_map_current(int32_t armed_mapid, int32_t field_mapid)
+        {
+            return armed_mapid == field_mapid;
+        }
+
         // A server-driven npc dialog or shop already replaced the talk, so
         // the fallback must not fire on top of it.
         bool server_dialog_open()
@@ -99,30 +113,42 @@ namespace jrc
             }
             return total;
         }
+    }
 
-        // Player context for quest_offer_at: level plus an item counter
-        // over the live inventory.
-        QuestCheckContext make_context()
+    namespace quest_interaction
+    {
+        // Player context for quest_offer_at: level, job, meso and the
+        // wall clock plus an item counter over the live inventory.
+        // Lives in the quest_interaction namespace so every client-side
+        // quest-offer probe (the fallback dialog and the npc quest
+        // marker seam) resolves offers against the same live state.
+        QuestCheckContext make_check_context()
         {
             Player& player = Stage::get().get_player();
 
             QuestCheckContext context;
             context.level = static_cast<uint16_t>(
                 player.get_stats().get_stat(Maplestat::LEVEL));
+            context.job = player.get_stats().get_job().get_id();
+            context.meso = player.get_inventory().get_meso();
+            // Wall-clock epoch ms: the repeat-interval check compares
+            // against the server's completion timestamps.
+            context.now_ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch())
+                    .count();
             context.item_count = [](int32_t item_id)
             {
                 return count_item(item_id);
             };
             return context;
         }
-    }
 
-    namespace quest_interaction
-    {
         void arm_npc_talk(int32_t npc_id)
         {
             armed() = true;
             armed_npc() = npc_id;
+            armed_map() = Stage::get().get_mapid();
             armed_at() = std::chrono::steady_clock::now();
         }
 
@@ -145,6 +171,15 @@ namespace jrc
 
         void update()
         {
+            // Check-on-use guard: the player left the field the talk was
+            // armed on, so the slot is stale — drop it instead of firing
+            // an old-map offer on the new map.
+            if (armed()
+                && !armed_map_current(
+                    armed_map(), Stage::get().get_mapid()))
+            {
+                armed() = false;
+            }
             if (!armed())
             {
                 return;
@@ -166,7 +201,7 @@ namespace jrc
             }
 
             Player& player = Stage::get().get_player();
-            const QuestCheckContext context = make_context();
+            const QuestCheckContext context = make_check_context();
             QuestOffer offer{};
             if (!quest_offer_at(npc_id, player.get_quests(), context, offer))
             {

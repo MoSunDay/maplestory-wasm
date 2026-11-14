@@ -86,7 +86,6 @@ namespace jrc
             {
                 if (pressed)
                 {
-                    // TODO: try finding dialogue first
                     // Arm the local quest-offer fallback for silent quest
                     // NPCs; a real server dialog cancels it.
                     quest_interaction::arm_npc_talk(npc->get_npcid());

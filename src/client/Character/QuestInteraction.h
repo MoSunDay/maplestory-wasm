@@ -17,7 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <cstdint>
+#include "QuestCheck.h"
 
 namespace jrc
 {
@@ -34,8 +34,15 @@ namespace jrc
     // loop is single threaded so one slot is enough.
     namespace quest_interaction
     {
+        // Player context for QuestCheck::quest_offer_at over the live
+        // character (level, job, meso, wall clock, inventory counter).
+        // Shared seam: the fallback dialog and the npc quest-marker
+        // helper both resolve offers through it.
+        QuestCheckContext make_check_context();
+
         // Called when the player initiates an NPC talk (same moment the
-        // TalkToNPCPacket is dispatched).
+        // TalkToNPCPacket is dispatched). Records the current field so a
+        // map change before the timeout invalidates the arm.
         void arm_npc_talk(int32_t npc_id);
 
         // Called when the server really opened an npc dialog or shop;

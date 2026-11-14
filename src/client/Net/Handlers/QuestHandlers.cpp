@@ -77,12 +77,16 @@ namespace jrc
         {
         case 6:
         {
-            // Quest timer list: count x (quest id, remaining ms).
+            // Quest timer list (server addQuestTimeLimit): count x
+            // (quest id, remaining ms). Stored as absolute deadlines so
+            // the quest log can tick them down without refreshes.
             const int16_t count = recv.read_short();
+            Questlog& quests = Stage::get().get_player().get_quests();
             for (int16_t i = 0; i < count; ++i)
             {
-                recv.read_short();
-                recv.read_int();
+                const int16_t qid = recv.read_short();
+                const int32_t remaining = recv.read_int();
+                quests.add_timer(qid, remaining);
             }
             Console::get().print(
                 "[UpdateQuestInfo] Timers updated for " +
@@ -92,27 +96,47 @@ namespace jrc
         }
         case 7:
         {
-            // Npc marker list: count x quest id.
+            // Quest timer removal (server removeQuestTimeLimit):
+            // count x quest id.
             const int16_t count = recv.read_short();
+            Questlog& quests = Stage::get().get_player().get_quests();
             for (int16_t i = 0; i < count; ++i)
             {
-                recv.read_short();
+                quests.remove_timer(recv.read_short());
             }
             Console::get().print(
-                "[UpdateQuestInfo] Npc markers updated for " +
+                "[UpdateQuestInfo] Timers removed for " +
                 std::to_string(count) + " quest(s)"
             );
             break;
         }
         case 8:
         {
-            // updateQuestFinish (MaplePacketCreator.updateQuestFinish, sent
-            // by the server's NextQuestAction): [short quest][int npc]
-            // [short nextquest]. The questlog itself is already updated by
-            // the SHOW_STATUS_INFO notification; only the player visible
-            // hint is added here.
+            // Mode 8 has two variants, both opening with
+            // [short quest][int npc]:
+            // - STARTED (MaplePacketCreator.updateQuestInfo, sent by the
+            //   server's MapleCharacter.updateQuest STARTED branch):
+            //   [short quest][int npc][int 0] -> 10 bytes, trailing int.
+            //   This merely records the accepting npc; no completion popup.
+            // - FINISH (MaplePacketCreator.updateQuestFinish, sent by the
+            //   server's NextQuestAction on true completion):
+            //   [short quest][int npc][short nextquest] -> 8 bytes,
+            //   trailing short. The questlog itself is already updated by
+            //   the SHOW_STATUS_INFO notification; only the player visible
+            //   hint is added here.
             const int16_t quest_id = recv.read_short();
             const int32_t npc_id = recv.read_int();
+            if (recv.length() >= 4)
+            {
+                // STARTED variant: the trailing int (always 0) is what
+                // distinguishes it from the FINISH variant's short.
+                recv.read_int();
+                Console::get().print(
+                    "[UpdateQuestInfo] Quest " + std::to_string(quest_id) +
+                    " npc " + std::to_string(npc_id) + " started"
+                );
+                break;
+            }
             const int16_t nextquest = recv.read_short();
             Console::get().print(
                 "[UpdateQuestInfo] Quest " + std::to_string(quest_id) +
@@ -145,6 +169,13 @@ namespace jrc
             // questFailure: not enough meso.
             Console::get().print("[UpdateQuestInfo] Quest notice updated");
             UI::get().emplace<UIOk>("金币不足，无法完成任务。", []() {});
+            break;
+        case 0x0C:
+            // questFailure: the inventory is full (payload is just the
+            // mode byte, like the neighbouring failure modes).
+            Console::get().print("[UpdateQuestInfo] Quest notice updated");
+            UI::get().emplace<UIOk>(
+                "背包空间不足，请清理背包后重试。", []() {});
             break;
         case 0x0D:
             // questFailure: the required item is worn by the character.

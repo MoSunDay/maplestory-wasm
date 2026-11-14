@@ -340,18 +340,10 @@ namespace jrc
         case KeyType::FACE:
         case KeyType::ITEM:
         case KeyType::SKILL:
-            // 对话期间阻断游戏层输入，避免重复触发 TalkToNPC 导致会话重开
-            if (auto npctalk = get(UIElement::NPCTALK))
-            {
-                if (npctalk->is_active())
-                    break;
-            }
-            // 本地任务对话框同样阻断游戏层输入
-            if (auto questdialog = get(UIElement::QUESTDIALOG))
-            {
-                if (questdialog->is_active())
-                    break;
-            }
+            // 对话期间（NPC 对话框与本地任务对话框）阻断游戏层输入，
+            // 避免重复触发 TalkToNPC 导致会话重开
+            if (modal_dialog_open())
+                break;
             Stage::get().send_key(type, action, pressed);
             break;
         default:
@@ -479,10 +471,10 @@ namespace jrc
                     }
                     if (clicked)
                         clear_pending_player_target();
-                    // 对话期间点击对话窗外不落空到游戏层，避免点 NPC 重复发起对话
-                    if (auto npctalk = get(UIElement::NPCTALK))
-                        if (npctalk->is_active())
-                            return mst;
+                    // 对话期间（NPC 对话框与本地任务对话框）点击对话窗外
+                    // 不落空到游戏层，避免点 NPC 重复发起 TalkToNPC
+                    if (modal_dialog_open())
+                        return mst;
                     return Stage::get().send_cursor(clicked, pos);
                 }
             }
@@ -516,6 +508,19 @@ namespace jrc
     {
         pending_player_target.reset();
         pending_player_frames = 0;
+    }
+
+    bool UIStateGame::modal_dialog_open()
+    {
+        // NPC 对话框或本地任务对话框任一处于激活状态时，
+        // 视为存在模态对话，需阻断游戏层输入/点击。
+        if (auto npctalk = get(UIElement::NPCTALK))
+            if (npctalk->is_active())
+                return true;
+        if (auto questdialog = get(UIElement::QUESTDIALOG))
+            if (questdialog->is_active())
+                return true;
+        return false;
     }
 
     void UIStateGame::send_scroll(Point<int16_t> pos, double yoffset)

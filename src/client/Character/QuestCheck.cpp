@@ -160,6 +160,16 @@ namespace jrc
             return std::string();
         }
 
+        // Meso gate (server MesoRequirement: chr.getMeso() >= meso).
+        // Used on the completion table; a start-side shortfall is
+        // reported by the server via UPDATE_QUEST_INFO 0x0B instead.
+        bool meso_met(int16_t qid, const QuestCheckContext& context)
+        {
+            const int64_t required =
+                read_int(check_stage(qid, "1")["meso"]);
+            return context.meso >= required;
+        }
+
         // Completion conditions live in Check.img/<qid>/1: every mob entry
         // needs its decoded kill counter >= count and every item entry needs
         // context.item_count(id) >= count. A table without mob and item
@@ -186,12 +196,19 @@ namespace jrc
                 if (!context.item_count || context.item_count(id) < count)
                     return false;
             }
+            // Completion-side meso (server MesoRequirement over
+            // Check.img/<qid>/1/meso) is checked like the item counts.
+            if (!meso_met(qid, context))
+                return false;
             return true;
         }
 
-        // Quest prerequisites from Check.img/<qid>/0/quest/<i>: state 2
-        // requires the referenced quest completed, state 1 active
-        // (server MapleQuest.check()).
+        // Quest prerequisites from Check.img/<qid>/0/quest/<i>: the
+        // referenced quest must sit in the exact required state (server
+        // QuestRequirement, MapleQuestStatus.Status: 0 NOT_STARTED,
+        // 1 STARTED, 2 COMPLETED; the state node defaults to 0 when
+        // absent). "Active" counts both local buckets, started and the
+        // in-progress pairing.
         bool prerequisites_met(int16_t qid, const Questlog& quests)
         {
             const nl::node list = check_stage(qid, "0")["quest"];
@@ -213,6 +230,16 @@ namespace jrc
                         && quests.list_in_progress().count(refid) == 0)
                         return false;
                 }
+                else if (state == 0)
+                {
+                    // NOT_STARTED: the quest must sit in no bucket at
+                    // all (an unknown quest counts as NOT_STARTED on the
+                    // server, hence the pass-through above).
+                    if (quests.is_started(refid)
+                        || quests.list_in_progress().count(refid) > 0
+                        || quests.list_completed().count(refid) > 0)
+                        return false;
+                }
             }
             return true;
         }
@@ -227,6 +254,71 @@ namespace jrc
             const int64_t required = lvmin.get_integer();
             return required <= 0
                 || context.level >= static_cast<uint16_t>(required);
+        }
+
+        // Maximum level gate (server MaxLevelRequirement:
+        // maxLevel >= level; absent or <= 0 never restricts).
+        bool lvmax_met(int16_t qid, const QuestCheckContext& context)
+        {
+            const nl::node lvmax = check_stage(qid, "0")["lvmax"];
+            if (!node_is_integer(lvmax))
+                return true;
+            const int64_t limit = lvmax.get_integer();
+            return limit <= 0
+                || context.level <= static_cast<uint16_t>(limit);
+        }
+
+        // Job gate (server JobRequirement.check): the player job must be
+        // one of the listed ids. The server also lets GM accounts through
+        // (chr.isGM()); the client cannot observe that account flag, so
+        // a table listing the GM-side id 2000 keeps the local fallback
+        // offer alive and lets the server reject the actual request.
+        bool job_met(int16_t qid, const QuestCheckContext& context)
+        {
+            const std::vector<uint16_t> jobs = decoded_job_list(qid);
+            if (jobs.empty())
+                return true;
+            for (const uint16_t job : jobs)
+            {
+                if (job == context.job || job == 2000)
+                    return true;
+            }
+            return false;
+        }
+
+        // Stored completion times carry whatever unit their wire path
+        // used: setfield sends Windows FILETIME (100 ns since 1601,
+        // magnitudes above 1e17), the local completion path stores plain
+        // epoch seconds. Reduce them all to wall-clock epoch ms.
+        int64_t completion_ms(int64_t stored)
+        {
+            if (stored > 116444736000000000LL)
+                return (stored - 116444736000000000LL) / 10000LL;
+            if (stored > 100000000000LL)
+                return stored;
+            return stored > 0 ? stored * 1000 : 0;
+        }
+
+        // Repeat cooldown (server IntervalRequirement.processData: the
+        // node value is minutes): a completed quest re-becomes acceptable
+        // once now - completion >= interval minutes. Only repeatable
+        // quests reach this check (acceptable drops the rest earlier).
+        // A caller that supplies no wall clock (now_ms <= 0) cannot be
+        // compared, so the gate stays open and the server re-checks.
+        bool interval_elapsed(
+            int16_t qid, const Questlog& quests, int64_t now_ms)
+        {
+            if (now_ms <= 0)
+                return true;
+            const nl::node interval = check_stage(qid, "0")["interval"];
+            if (!node_is_integer(interval))
+                return true;
+            const int64_t cooldown_ms =
+                interval.get_integer() * 60LL * 1000LL;
+            const auto done = quests.list_completed().find(qid);
+            if (done == quests.list_completed().end())
+                return true;
+            return now_ms - completion_ms(done->second) >= cooldown_ms;
         }
 
         bool deliverable(int16_t qid, const Questlog& quests,
@@ -251,6 +343,12 @@ namespace jrc
             if (auto_start(qid))
                 return false;
             if (!level_met(qid, context))
+                return false;
+            if (!lvmax_met(qid, context))
+                return false;
+            if (!job_met(qid, context))
+                return false;
+            if (done && !interval_elapsed(qid, quests, context.now_ms))
                 return false;
             return prerequisites_met(qid, quests);
         }
@@ -334,9 +432,54 @@ namespace jrc
         return static_cast<bool>(check_stage(qid, "0")["interval"]);
     }
 
+    std::vector<uint16_t> decoded_job_list(int16_t qid)
+    {
+        // Server JobRequirement.processData collects the integer children
+        // of the job node; the 5-byte encoding only feeds item actions
+        // (ItemAction.canGetItem) and never the quest start gate.
+        std::vector<uint16_t> jobs;
+        for (const nl::node& entry : check_stage(qid, "0")["job"])
+        {
+            if (node_is_integer(entry))
+            {
+                jobs.push_back(
+                    static_cast<uint16_t>(entry.get_integer()));
+            }
+        }
+        return jobs;
+    }
+
     std::string quest_name(int16_t qid)
     {
         const nl::node name = quest_info(qid)["name"];
         return static_cast<bool>(name) ? name.get_string() : "?";
+    }
+
+    std::vector<QuestMobProgress> decoded_progress(int16_t qid,
+        const std::string& progress)
+    {
+        std::vector<QuestMobProgress> kills;
+        const std::vector<int32_t>& mobs = relevant_mobs(qid);
+        // Length gate: the server always writes one padded counter per
+        // tracked mob, so any other length is a foreign format the
+        // caller must keep verbatim.
+        if (mobs.empty() || progress.size() != mobs.size() * 3)
+        {
+            return kills;
+        }
+
+        // Rows follow the completion table; the killed counter is
+        // matched by mob id (the server also keys progress by mob id),
+        // which keeps the pairing correct when the start table tracks
+        // extra mobs the completion side never asks for.
+        for (const nl::node& entry : check_stage(qid, "1")["mob"])
+        {
+            QuestMobProgress kill;
+            kill.mobid = read_int(entry["id"]);
+            kill.required = read_int(entry["count"]);
+            kill.killed = progress_counter(progress, kill.mobid, mobs);
+            kills.push_back(kill);
+        }
+        return kills;
     }
 }

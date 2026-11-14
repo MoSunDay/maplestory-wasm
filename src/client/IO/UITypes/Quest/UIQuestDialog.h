@@ -53,6 +53,19 @@ namespace jrc
         void draw(float inter) const override;
         void update_screen(int16_t width, int16_t height) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
+        UIElement::CursorResult send_cursor(bool clicked,
+            Point<int16_t> cursorpos) override;
+
+        // 只读诊断探针（ImeBridge 调用）：which 0=NEXT 1=PREV 2=YES 3=NO；
+        // field 0=x 1=y 2=w 3=h 4=active。元素级 field:
+        // 0=pos.x 1=pos.y 2=dim.x 3=dim.y 4=on_last_page
+        // 5=selection_count 6=selected_index 7=page_index 8=declining
+        // 9=quest_id 10=completing 11=scripted。
+        int32_t probe_button(int which, int field) const;
+        int32_t probe_element(int field) const;
+        // 奖励格：index 为 rewards 下标，field 0=x 1=y 2=w 3=h
+        // （均为对话框相对坐标），越界返回 -9998。
+        int32_t probe_reward(int index, int field) const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;
@@ -73,12 +86,28 @@ namespace jrc
         const std::string& current_page() const;
         // Whether the last speech page (the YES/NO page) is on screen.
         bool on_last_page() const;
+        // Whether the final page also renders the choose-one reward row
+        // (completion offer whose Act.img table has prop == -1 items).
+        bool on_selection_page() const;
+        // Height of the reward row block, 0 when it is not shown.
+        int16_t rewards_height() const;
+        // Top-left corner of the reward block, relative to `position`.
+        Point<int16_t> rewards_origin() const;
+        // Index of the reward cell under the dialog-relative cursor, -1
+        // when the cursor is outside every cell.
+        int16_t reward_at(Point<int16_t> relative) const;
         // Sends the quest action packet matching offer.completing/scripted.
         void dispatch_accept();
 
         QuestOffer offer;
         int32_t npc_id;
         quest_dialog_model::DialogContent content;
+
+        // prop == -1 completion rewards (Act.img/<qid>/1/item); empty for
+        // quests without a choose-one reward. `reward_selection` is the
+        // index sent as the trailing [short selection] byte pair.
+        std::vector<quest_dialog_model::RewardChoice> rewards;
+        std::size_t reward_selection;
 
         Texture top;
         Texture fill;
@@ -87,6 +116,7 @@ namespace jrc
 
         Text title;
         Text text;
+        Text hint;
         int16_t height;
         int16_t vtile;
 

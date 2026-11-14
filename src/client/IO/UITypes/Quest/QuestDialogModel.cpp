@@ -39,6 +39,13 @@ namespace
         return nl::nx::quest["QuestInfo.img"][std::to_string(qid)];
     }
 
+    // Act.img/<qid>/<stage> action table: "0" holds the accept actions,
+    // "1" the completion (完成期) rewards.
+    nl::node act_stage(int16_t qid, const char* stage)
+    {
+        return nl::nx::quest["Act.img"][std::to_string(qid)][stage];
+    }
+
     bool node_is_string(const nl::node& node)
     {
         return static_cast<bool>(node)
@@ -48,6 +55,16 @@ namespace
     std::string string_of(const nl::node& node)
     {
         return node_is_string(node) ? node.get_string() : std::string();
+    }
+
+    // Integer value of an NX node; `fallback` when the node is absent or
+    // not an integer (mirrors MapleDataTool.getInt(path, default)).
+    int32_t integer_of(const nl::node& node, int32_t fallback)
+    {
+        return static_cast<bool>(node)
+            && node.data_type() == nl::node::type::integer
+            ? static_cast<int32_t>(node.get_integer())
+            : fallback;
     }
 
     // True when the child name is only digits ("0", "1", "2", ...). The
@@ -110,6 +127,17 @@ namespace
             ? "确定要提交这个任务吗？"
             : "你愿意接受这个任务吗？";
     }
+
+    // The completion item table. v83 data ships it unwrapped at
+    // Act.img/<qid>/1/item; some WZ revisions wrap it in a "yes" subtree,
+    // so that spelling is accepted as a fallback.
+    nl::node completion_items(int16_t qid)
+    {
+        const nl::node complete = act_stage(qid, "1");
+        return static_cast<bool>(complete["item"])
+            ? complete["item"]
+            : complete["yes"]["item"];
+    }
 }
 
 namespace jrc
@@ -146,6 +174,41 @@ namespace jrc
             }
 
             return content;
+        }
+
+        std::vector<RewardChoice> selectable_rewards(int16_t qid)
+        {
+            // Name-keyed so the numeric child order ("0", "1", ..., "10")
+            // matches the server's re-sorted selectList exactly.
+            std::map<int32_t, RewardChoice> by_index;
+            for (const nl::node& entry : completion_items(qid))
+            {
+                if (!is_numbered_child(entry.name()))
+                {
+                    continue;
+                }
+
+                // Only prop == -1 entries are player-selectable; every
+                // other prop value is a random reward the server rolls
+                // itself, and missing prop means a fixed reward.
+                if (integer_of(entry["prop"], 0) != -1)
+                {
+                    continue;
+                }
+
+                by_index[std::atoi(entry.name().c_str())] = {
+                    integer_of(entry["id"], 0),
+                    integer_of(entry["count"], 1)
+                };
+            }
+
+            std::vector<RewardChoice> choices;
+            choices.reserve(by_index.size());
+            for (const auto& entry : by_index)
+            {
+                choices.push_back(entry.second);
+            }
+            return choices;
         }
     }
 }

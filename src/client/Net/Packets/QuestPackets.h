@@ -28,8 +28,9 @@ namespace jrc
     // consumes [int npcid] and, if at least 4 bytes are still available,
     // [short x][short y] for the isNpcNearby check (x before y, both after
     // the npcid). Action 2 additionally reads a trailing [short selection]
-    // when at least 2 bytes remain; these packets omit it, so the server
-    // takes the no-selection completion branch.
+    // when at least 2 bytes remain; the selection overload of
+    // QuestCompletePacket sends it, while the other packets omit it so the
+    // server takes the no-selection branch.
 
     // Requests starting a quest. Opcode: QUEST_ACTION(107)
     class QuestStartPacket : public OutPacket
@@ -52,10 +53,14 @@ namespace jrc
         };
     };
 
-    // Requests completing a quest (no selection). Opcode: QUEST_ACTION(107)
+    // Requests completing a quest. Opcode: QUEST_ACTION(107).
+    // Action 2 (COMPLETE): [byte 2][short questid][int npcid][short x]
+    // [short y], optionally followed by [short selection].
     class QuestCompletePacket : public OutPacket
     {
     public:
+        // No-selection variant: the server sees fewer than 2 trailing
+        // bytes and takes the no-selection completion branch.
         QuestCompletePacket(int16_t quest_id, int32_t npc_id,
             Point<int16_t> position) : OutPacket(QUEST_ACTION)
         {
@@ -64,6 +69,21 @@ namespace jrc
             write_int(npc_id);
             write_short(position.x());
             write_short(position.y());
+        }
+
+        // Selection variant: appends the trailing [short selection] the
+        // server's QuestActionHandler action 2 reads when a dialog choice
+        // is submitted together with the completion request.
+        QuestCompletePacket(int16_t quest_id, int32_t npc_id,
+            Point<int16_t> position, int16_t selection)
+            : OutPacket(QUEST_ACTION)
+        {
+            write_byte(COMPLETE);
+            write_short(quest_id);
+            write_int(npc_id);
+            write_short(position.x());
+            write_short(position.y());
+            write_short(selection);
         }
 
     private:

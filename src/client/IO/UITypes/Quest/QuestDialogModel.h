@@ -43,6 +43,14 @@ namespace jrc
             std::string title;
         };
 
+        // One selectable completion reward: an Act.img item entry whose
+        // prop is -1. The player picks exactly one of these.
+        struct RewardChoice
+        {
+            int32_t itemid;
+            int32_t count;
+        };
+
         // Collects the dialogue of one quest interaction.
         //
         // completing == false reads Say.img/<qid>/0/* (accept speech) with
@@ -54,5 +62,19 @@ namespace jrc
         // usable. The title comes from QuestInfo.img/<qid>/name ("任务"
         // when absent).
         DialogContent collect(int16_t qid, bool completing);
+
+        // Reads Act.img/<qid>/1/yes/item (falling back to the unwrapped
+        // Act.img/<qid>/1/item layout this data set ships) child-by-child
+        // and returns only the prop == -1 entries (itemid + count).
+        //
+        // Server contract (MapleStory-Server
+        // src/server/quest/actions/ItemAction.java): the completion item
+        // table's children are re-sorted by their numeric node names, the
+        // prop == -1 entries form the selectList in that order, and the
+        // trailing [short selection] of the action-2 QUEST_ACTION packet
+        // indexes into it. Children are therefore collected into a
+        // name-keyed map ("10" never sorts before "2") so the returned
+        // order matches the server's selectList exactly.
+        std::vector<RewardChoice> selectable_rewards(int16_t qid);
     }
 }

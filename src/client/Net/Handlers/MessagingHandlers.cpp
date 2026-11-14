@@ -731,6 +731,20 @@ namespace jrc
             return;
         }
 
+        if (mode1 == 9) // quest complete effect
+        {
+            // Server showSpecialEffect(9) (MapleQuest.forceComplete)
+            // carries no further payload. The quest-complete screen
+            // effect is intentionally gated: Effect.nx ships no
+            // Quest.img asset yet, so rendering it would only produce
+            // a missing-asset log line.
+            log_show_item_gain_once(
+                "mode9_quest_complete_effect",
+                "[ShowItemGainInChatHandler] Mode 9 quest-complete effect is gated: Effect.nx has no Quest.img asset yet."
+            );
+            return;
+        }
+
         log_show_item_gain_once(
             "mode_fallback_" + std::to_string(static_cast<int>(mode1)),
             "[ShowItemGainInChatHandler] Treating mode " +

@@ -20,6 +20,8 @@
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
 
+#include <chrono>
+
 namespace jrc
 {
     int16_t quest_info_number(int16_t qid)
@@ -48,7 +50,7 @@ namespace jrc
     void Questlog::add_started(int16_t qid, const std::string& qdata)
     {
         started[qid] = qdata;
-        last_started = qid;
+        started_order[qid] = ++started_seq;
         ++rev;
     }
 
@@ -70,12 +72,22 @@ namespace jrc
 
         // Preferred rule: the linked server appends the info entry
         // (keyed by the parent's infoNumber) directly after its parent.
-        if (last_started > 0 && quest_info_number(last_started) == qid)
+        // Pair with the most recently STARTED quest carrying that info
+        // number, following the insertion-order sequence: `started` is
+        // key-sorted, so a later-started smaller-id quest must not hide
+        // an earlier parent.
+        uint64_t parent_seq = 0;
+        for (const auto& entry : started_order)
         {
-            parent = last_started;
+            if (entry.second > parent_seq
+                && quest_info_number(entry.first) == qid)
+            {
+                parent_seq = entry.second;
+                parent = entry.first;
+            }
         }
         // Fallback heuristic for servers that repeat the same quest id.
-        else if (is_started(qid))
+        if (parent == 0 && is_started(qid))
         {
             const int16_t previous = get_last_started();
             if (previous > 0 && previous != qid)
@@ -88,10 +100,7 @@ namespace jrc
         {
             in_progress[parent] = std::make_pair(qid, qdata);
             started.erase(parent);
-            if (last_started == parent)
-            {
-                last_started = 0;
-            }
+            started_order.erase(parent);
             ++rev;
         }
         else
@@ -120,14 +129,19 @@ namespace jrc
     void Questlog::forfeit(int16_t qid)
     {
         started.erase(qid);
+        started_order.erase(qid);
         in_progress.erase(qid);
-        if (last_started == qid)
-        {
-            last_started = 0;
-        }
+        // The quest is gone, so its timer must not keep ticking.
+        remove_timer(qid);
         // Remember the info number so update_data can drop the server's
-        // trailing info echo instead of resurrecting it as a row.
-        forfeited_info_number = quest_info_number(qid);
+        // trailing info echo instead of resurrecting it as a row. Every
+        // forfeit gets its own slot, so a second forfeit cannot let an
+        // older echo through; the setfield parser clears the set.
+        const int16_t info = quest_info_number(qid);
+        if (info != 0)
+        {
+            forfeited_info_numbers.insert(info);
+        }
         ++rev;
     }
 
@@ -175,10 +189,9 @@ namespace jrc
 
         // Trailing info echo of a forfeit/expire removal. The legitimate
         // re-accept path is already handled by the loop above, so this
-        // can only be the orphan echo: drop it.
-        if (forfeited_info_number != 0 && qid == forfeited_info_number)
+        // can only be the orphan echo: drop it and release its slot.
+        if (forfeited_info_numbers.erase(qid) > 0)
         {
-            forfeited_info_number = 0;
             return;
         }
 
@@ -189,13 +202,62 @@ namespace jrc
     void Questlog::complete(int16_t qid, int64_t time)
     {
         started.erase(qid);
+        started_order.erase(qid);
         in_progress.erase(qid);
+        // Completed quests no longer run their time limit.
+        remove_timer(qid);
         completed[qid] = time;
-        if (last_started == qid)
-        {
-            last_started = 0;
-        }
         ++rev;
+    }
+
+    void Questlog::clear_forfeited()
+    {
+        // Stale guards must never suppress rows of a freshly parsed
+        // questlog, so the setfield parser empties this at every parse.
+        if (forfeited_info_numbers.empty())
+        {
+            return;
+        }
+
+        forfeited_info_numbers.clear();
+        ++rev;
+    }
+
+    void Questlog::add_timer(int16_t qid, int32_t remaining_ms)
+    {
+        // Absolute deadline on the steady clock: immune to wall-clock
+        // adjustments and directly comparable in timer_remaining_ms.
+        const auto now = std::chrono::steady_clock::now()
+            .time_since_epoch();
+        deadlines[qid] =
+            std::chrono::duration_cast<std::chrono::milliseconds>(now)
+                .count()
+            + remaining_ms;
+        ++rev;
+    }
+
+    void Questlog::remove_timer(int16_t qid)
+    {
+        if (deadlines.erase(qid) > 0)
+        {
+            ++rev;
+        }
+    }
+
+    int64_t Questlog::timer_remaining_ms(int16_t qid) const
+    {
+        const auto entry = deadlines.find(qid);
+        if (entry == deadlines.end())
+        {
+            return -1;
+        }
+        const auto now = std::chrono::steady_clock::now()
+            .time_since_epoch();
+        const int64_t remaining =
+            entry->second
+            - std::chrono::duration_cast<std::chrono::milliseconds>(now)
+                  .count();
+        return remaining > 0 ? remaining : -1;
     }
 
     uint64_t Questlog::revision() const

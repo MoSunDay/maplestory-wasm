@@ -18,8 +18,17 @@
 //#pragma once
 #include "Npc.h"
 
+#include "../../Character/QuestCheck.h"
+#include "../../Character/QuestInteraction.h"
+#include "../../Character/QuestLog.h"
+#include "../Stage.h"
+
 #include "nlnx/node.hpp"
 #include "nlnx/nx.hpp"
+
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
 
 
 namespace
@@ -45,6 +54,82 @@ namespace
         }
 
         return false;
+    }
+
+    // Numeric suffix of a condition node name ("condition12" -> 12); 0
+    // when the name carries no number. The client evaluates the
+    // conditions in this order and uses the first match.
+    int32_t condition_order(const std::string& name)
+    {
+        const size_t at = name.rfind("condition");
+        const std::string suffix =
+            at == 0 ? name.substr(std::strlen("condition")) : std::string();
+        const int32_t value = std::atoi(suffix.c_str());
+        return value > 0 ? value : 0;
+    }
+
+    // Current state of one quest for the condition gates, using the
+    // value range the Npc.nx condition tables encode: 1 = not started,
+    // 2 = started (either local active bucket), 3 = completed.
+    int32_t quest_gate_state(int32_t qid, const jrc::Questlog& quests)
+    {
+        if (quests.list_completed().count(
+                static_cast<int16_t>(qid)) > 0)
+        {
+            return 3;
+        }
+        if (quests.list_started().count(static_cast<int16_t>(qid)) > 0
+            || quests.list_in_progress().count(
+                static_cast<int16_t>(qid)) > 0)
+        {
+            return 2;
+        }
+        return 1;
+    }
+
+    // Every quest-state gate of the condition must hold.
+    bool condition_gates_met(const jrc::NpcCondition& condition,
+        const jrc::Questlog& quests)
+    {
+        for (const jrc::NpcConditionGate& gate : condition.gates)
+        {
+            if (quest_gate_state(gate.quest_id, quests) != gate.state)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Picks the stance the npc should display out of its current base
+    // stance and the condition stances: the first condition (numeric
+    // name order) whose quest-state gates all hold replaces the base
+    // stance; the returned key is "<condition>/<stance>" when that
+    // condition ships art for the base stance and empty otherwise. Pure,
+    // so the selection stays testable without an npc instance.
+    std::string stance_for_quest_state(const std::string& base_stance,
+        const std::vector<jrc::NpcCondition>& conditions,
+        const jrc::Questlog& quests)
+    {
+        for (const jrc::NpcCondition& condition : conditions)
+        {
+            if (!condition_gates_met(condition, quests))
+            {
+                continue;
+            }
+
+            const auto art = std::find(
+                condition.stances.begin(), condition.stances.end(),
+                base_stance);
+            if (art != condition.stances.end())
+            {
+                return condition.name + "/" + base_stance;
+            }
+            // The condition matches but carries no art for this stance:
+            // keep the base stance rather than drawing nothing.
+            return std::string();
+        }
+        return std::string();
     }
 }
 
@@ -82,17 +167,37 @@ namespace jrc
         for (const auto& npcnode : src)
         {
             const std::string state = npcnode.name();
-            if (state != "info")
+            if (is_special_node(state))
             {
-                animations[state] = npcnode;
-                states.push_back(state);
+                // 'shop'/'condition*' subtrees are not stances: parsing
+                // them as such made the npc vanish once the random idle
+                // switch landed on one. Conditions become their own
+                // table; the shop portrait stays unloaded like 'info'.
+                if (state.rfind("condition", 0) == 0)
+                {
+                    load_condition(npcnode);
+                }
+                continue;
             }
+
+            animations[state] = npcnode;
+            states.push_back(state);
 
             for (auto speaknode : npcnode["speak"])
             {
                 lines[state].push_back(strsrc[speaknode.get_string()]);
             }
         }
+
+        // The client evaluates conditions by numeric name order; the nx
+        // child order happens to match, but sorting keeps that
+        // independent of the file layout.
+        std::sort(conditions.begin(), conditions.end(),
+            [](const NpcCondition& a, const NpcCondition& b)
+            {
+                return condition_order(a.name)
+                    < condition_order(b.name);
+            });
 
         name = strsrc["name"].get_string();
         func = strsrc["func"].get_string();
@@ -104,17 +209,103 @@ namespace jrc
         flip    = !fl;
         control = cnt;
         stance  = "stand";
+        drawn_stance = stance;
 
         phobj.fhid = f;
         set_position(position);
     }
 
+    // NX layout (verified against assets/Npc.nx and the linked server's
+    // Npc.wz XML): a 'conditionN' node mixes quest-state gates with
+    // replacement stance art,
+    //   <imgdir name="condition1">
+    //     <int name="21300" value="3"/>          quest gate (state)
+    //     <int name="hide" value="1"/>           hide the npc instead
+    //     <imgdir name="stand">...</imgdir>      replacement stance art
+    //   </imgdir>
+    // The state values 1/2/3 mean not started/started/completed (chains
+    // like 1201001.gate {21300=3, 21302=2} are only consistent in that
+    // reading: an earlier quest cannot be 'started' while a later one is
+    // already completed).
+    void Npc::load_condition(const nl::node& condition)
+    {
+        NpcCondition built;
+        built.name = condition.name();
+        for (const nl::node& child : condition)
+        {
+            if (child.data_type() == nl::node::type::integer)
+            {
+                if (child.name() == "hide")
+                {
+                    built.hidden = child.get_integer() == 1;
+                }
+                else
+                {
+                    built.gates.push_back(NpcConditionGate{
+                        std::atoi(child.name().c_str()),
+                        static_cast<int32_t>(child.get_integer())
+                    });
+                }
+                continue;
+            }
+
+            // Art subtrees only; gates never carry frames.
+            if (has_bitmap_frame(child))
+            {
+                built.stances.push_back(child.name());
+                animations[built.name + "/" + child.name()] = child;
+            }
+        }
+        conditions.push_back(std::move(built));
+    }
+
+    // Quest-state-driven stance selection: while a condition's gates
+    // hold, its art replaces the base stance; 'hide' conditions remove
+    // the npc from view until the quest state moves on.
+    void Npc::resolve_condition_stance()
+    {
+        const std::string previous = drawn_stance;
+        bool hidden = false;
+
+        std::string override_stance;
+        if (!conditions.empty())
+        {
+            const Questlog& quests =
+                Stage::get().get_player().get_quests();
+            override_stance =
+                stance_for_quest_state(stance, conditions, quests);
+            for (const NpcCondition& condition : conditions)
+            {
+                if (condition_gates_met(condition, quests))
+                {
+                    hidden = condition.hidden;
+                    break;
+                }
+            }
+        }
+
+        condition_hidden = hidden;
+        drawn_stance = override_stance.empty() ? stance : override_stance;
+        if (drawn_stance != previous && animations.count(drawn_stance))
+        {
+            // Entering another animation restarts it from frame zero,
+            // like set_stance does for the base stances.
+            animations.at(drawn_stance).reset();
+        }
+    }
+
     void Npc::draw(double viewx, double viewy, float alpha) const
     {
-        Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
-        if (animations.count(stance))
+        if (condition_hidden)
         {
-            animations.at(stance).draw(DrawArgument(absp, flip), alpha);
+            return;
+        }
+
+        Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+        if (animations.count(drawn_stance))
+        {
+            animations.at(drawn_stance)
+                .draw(DrawArgument(absp, flip), alpha);
         }
 
         if (!hidename)
@@ -133,14 +324,23 @@ namespace jrc
 
         physics.move_object(phobj);
 
-        if (animations.count(stance))
+        // Quest conditions are re-checked every frame so the stance (and
+        // the hidden flag) follows the live quest log; the walk is a few
+        // map lookups per condition.
+        resolve_condition_stance();
+
+        if (animations.count(drawn_stance))
         {
-            bool aniend = animations.at(stance).update();
-            if (aniend && states.size() > 0)
+            bool aniend = animations.at(drawn_stance).update();
+            // Random idle switching only ranges over the base stances;
+            // a condition override keeps its art until the state moves.
+            if (aniend && states.size() > 0
+                && drawn_stance == stance)
             {
                 size_t next_stance = random.next_int(states.size());
                 std::string new_stance = states[next_stance];
                 set_stance(new_stance);
+                resolve_condition_stance();
             }
         }
 
@@ -175,7 +375,7 @@ namespace jrc
 
     bool Npc::inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const
     {
-        if (!active)
+        if (!active || condition_hidden)
         {
             return false;
         }
@@ -192,5 +392,22 @@ namespace jrc
             absp.y() - dim.y(),
             absp.y()
         ).contains(cursorpos);
+    }
+
+    bool npc_has_quest_marker(int32_t npc_id, const Questlog& quests,
+        const QuestCheckContext& context)
+    {
+        QuestOffer offer{};
+        return quest_offer_at(npc_id, quests, context, offer);
+    }
+
+    bool npc_has_quest_marker_now(int32_t npc_id)
+    {
+        Player& player = Stage::get().get_player();
+        return npc_has_quest_marker(
+            npc_id,
+            player.get_quests(),
+            quest_interaction::make_check_context()
+        );
     }
 }

@@ -34,6 +34,14 @@ namespace jrc
 
         void update_screen(int16_t width, int16_t height) override;
 
+        // E2E 只读探针：UIOk / UIYesNo / UIEnterNumber 共享 NOTICE 槽，
+        // probe_is_ok 让探针只认单按钮 UIOk；question 为对话框正文。
+        virtual bool probe_is_ok() const { return false; }
+        const std::string& probe_question() const
+        {
+            return question.get_text();
+        }
+
     protected:
         UINotice(std::string question);
 
@@ -82,6 +90,8 @@ namespace jrc
 
         void draw(float alpha) const override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+        bool probe_is_ok() const override { return true; }
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;

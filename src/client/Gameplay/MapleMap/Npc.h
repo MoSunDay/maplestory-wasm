@@ -24,10 +24,51 @@
 #include "../../Graphics/Text.h"
 #include "../../Util/Randomizer.h"
 
+#include "nlnx/node.hpp"
+
 #include <map>
+#include <string>
+#include <vector>
 
 namespace jrc
 {
+    class Questlog;
+    struct QuestCheckContext;
+
+    // One quest-state gate of a 'conditionN' npc node: the quest must
+    // sit in exactly this state for the condition to apply.
+    struct NpcConditionGate
+    {
+        int32_t quest_id = 0;
+        // Values observed in Npc.nx condition tables (see Npc.cpp):
+        // 1 = not started, 2 = started (in progress), 3 = completed.
+        int32_t state = 0;
+    };
+
+    // A 'conditionN' npc node: quest-state gates plus replacement stance
+    // art the npc shows while the gates hold (some conditions carry
+    // 'hide' = 1 instead, removing the npc from view entirely).
+    struct NpcCondition
+    {
+        std::string name;                    // "condition1", ...
+        std::vector<NpcConditionGate> gates; // quest state requirements
+        bool hidden = false;                 // 'hide' == 1
+        std::vector<std::string> stances;    // art subtree names ("stand")
+    };
+
+    // Asset-gate seam for the head-top quest balloon: this data set's
+    // Effect.nx ships no Quest.img, so no marker is ever drawn. The pure
+    // query below keeps the availability decision (QuestCheck::
+    // quest_offer_at over the character's live log) in one place for the
+    // future balloon art.
+    bool npc_has_quest_marker(int32_t npc_id, const Questlog& quests,
+        const QuestCheckContext& context);
+
+    // Live-state variant of the above: builds the check context through
+    // quest_interaction::make_check_context (the same builder the local
+    // quest-offer fallback dialog uses).
+    bool npc_has_quest_marker_now(int32_t npc_id);
+
     // Represents a npc on the current map.
     // Implements the 'Mapobject' interface to be used in a 'Mapobjects' template.
     class Npc : public MapObject
@@ -70,9 +111,23 @@ namespace jrc
         }
 
     private:
+        // Loads one 'conditionN' child into the condition table and its
+        // stance art into the animation map ("<condition>/<stance>" keys).
+        void load_condition(const nl::node& condition);
+        // Re-resolves which stance key the quest state selects; called
+        // from update() so the npc follows the quest log live.
+        void resolve_condition_stance();
+
         std::map<std::string, Animation> animations;
         std::map<std::string, std::vector<std::string>> lines;
         std::vector<std::string> states;
+        // 'conditionN' nodes in numeric order; empty for plain npcs.
+        std::vector<NpcCondition> conditions;
+        // Stance key currently drawn: the base stance name, or a
+        // "conditionN/<stance>" override.
+        std::string drawn_stance;
+        // The winning condition carries hide = 1: nothing is drawn.
+        bool condition_hidden = false;
         std::string name;
         std::string func;
         bool hidename;
