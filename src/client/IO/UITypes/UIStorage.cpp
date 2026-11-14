@@ -110,17 +110,12 @@ namespace jrc
                 {
                     const EntryT& entry = items[index];
 
-                    if (grid)
-                    {
-                        Texture icon = ItemData::get(entry.itemid).get_icon(false);
-                        icon.shift(Point<int16_t>(0, 32));
-                        icon.draw(iconpos);
-                    }
-                    else
-                    {
-                        const Texture& icon = ItemData::get(entry.itemid).get_icon(false);
-                        icon.draw(iconpos);
-                    }
+                    // NX item icons carry a bottom-left origin (usually
+                    // (0, 32)); shift it onto the top-left anchor so the
+                    // icon sits inside the 32px cell / 35px legacy row.
+                    Texture icon = ItemData::get(entry.itemid).get_icon(false);
+                    icon.shift(Point<int16_t>(0, 32));
+                    icon.draw(iconpos);
 
                     if (tab != InventoryType::EQUIP && entry.count > 1)
                     {

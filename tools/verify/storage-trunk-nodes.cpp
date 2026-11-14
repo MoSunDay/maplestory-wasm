@@ -241,6 +241,15 @@ int main(int argc, char** argv)
     check_eq(sn::get_pos().y(), 247, "action button strip y");
     check(sn::get_pos().x() > 0 && sn::exit_pos().y() >= 271,
         "action buttons on the parchment strip");
+    // BtSort is the only legacy button whose sprite is origin-bearing
+    // (center anchor (35,9)): MapleButton draws the visible rect at
+    // position - origin, so sort_pos() stores the anchor and the rect must
+    // still land on the bottom action row's left edge at (28,272).
+    const nl::node sort_origin = sn::src()["BtSort"]["normal"]["0"]["origin"];
+    check_eq(sn::sort_pos().x() - sort_origin.x(), 28,
+        "legacy BtSort visible rect left edge (sort_pos().x() - origin.x())");
+    check_eq(sn::sort_pos().y() - sort_origin.y(), 272,
+        "legacy BtSort visible rect top edge (sort_pos().y() - origin.y())");
     check(!sn::has_mode_buttons(), "mode buttons hidden for legacy trunk");
 
     std::cout << "post-Chaos grid metadata\n";

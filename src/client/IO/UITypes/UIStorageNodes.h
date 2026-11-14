@@ -331,7 +331,10 @@ namespace jrc
         // authored spot in the sprite origin (BtExit (94,17), BtGet
         // (94,36), BtSort (94,55), BtPut (255,17)), so those buttons
         // position themselves and the helpers stay zero. v83 art is
-        // origin-less and is placed explicitly on the parchment strip.
+        // origin-less and is placed explicitly on the parchment strip,
+        // except BtSort: its 71x18 sprite is center-anchored with origin
+        // (35,9), so sort_pos() stores the anchor (visible rect + origin)
+        // to draw the button at (28,272) like the origin-less neighbours.
         inline Point<int16_t> get_pos()
         {
             return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 28, 247 };
@@ -344,7 +347,7 @@ namespace jrc
 
         inline Point<int16_t> sort_pos()
         {
-            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 28, 272 };
+            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 63, 281 };
         }
 
         inline Point<int16_t> exit_pos()
