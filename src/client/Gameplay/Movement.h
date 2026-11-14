@@ -28,7 +28,11 @@ namespace jrc
             _ABSOLUTE,
             _RELATIVE,
             CHAIR,
-            JUMPDOWN
+            JUMPDOWN,
+            // Instant-position fragments (teleport, assaulter, rush, chair
+            // sit). The wire format carries no duration for them, so they
+            // use duration 0 and replay as zero-length waypoints.
+            TELEPORT
         };
 
         // Official absolute-movement fragment command used while swimming.
@@ -41,8 +45,10 @@ namespace jrc
         Movement(int16_t x, int16_t y, int16_t lx, int16_t ly, uint8_t s, int16_t d)
             : Movement(_ABSOLUTE, 0, x, y, lx, ly, 0, s, d) {}
 
-        Movement(const PhysicsObject& phobj, uint8_t s, uint8_t cmd = 0)
-            : Movement(_ABSOLUTE, cmd, phobj.get_x(), phobj.get_y(), phobj.get_last_x(), phobj.get_last_y(), phobj.fhid, s, 1) {}
+        // 'd' is the fragment duration in milliseconds and is passed through
+        // as-is: 0 is a valid instant duration, never a sentinel.
+        Movement(const PhysicsObject& phobj, uint8_t s, uint8_t cmd = 0, int16_t d = 1)
+            : Movement(_ABSOLUTE, cmd, phobj.get_x(), phobj.get_y(), phobj.get_last_x(), phobj.get_last_y(), phobj.fhid, s, d) {}
 
         Movement()
             : Movement(NONE, 0, 0, 0, 0, 0) {}
@@ -50,7 +56,8 @@ namespace jrc
         bool hasmoved(const Movement& newmove) const
         {
             return newmove.newstate != newstate || newmove.xpos != xpos ||
-                newmove.ypos != ypos || newmove.lastx != lastx || newmove.lasty != lasty;
+                newmove.ypos != ypos || newmove.lastx != lastx || newmove.lasty != lasty ||
+                newmove.fh != fh;
         }
 
         Type type;

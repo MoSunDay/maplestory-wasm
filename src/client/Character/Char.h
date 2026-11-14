@@ -57,7 +57,7 @@ namespace jrc
         /// Check wether the character is invincible.
         virtual bool is_invincible() const;
         /// Check whether the character is hidden (GM hide / Dark Sight).
-        virtual bool is_hidden() const { return false; }
+        virtual bool is_hidden() const { return darksight; }
         /// Return the character's level.
         virtual uint16_t get_level() const = 0;
         /// Return the character's level.
@@ -111,6 +111,17 @@ namespace jrc
         void set_expression(int32_t emote);
         /// Change the item-chair visual; zero clears it.
         void set_chair(int32_t item_id);
+        /// Set the chalkboard text shown above the name tag; an empty
+        /// string closes the board.
+        void set_chalkboard(const std::string& text);
+        /// Return the current chalkboard text; empty while closed.
+        const std::string& get_chalkboard() const;
+        /// Set the remote Dark Sight look; fades the body and name tag.
+        void set_darksight(bool active);
+        /// Set the remote Shadow Partner look; adds a mirrored after-image.
+        void set_shadowpartner(bool active);
+        /// Set the remote Morph look; tints the transformed body.
+        void set_morphed(bool active);
 
         /// Add a pet with the specified stats.
         void add_pet(
@@ -177,9 +188,14 @@ namespace jrc
         State state = STAND;
         bool attacking = false;
         bool flip = false;
+        bool darksight = false;
+        bool shadowpartner = false;
+        bool morphed = false;
 
     private:
         Text namelabel;
+        Text chalkboardlabel;
+        std::string chalkboard;
         ChatBalloon chatballoon;
         EffectLayer effects;
         Afterimage afterimage;

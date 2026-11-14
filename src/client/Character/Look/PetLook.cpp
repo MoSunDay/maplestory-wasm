@@ -28,6 +28,23 @@
 
 namespace jrc
 {
+    namespace
+    {
+        // Index of the first positioned fragment of a MOVE_PET batch: the
+        // anchor the replay starts from. Everything before it (teleports,
+        // equip changes) carries no usable waypoint.
+        size_t pet_playback_anchor(const std::vector<Movement>& movements)
+        {
+            size_t index = 0;
+            while (index < movements.size()
+                && !mobplayback::positioned(movements[index]))
+            {
+                ++index;
+            }
+            return index;
+        }
+    }
+
     PetLook::PetLook(int32_t iid, std::string nm, int32_t uqid,
         Point<int16_t> pos, uint8_t st, int32_t fhid) {
 
@@ -76,6 +93,13 @@ namespace jrc
         uint16_t owner_fhid, const pet_follow::MovementProfile& movement)
     {
         static const double PETFLYFORCE = 0.2;
+
+        // While a remote fragment batch replays, it drives the pet
+        // exclusively: the local follow simulation (decide, leash warps,
+        // WARP landing) resumes from the final endpoint once the fragment
+        // time is exhausted.
+        if (update_playback())
+            return;
 
         Point<int16_t> curpos = phobj.get_position();
         if (stance == WARP)
@@ -296,6 +320,79 @@ namespace jrc
         set_position(movement.xpos, movement.ypos);
         phobj.fhid = movement.fh;
         set_stance(movement.newstate);
+    }
+
+    void PetLook::apply_movements(const std::vector<Movement>& movements)
+    {
+        if (movements.empty())
+            return;
+
+        const size_t anchor = pet_playback_anchor(movements);
+        if (anchor >= movements.size())
+            return;
+
+        // The first positioned fragment anchors the batch: land on its
+        // endpoint, foothold and stance directly (a single-fragment batch
+        // is exactly the old snap), then hand the remaining fragments to
+        // the replay channel so the pet interpolates along the path
+        // instead of teleporting to the last fragment.
+        const Movement& first = movements[anchor];
+        set_position(first.xpos, first.ypos);
+        phobj.fhid = first.fh;
+        set_stance(first.newstate);
+        reset_motion();
+        jump_start_distance = 0;
+        jump_direction = 0;
+        jump_airborne = false;
+        last_move_intent = pet_follow::Action::IDLE;
+        last_horizontal_collision = Footholdtree::HorizontalCollision::NONE;
+
+        playback = mobplayback::begin(get_position(),
+            { movements.begin() + anchor + 1, movements.end() });
+    }
+
+    bool PetLook::is_playing_back() const
+    {
+        return playback.started();
+    }
+
+    bool PetLook::update_playback()
+    {
+        if (!playback.started())
+            return false;
+
+        const mobplayback::Sample sample =
+            mobplayback::step(playback, Constants::TIMESTEP);
+
+        // Fragments own the trajectory while their time lasts, so the
+        // local physics model stays frozen, like remote characters. The
+        // raw assignment keeps per-frame render interpolation alive.
+        phobj.hforce = 0.0;
+        phobj.vforce = 0.0;
+        phobj.hspeed = 0.0;
+        phobj.vspeed = 0.0;
+        phobj.x = sample.position.x();
+        phobj.y = sample.position.y();
+        phobj.fhid = sample.fh;
+        set_stance(sample.state);
+        animations[stance].update();
+
+        if (sample.done)
+        {
+            // Replay exhausted: resume local following from the final
+            // endpoint with neutral physics and no jump state, so the
+            // simulation continues deterministically.
+            reset_motion();
+            jump_start_distance = 0;
+            jump_direction = 0;
+            jump_airborne = false;
+            last_move_intent = pet_follow::Action::IDLE;
+            last_horizontal_collision =
+                Footholdtree::HorizontalCollision::NONE;
+            playback = mobplayback::State{};
+        }
+
+        return true;
     }
 
     int32_t PetLook::get_itemid() const

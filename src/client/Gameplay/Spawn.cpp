@@ -26,6 +26,33 @@
 
 namespace jrc
 {
+    namespace
+    {
+        // The server spawns a character entering the field 42px above its
+        // foothold with a falling stance. Remote characters never simulate
+        // local physics, so without a correction they would hang in the air.
+        constexpr int16_t MIN_AIRBORNE_SNAP = 1;
+        constexpr int16_t MAX_AIRBORNE_SNAP = 200;
+
+        // Stance bytes pair up per state (mirrored adds one), and FALL is
+        // the only airborne state in the movement encoding.
+        bool is_airborne_stance(int8_t stancebyte)
+        {
+            return (stancebyte & ~static_cast<int8_t>(1)) == Char::FALL;
+        }
+
+        Point<int16_t> snap_airborne_spawn(
+            const Physics& physics,
+            Point<int16_t> position)
+        {
+            Point<int16_t> ground = physics.get_y_below(position);
+            int16_t drop = ground.y() - position.y();
+            if (drop < MIN_AIRBORNE_SNAP || drop > MAX_AIRBORNE_SNAP)
+                return position;
+            return Point<int16_t>(position.x(), ground.y());
+        }
+    }
+
     NpcSpawn::NpcSpawn(int32_t o, int32_t i, Point<int16_t> p, bool fl, uint16_t f)
         : oid(o), id(i), position(p), flip(fl), fh(f) {}
 
@@ -141,9 +168,11 @@ namespace jrc
                          const std::string& nm,
                          int8_t st,
                          Point<int16_t> p,
-                         int16_t combo)
+                         int16_t combo,
+                         int32_t chair,
+                         const std::string& board)
         : cid(c), level(l), job(j), name(nm), stance(st), position(p),
-          combo_value(combo), look(lk) {}
+          combo_value(combo), chair_id(chair), chalkboard(board), look(lk) {}
 
     int32_t CharSpawn::get_cid() const
     {
@@ -158,6 +187,23 @@ namespace jrc
     int8_t CharSpawn::get_stance() const
     {
         return stance;
+    }
+
+    Point<int16_t> CharSpawn::resolve_position(const Physics& physics) const
+    {
+        if (!is_airborne_stance(stance))
+            return position;
+        return snap_airborne_spawn(physics, position);
+    }
+
+    int32_t CharSpawn::get_chair_id() const
+    {
+        return chair_id;
+    }
+
+    const std::string& CharSpawn::get_chalkboard() const
+    {
+        return chalkboard;
     }
 
     void CharSpawn::set_pets(const PetSpawnEntry* entries, uint8_t count)
@@ -179,9 +225,10 @@ namespace jrc
         return petcount;
     }
 
-    std::unique_ptr<MapObject> CharSpawn::instantiate() const
+    std::unique_ptr<MapObject> CharSpawn::instantiate(const Physics& physics) const
     {
-        auto character = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
+        auto character = std::make_unique<OtherChar>(
+            cid, look, level, job, name, stance, resolve_position(physics));
         if (combo_value > 0)
             character->set_visual_buff(Buffstat::COMBO, combo_value);
         return character;

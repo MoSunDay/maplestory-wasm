@@ -108,6 +108,7 @@ namespace jrc
         mobs.clear();
         drops.clear();
         mists.clear();
+        summon::clear(summons);
         reactors.clear();
         pet_loot_target_oid = 0;
         pet_loot_target_frames = 0;
@@ -191,6 +192,7 @@ namespace jrc
             drops.draw(id, viewx, viewy, alpha);
         }
         drops.draw_explosions(viewx, viewy, alpha);
+        summon::draw(summons, viewx, viewy, alpha);
         combat.draw(viewx, viewy, alpha);
         portals.draw(viewpos, alpha);
         backgrounds.drawforegrounds(viewx, viewy, alpha);
@@ -235,7 +237,29 @@ namespace jrc
         npcs.update(physics);
         mobs.update(physics, player.get_position());
         chars.update(physics);
+        // Replay summon events stashed while their owner was still in
+        // the spawn queue, now that instantiate_spawns has run.
+        summon::replay_stashed(
+            summons,
+            [this](int32_t cid)
+            {
+                return is_player(cid)
+                    || static_cast<bool>(chars.get_char(cid));
+            });
         drops.update(physics);
+        // Remote summons replay their own movement fragments and ease
+        // toward owners they can still see on the map.
+        summon::update(
+            summons,
+            Constants::TIMESTEP,
+            [this](int32_t cid) -> std::optional<Point<int16_t>>
+            {
+                if (is_player(cid))
+                    return player.get_position();
+                if (Optional<OtherChar> chr = chars.get_char(cid))
+                    return chr->get_position();
+                return std::nullopt;
+            });
         player.update(physics);
         update_pet_movement();
         update_pet_automation();
@@ -589,6 +613,11 @@ namespace jrc
     MapMists& Stage::get_mists()
     {
         return mists;
+    }
+
+    summon::SummonPool& Stage::get_summons()
+    {
+        return summons;
     }
 
     Player& Stage::get_player()

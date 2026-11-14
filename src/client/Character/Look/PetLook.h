@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../../Gameplay/Physics/Physics.h"
+#include "../../Gameplay/MapleMap/MobMovementPlayback.h"
 #include "../../Gameplay/Pet/PetFollowPolicy.h"
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Animation.h"
@@ -27,6 +28,7 @@
 #include <string>
 #include <map>
 #include <optional>
+#include <vector>
 
 #include "../../Gameplay/Movement.h"
 
@@ -70,6 +72,8 @@ namespace jrc
         void set_loot_target(Point<int16_t> position);
         void clear_loot_target();
         void apply_movement(const Movement& movement);
+        void apply_movements(const std::vector<Movement>& movements);
+        bool is_playing_back() const;
 
         int32_t get_itemid() const;
         int32_t get_uniqueid() const;
@@ -87,6 +91,7 @@ namespace jrc
 
     private:
         void reset_motion();
+        bool update_playback();
         void warp_to(Point<int16_t> position, uint16_t owner_fhid);
         void begin_jump(pet_follow::Action action, int32_t target_distance,
             double jump_force);
@@ -112,5 +117,8 @@ namespace jrc
             Footholdtree::HorizontalCollision::NONE;
         uint32_t jump_trigger_count = 0;
         bool urgent_movement = false;
+        // Replay of a remote MOVE_PET fragment batch; empty while the pet
+        // is driven by the local follow simulation.
+        mobplayback::State playback;
     };
 }

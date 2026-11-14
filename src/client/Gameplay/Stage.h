@@ -37,6 +37,7 @@
 #include "Pet/PetAutomation.h"
 #include "Pet/PetCapabilityPolicy.h"
 #include "Mist/MapMists.h"
+#include "Summon/SummonPool.h"
 
 #include "../Character/Player.h"
 #include "../IO/KeyType.h"
@@ -109,6 +110,8 @@ namespace jrc
         // Returns a reference to the drops on the current map.
         MapDrops& get_drops();
         MapMists& get_mists();
+        // Returns a reference to the remote summons on the current map.
+        summon::SummonPool& get_summons();
         // Returns a reference to the Player.
         Player& get_player();
         // Returns the id of the current map.
@@ -195,6 +198,7 @@ namespace jrc
         MapMobs mobs;
         MapDrops drops;
         MapMists mists;
+        summon::SummonPool summons;
         MapEffect effect;
 
         Combat combat;

@@ -94,7 +94,7 @@ namespace jrc
         reactors.instantiate_spawns(physics);
         npcs.instantiate_spawns(physics);
         mobs.instantiate_spawns();
-        chars.instantiate_spawns();
+        chars.instantiate_spawns(physics);
         drops.instantiate_spawns();
 
         const auto graphics = GraphicsGL::get().bitmapbatchprogress(asset_generation);

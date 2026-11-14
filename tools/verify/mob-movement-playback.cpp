@@ -99,11 +99,11 @@ int main()
     require(sample_at(origin, 208, 100),
             "first fragment interpolates from the server start");
 
-    // Unpositioned fragments (teleports, equip changes) add no time and
-    // never become waypoints.
+    // Unpositioned fragments (all-zero NONE, e.g. a legacy equip change
+    // that slipped through) add no time and never become waypoints.
     std::vector<Movement> gapped;
     gapped.push_back(absolute(150, 100, 100, 100, 3, 3, 40));
-    gapped.push_back(Movement{ Movement::NONE, 14, 0, 0, 0, 0, 0, 2, 50 });
+    gapped.push_back(Movement{ Movement::NONE, 14, 0, 0, 0, 0, 0, 0, 50 });
     gapped.push_back(relative(150, 80, 7, 40));
     State skipped = begin({ 100, 100 }, std::move(gapped));
     const Sample past = advance(skipped, 5);
@@ -113,6 +113,21 @@ int main()
     const Sample finish = advance(skipped, 5);
     require(sample_at(finish, 150, 80) && finish.done,
             "batch after skipped fragment still completes");
+
+    // Teleport fragments are instant waypoints now: their zero duration
+    // consumes no time, the replay jumps straight to their endpoint, and
+    // a following fragment interpolates from there.
+    std::vector<Movement> warped;
+    warped.push_back(absolute(150, 100, 100, 100, 3, 3, 40));
+    warped.push_back(Movement{ Movement::TELEPORT, 3, 300, 40, 150, 100, 0, 5, 0 });
+    warped.push_back(relative(340, 40, 7, 40));
+    State teleported = begin({ 100, 100 }, std::move(warped));
+    const Sample jumped = advance(teleported, 5);
+    require(sample_at(jumped, 300, 40) && jumped.state == 5 && !jumped.done,
+            "teleport lands instantly on its endpoint and stance");
+    const Sample resume = advance(teleported, 1);
+    require(sample_at(resume, 308, 40) && resume.state == 7,
+            "the fragment after a teleport interpolates from its endpoint");
 
     // An empty batch never moves the mob; callers keep the spawn position.
     State empty = begin({ 50, 60 }, {});

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "MovementParser.h"
 
+#include <iostream>
+
 namespace jrc
 {
     std::vector<Movement> MovementParser::parse_movements(InPacket& recv)
@@ -27,11 +29,13 @@ namespace jrc
         {
             Movement fragment;
             fragment.command = recv.read_byte();
+            bool enqueue = true;
             switch (fragment.command)
             {
             case 0:
             case 5:
             case 17:
+                // Absolute move: x y xwobble ywobble fh state duration.
                 fragment.type = Movement::_ABSOLUTE;
                 fragment.xpos = recv.read_short();
                 fragment.ypos = recv.read_short();
@@ -47,28 +51,14 @@ namespace jrc
             case 12:
             case 13:
             case 16:
+            case 18:
+            case 19:
+            case 20:
+            case 22:
+                // Relative move: x y state duration.
                 fragment.type = Movement::_RELATIVE;
                 fragment.xpos = recv.read_short();
                 fragment.ypos = recv.read_short();
-                fragment.newstate = recv.read_byte();
-                fragment.duration = recv.read_short();
-                break;
-            case 11:
-                fragment.type = Movement::CHAIR;
-                fragment.xpos = recv.read_short();
-                fragment.ypos = recv.read_short();
-                recv.skip(2);
-                fragment.newstate = recv.read_byte();
-                fragment.duration = recv.read_short();
-                break;
-            case 15:
-                fragment.type = Movement::JUMPDOWN;
-                fragment.xpos = recv.read_short();
-                fragment.ypos = recv.read_short();
-                fragment.lastx = recv.read_short();
-                fragment.lasty = recv.read_short();
-                recv.skip(2);
-                fragment.fh = recv.read_short();
                 fragment.newstate = recv.read_byte();
                 fragment.duration = recv.read_short();
                 break;
@@ -77,15 +67,61 @@ namespace jrc
             case 7:
             case 8:
             case 9:
+            case 11:
+                // Teleport-shaped move: x y xwobble ywobble state. The
+                // server reads no duration here, so replay it instantly.
+                fragment.type = Movement::TELEPORT;
+                fragment.xpos = recv.read_short();
+                fragment.ypos = recv.read_short();
+                fragment.lastx = recv.read_short();
+                fragment.lasty = recv.read_short();
+                fragment.newstate = recv.read_byte();
+                fragment.duration = 0;
+                break;
+            case 15:
+                // Jump down with footholds: x y xwobble ywobble fh origin
+                // fh state duration. The origin foothold is not replayed.
+                fragment.type = Movement::JUMPDOWN;
+                fragment.xpos = recv.read_short();
+                fragment.ypos = recv.read_short();
+                fragment.lastx = recv.read_short();
+                fragment.lasty = recv.read_short();
+                fragment.fh = recv.read_short();
+                recv.skip(2);
+                fragment.newstate = recv.read_byte();
+                fragment.duration = recv.read_short();
+                break;
             case 14:
-                fragment.type = Movement::NONE;
+                // Jump down without footholds; the server drops it after
+                // parsing, so it must not enter the replay either.
+                recv.skip(9);
+                enqueue = false;
+                break;
+            case 21:
+                // Aran movement; the server skips and drops it.
+                recv.skip(3);
+                enqueue = false;
                 break;
             case 10:
-                fragment.type = Movement::NONE;
-                //change equip
+                // Equip change; looks are broadcast in a separate packet.
+                recv.skip(1);
+                enqueue = false;
                 break;
+            default:
+                // Unknown command: the server drops the whole list when it
+                // hits one, and the payload layout is unknowable, so the
+                // batch cannot be resynced — log and truncate it all.
+                std::cerr << "[MovementParser] Unknown movement command "
+                          << static_cast<int>(fragment.command)
+                          << "; dropping the whole fragment batch"
+                          << std::endl;
+                movements.clear();
+                return movements;
             }
-            movements.push_back(fragment);
+            if (enqueue)
+            {
+                movements.push_back(fragment);
+            }
         }
         return movements;
     }

@@ -90,8 +90,12 @@ tools/verify/index.md）；5 个改动 cpp 经 clang++ -std=gnu++17 -fsyntax-onl
    setup 工具化之前的旧角色（现快照于 `test1hold` 账号）。本轮首次重跑
    `create_accounts.py` 重建 test1-3 后，新角色蓝图（1052155 上身、无背包装备）
    与断言不符 → FAIL。已按旧 fixture 修复 DB（换装 1062000@-6、补背包 4 件）
-   后 equip 两断言全 PASS。待办：把背包 4 件与 -6 裤子并入 create_accounts.py
-   蓝图，否则每次 setup 后 equip 必红。
+   后 equip 两断言全 PASS。收尾已闭环：背包 4 件与 -6 裤子并入 create_accounts.py
+   蓝图（plans.py `HERO_PANTS`/`HERO_BAG_EQUIPS`，1062000 无本地 wz 条目由
+   `_prime_infos` 合成），2026-11-09 21:50 setup 重建后 equip 直接 PASS
+   （phys=690/magic=733），不再依赖手工修 DB。配套：verify_all.sh 的 equip/cooppet
+   阶段输出加 tee 落盘（`/tmp/equip-stat-flow-last.log`、
+   `/tmp/remote-pet-desync-flow-last.log`），长跑失败可回看全量日志。
 3. **test1hold 同名角色计数陷阱**：test1Hero/Pala/DK/FPA 各存在两份（旧
    `test1hold` 账号 + 新 `test1` 账号），按名字 GROUP BY 会得出"装备行翻倍"
    的假象；排查 DB 时需带 accountid 过滤。

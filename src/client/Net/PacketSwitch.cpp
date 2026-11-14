@@ -24,6 +24,8 @@
 #include "Handlers/PlayerHandlers.h"
 #include "Handlers/AttackHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
+#include "Handlers/CosmeticHandlers.h"
+#include "Handlers/SummonHandlers.h"
 #include "Handlers/InventoryHandlers.h"
 #include "Handlers/MessagingHandlers.h"
 #include "Handlers/QuestHandlers.h"
@@ -113,9 +115,20 @@ namespace jrc
         STOP_CLOCK              = 154,
         LEGACY_FIELD_OBJECT     = 159,
 
+        // Summon
+        SPAWN_SPECIAL_MAPOBJECT = 175,
+        REMOVE_SPECIAL_MAPOBJECT = 176,
+        MOVE_SUMMON             = 177,
+        SUMMON_ATTACK           = 178,
+        DAMAGE_SUMMON           = 179,
+        SPAWN_DRAGON            = 181,
+
         // Mapobject
         SPAWN_CHAR  = 160,
         REMOVE_CHAR = 161,
+
+        // Cosmetic
+        CHALKBOARD = 164,
 
         // Messaging
         CHAT_RECEIVED = 162,
@@ -210,6 +223,7 @@ namespace jrc
         emplace<CHAR_MOVED, CharMovedHandler>();
         emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();
         emplace<SHOW_CHAIR, ShowChairHandler>();
+        emplace<CHALKBOARD, ChalkboardHandler>();
         emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
         emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
         emplace<GIVE_FOREIGN_BUFF, GiveForeignBuffHandler>();
@@ -235,6 +249,14 @@ namespace jrc
         emplace<REMOVE_MIST, RemoveMistHandler>();
         emplace<SPAWN_REACTOR, SpawnReactorHandler>();
         emplace<REMOVE_REACTOR, RemoveReactorHandler>();
+
+        // Summon handlers
+        emplace<SPAWN_SPECIAL_MAPOBJECT, SpawnSummonHandler>();
+        emplace<REMOVE_SPECIAL_MAPOBJECT, RemoveSummonHandler>();
+        emplace<MOVE_SUMMON, MoveSummonHandler>();
+        emplace<SUMMON_ATTACK, SummonAttackHandler>();
+        emplace<DAMAGE_SUMMON, DamageSummonHandler>();
+        emplace<SPAWN_DRAGON, SpawnDragonHandler>();
 
         // Attack handlers
         emplace<ATTACKED_CLOSE, CloseAttackHandler>();

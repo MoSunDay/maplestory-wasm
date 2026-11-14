@@ -1,0 +1,34 @@
+# 服务端源码补丁：玩家表情（emote）广播节流 2000ms → 300ms
+# 背景：客户端按键表情在本地是即时播放的（自身动画约 2-4s 后回落），
+#       而同地图其他玩家看到的服务端广播表情走 MapleCharacter.
+#       changeFaceExpression 的节流门：timeNow - lastExpression > 2000。
+#       连续做表情时绝大多数 emote 封包被 2s 节流丢弃，远端只能看到
+#       零星几个表情，与发起方本地表现明显不同步（动作"丢失"感）。
+#       放宽到 300ms：仍在同一回落窗口内（服务端 FaceExpressionScheduler
+#       另有 5s 的 emote 0 回落广播，不受本补丁影响），300ms 足以防止
+#       按住快捷键刷屏/封包洪水，同时让远端表情序列与本地基本一致。
+#       仅改这一处阈值，其余表情链路（Channel.registerFaceExpression、
+#       FaceExpressionScheduler）不动。
+#
+# 应用（在 link_repos/MapleStory-Server 检出根目录内；注意该目录是指向
+#   /data/MapleStory-Server 的符号链接，相对路径 ../../../ 回不到父仓，
+#   直接用父仓补丁的绝对路径）：
+#   patch -p1 < /data/maplestory-wasm/scripts/server-patches/0019-expression-throttle.patch
+# 验证：
+#   改动影响 dist：需重编并重启容器生效——
+#   bash posix-compile.sh && docker restart ms-game-server
+#   两个客户端同图，一方连续按表情快捷键，另一方表情应基本同步跟上
+#   （不再每 2s 才漏出一个）；若 300ms 内重复触发则仍被节流吞掉。
+#   grep -n "lastExpression > " src/client/MapleCharacter.java  # 应为 > 300
+#
+--- a/src/client/MapleCharacter.java
++++ b/src/client/MapleCharacter.java
+@@ -3484,7 +3484,7 @@
+     public void changeFaceExpression(int emote) {
+         long timeNow = Server.getInstance().getCurrentTime();
+ 
+-        if (timeNow - lastExpression > 2000) {
++        if (timeNow - lastExpression > 300) {
+             lastExpression = timeNow;
+ 
+             client.getChannelServer().registerFaceExpression(map, this, emote);

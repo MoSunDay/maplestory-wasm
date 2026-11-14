@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "Player.h"
 
+#include "PlayerMovement.h"
 #include "PlayerStates.h"
 
 #include "../Audio/Audio.h"
@@ -282,13 +283,7 @@ namespace jrc
         uint8_t stancebyte = flip ? state : state + 1;
         // Swimming reports the official swim fragment command.
         uint8_t command = state == SWIM ? Movement::CMD_SWIM : 0;
-        Movement newmove(phobj, stancebyte, command);
-        bool needupdate = lastmove.hasmoved(newmove);
-        if (needupdate)
-        {
-            MovePlayerPacket(newmove).dispatch();
-            lastmove = newmove;
-        }
+        send_player_movement(phobj, stancebyte, command, lastmove, movesince);
 
         natural_recovery::Posture posture = natural_recovery::Posture::OTHER;
         if (state == DIED)
@@ -670,44 +665,6 @@ namespace jrc
     {
         show_effect_id(CharEffect::JOBCHANGE);
         stats.change_job(jobid);
-    }
-
-    void Player::set_seat(Optional<const Seat> seat)
-    {
-        if (seat)
-        {
-            CancelChairPacket(seat->get_id()).dispatch();
-            chair_id = 0;
-            map_seat_id = seat->get_id();
-            set_chair(0);
-            set_position(seat->getpos());
-            set_state(Char::SIT);
-        }
-    }
-
-    void Player::set_recovery_rate(float rate)
-    {
-        recovery_rate = rate >= 0.0f ? rate : 0.0f;
-        recovery_state = {};
-    }
-
-    void Player::set_item_chair(int32_t item_id)
-    {
-        chair_id = item_id;
-        map_seat_id = -1;
-        set_chair(item_id);
-        set_state(Char::SIT);
-    }
-
-    void Player::apply_server_chair_state(bool sitting)
-    {
-        if (!sitting)
-        {
-            chair_id = 0;
-            map_seat_id = -1;
-            set_chair(0);
-        }
-        Char::set_state(sitting ? Char::SIT : Char::STAND);
     }
 
     void Player::set_ladder(Optional<const Ladder> ldr)

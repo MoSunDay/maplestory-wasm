@@ -3099,13 +3099,14 @@ targetCount    byte
 
 ```
 Field       Type   Notes
-ownerId     int
-dragonOid   int
-posX        short
-posY        short
-stance      byte
-fh          short
-dragonType  short
+ownerId     int    Owner character ID, reused as the dragon object ID
+pos.x       short  Spawn X
+[2 bytes]   —      0 padding
+pos.y       short  Spawn Y
+[2 bytes]   —      0 padding
+stance      byte   Facing/action
+[1 byte]    —      0 padding
+job         short  Owner job (selects the dragon sprite)
 ```
 
 ---
@@ -4124,7 +4125,13 @@ count      short
 
 ### 11.4 Movement Fragment List
 
-The client sends movement data as a sequence of typed movement commands. The server re-broadcasts them as-is.
+The client sends movement data as a sequence of typed movement commands. The
+server does **not** forward the raw byte sequence: it decodes each command
+field-by-field (`parseMovement`) and re-encodes the list
+(`serializeMovementList`) before rebroadcasting. Two consequences for
+clients: command 14 (jump down without footholds) and 21 (Aran arcing) are
+parsed then dropped, and ChangeEquip-special (10) fragments are rewritten on
+serialize, so replays built from the broadcast never see those fragments.
 
 ```
 commandCount  byte
@@ -4133,7 +4140,7 @@ commandCount  byte
   [data] —       Varies by type
 ```
 
-Movement types are encoded per the `moveactions.txt` documentation; the server re-broadcasts the raw byte sequence without parsing individual commands.
+Movement types are encoded per the `moveactions.txt` documentation.
 
 ### 11.5 SP Table (for jobs with multiple SP pools)
 

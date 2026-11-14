@@ -25,10 +25,13 @@
 #include "../Protocol/SpawnPlayerPayload.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Character/OtherChar.h"
 #include "../../Character/SkillId.h"
 #include "../../Console.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/Spawn.h"
+#include "../../Gameplay/Summon/SummonPool.h"
+#include "../../Template/Optional.h"
 
 #include <algorithm>
 #include <optional>
@@ -59,9 +62,8 @@ namespace jrc
             });
         }
 
-        // Disease (debuff) bits of the second buff mask. Debuff packets use
-        // a wider per-flag layout than regular foreign buffs: every disease
-        // flag carries three shorts instead of one.
+        // Disease (debuff) bits of the second buff mask: POISON writes a
+        // value short before the skill id and skill level shorts pair.
         constexpr uint64_t POISON_FLAG = 0x4000000000000;
 
         bool is_disease_flag(uint64_t flag)
@@ -83,6 +85,30 @@ namespace jrc
                     return false;
             }
         }
+
+        // Skill variants of SHOW_FOREIGN_EFFECT are cid + effect + skillid
+        // + direction (+9 more bytes); the tail is not consumed here.
+        void show_foreign_skill_effect(InPacket& recv, int32_t cid, int8_t effect)
+        {
+            if (recv.length() < 5)
+                return;
+
+            int32_t skillid = recv.read_int();
+            recv.read_byte(); // 'direction'
+            // 9 more bytes after this
+
+            if ((skillid >= SkillId::SWORD_FIRE_CHARGE
+                    && skillid <= SkillId::BW_LIT_CHARGE)
+                || skillid == SkillId::SWORD_HOLY_CHARGE
+                || skillid == SkillId::BW_HOLY_CHARGE)
+            {
+                Stage::get().get_chars().set_visual_buff_source(
+                    cid, Buffstat::WK_CHARGE, skillid
+                );
+            }
+
+            Stage::get().get_combat().show_buff(cid, skillid, effect);
+        }
     }
 
     void SpawnCharHandler::handle(InPacket& recv) const
@@ -97,7 +123,9 @@ namespace jrc
             payload.header.name,
             payload.stance,
             payload.position,
-            payload.combo_value
+            payload.combo_value,
+            payload.chair_id,
+            payload.chalkboard
         });
         charspawn.set_pets(payload.pets, payload.pet_count);
         Stage::get().get_chars().spawn(std::move(charspawn));
@@ -109,6 +137,9 @@ namespace jrc
         int32_t cid = recv.read_int();
 
         Stage::get().get_chars().remove(cid);
+        // The cid left the map; drop any summon events stashed while its
+        // SPAWN_PLAYER was still queued, mirroring MapChars::remove.
+        summon::drop_stashed(Stage::get().get_summons(), cid);
     }
 
 
@@ -118,8 +149,7 @@ namespace jrc
         uint8_t petindex = recv.read_byte();
         int8_t mode = recv.read_byte();
 
-        // Parse the body before resolving the owner so the update survives
-        // the owner still being queued for instantiation.
+        // Parse the body before the owner resolves; survives a queued spawn.
         MapChars::PetUpdate update{};
         update.index = petindex;
         if (mode == 1)
@@ -170,8 +200,8 @@ namespace jrc
         recv.read_int(); // pet unique id
         std::vector<Movement> movements = MovementParser::parse_movements(recv);
 
-        if (Optional<Char> character = Stage::get().get_character(cid))
-            character->move_pet(petindex, movements);
+        // Parsed before the owner resolves, so it survives a queued spawn.
+        Stage::get().get_chars().move_pet(cid, petindex, movements);
     }
 
 
@@ -198,61 +228,62 @@ namespace jrc
     {
         int32_t cid = recv.read_int();
         int32_t item_id = recv.read_int();
-        if (auto character = Stage::get().get_character(cid))
-        {
-            character->set_chair(item_id);
-            character->set_state(item_id > 0 ? Char::SIT : Char::STAND);
-        }
+
+        // Routed through MapChars so a queued spawn stashes it, not drops.
+        Stage::get().get_chars().set_chair(cid, item_id);
     }
 
     void FacialExpressionHandler::handle(InPacket& recv) const
     {
         int32_t cid = recv.read_int();
         int32_t emote = recv.read_int();
-        if (auto character = Stage::get().get_character(cid))
-            character->set_expression(emote);
+
+        // Routed through MapChars so a queued spawn stashes it, not drops.
+        Stage::get().get_chars().set_expression(cid, emote);
     }
 
     void ShowForeignEffectHandler::handle(InPacket& recv) const
     {
         int32_t cid = recv.read_int();
         int8_t effect = recv.read_byte();
-        if (effect == 10) // recovery
-        {
-            if (recv.length() >= 1)
-                recv.read_byte(); // 'amount'
-        }
-        else if (effect == 13) // card effect
-        {
-            Stage::get()
-                .show_character_effect(cid, CharEffect::MONSTER_CARD);
-        }
-        else if (recv.length() >= 4) // skill
-        {
-            int32_t skillid = recv.read_int();
-            recv.read_byte(); // 'direction'
-            // 9 more bytes after this
 
-            if ((skillid >= SkillId::SWORD_FIRE_CHARGE
-                    && skillid <= SkillId::BW_LIT_CHARGE)
-                || skillid == SkillId::SWORD_HOLY_CHARGE
-                || skillid == SkillId::BW_HOLY_CHARGE)
-            {
-                Stage::get().get_chars().set_visual_buff_source(
-                    cid, Buffstat::WK_CHARGE, skillid
-                );
-            }
-
-            Stage::get().get_combat().show_buff(cid, skillid, effect);
-        }
-        else if (effect == 0) // level up
+        // The effect id alone decides the payload layout. Probing by
+        // remaining length first would misroute bare packets (e.g. the
+        // maker result int) into the skill branch, so dispatch on the id.
+        switch (effect)
         {
-            Stage::get().show_character_effect(cid, CharEffect::LEVELUP);
-            Sound(Sound::LEVELUP).play();
-        }
-        else if (effect == 8) // job advance
-        {
-            Stage::get().show_character_effect(cid, CharEffect::JOBCHANGE);
+            case 0: // level up
+                Stage::get().show_character_effect(cid, CharEffect::LEVELUP);
+                Sound(Sound::LEVELUP).play();
+                break;
+            case 1: // buff effect (skill)
+            case 2: // buff effect (skill)
+            case 5: // buff effect (skill)
+                show_foreign_skill_effect(recv, cid, effect);
+                break;
+            case 8: // job advance
+                Stage::get().show_character_effect(cid, CharEffect::JOBCHANGE);
+                break;
+            case 9: // quest complete; no payload, no sound asset yet
+                break;
+            case 10: // recovery
+                if (recv.length() >= 1)
+                    recv.read_byte(); // 'amount'
+                break;
+            case 11: // buff (buyback); carries a trailing int
+            case 15: // maker / equipment level up; may carry a trailing int
+            case 16: // maker result; 0 = success
+                if (recv.length() >= 4)
+                    recv.read_int();
+                break;
+            case 13: // card effect
+                Stage::get().show_character_effect(cid, CharEffect::MONSTER_CARD);
+                if (recv.length() >= 4)
+                    recv.read_int(); // skillid
+                break;
+            default:
+                // 6, 7, 14, 17, 19, 21 and 26 carry no payload in v83.
+                break;
         }
     }
 
@@ -268,17 +299,18 @@ namespace jrc
             int16_t value;
         };
         std::vector<VisualUpdate> updates;
+        bool darksight = false;
+        bool shadowpartner = false;
+        bool morphed = false;
 
         // Parse the complete packet before mutating character state. A
         // truncated packet must not leave half of a multi-buff update applied.
         const size_t first_count = buff_mask::ordered_flags(firstmask).size();
         for (size_t i = 0; i < first_count; ++i)
-        {
             recv.read_short();
-        }
 
         // The second mask mixes regular buffs (one value short) with
-        // diseases (a value short, then skill id and skill level shorts).
+        // diseases: POISON adds a value short before the skill pair.
         const auto second_ids = buff_mask::ordered_ids<Buffstat::Id>(
             secondmask, Buffstat::second_codes);
         for (const Buffstat::Id stat : second_ids.ids)
@@ -293,9 +325,8 @@ namespace jrc
             }
             else if (is_disease_flag(flag))
             {
-                recv.read_short(); // mob skill value, unused
-                recv.read_short(); // skill id
-                recv.read_short(); // skill level
+                recv.read_short(); // mob skill id
+                recv.read_short(); // mob skill level
                 updates.push_back({ stat, 1 });
             }
             else
@@ -303,11 +334,31 @@ namespace jrc
                 const int16_t value = recv.read_short();
                 if (stat == Buffstat::COMBO || stat == Buffstat::WK_CHARGE)
                     updates.push_back({ stat, value });
+                else if (stat == Buffstat::DARKSIGHT)
+                    darksight = true;
+                else if (stat == Buffstat::SHADOWPARTNER)
+                    shadowpartner = true;
+                else if (stat == Buffstat::MORPH)
+                    morphed = true;
             }
         }
 
         for (const VisualUpdate& update : updates)
             Stage::get().get_chars().set_visual_buff(cid, update.stat, update.value);
+
+        // Whole-body looks land as dedicated character flags, not buffs.
+        if (darksight || shadowpartner || morphed)
+        {
+            if (Optional<OtherChar> character = Stage::get().get_chars().get_char(cid))
+            {
+                if (darksight)
+                    character->set_darksight(true);
+                if (shadowpartner)
+                    character->set_shadowpartner(true);
+                if (morphed)
+                    character->set_morphed(true);
+            }
+        }
     }
 
     void CancelForeignBuffHandler::handle(InPacket& recv) const
@@ -315,7 +366,24 @@ namespace jrc
         int32_t cid = recv.read_int();
         uint64_t firstmask = recv.read_long();
         uint64_t secondmask = recv.read_long();
-        (void)firstmask;
+
+        // DARKSIGHT, SHADOWPARTNER and MORPH are second-mask stats on the
+        // server, but checking both masks keeps clearing the looks robust.
+        const uint64_t lookmask = firstmask | secondmask;
+        if (lookmask & (Buffstat::second_codes.at(Buffstat::DARKSIGHT)
+                | Buffstat::second_codes.at(Buffstat::SHADOWPARTNER)
+                | Buffstat::second_codes.at(Buffstat::MORPH)))
+        {
+            if (Optional<OtherChar> character = Stage::get().get_chars().get_char(cid))
+            {
+                if (lookmask & Buffstat::second_codes.at(Buffstat::DARKSIGHT))
+                    character->set_darksight(false);
+                if (lookmask & Buffstat::second_codes.at(Buffstat::SHADOWPARTNER))
+                    character->set_shadowpartner(false);
+                if (lookmask & Buffstat::second_codes.at(Buffstat::MORPH))
+                    character->set_morphed(false);
+            }
+        }
 
         if (secondmask & Buffstat::second_codes.at(Buffstat::COMBO))
             Stage::get().get_chars().cancel_visual_buff(cid, Buffstat::COMBO);
@@ -484,6 +552,17 @@ namespace jrc
 
         const int32_t cid = recv.read_int();
         const int8_t skill = recv.read_byte();
+        if (skill == -3)
+        {
+            // Fall damage prefixes the damage with a 4-byte zero pad;
+            // without skipping it the damage would read as 0 and be
+            // dropped by the guard below.
+            if (recv.length() < 8)
+            {
+                throw PacketError("Truncated DAMAGE_PLAYER fall payload");
+            }
+            recv.skip(4);
+        }
         const int32_t damage = recv.read_int();
 
         if (damage <= 0)
@@ -492,7 +571,9 @@ namespace jrc
         if (cid == Stage::get().get_player().get_oid())
         {
             // Contact damage is already shown by the local prediction, so
-            // only damage over time (skill -4) is displayed here.
+            // only damage over time (skill -4) is displayed here. The DoT
+            // variant omits the trailing monster block; nothing of it is
+            // read, so no extra skip is needed.
             if (skill == -4)
                 Stage::get().get_player().show_damage(damage);
         }

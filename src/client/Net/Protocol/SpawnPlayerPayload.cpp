@@ -101,7 +101,7 @@ namespace jrc::spawn_player
 
         recv.read_int(); // cash item count (5110000)
         recv.read_int(); // item effect
-        recv.read_int(); // chair id
+        payload.chair_id = recv.read_int();
 
         payload.position = recv.read_point();
         payload.stance = recv.read_byte();
@@ -136,7 +136,7 @@ namespace jrc::spawn_player
 
         if (recv.read_bool())
         {
-            recv.read_string(); // chalkboard text
+            payload.chalkboard = recv.read_string(); // chalkboard text
         }
 
         skip_ring(recv); // crush ring

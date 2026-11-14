@@ -206,6 +206,9 @@ namespace jrc
 
         Movement lastmove;
 
+        // Milliseconds accumulated since the last movement packet.
+        uint16_t movesince = 0;
+
         Randomizer randomizer;
 
         Optional<const Ladder> ladder;

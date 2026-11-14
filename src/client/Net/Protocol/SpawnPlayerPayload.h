@@ -8,6 +8,7 @@
 #include "../../Template/Point.h"
 
 #include <cstdint>
+#include <string>
 
 namespace jrc::spawn_player
 {
@@ -18,6 +19,8 @@ namespace jrc::spawn_player
         int16_t job = 0;
         int8_t stance = 0;
         Point<int16_t> position;
+        int32_t chair_id = 0;
+        std::string chalkboard;
         int16_t combo_value = 0;
         PetSpawnEntry pets[3];
         uint8_t pet_count = 0;

@@ -144,12 +144,19 @@ namespace jrc
                   const std::string& name,
                   int8_t stance,
                   Point<int16_t> position,
-                  int16_t combo_value = 0);
+                  int16_t combo_value = 0,
+                  int32_t chair_id = 0,
+                  const std::string& chalkboard = "");
 
         int32_t get_cid() const;
         Point<int16_t> get_position() const;
         int8_t get_stance() const;
-        std::unique_ptr<MapObject> instantiate() const;
+        // Resolve the spawn position: an airborne stance spawned above the
+        // ground is snapped onto the foothold directly below it.
+        Point<int16_t> resolve_position(const Physics& physics) const;
+        int32_t get_chair_id() const;
+        const std::string& get_chalkboard() const;
+        std::unique_ptr<MapObject> instantiate(const Physics& physics) const;
 
         // Adopt the pet slots carried by SPAWN_PLAYER.
         void set_pets(const PetSpawnEntry* entries, uint8_t count);
@@ -164,6 +171,8 @@ namespace jrc
         int8_t stance;
         Point<int16_t> position;
         int16_t combo_value;
+        int32_t chair_id;
+        std::string chalkboard;
         LookEntry look;
         PetSpawnEntry pets[3];
         uint8_t petcount = 0;

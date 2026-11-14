@@ -66,14 +66,26 @@ namespace jrc
         }
 
         /// Whether a fragment carries usable position data. Parsed
-        /// fragments without positions (teleport, equip change) contribute
-        /// no time and no waypoint to the replay.
+        /// fragments without positions (equip change) contribute no time
+        /// and no waypoint to the replay. Teleport fragments count like
+        /// any positioned one: their zero duration turns the endpoint
+        /// into an instant, zero-length waypoint. A fragment of unknown
+        /// type still counts when it carries a destination or a state,
+        /// so a trailing state-only fragment is not lost.
         inline bool positioned(const Movement& fragment)
         {
-            return fragment.type == Movement::_ABSOLUTE
-                || fragment.type == Movement::_RELATIVE
-                || fragment.type == Movement::CHAIR
-                || fragment.type == Movement::JUMPDOWN;
+            switch (fragment.type)
+            {
+            case Movement::_ABSOLUTE:
+            case Movement::_RELATIVE:
+            case Movement::CHAIR:
+            case Movement::JUMPDOWN:
+            case Movement::TELEPORT:
+                return true;
+            default:
+                return fragment.xpos != 0 || fragment.ypos != 0
+                    || fragment.newstate != 0;
+            }
         }
 
         /// Segment origin of the positioned fragment at 'index': the batch
@@ -126,6 +138,9 @@ namespace jrc
             while (state.index < state.fragments.size() && remaining > 0.0)
             {
                 const Movement& fragment = state.fragments[state.index];
+                // Instant fragments (duration <= 0, e.g. teleports) span
+                // zero time: they are consumed on the spot and the replay
+                // jumps straight to their endpoint.
                 const double length = positioned(fragment)
                     ? std::max<double>(fragment.duration, 0.0)
                     : 0.0;
@@ -160,6 +175,8 @@ namespace jrc
 
             const Movement& fragment = state.fragments[state.index];
             const double length = std::max<double>(fragment.duration, 0.0);
+            // Zero-length fragments are already at their endpoint, so the
+            // alpha clamp never applies to them.
             const float alpha = length > 0.0
                 ? static_cast<float>(std::clamp(state.elapsed / length, 0.0, 1.0))
                 : 1.0f;

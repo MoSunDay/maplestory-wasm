@@ -171,3 +171,24 @@ grep 'Attempting to save' \
 `proxy` 起 systemd socket 代理、`run-cosmic` 注入环境后执行 linked
 server `run.sh`。种子/复核 SQL 一律经该端点连接，不写死回环地址与凭据
 （凭据从 `configuration.ini` 运行时解析）。
+
+## 多人同步收尾遗留边界（2026-11-14）
+
+本批次（远端移动/宠物/召唤/迟到事件/外观同步）以「群内阈值 + e2e 实证」
+收口，以下项目明确不在本次范围内，仅登记：
+
+- **Morph.nx 挂载与变身外观**：`Morph.nx`（约 17MB）尚未进入 LazyFS 分发
+  清单；GM/技能变身目前只同步逻辑状态，不改变角色外观。需评估按需分发
+  成本后挂载并消费 morph 模板。
+- **召唤兽动画美术缺节点**：傀儡/鹰/祭司龙等技能在 `Skill.wz` 中缺少
+  `summon/summoned|stand|move` 节点时保持逻辑同步但不可见（无占位渲染）。
+  需补源或按技能 id 提供回退动画。
+- **出生包三态 morph**：`SPAWN_PLAYER`/`SPAWN_CHAR` 的 morph 三态（普通/
+  隐身/变身）目前只解析不消费；需与远端 BUFF 外观状态合并落地。
+- **D4 服务端 effectid**：`SpecialMoveHandler.java:121` 将 effectid 误传，
+  待补丁 0021 修正；另需复核 `giveForeignDebuff` 多疾病 2B/病偏差。
+- **trade-server-contract 环境修复**：交易源码契约依赖的测试环境
+  （独立账号/DB 种子）尚未稳定，单列跟进。
+- **e2e 长跑稳定性**：idle-reaper/重启绑定冻结等 known-issues 仍会造成
+  偶发环境类失败；重试策略与告警记录见
+  `docs/known-issues/2026-11-06-idle-reaper-pong-baseline.md` 等条目。

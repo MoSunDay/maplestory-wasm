@@ -18,10 +18,24 @@
 
 namespace jrc
 {
+    namespace
+    {
+        // Dark Sight fades the whole sprite to the hidden look's opacity.
+        constexpr float DARKSIGHT_ALPHA = 0.4f;
+        // The Shadow Partner mirror is a translucent copy of the look.
+        constexpr float SHADOWPARTNER_ALPHA = 0.5f;
+        // A morphed body renders translucent with a violet tint; the
+        // dedicated morph images are not part of the mounted nx files.
+        constexpr float MORPH_ALPHA = 0.6f;
+        // The mirror trails behind the character, opposite its facing.
+        constexpr int16_t SHADOWPARTNER_X_OFFSET = 30;
+    }
+
     Char::Char(int32_t o, const CharLook& lk, const std::string& name)
         : LivingObject(o, { false, true, true }),
           look(lk),
           namelabel({ Text::A13M, Text::CENTER, Text::WHITE, Text::NAMETAG, name }),
+          chalkboardlabel({ Text::A13M, Text::CENTER, Text::YELLOW, Text::NAMETAG, "" }),
           partyhp(-1),
           partymaxhp(0) {}
 
@@ -41,7 +55,11 @@ namespace jrc
         }
         else if (is_hidden())
         {
-            color = { 1.0f, 1.0f, 1.0f, 0.4f };
+            color = { 1.0f, 1.0f, 1.0f, DARKSIGHT_ALPHA };
+        }
+        else if (morphed)
+        {
+            color = { 1.0f, 0.85f, 1.0f, MORPH_ALPHA };
         }
         else if (get_visual_buff_value(Buffstat::POISON) > 0)
         {
@@ -75,6 +93,19 @@ namespace jrc
             combo_orbs::draw_aura(*this, absp, alpha);
 
             look.draw({ absp, color }, alpha);
+
+            if (shadowpartner)
+            {
+                // Shadow Partner trails a mirrored copy of the look behind
+                // the character; looks only, movement is unaffected.
+                Point<int16_t> mirror_position = absp
+                    + Point<int16_t>(
+                        flip ? SHADOWPARTNER_X_OFFSET : -SHADOWPARTNER_X_OFFSET,
+                        0
+                    );
+                look.draw({ mirror_position, !flip, SHADOWPARTNER_ALPHA }, alpha);
+            }
+
             chair.draw({ absp, flip }, alpha, false);
 
             afterimage.draw(look.get_frame(), { absp, flip }, alpha);
@@ -105,7 +136,23 @@ namespace jrc
             partyhpbar.draw(absp + Point<int16_t>(0, -55), hp_percent);
         }
 
-        namelabel.draw(absp);
+        namelabel.draw({ absp, {
+            1.0f,
+            1.0f,
+            1.0f,
+            is_hidden() ? DARKSIGHT_ALPHA : 1.0f
+        } });
+        if (!chalkboard.empty())
+        {
+            // The chalkboard floats one name tag height above the name,
+            // using the same anchor the name tag draws from.
+            chalkboardlabel.draw({ absp - Point<int16_t>(0, namelabel.height()), {
+                1.0f,
+                1.0f,
+                1.0f,
+                is_hidden() ? DARKSIGHT_ALPHA : 1.0f
+            } });
+        }
         chatballoon.draw(absp - Point<int16_t>(0, 85));
 
         effects.drawabove(absp, alpha);
@@ -133,18 +180,25 @@ namespace jrc
         {
             if (pet.get_itemid())
             {
-                switch (state)
+                // While a remote movement batch replays, the fragment
+                // newstate owns the stance; the owner-state forcing would
+                // reset the pet animation every frame. It resumes as soon
+                // as the replay hands control back to local following.
+                if (!pet.is_playing_back())
                 {
-                case LADDER:
-                case ROPE:
-                    pet.set_stance(PetLook::HANG);
-                    break;
-                case SWIM:
-                    pet.set_stance(PetLook::FLY);
-                    break;
-                default:
-                    if (pet.get_stance() == PetLook::HANG || pet.get_stance() == PetLook::FLY)
-                        pet.set_stance(PetLook::STAND);
+                    switch (state)
+                    {
+                    case LADDER:
+                    case ROPE:
+                        pet.set_stance(PetLook::HANG);
+                        break;
+                    case SWIM:
+                        pet.set_stance(PetLook::FLY);
+                        break;
+                    default:
+                        if (pet.get_stance() == PetLook::HANG || pet.get_stance() == PetLook::FLY)
+                            pet.set_stance(PetLook::STAND);
+                    }
                 }
                 pet.update(physics, get_position(), get_fhid(), pet_movement);
             }
@@ -344,6 +398,33 @@ namespace jrc
         chair.set(item_id);
     }
 
+    void Char::set_chalkboard(const std::string& text)
+    {
+        chalkboard = text;
+        if (!text.empty())
+            chalkboardlabel.change_text(text);
+    }
+
+    const std::string& Char::get_chalkboard() const
+    {
+        return chalkboard;
+    }
+
+    void Char::set_darksight(bool active)
+    {
+        darksight = active;
+    }
+
+    void Char::set_shadowpartner(bool active)
+    {
+        shadowpartner = active;
+    }
+
+    void Char::set_morphed(bool active)
+    {
+        morphed = active;
+    }
+
     bool Char::is_in_item_chair() const
     {
         return chair.get_item_id() > 0;
@@ -472,7 +553,10 @@ namespace jrc
         if (!pet || movements.empty())
             return;
 
-        pet->apply_movement(movements.back());
+        // Feed the whole batch to the pet's replay channel: snapping to
+        // the last fragment teleports it, while replaying the fragments
+        // over their durations moves it along the server-side path.
+        pet->apply_movements(movements);
     }
 
     bool Char::is_invincible() const
