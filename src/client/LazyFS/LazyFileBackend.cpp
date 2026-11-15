@@ -242,6 +242,34 @@ namespace LazyFS
 						? Module.LazyFS.readCachedSync(path, offset, size) : null);
 				if (hit) { HEAPU8.set(hit, bufferPtr); return 1; }
 
+				// Another wasm chain is parked in Asyncify's single rewind
+				// buffer (currData set: a tick is unwound inside a chunk fetch
+				// or the ws_recv emscripten_sleep poll). Suspending here would
+				// start a SECOND unwind and overwrite the parked chain's rewind
+				// data; when that chain's wakeUp later fires, doRewind runs
+				// through the freed buffer, traps mid-replay ("unreachable")
+				// and wedges Asyncify in state 2 - every subsequent dynCall
+				// then faults with "memory access out of bounds". The
+				// readFileData busy-guard alone does not prevent this: its null
+				// return value still travels through a promise, so handleSleep
+				// has already unwound by the time it resolves. Instead fail
+				// this read synchronously (no unwind at all) and warm the
+				// missing chunks purely on the JS side: the caller already
+				// tolerates a failed read (e.g. a skipped cast sound) and the
+				// next attempt hits the warmed cache through readCachedSync.
+				// (replayingSuspendedRead must fall through to handleSleep
+				// below: it is the frame that recorded the suspension, and
+				// only re-entering handleSleep stops the rewind here.)
+				if (!replayingSuspendedRead &&
+					typeof Asyncify !== 'undefined' && (Asyncify.currData || Asyncify.state))
+				{
+					if (Module.LazyFS.warmRangeInBackground)
+					{
+						Module.LazyFS.warmRangeInBackground(path, offset, size);
+					}
+					return 0;
+				}
+
 				// Use Asyncify.handleSleep directly to avoid Promise wrapper issues.
 				// Tag this read as the live suspension point; a rewinding replay
 				// clears the tag once it has resumed at the recorded frame.

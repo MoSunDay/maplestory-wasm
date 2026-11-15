@@ -19,7 +19,7 @@ SECONDARY_BUFFER = 10
 CLASS_ID = {"warrior": 1, "mage": 2, "archer": 4, "thief": 8, "pirate": 16}
 
 SLOT_POSITION = {
-    "cap": -1, "earring": -4, "coat": -5, "shoes": -7, "glove": -8,
+    "cap": -1, "earring": -4, "coat": -5, "pants": -6, "shoes": -7, "glove": -8,
     "cape": -9, "shield": -10, "weapon": -11, "pendant": -17,
 }
 
@@ -32,6 +32,20 @@ ARMOR_POOLS = {
 }
 ANY_JOB_GEARS = {"cape": 1102172, "earring": 1032031, "pendant": 1122012}
 FALLBACK_GEARS = {"shoes": 1072344}  # any-job Facestompers when no class variant exists
+
+# equip-stat-flow.mjs fixture contract, inherited from the pre-automation manual
+# test1Hero (snapshot preserved on the test1hold account): pants 1062000 worn
+# instead of a coat, plus four unequipped items in the EQUIP bag
+# (inventorytype=1) at slots 2..5. Stats below are the legacy DB rows verbatim;
+# the flow's damage expectations (phys/magic probes) are calibrated to them,
+# and 1062000 has no entry in the local wz XML dump.
+HERO_PANTS = (1062000, 7, {"mp": 4, "wdef": 13})
+HERO_BAG_EQUIPS = (
+    (2, 1302000, 7, {"matk": 17}),
+    (3, 1002067, 7, {"mdef": 4}),
+    (4, 1302000, 7, {"matk": 16}),
+    (5, 1052155, 0, {"str": 20, "wdef": 100, "mdef": 50}),
+)
 
 HPMP_BY_CLASS = {
     "warrior": (30000, 12000),
@@ -62,7 +76,7 @@ POTION_DEFAULT_QTY = {2000005: 200, 2050004: 100, 2022179: 100}
 
 
 def _stat_key_to_req(info, key):
-    return info.get("req_%s" % key, 0)
+    return info.get("req_%s" % key, 0) if info else 0
 
 
 def _pick_armor(pools, cls, infos):
@@ -79,6 +93,14 @@ def _pick_armor(pools, cls, infos):
         else:
             chosen[slot] = None
     return chosen
+
+
+def _body_slot(code, armor, primary):
+    """Hero keeps the legacy fixture shape: pants worn, coat left in the bag."""
+    if code == "Hero":
+        return ("pants", HERO_PANTS[0], HERO_PANTS[2])
+    coat = armor["coat"]
+    return ("coat", coat, _armor_bonus(ARMOR_INFOS[coat]["tuc"], primary) if coat else None)
 
 
 def _weapon_bonus(tuc, cls):
@@ -103,7 +125,7 @@ def plan_equips(job):
     layout = [
         ("weapon", weapon, _weapon_bonus(WEAPON_INFOS[weapon]["tuc"], cls)),
         ("glove", armor["glove"], _glove_bonus(ARMOR_INFOS[armor["glove"]]["tuc"], cls) if armor["glove"] else None),
-        ("coat", armor["coat"], _armor_bonus(ARMOR_INFOS[armor["coat"]]["tuc"], primary) if armor["coat"] else None),
+        _body_slot(code, armor, primary),
         ("cap", armor["cap"], _armor_bonus(ARMOR_INFOS[armor["cap"]]["tuc"], primary) if armor["cap"] else None),
         ("shoes", armor["shoes"], {**_armor_bonus(ARMOR_INFOS[armor["shoes"]]["tuc"], primary), "speed": 8, "jump": 7} if armor["shoes"] else None),
         ("cape", ANY_JOB_GEARS["cape"], _armor_bonus(ARMOR_INFOS[ANY_JOB_GEARS["cape"]]["tuc"], primary)),
@@ -138,6 +160,14 @@ def compute_stats(job):
     return stats
 
 
+def plan_bag_equips(job):
+    """(position, itemid, tuc, bonus) items in the EQUIP bag; Hero fixture only."""
+    code, *_ = job
+    if code != "Hero":
+        return []
+    return [list(row) for row in HERO_BAG_EQUIPS]
+
+
 def plan_use_items(job):
     """(itemid, quantity) consumables; stars/bullets for throwers."""
     code, _job_id, _imgs, _weapon, _shield, _cls, _p, _s, _suffix = job
@@ -164,6 +194,7 @@ def character_blueprint(job):
         "maxhp": maxhp,
         "maxmp": maxmp,
         "equips": plan_equips(job),
+        "bag_equips": plan_bag_equips(job),
         "use_items": plan_use_items(job),
     }
 
@@ -191,6 +222,9 @@ def _prime_infos():
     shield_ids = [job[4] for job in JOBS if job[4]]
     WEAPON_INFOS = load_equip_infos(weapon_ids)
     SHIELD_INFOS = load_equip_infos(shield_ids)
+    # Legacy fixture pants has no local wz XML entry; tuc is part of the
+    # HERO_PANTS contract tuple so plan_equips can still derive it.
+    ARMOR_INFOS.setdefault(HERO_PANTS[0], {"itemid": HERO_PANTS[0], "tuc": HERO_PANTS[1]})
 
 
 _prime_infos()

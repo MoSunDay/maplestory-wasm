@@ -546,6 +546,43 @@ var LazyFS = {
 	},
 
 	/**
+	 * Fire-and-forget warm-up of the chunks covering [offset, offset+length).
+	 *
+	 * Used when a wasm read must fail synchronously because another chain is
+	 * parked in Asyncify's single rewind buffer (see fetch_data in
+	 * LazyFileBackend.cpp): the fetch runs purely on the JS side - no wasm
+	 * suspension, no wakeUp - and handleBinaryChunk moves each chunk into the
+	 * memory cache as it arrives, so the caller's next attempt is served from
+	 * readCachedSync. Errors are swallowed on purpose: this is best-effort
+	 * warming, the real read is retried by its caller.
+	 */
+	warmRangeInBackground: function (filepath, offset, length) {
+		try {
+			const fileEntry = this.files.get(filepath);
+			if (!fileEntry || !this.CHUNK_SIZE) {
+				return;
+			}
+			const versionTag = this.getFileVersionTag(fileEntry);
+			const startChunk = Math.floor(offset / this.CHUNK_SIZE);
+			const endChunk = Math.floor((offset + Math.max(1, length) - 1) / this.CHUNK_SIZE);
+			// Only fetch consecutive missing batches, mirroring readFileData.
+			let batchStart = -1;
+			for (let chunkIdx = startChunk; chunkIdx <= endChunk + 1; chunkIdx++) {
+				const missing = chunkIdx <= endChunk &&
+					!this.chunkCache.has(this.getChunkCacheKey(filepath, versionTag, chunkIdx));
+				if (missing && batchStart === -1) {
+					batchStart = chunkIdx;
+				} else if (!missing && batchStart !== -1) {
+					this.fetchChunks(filepath, batchStart, chunkIdx - 1).catch(function () {});
+					batchStart = -1;
+				}
+			}
+		} catch (ignored) {
+			// Best-effort warming: never let it surface in the caller.
+		}
+	},
+
+	/**
 	 * Read data from a file at a specific offset
 	 * This is called by Emscripten's FS when the file is read
 	 */

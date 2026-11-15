@@ -632,6 +632,9 @@ http://127.0.0.1:8000/web/index.html）、`REJECT_ACCOUNT`/`REJECT_PASSWORD`
 
 - `pet-automation-flow.mjs`：宠物自动化库（E2E_PET_OPTIONS
   configure/runtime/pickup/follow）；
+- `pet-options-flow.mjs`：宠物自动补给面板交互库（自 pet-automation-flow.mjs
+  拆出，滑条/药品/BUFF 槽/OK 坐标经 mspet_options_* 探针解析；由
+  `E2E_PET_OPTIONS=configure|runtime|pickup|follow|hunger node run.mjs` 驱动）；
 - `pet-hunger-fixture.mjs`：饥饿数据夹具（E2E_PET_HUNGER）；
 - `pet-hunger-flow.mjs`：温饱/饥饿/罢工/喂食/复工全链路；
 - `pet-stat-boost.mjs`：-7 鞋位提速夹具（E2E_PET_SHOE_STATS）。

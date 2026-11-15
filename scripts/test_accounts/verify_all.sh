@@ -83,7 +83,7 @@ phase_equip() {
   reset_login
   rm -rf /tmp/equip-stat-flow
   CHROME_BIN=/usr/bin/chromium-browser \
-    timeout 420 node "$ROOT/tools/verify/maplestory-webui/equip-stat-flow.mjs" 2>&1 | tail -3
+    timeout 420 node "$ROOT/tools/verify/maplestory-webui/equip-stat-flow.mjs" 2>&1 | tee /tmp/equip-stat-flow-last.log | tail -3
   reset_login
 }
 
@@ -96,7 +96,7 @@ phase_cooppet() {
   reset_login
   rm -rf /tmp/remote-pet-desync-flow
   CHROME_BIN=/usr/bin/chromium-browser COOP_MAX_P95_FRAME_MS=60 \
-    timeout 900 node "$ROOT/tools/verify/maplestory-webui/remote-pet-desync-flow.mjs" 2>&1 | tail -5
+    timeout 900 node "$ROOT/tools/verify/maplestory-webui/remote-pet-desync-flow.mjs" 2>&1 | tee /tmp/remote-pet-desync-flow-last.log | tail -5
   reset_login
 }
 

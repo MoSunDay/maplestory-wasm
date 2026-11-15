@@ -104,3 +104,67 @@
   出视野期间召唤继续按服务端广播移动；此前基线 changelog
   `summons-foreign-buffs-and-cosmetics.md` 记录的「owner 离图则保持」
   从已知边界升级为已修复。
+
+## 收尾实录（2026-11-15 下午：门 3 三场景转绿 + 宠物拾取环境修复）
+
+上文 e2e 首跑仅 1/3：傀儡场景 B 侧计数恒 0。逐项定位出六个叠加根因，
+全部修复后 `summon-owner-leave-flow.mjs` 3/3 全绿，顺带修复同日
+`pet-automation-flow.mjs`（E2E_PET_OPTIONS=pickup）的环境性失败。
+
+### 客户端/数据根因与修复
+
+1. **Skill.nx 缺 3111002（Puppet）节点**：v83 数据集根本不含该技能，
+   `SkillData::get(3111002)` 为空、is_summon 判否。新增
+   `tools/nx/inject_puppet_summon_nx.py` 参照 Phoenix(3121006) 结构把
+   20 级傀儡数据移植进 `assets/Skill.nx`（备份
+   `Skill.nx.pre-puppet-summon-backup`）。
+2. **bullet 字段缺失**：数据集剥离了各级 bulletConsume/bulletCount，
+   `SkillData.cpp` bulletcost 缺省取 0，与服务端扣弹逻辑对齐。
+3. **Asyncify 双重展开崩溃**：召唤首帧在挂起读上再次 handleSleep 触发
+   wasm 双重展开 abort。`LazyFileBackend.cpp` 预置 busy-guard
+   （`!replayingSuspendedRead && (currData || state)` 时同步返回 0），
+   `lazyfs.js` 配套 `warmRangeInBackground` 预热，消除交互期挂起读。
+4. **UseSkillPacket 不带坐标**：服务端 `SpecialMoveHandler` 仅在
+   `slea.available() == 5` 时刷出召唤兽。`AttackAndSkillPackets.h`
+   新增坐标重载（write_point + write_byte(0)），`Combat.cpp` apply_move
+   对 `is_summon()` 技能改发坐标版。
+5. **首登冷缓存丢键**：`Stage::send_key` 在 Stage 非 ACTIVE（LOADING）
+   时静默丢键，首登傀儡按键被吞（重登热缓存才成功）。e2e 的
+   castSummon 先等 `uiState==game && msstage_loading==0` 再点击+按键。
+6. **StageInput.cpp / PacketSwitch.cpp** 诊断后还原为与 HEAD 字节一致。
+
+### 宠物拾取门（pet-automation-flow.mjs pickup）环境根因
+
+- 门入口固定**双击第一张角色卡**：test1 首卡是 test1Hero（等级 200、
+  HP 30000、map 40001），并非当轮新建的「测试一」——门实际一直跑在
+  test1Hero 上（历史全绿记录用 accept1/accept1Hero 同理）。
+- test1Hero 现金栏幼犬被 `remote-pet-desync-flow` 的 injectPet 重绑到
+  pets 行 50000024「DesyncPet」，温饱度随全量 worker 衰减到 25 <
+  客户端 HUNGRY_THRESHOLD(40) → `update_pet_automation` 饥饿门每帧
+  `clear_pet_loot_target`，targetSeen 恒 false、服务端确认拾取恒 0。
+- 修复：`UPDATE pets SET fullness=100, summoned=0 WHERE petid=50000024`
+  （恢复验证过的健康形态：门自己走现金栏双击召唤路径）。复跑全绿：
+  服务端确认拾取 4 次（meso +4）、精确 OID 1000000031 1ms 移除、
+  跟随恢复达标（distance 34 / 0 warp / recovered）。
+
+### 附带环境结论（复现排查途中定位）
+
+- 服务端 `accountChars` 内存计数**不会遗忘 SQL 直删的角色**：门收尾
+  脚本按 SQL 清理同名角色后，内存仍占满 test1 的 4 槽，
+  `CreateCharHandler` 槽位 -3 **静默无回包**，客户端卡建角界面 →
+  `Timed out: character creation returned to selection`。处理：清理
+  残留角色后 `docker restart ms-game-server` 同步内存即可复跑。
+- 测试库 `innodb_flush_log_at_trx_commit=2`、`sync_binlog=0`（建角
+  82–107s → 57ms），为测试环境调优，保留；生产不适用。
+
+### 回归验证（全部通过）
+
+- `summon-owner-leave-flow.mjs` 3/3（puppet/phoenix/owner-leave 归零、
+  0×182/183、0 浏览器异常）。
+- `node tools/verify/summon-late-owner-contract.mjs`。
+- 纯函数门 chatbar-geometry / pet-buff-policy / drag-session。
+- `E2E_PET_OPTIONS=pickup E2E_REQUIRE_MOBS=1 E2E_ROUTE_TUTORIAL_MOB_MAP=1
+  node tools/verify/maplestory-webui/run.mjs` 全绿（含建角、入场、
+  现金栏召唤、能力掩码、拾取、跟随）。
+- snow-slide-flow 于当日最终构建后已复验 ALL CHECKS PASSED（本轮无
+  源码改动，未重跑）。

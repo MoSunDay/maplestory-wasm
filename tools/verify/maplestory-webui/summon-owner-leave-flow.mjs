@@ -106,10 +106,13 @@ async function runScenario(name, body) {
 // ---- DB 幂等注入：技能 + 键位 + 双号落图/登出复位 ----
 function prepareDatabase(db, aCharId, bCharId) {
   mysqlRun(db, `UPDATE characters SET map=${MAP_ID}, spawnpoint=0 WHERE id IN (${aCharId}, ${bCharId});`);
-  for (const skill of [PUPPET, PHOENIX]) {
+  // Puppet 数据上限 20 级（Skill.nx/Skill.nx.v83-backup 的 3111002 level 表），
+  // 注入 30 级会被客户端 masterlevel=20 的 can_use 门槛拒绝。
+  const skillLevels = { [PUPPET]: 20, [PHOENIX]: 30 };
+  for (const [skill, level] of Object.entries(skillLevels)) {
     mysqlRun(db, `DELETE FROM skills WHERE characterid=${aCharId} AND skillid=${skill};`);
     mysqlRun(db, `INSERT INTO skills (characterid, skillid, skilllevel, masterlevel) ` +
-      `VALUES (${aCharId}, ${skill}, 30, 30);`);
+      `VALUES (${aCharId}, ${skill}, ${level}, ${level});`);
   }
   for (const binding of [[KEY_J.index, PUPPET], [KEY_K.index, PHOENIX]]) {
     mysqlRun(db, `DELETE FROM keymap WHERE characterid=${aCharId} AND \`key\`=${binding[0]};`);
@@ -120,11 +123,16 @@ function prepareDatabase(db, aCharId, bCharId) {
   report(true, `DB: skills ${PUPPET}/${PHOENIX} lvl30 + keymap J/K bound for ${primary.character} (${aCharId})`);
 }
 
-// A 侧按键施放：先点画布夺焦点，按键后以 B 侧观测为准（A 侧 UI 不参与断言）。
+// A 侧按键施放：先等舞台真正可交互（msmap_id 就绪≠装载完成：Stage 在
+// LOADING 态会静默丢弃按键，首登冷缓存时 1.5s 的静置不够——重登走的
+// 是热缓存才会显得"偶发"），再点画布夺焦点；以 B 侧观测为准（A 侧 UI
+// 不参与断言）。
 async function castSummon(driver, binding, label) {
+  await waitFor(`${label}: A stage interactive`, async () =>
+    await uiState(driver) === 5 && await probe(driver, 'msstage_loading') === 0, 20);
   await driver.click(400, 300);
   await sleep(300);
-  await driver.key(binding.key, binding.code, binding.vk);
+  await driver.key(binding.key, binding.code, binding.vk, binding.key);
   await sleep(1200);
   console.log(`INFO  ${label} cast (key ${binding.code})`);
 }

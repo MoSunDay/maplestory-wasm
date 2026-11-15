@@ -297,7 +297,18 @@ namespace jrc
 
             int32_t moveid = move.get_id();
             int32_t level = player.get_skills().get_level(moveid);
-            UseSkillPacket(moveid, level).dispatch();
+            if (SkillData::get(moveid).is_summon())
+            {
+                // The server only spawns the summon when the cast position
+                // is appended (x, y and one trailing byte). See
+                // SpecialMoveHandler in the server sources.
+                UseSkillPacket(moveid, level,
+                    player.get_position()).dispatch();
+            }
+            else
+            {
+                UseSkillPacket(moveid, level).dispatch();
+            }
         }
     }
 

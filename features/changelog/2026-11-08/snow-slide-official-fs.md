@@ -60,8 +60,13 @@ e2e 走廊（211000000 x∈[-1980,-1170] 街面）实测全部为平坡
 ## 验证
 
 - 数值模拟如上（`/tmp/ice_sim.py` 复现）。
-- e2e：`tools/verify/maplestory-webui/snow-slide-flow.mjs` 更新预期
-  （滑行 ≈42px，窗口 8~90px 不变），断言集不变。
+- e2e：`tools/verify/maplestory-webui/snow-slide-flow.mjs` 全部断言 PASS
+  （211000000 实测：ICE 物理生效、行走平台 1.26 px/t 不变、松键滑行
+  **36px**（旧实现实测 22px，1.64 倍）、WALK 姿态保持 453ms（旧 209ms）
+  后停稳回 STAND、完全停止 hs=0）。观察项：滑行中按 Down 进 prone 会
+  带惯性继续滑行后停稳（雪面匍匐不打断滑行，与官方手感一致）。
+- 构建：HEAD（含本改动）Docker WASM 全量构建 `[100%] Built target
+  JourneyClient` 零错误（隔离 worktree 验证，规避并行在途改动）。
 
 ## 相关文档
 

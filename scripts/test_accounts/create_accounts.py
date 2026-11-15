@@ -209,10 +209,22 @@ def character_sql(name, char_index, blueprint, quest_ids, world=4):
     return stmts
 
 
-def equipped_item_sql(equip):
-    slot, itemid, tuc, bonus = equip
+def _equip_stats_insert(tuc, bonus):
     bonus = bonus or {}
     inc = {col: int(bonus.get(col, 0)) for col in EQUIP_BONUS_COLUMNS}
+    return ("INSERT INTO inventoryequipment (inventoryitemid, upgradeslots, level, str, dex,"
+            " `int`, luk, hp, mp, watk, matk, wdef, mdef, acc, avoid, hands, speed, jump,"
+            " locked, vicious, itemlevel, itemexp, ringid)"
+            " VALUES (@item, 0, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d,"
+            " 0, 0, 1, 0, -1);" % (
+                tuc, inc["str"], inc["dex"], inc["int"], inc["luk"], inc["hp"], inc["mp"],
+                inc["watk"], inc["matk"], inc["wdef"], inc["mdef"], inc["acc"], inc["avoid"],
+                inc["hands"], inc["speed"], inc["jump"],
+            ))
+
+
+def equipped_item_sql(equip):
+    slot, itemid, tuc, bonus = equip
     return [
         "INSERT INTO inventoryitems (type, characterid, accountid, itemid, inventorytype,"
         " position, quantity, owner, petid, flag, expiration, giftFrom)"
@@ -220,15 +232,21 @@ def equipped_item_sql(equip):
             itemid, SLOT_POSITION[slot]
         ),
         "SET @item = LAST_INSERT_ID();",
-        ("INSERT INTO inventoryequipment (inventoryitemid, upgradeslots, level, str, dex,"
-         " `int`, luk, hp, mp, watk, matk, wdef, mdef, acc, avoid, hands, speed, jump,"
-         " locked, vicious, itemlevel, itemexp, ringid)"
-         " VALUES (@item, 0, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d,"
-         " 0, 0, 1, 0, -1);" % (
-             tuc, inc["str"], inc["dex"], inc["int"], inc["luk"], inc["hp"], inc["mp"],
-             inc["watk"], inc["matk"], inc["wdef"], inc["mdef"], inc["acc"], inc["avoid"],
-             inc["hands"], inc["speed"], inc["jump"],
-         )),
+        _equip_stats_insert(tuc, bonus),
+    ]
+
+
+def bag_item_sql(equip):
+    """Unequipped fixture item in the EQUIP bag (inventorytype=1, fixed slot)."""
+    position, itemid, tuc, bonus = equip
+    return [
+        "INSERT INTO inventoryitems (type, characterid, accountid, itemid, inventorytype,"
+        " position, quantity, owner, petid, flag, expiration, giftFrom)"
+        " VALUES (1, @chr, @acc, %d, 1, %d, 1, '', -1, 0, -1, '');" % (
+            itemid, position
+        ),
+        "SET @item = LAST_INSERT_ID();",
+        _equip_stats_insert(tuc, bonus),
     ]
 
 
@@ -284,6 +302,8 @@ def build_sql(account_names, blueprints, quest_ids, password=None, chars_per_acc
             stmts.extend(character_sql(name, char_index, blueprint, quest_ids, world))
             for equip in blueprint["equips"]:
                 stmts.extend(equipped_item_sql(equip))
+            for equip in blueprint["bag_equips"]:
+                stmts.extend(bag_item_sql(equip))
             stmts.append(use_items_sql(blueprint["use_items"]))
     return "\n".join(stmts)
 

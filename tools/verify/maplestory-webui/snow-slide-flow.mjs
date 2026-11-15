@@ -211,7 +211,7 @@ async function main() {
     report.observations.prone = { sawProne, proneStill,
       stances: [...new Set(proneRows.map(r => r.stance))] };
     console.log(`  NOTE  prone-on-snow: sawProne=${sawProne} staysStill=${proneStill}`
-      + ` (prone 从静止进入；斜坡上会被下滑力持续拖行，本走廊为平地 —— 观察项不作断言)`);
+      + ` (滑行中切入 prone 保持惯性滑行后停稳，雪面匍匐不打断滑行 —— 观察项不作断言)`);
     await driver.screenshot('03-prone');
   } finally {
     fs.writeFileSync(`${outDir}/report.json`, JSON.stringify(report, null, 2));

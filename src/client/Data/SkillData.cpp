@@ -72,7 +72,14 @@ namespace jrc
             uint8_t  attackcount = (uint8_t)sub["attackCount"].get_integer(1);
             uint8_t  mobcount = (uint8_t)sub["mobCount"].get_integer(1);
             uint8_t bulletcount = (uint8_t)sub["bulletCount"].get_integer(1);
-            int16_t bulletcost = (int16_t)sub["bulletConsume"].get_integer(bulletcount);
+            // This dataset strips bulletConsume/bulletCount from skill levels
+            // (verified: no skill in Skill.nx carries them). The server-side
+            // reader (MapleStatEffect: getIntConvert("bulletConsume", source, 0))
+            // treats a missing node as "no arrows consumed", so the client must
+            // default to 0 as well - defaulting to `bulletcount` (1) would make
+            // every BOW/CROSSBOW/CLAW/GUN skill uncastable for arrowless
+            // characters, diverging from the server on the same data.
+            int16_t bulletcost = (int16_t)sub["bulletConsume"].get_integer(0);
             int32_t hpcost = sub["hpCon"];
             int32_t mpcost = sub["mpCon"];
             int32_t hprecovery = sub["hp"];

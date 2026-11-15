@@ -271,8 +271,17 @@ namespace jrc
 
             if (skillid % 10000000 == 1004)
                 skip(2); // no idea what this could be
+        }
 
-            // a point (4 bytes) could be added at the end
+        // Summon skills (Puppet, Phoenix, ...) carry the cast position:
+        // the server's SpecialMoveHandler only spawns the summon when
+        // exactly 5 bytes remain after the level (x, y plus one trailing
+        // byte), and uses that point as the summon's spawn position.
+        UseSkillPacket(int32_t skillid, int32_t level, Point<int16_t> position)
+            : UseSkillPacket(skillid, level)
+        {
+            write_point(position);
+            write_byte(0);
         }
     };
 }
