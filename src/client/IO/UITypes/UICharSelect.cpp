@@ -27,7 +27,7 @@
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "../Components/AreaButton.h"
-#include "../Components/TwoSpriteButton.h"
+#include "../CharacterSelect/CharSelectModernPanels.h"
 
 #include "../../Constants.h"
 #include "../../Configuration.h"
@@ -44,6 +44,15 @@ namespace jrc
     namespace
     {
         constexpr const char* AUTO_PIC = "1010";
+
+        // Fallback Lv marker when the UI.nx ships no lv charset: a plain
+        // label. Function local static because Text caches its layout and
+        // change_text() is a no-op while the level stays the same.
+        Text& level_label()
+        {
+            static Text label{ Text::A11M, Text::CENTER, Text::WHITE };
+            return label;
+        }
     }
 
     UICharSelect::UICharSelect(std::vector<CharEntry> cs,
@@ -81,14 +90,15 @@ namespace jrc
 
     void UICharSelect::initialize_ui()
     {
+        namespace layout = charselect_modern;
 
         nl::node back       = nl::nx::map["Back"]["login.img"]["back"];
         nl::node title      = nl::nx::ui["Login.img"]["Title"];
         nl::node common     = nl::nx::ui["Login.img"]["Common"];
-        nl::node charselect = nl::nx::ui["Login.img"]["CharSelect"];
+        nl::node charselect = charselect_nodes::root();
 
-        // Compatibility: base login background exists across more UI.nx variants
-        // than Title/worldsel.
+        // Backdrop and frame are shared login-chain art; the 2023 chrome
+        // is drawn procedurally on top of them.
         if (back["11"])
         {
             sprites.emplace_back(back["11"], Point<int16_t>(360, 313));
@@ -98,7 +108,7 @@ namespace jrc
             sprites.emplace_back(back["0"], Point<int16_t>(400, 300));
         }
 
-        // Keep legacy world-select art as an optional overlay when available.
+        // Keep legacy world-select art as an optional overlay.
         if (title["worldsel"])
         {
             sprites.emplace_back(title["worldsel"]);
@@ -113,42 +123,21 @@ namespace jrc
             Console::get().print("[UICharSelect] Missing Login.img/Common/frame for this UI.nx variant.");
         }
 
-        // Post BB
-        /*
-        selworldpos = Point<int16_t>(578, 42);
-        charinfopos = Point<int16_t>(662, 355);
-        buttons[BT_ARBEIT] = std::make_unique<MapleButton>(charsel["arbeit"], Point<int16_t>(580, 115)));
-        buttons[BT_CARDS] = std::make_unique<MapleButton>(charsel["characterCard"], Point<int16_t>(665, 115)));
-        */
-
-        // Pre BB
-        // Post-Chaos restores the upstream post-BB anchors: the
-        // selectWorld banner (190x89, origin (11,11), opaque rows 12-76)
-        // then ends exactly above the NX-positioned charSlot window
-        // (589,106), instead of colliding with it as the pre-Chaos
-        // (578,112) anchor did. The charInfo board follows 50px lower,
-        // clearing the count window and seating BtSelect on the board's
-        // bottom section. The pre-Chaos board (charInfo1, 183x151,
-        // origin (45,57)) would run flush against the right screen edge
-        // at the upstream x, so it is shifted left.
-        const bool post_chaos_assets = charselect_nodes::post_chaos();
-        charinfopos = post_chaos_assets ? Point<int16_t>(662, 355)
-                                        : Point<int16_t>(625, 305);
-        selworldpos = post_chaos_assets ? Point<int16_t>(578, 42)
-                                        : Point<int16_t>(578, 112);
-
-        sprites.emplace_back(charselect_nodes::info_board(),      charinfopos);
-        sprites.emplace_back(common["selectWorld"],               selworldpos);
-
+        // NX accent: the world banner sits under the flat top bar.
+        sprites.emplace_back(common["selectWorld"], layout::WORLD_BANNER_POS);
         if (charselect["selectedWorld"])
         {
-            // Post-Chaos world banner art. Pre-Chaos only ships the
-            // Common/selectWorld board added above.
-            sprites.emplace_back(charselect["selectedWorld"]["icon"]["15"],     selworldpos);
-            sprites.emplace_back(charselect["selectedWorld"]["name"]["15"],     selworldpos);
-            sprites.emplace_back(charselect["selectedWorld"]["ch"][channel_id], selworldpos);
+            sprites.emplace_back(charselect["selectedWorld"]["icon"]["15"], layout::WORLD_BANNER_POS);
+            sprites.emplace_back(charselect["selectedWorld"]["name"]["15"], layout::WORLD_BANNER_POS);
+            sprites.emplace_back(charselect["selectedWorld"]["ch"][channel_id], layout::WORLD_BANNER_POS);
+        }
+        else
+        {
+            Console::get().print("[UICharSelect] Missing Login.img/CharSelect/selectedWorld for this UI.nx variant.");
         }
 
+        // NX accent: the slot count window. Without it the count label
+        // falls back into the top bar.
         if (charselect["charSlot"])
         {
             nl::node charslot = charselect["charSlot"];
@@ -158,9 +147,8 @@ namespace jrc
         }
         else
         {
-            // Pre-Chaos has no slot window: anchor the count label at the
-            // bottom right corner of the selectWorld board instead.
-            slotcountpos = selworldpos + Point<int16_t>(144, 71);
+            Console::get().print("[UICharSelect] Missing Login.img/CharSelect/charSlot for this UI.nx variant.");
+            slotcountpos = layout::COUNT_FALLBACK_POS;
         }
         slotcountlabel = { Text::A11M, Text::RIGHT, Text::WHITE };
 
@@ -169,41 +157,29 @@ namespace jrc
         nametag      = charselect["nameTag"];
 
         buttons[BT_SELECTCHAR] = std::make_unique<MapleButton>(
-            charselect["BtSelect"],
-            post_chaos_assets ? charinfopos + Point<int16_t>(-76, 72)
-                              : Point<int16_t>(440, 495));
-        buttons[BT_CREATECHAR] = std::make_unique<MapleButton>(charselect["BtNew"],    Point<int16_t>(200, 495));
-        buttons[BT_DELETECHAR] = std::make_unique<MapleButton>(charselect["BtDelete"], Point<int16_t>(320, 495));
-
-        if (charselect_nodes::pages_are_state_buttons())
-        {
-            buttons[BT_PAGELEFT]   = std::make_unique<MapleButton>(charselect["pageL"],    charselect_layout::PAGE_ARROW_LEFT_POS);
-            buttons[BT_PAGERIGHT]  = std::make_unique<MapleButton>(charselect["pageR"],    charselect_layout::PAGE_ARROW_RIGHT_POS);
-        }
-        else
-        {
-            // Pre-Chaos pageL/pageR are big edge arrows stored as plain
-            // frame pairs instead of state subtrees. Their origins are
-            // (43,37)/(44,36), so the anchors keep the upstream top left
-            // corners and the right arrow mirrors the left one at the
-            // opposite screen edge.
-            buttons[BT_PAGELEFT]   = std::make_unique<TwoSpriteButton>(
-                charselect["pageL"]["1"], charselect["pageL"]["0"],
-                Point<int16_t>(100, 490));
-            buttons[BT_PAGERIGHT]  = std::make_unique<TwoSpriteButton>(
-                charselect["pageR"]["1"], charselect["pageR"]["0"],
-                Point<int16_t>(698, 490));
-        }
+            charselect["BtSelect"], layout::START_POS);
+        buttons[BT_CREATECHAR] = std::make_unique<MapleButton>(
+            charselect["BtNew"], layout::CREATE_POS);
+        buttons[BT_DELETECHAR] = std::make_unique<MapleButton>(
+            charselect["BtDelete"], layout::DELETE_POS);
+        buttons[BT_PAGELEFT]   = std::make_unique<MapleButton>(
+            charselect["pageL"], layout::PAGE_ARROW_LEFT_POS);
+        buttons[BT_PAGERIGHT]  = std::make_unique<MapleButton>(
+            charselect["pageR"], layout::PAGE_ARROW_RIGHT_POS);
 
         for (uint8_t i = 0; i < PAGESIZE; ++i)
         {
             buttons[BT_CHAR0 + i] = std::make_unique<AreaButton>(
-                charselect_layout::slot_hotzone_pos(i),
-                charselect_layout::slot_hotzone_dim()
+                layout::slot_hotzone_pos(i),
+                layout::slot_hotzone_dim()
             );
         }
 
         levelset = { charselect["lv"], Charset::CENTER };
+        if (!charselect_nodes::has_level_charset())
+        {
+            Console::get().print("[UICharSelect] Missing Login.img/CharSelect/lv charset; falling back to a plain level label.");
+        }
 
         namelabel = { Text::A18M, Text::CENTER };
         for (size_t i = 0; i < NUM_LABELS; ++i)
@@ -223,81 +199,78 @@ namespace jrc
 
     void UICharSelect::draw(float alpha) const
     {
-        UIElement::draw(alpha);
         if (!ui_initialized)
         {
+            UIElement::draw(alpha);
             return;
         }
 
-        const Point<int16_t> origin = ui_layout::origin();
-        const bool post_chaos_assets = charselect_nodes::post_chaos();
-        slotcountlabel.draw(slotcountpos + origin);
+        namespace layout = charselect_modern;
+
+        // Layer order: backdrop sprites, flat chrome, button backings,
+        // NX buttons, then the roster and the info card content on top.
+        draw_sprites(alpha);
+        charselect_panels::draw_chrome(position);
+        charselect_panels::draw_start_backing(
+            position, buttons.at(BT_SELECTCHAR)->get_state());
+        charselect_panels::draw_footer_backing(
+            position,
+            buttons.at(BT_CREATECHAR)->get_state(),
+            buttons.at(BT_DELETECHAR)->get_state()
+        );
+        draw_buttons(alpha);
+
+        slotcountlabel.draw(slotcountpos + position);
 
         for (uint8_t i = 0; i < charcount_relative; ++i)
         {
-            const Point<int16_t> charpos = charselect_layout::char_slot_pos(i) + origin;
+            const Point<int16_t> charpos = layout::char_slot_pos(i) + position;
             const uint8_t index = i + page * PAGESIZE;
-            // The post-Chaos disc origin sinks the feet; the pre-Chaos
-            // platform already sits correctly at the feet anchor.
-            const Point<int16_t> platformpos = post_chaos_assets
-                ? charpos + charselect_layout::PLATFORM_OFFSET
-                : charpos;
-            charplatform.draw(platformpos, alpha);
-            draw_preview(index, charpos, alpha);
-            nametags[index].draw(
-                post_chaos_assets
-                    ? charpos + charselect_layout::NAMETAG_OFFSET
-                    : charpos
+            charselect_panels::draw_slot_highlight(
+                position, i, i == selected_relative,
+                buttons.at(static_cast<uint16_t>(BT_CHAR0 + i))->get_state()
             );
-        }
-
-        if (selected_absolute < charcount_absolute)
-        {
-            const StatsEntry& stats = characters[selected_absolute].stats;
-            const Point<int16_t> data_origin = charinfopos + charselect_layout::CHARACTER_DATA_OFFSET + origin;
-
-            std::string levelstr = std::to_string(stats.stats[Maplestat::LEVEL]);
-            if (charselect_nodes::has_level_charset())
-            {
-                int16_t lvx = levelset.draw(levelstr, charinfopos + Point<int16_t>(23, -93) + origin);
-                levelset.draw('l', charinfopos + Point<int16_t>(-7 - lvx / 2, -93) + origin);
-
-                namelabel.draw(charinfopos + Point<int16_t>(0, -85) + origin);
-            }
-            else
-            {
-                // Pre-Chaos ships no lv charset, so the marker is a plain
-                // label. The info board top edge sits 57px above the
-                // anchor; the level goes on the first board row and the
-                // name right below it.
-                Text& lvlabel = charselect_nodes::level_label();
-                lvlabel.change_text("Lv. " + levelstr);
-                lvlabel.draw(charinfopos + Point<int16_t>(46, -37) + origin);
-
-                namelabel.draw(charinfopos + Point<int16_t>(46, -13) + origin);
-            }
-
-            for (size_t i = 0; i < NUM_LABELS; ++i)
-            {
-                Point<int16_t> labelpos = data_origin + charselect_layout::label_pos(i, post_chaos_assets);
-                infolabels[i].draw(labelpos);
-            }
+            charplatform.draw(charpos + layout::PLATFORM_OFFSET, alpha);
+            draw_preview(index, charpos, alpha);
+            nametags[index].draw(charpos + layout::NAMETAG_OFFSET);
         }
 
         for (uint8_t i = charcount_relative; i < slots_relative; ++i)
         {
-            const Point<int16_t> position_slot = charselect_layout::char_slot_pos(i) + origin;
-            if (post_chaos_assets)
+            const Point<int16_t> position_slot = layout::char_slot_pos(i) + position;
+            charplatform.draw(position_slot + layout::PLATFORM_OFFSET, alpha);
+            emptyslot.draw(position_slot, alpha);
+        }
+
+        if (selected_absolute < charcount_absolute &&
+            selected_absolute < characters.size())
+        {
+            const StatsEntry& stats = characters[selected_absolute].stats;
+
+            if (charselect_nodes::has_level_charset())
             {
-                charplatform.draw(position_slot + charselect_layout::PLATFORM_OFFSET, alpha);
-                emptyslot.draw(position_slot, alpha);
+                const std::string levelstr =
+                    std::to_string(stats.stats[Maplestat::LEVEL]);
+                const int16_t lvx = levelset.draw(
+                    levelstr, layout::CARD_LV_POS + position);
+                levelset.draw(
+                    'l',
+                    layout::CARD_LV_POS +
+                        Point<int16_t>(-8 - lvx / 2, 0) + position);
             }
             else
             {
-                // Pre-Chaos keeps the empty platform under unused slots
-                // and puts the small icon/new badge just above it.
-                charplatform.draw(position_slot, alpha);
-                emptyslot.draw(position_slot + Point<int16_t>(-4, -84), alpha);
+                Text& lvlabel = level_label();
+                lvlabel.change_text(
+                    "Lv. " + std::to_string(stats.stats[Maplestat::LEVEL]));
+                lvlabel.draw(layout::CARD_LV_POS + position);
+            }
+
+            namelabel.draw(layout::CARD_NAME_POS + position);
+
+            for (size_t i = 0; i < NUM_LABELS; ++i)
+            {
+                infolabels[i].draw(layout::card_label_pos(i) + position);
             }
         }
     }

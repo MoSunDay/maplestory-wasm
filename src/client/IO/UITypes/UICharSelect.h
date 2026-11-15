@@ -17,7 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../UIElement.h"
-#include "UICharSelectLayout.h"
+#include "../CharacterSelect/CharSelectModernLayout.h"
 
 #include "../Components/Charset.h"
 #include "../Components/Nametag.h"
@@ -88,14 +88,12 @@ namespace jrc
             BT_CREATECHAR,
             BT_DELETECHAR,
             BT_SELECTCHAR,
-            BT_ARBEIT,
-            BT_CARDS,
             BT_PAGELEFT,
             BT_PAGERIGHT,
             BT_CHAR0
         };
 
-        static constexpr uint8_t PAGESIZE = charselect_layout::PAGESIZE;
+        static constexpr uint8_t PAGESIZE = charselect_modern::PAGESIZE;
 
         Sprite emptyslot;
         Sprite charplatform;
@@ -103,8 +101,6 @@ namespace jrc
         nl::node nametag;
         Text slotcountlabel;
 
-        Point<int16_t> selworldpos;
-        Point<int16_t> charinfopos;
         Point<int16_t> slotcountpos;
 
         std::vector<CharEntry> characters;
