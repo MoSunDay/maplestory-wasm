@@ -48,7 +48,7 @@ UI 状态接口。三个具体实现:
 
 ### Keyboard / Cursor
 
-- `Keyboard`: 键位绑定与映射 (`KeyConfig`, `KeyType`, `KeyAction`)
+- `Keyboard`: 键位绑定与映射 (`KeyConfig`, `KeyType`, `KeyAction`)；`DefaultKeymap.h` 预置与服务器 GameConstants 逐条一致的官方 v83 默认键位（键位设置“默认”按钮共用）
 - `Cursor`: 光标状态与渲染
 
 ## UI 组件分类

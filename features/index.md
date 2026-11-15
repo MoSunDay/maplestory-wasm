@@ -24,6 +24,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 
 - **[中文/Unicode 输入与渲染](input-localization/)**: CJK 回退字体与 UTF-8 排版；WASM 下由浏览器原生输入法处理候选，拼音 preedit 不进入游戏文本框，只同步选中后的最终文本，密码字段除外
 - **[回车打开输入框不再带入多余空格](changelog/2026-10-25/enter-key-stray-space-in-textfield.md)**: 修复按 Enter 聚焦聊天输入框时浏览器默认动作向 IME 镜像 textarea 插入换行、渲染成多余空格的问题，单行字段一律拦截换行插入
+- **[默认键位对齐官方 v83](changelog/2026-11-15/default-keymap-official-v83.md)**: 运行时预置与键位设置“默认”按钮共用的默认键表逐条对齐服务器 GameConstants 官方 v83 键表；修正 F4 空绑导致的表情键整体右移一位、C/S/B 错绑与 T/Y/V 错加大乱改动作，补回 S/F/O/数字6 的属性/家族/组队搜索/夫妻聊天官方绑定
 
 ### 游戏世界
 
