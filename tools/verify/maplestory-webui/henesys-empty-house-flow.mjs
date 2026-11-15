@@ -13,7 +13,7 @@
 // 100000000（射手村街道 y=274 被误读为"掉穿地图"）。
 // 用法：node henesys-empty-house-flow.mjs  （MAP/ACCOUNT/PASSWORD/CARD/SPAWN/URL/DEBUG_PORT 可用环境变量覆盖）
 import { BrowserDriver, sleep } from './cdp.mjs';
-import { sqlExec, waitAccountFree } from './pq-harness-db.mjs';
+import { sqlExec, sqlQuery, waitAccountFree } from './pq-harness-db.mjs';
 
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
 const debugPort = Number(process.env.HOUSE_DEBUG_PORT || 9261);
@@ -63,9 +63,23 @@ async function main() {
   // 把城镇当地图误诊成"进图掉落/冻结"（2026-11-15 排障实证）。
   if (!await waitAccountFree(account, 40))
     console.log('WARN: account still loggedin, login may bounce');
-  sqlExec(
-    `update accounts set loggedin=0 where name='${account}';` +
-    `update characters set map=${MAP}, spawnpoint=${Number(process.env.HOUSE_SPAWN ?? 0)} where name='${account}Hero';`);
+  const spawn = Number(process.env.HOUSE_SPAWN ?? 0);
+  // 写后回读：服务端"loggedin 归零"与"断线存档落库"的先后无契约保证，
+  // 静置后回读一旦被旧存档覆盖即重写，彻底关死登录进错图的竞态窗口。
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    sqlExec(
+      `update accounts set loggedin=0 where name='${account}';` +
+      `update characters set map=${MAP}, spawnpoint=${spawn} where name='${account}Hero';`);
+    await sleep(2500);
+    const row = sqlQuery(
+      `select map, spawnpoint from characters where id=(select id from characters where name='${account}Hero' order by id desc limit 1);`);
+    // mysql CLI 表格输出：表头行后每行一记录，末行应精确等于 "map<TAB>spawn"
+    const lastRow = row.trim().split('\n').pop();
+    const settled = lastRow === `${MAP}\t${spawn}`;
+    console.log(`INFO  map 预置第 ${attempt} 次回读: ${lastRow}`);
+    if (settled) break;
+    if (attempt === 3) throw new Error('characters.map 预置 3 次仍被回写覆盖，放弃登录');
+  }
 
   const driver = new BrowserDriver({ binary: chromeBinary, debugPort,
     artifactDir: process.env.HOUSE_ARTIFACT_DIR || undefined });
