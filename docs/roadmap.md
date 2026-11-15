@@ -186,7 +186,7 @@ server `run.sh`。种子/复核 SQL 一律经该端点连接，不写死回环�
 - **出生包三态 morph**：`SPAWN_PLAYER`/`SPAWN_CHAR` 的 morph 三态（普通/
   隐身/变身）目前只解析不消费；需与远端 BUFF 外观状态合并落地。
 - **D4 服务端 effectid**：`SpecialMoveHandler.java:121` 将 effectid 误传，
-  待补丁 0021 修正；另需复核 `giveForeignDebuff` 多疾病 2B/病偏差。
+  待补丁 0023 修正；另需复核 `giveForeignDebuff` 多疾病 2B/病偏差。
 - **trade-server-contract 环境修复**：交易源码契约依赖的测试环境
   （独立账号/DB 种子）尚未稳定，单列跟进。
 - **e2e 长跑稳定性**：idle-reaper/重启绑定冻结等 known-issues 仍会造成

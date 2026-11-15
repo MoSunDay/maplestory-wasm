@@ -1,0 +1,51 @@
+# 补丁 0022：owner 离图时对跟随型召唤广播 REMOVE_SPECIAL_MAPOBJECT
+# 背景：MapleMap.removePlayer 原先对非静止（跟随型）召唤只做本地
+#       removeMapObject(summon)，不向地图广播；客户端 RemoveCharHandler
+#       仅清 owner 的 summon 暂存，SummonPool 也没有按 owner 删除实体的
+#       接口，于是 B 侧的鸟/鹰/章鱼等跟随召唤在 A 离图后永久冻结残留
+#       （同 cid 再进图还会与新召唤并存）。静止傀儡不受影响：服务端
+#       cancelEffectFromBuffStat(PUPPET) 已按既有链路广播
+#       REMOVE_SPECIAL_MAPOBJECT（MapleCharacter.giveBuffRemove 链），本
+#       补丁不重复广播，避免双 remove。
+# 改动：removePlayer 的非静止分支在 removeMapObject 之外，按 owner 隐藏
+#       状态选择 broadcastGMMessage/broadcastMessage 广播
+#       removeSummon(summon, true)（mode 4，客户端走死亡动画淡出）；广播
+#       排除离图者本人（broadcastMessage(chr, ...) 语义），与同函数内
+#       removeDragon 分支的隐藏/GM 分派一致。
+# 配套客户端（同批合入）：RemoveSummonHandler 已改为无条件先
+#       drop_stashed_oid 再幂等 summon::remove——REMOVE_CHAR 先于
+#       REMOVE_SUMMON 到达（GONE owner）时也能清掉实体，本补丁与其共同
+#       关闭「owner 离图召唤残留」。
+# 应用（在 link_repos/MapleStory-Server 检出根目录内；该目录是指向
+#   /data/MapleStory-Server 的符号链接，直接用绝对路径）：
+#   patch -p1 < /data/maplestory-wasm/scripts/server-patches/0022-summon-owner-leave-broadcast.patch
+# 验证：
+#   改动影响 dist：需重编并重启容器生效——
+#   bash posix-compile.sh && docker restart ms-game-server
+#   两客户端同图：A 召唤跟随型召唤（如 Phoenix 3121006），B 可见；A 走出
+#   地图/登出，B 侧召唤应播死亡动画后消失（客户端探针 ms_summon_count
+#   归零）；静止傀儡（Puppet 3111002）走原链路，仍只收到一次 remove。
+#   grep -n "removeSummon(summon, true)" src/server/maps/MapleMap.java  # 应命中 2 处
+#
+--- a/src/server/maps/MapleMap.java
++++ b/src/server/maps/MapleMap.java
+@@ -2675,9 +2675,19 @@
+         
+         for (MapleSummon summon : new ArrayList<>(chr.getSummonsValues())) {
+             if (summon.isStationary()) {
++                // The stationary puppet removal is already broadcast by
++                // cancelEffectFromBuffStat(PUPPET); do not double-send.
+                 chr.cancelEffectFromBuffStat(MapleBuffStat.PUPPET);
+             } else {
++                // Following summons (bird, octopus, ...) were broadcast
++                // on spawn: announce the removal too, or remote clients
++                // keep rendering a frozen summon after the owner left.
+                 removeMapObject(summon);
++                if (chr.isHidden()) {
++                    this.broadcastGMMessage(chr, MaplePacketCreator.removeSummon(summon, true));
++                } else {
++                    this.broadcastMessage(chr, MaplePacketCreator.removeSummon(summon, true));
++                }
+             }
+         }
+ 

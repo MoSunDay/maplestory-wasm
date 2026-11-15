@@ -21,7 +21,7 @@
 changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**，两个
 0006 均原样保留。此后规则：
 
-- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0020；0018 之后曾直接落过
+- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0022；0018 之后曾直接落过
   0019-expression-throttle，本行按实际最大编号维护）；
 - slug 必须唯一，禁止复用；
 - 同一编号出现不同 slug，一律视为历史遗留，不表示覆盖或替代关系。
@@ -59,3 +59,4 @@ changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**�
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。
+| [0022-summon-owner-leave-broadcast.patch](0022-summon-owner-leave-broadcast.patch) | owner 离图跟随型召唤补广播：`MapleMap.removePlayer` 原先对非静止（跟随型）召唤只做本地 `removeMapObject(summon)` 不广播，远端客户端（B 视角）在 A 离图后召唤兽永久冻结残留；现静止傀儡分支保持既有 `cancelEffectFromBuffStat(PUPPET)` 广播链不重复发送，非静止分支在 `removeMapObject` 外按 owner 隐藏状态 `broadcastGMMessage/broadcastMessage` 广播 `removeSummon(summon, true)`（mode 4 死亡动画，排除离图者本人）；与客户端 `RemoveSummonHandler` 无条件先 `drop_stashed_oid` 再幂等 `summon::remove` 配套，关闭「owner 离图召唤残留/幽灵」；影响 dist，重放后需 `bash posix-compile.sh` 并 `docker restart ms-game-server` 生效 | 待应用（2026-11-15 编排，随召唤收尾批次落地） |

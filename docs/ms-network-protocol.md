@@ -2093,15 +2093,16 @@ skill    int    Beholder skill ID being activated
 
 ---
 
-### 0x00B5 — MOVE_DRAGON
+### 0x00B6 — MOVE_DRAGON
 
-**Purpose:** Evan Dragon mount movement.
+**Purpose:** Evan Dragon mount movement replay, keyed by the owner cid.
 
 ```
-Field           Type    Notes
-dragonOid       int     Dragon object ID
-startPos        pos     Starting position
-movementData    byte[]  Movement fragments
+Field       Type   Notes
+ownerId     int    Owner character ID, doubles as the dragon object ID
+startX      short  Movement fragment anchor
+startY      short
+movements   ...    Shared movement fragment list (count byte + entries)
 ```
 
 ---
@@ -3107,6 +3108,17 @@ pos.y       short  Spawn Y
 stance      byte   Facing/action
 [1 byte]    —      0 padding
 job         short  Owner job (selects the dragon sprite)
+```
+
+---
+
+### 0x00B7 — REMOVE_DRAGON
+
+**Purpose:** Removes Evan's dragon when the owner leaves the map or changes job.
+
+```
+Field       Type   Notes
+ownerId     int    Owner character ID, doubles as the dragon object ID
 ```
 
 ---
