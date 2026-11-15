@@ -1,6 +1,6 @@
 // 仓库取出+存入动作全链路 e2e（storage-flow.mjs 只覆盖开窗/布局/关窗，本文件覆盖
 // CP_Storage 动作封包闭环：0x16 全量 / 0x09 取出 / 0x0D 存入）。
-// 账号 test2 卡0 test2ILA（charid 219，等级 200），130000200 sp0 走到 x≈1385 距储物
+// 账号 test2 卡0 test2ILA（charid 281，等级 200），130000200 sp0 走到 x≈1385 距储物
 // NPC 后按 Space 开仓。客户端语义（UIStorage::button_pressed）：同行二次点击触发动作
 // ——左列（仓库）二次点击=TAKE_OUT(4) 整堆取回（不弹数量框）；右列（背包镜像）非
 // EQUIP 且数量>1 时弹 UIEnterNumber（默认 1 全选，Enter=STORE(5)）。链路：
@@ -33,7 +33,7 @@ const configPath = process.env.MS_SERVER_CONFIG || '/data/maplestory-wasm/link_r
 const account = process.env.STORAGE_ACCOUNT || 'test2', password = process.env.STORAGE_PASSWORD || 'test2';
 const cardIndex = Number(process.env.STORAGE_CARD ?? 0);
 
-const CHARACTER_ID = 219;
+const CHARACTER_ID = 281;
 const STO_ITEM = 4000001;          // ETC 可堆叠（仓库侧注入，供取出链路）
 const STO_QTY = 5;
 const INV_ITEM = 4000000;          // ETC 可堆叠（slotMax 200，icon 26x27 origin 0,0）
@@ -250,8 +250,8 @@ async function selectEtcTab(driver) {
 }
 
 async function closeStorage(driver) {
-  // 退出按钮（羊皮纸条 BtExit）：canvas (306, 364)，storage-flow 同款
-  await driver.click(306, 364);
+  // 退出按钮（羊皮纸条 BtExit 可见 (110,35)-(180,53)，中心 (145,44)）：canvas (313, 125)，storage-flow 同款
+  await driver.click(313, 125);
   const closed = await waitFor(() => frontAt(driver, 400, 240).then(v => v !== STORAGE_UI), 8);
   report(closed, '退出按钮关闭仓库窗口');
   await sleep(400);

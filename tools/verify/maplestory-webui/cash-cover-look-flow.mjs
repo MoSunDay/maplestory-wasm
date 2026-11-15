@@ -90,9 +90,9 @@ const slotOffsets = Object.freeze([
   { dx: 11 + 18, dy: 51 + 17, pitchX: 36, pitchY: 35 },
   { dx: 8 + 18, dy: 50 + 17, pitchX: 36, pitchY: 34 }
 ]);
-// 装备窗口默认位 PosEQINV (250,150)，CAP 插槽 post-Chaos (43,25)、
+// 装备窗口默认位 PosEQINV (250,190)，CAP 插槽 post-Chaos (43,25)、
 // v83 (38,35)，32px 格取中心；坐标已含窗口原点偏移。
-const capSocketCandidates = Object.freeze([[309, 191], [304, 201]]);
+const capSocketCandidates = Object.freeze([[309, 231], [304, 241]]);
 const charCard = index => ({ x: 130 + 120 * index + 25, y: 210 });
 
 let failed = false;

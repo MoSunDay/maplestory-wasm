@@ -419,8 +419,8 @@ ACTION=5，Q 必须绑 16→4/8，写成 ACTION/8 不会开窗。运行前需重
 
 ```sql
 update accounts set loggedin=0 where name='test2';
-update characters set map=910000000, spawnpoint=0 where id=219;
-update keymap set type=4, action=8 where characterid=219 and `key`=16;
+update characters set map=910000000, spawnpoint=0 where id=281;
+update keymap set type=4, action=8 where characterid=281 and `key`=16;
 ```
 
 ```bash

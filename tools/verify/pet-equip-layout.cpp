@@ -130,7 +130,8 @@ int main(int argc, char** argv)
 
     expect(equipinv_nodes::post_chaos(), "post-Chaos UI.nx generation detected");
 
-    const Point<int16_t> window(250, 150);
+    // Mirrors the PosEQINV configuration default (250,190).
+    const Point<int16_t> window(250, 190);
     expect(equipinv_nodes::pet_panel_origin() == Point<int16_t>(184, 0),
         "pet panel origin is window + (184,0)");
 

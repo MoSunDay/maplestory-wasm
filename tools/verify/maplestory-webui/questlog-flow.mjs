@@ -21,8 +21,8 @@
 //
 // 前置（操作者执行，凭据不入代码仓库）：
 //   update accounts set loggedin=0 where name='test2';
-//   update characters set map=910000000, spawnpoint=0 where id=219;
-//   test2 的 card0 是 test2ILA（character id=219, accountid=64）。
+//   update characters set map=910000000, spawnpoint=0 where id=281;
+//   test2 的 card0 是 test2ILA（character id=281, accountid=128）。
 //   keymap 需有 Q=16→4/8（KeyType::MENU=4 + KeyAction::QUESTLOG=8）。
 //   两个易错点：① keymap 的 `key` 列是客户端 Keytable 的 MS 扫描码下标，
 //   Q 是 16——GLFW 键码 81 对应的槽位其实是 PAGE_DOWN，写 81 不会生效；

@@ -51,9 +51,9 @@ const slotOffsets = Object.freeze([
   { dx: 11 + 18, dy: 51 + 17, pitchX: 36, pitchY: 35 },
   { dx: 8 + 18, dy: 50 + 17, pitchX: 36, pitchY: 34 }
 ]);
-// 装备窗口默认位 PosEQINV (250,150)，CAP 插槽 post-Chaos (43,25)、
+// 装备窗口默认位 PosEQINV (250,190)，CAP 插槽 post-Chaos (43,25)、
 // v83 (38,35)，32px 格取中心；两个世代候选均落在彼此的 CAP 格内。
-const capSocketCandidates = Object.freeze([[309, 191], [304, 201]]);
+const capSocketCandidates = Object.freeze([[309, 231], [304, 241]]);
 const charCard = index => ({ x: 105 + 120 * index + 25, y: 210 });
 
 let failed = false;
@@ -304,7 +304,7 @@ async function equipCover(driver, slot, before) {
 
 async function unequipCover(driver, before) {
   // 覆盖穿戴完成后物品栏窗口仍开着，且默认位 (300,150) 会盖住装备窗口
-  // (250,150) 的 CAP 插槽：先点状态栏 INVENTORY 快捷钮把它收起。
+  // (250,190) 的 CAP 插槽：先点状态栏 INVENTORY 快捷钮把它收起。
   const invenCenter = await statusbarButtonCenter(driver, statusbarButton.inventory);
   report(invenCenter !== null, `statusbar INVENTORY shortcut located (${JSON.stringify(invenCenter)})`);
   if (invenCenter) {

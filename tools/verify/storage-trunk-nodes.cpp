@@ -187,6 +187,31 @@ namespace
         check_eq(-state["origin"].x(), x, what + " authored x");
         check_eq(-state["origin"].y(), y, what + " authored y");
     }
+
+    // Visible rectangle of a button: MapleButton draws at anchor - origin,
+    // the size comes straight from the normal-state bitmap.
+    struct ButtonRect
+    {
+        int16_t x;
+        int16_t y;
+        int16_t w;
+        int16_t h;
+    };
+
+    ButtonRect button_rect(nl::node art, jrc::Point<int16_t> anchor)
+    {
+        const nl::node state = art["normal"]["0"];
+        const nl::bitmap bmp = state.get_bitmap();
+        const nl::node origin = state["origin"];
+        const int16_t ox = origin ? static_cast<int16_t>(origin.x()) : 0;
+        const int16_t oy = origin ? static_cast<int16_t>(origin.y()) : 0;
+        return ButtonRect{
+            static_cast<int16_t>(anchor.x() - ox),
+            static_cast<int16_t>(anchor.y() - oy),
+            static_cast<int16_t>(bmp.width()),
+            static_cast<int16_t>(bmp.height())
+        };
+    }
 }
 
 int main(int argc, char** argv)
@@ -238,17 +263,46 @@ int main(int argc, char** argv)
     check_eq(sn::tab_pos(true, 0).x(), 251, "right tab strip x");
     check_eq(sn::tab_pos(true, 4).x(), 387, "right tab strip last x");
     check_eq(sn::tab_pos(false, 0).y(), 59, "tab strip y");
-    check_eq(sn::get_pos().y(), 247, "action button strip y");
-    check(sn::get_pos().x() > 0 && sn::exit_pos().y() >= 271,
-        "action buttons on the parchment strip");
+    check_eq(sn::get_pos().y(), 13, "action button header band y (top row)");
+    // The legacy 463x318 frame leaves the parchment header band y9..55
+    // empty (the two tab strips start at y59), so the 2x2 action block
+    // was moved up from the bottom parchment. Visible rect = anchor -
+    // origin; every button must stay inside the band, clear of the tab
+    // strip and clear of its neighbours.
+    const struct { const char* name; jrc::Point<int16_t> anchor; } legacy_buttons[] = {
+        { "BtGet", sn::get_pos() },
+        { "BtPut", sn::put_pos() },
+        { "BtSort", sn::sort_pos() },
+        { "BtExit", sn::exit_pos() }
+    };
+    ButtonRect legacy_rects[4] = {};
+    for (int i = 0; i < 4; ++i)
+    {
+        const ButtonRect r = button_rect(sn::src()[legacy_buttons[i].name], legacy_buttons[i].anchor);
+        legacy_rects[i] = r;
+        const std::string name = legacy_buttons[i].name;
+        const std::string rect = " (visible " + std::to_string(r.x) + "," + std::to_string(r.y)
+            + " " + std::to_string(r.w) + "x" + std::to_string(r.h) + ")";
+        check(r.y >= 9 && r.y + r.h <= 58 && r.x >= 4 && r.x + r.w <= 248,
+            name + " visible rect inside the header band" + rect);
+        check(r.y + r.h <= 59, name + " visible rect clears the y59 tab strip" + rect);
+        for (int j = 0; j < i; ++j)
+        {
+            const bool disjoint = r.x + r.w <= legacy_rects[j].x
+                || legacy_rects[j].x + legacy_rects[j].w <= r.x
+                || r.y + r.h <= legacy_rects[j].y
+                || legacy_rects[j].y + legacy_rects[j].h <= r.y;
+            check(disjoint, name + " does not overlap " + legacy_buttons[j].name);
+        }
+    }
     // BtSort is the only legacy button whose sprite is origin-bearing
     // (center anchor (35,9)): MapleButton draws the visible rect at
     // position - origin, so sort_pos() stores the anchor and the rect must
-    // still land on the bottom action row's left edge at (28,272).
+    // land on the header band's bottom-left block at (28,35).
     const nl::node sort_origin = sn::src()["BtSort"]["normal"]["0"]["origin"];
     check_eq(sn::sort_pos().x() - sort_origin.x(), 28,
         "legacy BtSort visible rect left edge (sort_pos().x() - origin.x())");
-    check_eq(sn::sort_pos().y() - sort_origin.y(), 272,
+    check_eq(sn::sort_pos().y() - sort_origin.y(), 35,
         "legacy BtSort visible rect top edge (sort_pos().y() - origin.y())");
     check(!sn::has_mode_buttons(), "mode buttons hidden for legacy trunk");
 

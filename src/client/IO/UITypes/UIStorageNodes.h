@@ -27,8 +27,9 @@
 //   - `en` (199x35) is the v83 empty-icon slot, drawn at the column
 //     origin; `select` (162x35) highlights the name area at column_x+37
 //   - two tab strips in the 0..83 header (tab art 27x16, 34px slots at
-//     y 59; left strip x 34, right strip x 248); parchment strip y246..289
-//     for the action buttons, meso row y292..311
+//     y 59; left strip x 34, right strip x 248); the empty parchment
+//     header band y9..55 carries the 2x2 action buttons (70x18), the
+//     bottom parchment y246..289 stays bare, meso row y292..311
 //
 // All lookups are null safe and every generation branch keeps the
 // post-Chaos coordinates when the post-Chaos assets are loaded.
@@ -330,29 +331,32 @@ namespace jrc
         // Action button positions. Post-Chaos button art carries its
         // authored spot in the sprite origin (BtExit (94,17), BtGet
         // (94,36), BtSort (94,55), BtPut (255,17)), so those buttons
-        // position themselves and the helpers stay zero. v83 art is
-        // origin-less and is placed explicitly on the parchment strip,
-        // except BtSort: its 71x18 sprite is center-anchored with origin
+        // position themselves and the helpers stay zero. The legacy
+        // 463x318 frame leaves the parchment header band y9..55 (the two
+        // tab strips start at y59) empty, so the origin-less 70x18
+        // sprites sit there as the usual 2x2 block: top row visible
+        // (28,13)/(110,13), bottom row (28,35)/(110,35). BtSort is the
+        // exception: its 71x18 sprite is center-anchored with origin
         // (35,9), so sort_pos() stores the anchor (visible rect + origin)
-        // to draw the button at (28,272) like the origin-less neighbours.
+        // to draw it at (28,35) like the origin-less neighbours.
         inline Point<int16_t> get_pos()
         {
-            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 28, 247 };
+            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 28, 13 };
         }
 
         inline Point<int16_t> put_pos()
         {
-            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 110, 247 };
+            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 110, 13 };
         }
 
         inline Point<int16_t> sort_pos()
         {
-            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 63, 281 };
+            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 63, 44 };
         }
 
         inline Point<int16_t> exit_pos()
         {
-            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 110, 271 };
+            return post_chaos() ? Point<int16_t>{} : Point<int16_t>{ 110, 35 };
         }
 
         // Coin buttons (33x16). Post-Chaos origins bake in the authored

@@ -206,7 +206,7 @@ async function selectTab(driver, index) {
   return await frontAt(driver, 400, 240) === STORAGE_UI;
 }
 async function closeStorageByButton(driver) {
-  await driver.click(306, 364);   // 羊皮纸条 BtExit（storage-flow 同款）
+  await driver.click(313, 125);   // 羊皮纸条 BtExit（110,35 可见矩形中心 145,44；storage-flow 同款）
   const closed = await waitFor(() => frontAt(driver, 400, 240).then(v => v !== STORAGE_UI), 8);
   report(closed, '退出按钮关闭仓库窗口');
   await sleep(400);

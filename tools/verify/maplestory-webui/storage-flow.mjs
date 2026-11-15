@@ -12,8 +12,8 @@
 //
 // 前置（操作者执行，凭据不入代码仓库）：
 //   update accounts set loggedin=0 where name='test2';
-//   update characters set map=130000200, spawnpoint=0 where id=219;
-//   test2 的 card0 是 test2ILA（character id=219, level 200 满足储物等级门槛）。
+//   update characters set map=130000200, spawnpoint=0 where id=281;
+//   test2 的 card0 是 test2ILA（character id=281, level 200 满足储物等级门槛）。
 //   注意：收尾已改为游戏内干净登出（logout.mjs：ESC 预选 Quit Game → Enter 发
 //   PLAYER_DC+WS Close），服务端 sessionClosed 即清 loggedin，可背靠背连跑，
 //   无需再等 2-3 分钟或重启 ws-proxy。
@@ -191,8 +191,8 @@ async function testInteractions(driver) {
   await sleep(500);
   report(await frontAt(driver, 400, 240) === STORAGE_UI, 'tab/行点击后窗口保持打开');
   await driver.screenshot('storage-flow-interact');
-  // 退出按钮（羊皮纸条 BtExit 110,271 中心）：canvas (WINDOW_X+138, WINDOW_Y+283)
-  await driver.click(WINDOW_X + 138, WINDOW_Y + 283);
+  // 退出按钮（羊皮纸条 BtExit 可见 (110,35)-(180,53)，中心 (145,44)）：canvas (WINDOW_X+145, WINDOW_Y+44)
+  await driver.click(WINDOW_X + 145, WINDOW_Y + 44);
   const closed = await waitFor(async () =>
     await frontAt(driver, 400, 240) !== STORAGE_UI, 8);
   report(closed, '退出按钮关闭窗口');

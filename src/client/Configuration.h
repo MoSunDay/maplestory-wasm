@@ -254,7 +254,7 @@ namespace jrc
     // The default position of the equip inventory.
     struct PosEQINV : public Configuration::PointEntry
     {
-        PosEQINV() : PointEntry("PosEQINV", "(250,150)") {}
+        PosEQINV() : PointEntry("PosEQINV", "(250,190)") {}
     };
 
     // The default position of the item inventory.
