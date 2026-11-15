@@ -67,7 +67,7 @@ namespace jrc
         void apply_move(int32_t owner_cid, int32_t oid,
             Point<int16_t> start, std::vector<Movement>&& movements)
         {
-            SummonPool& pool = Stage::get().get_summons();
+            summon::SummonPool& pool = Stage::get().get_summons();
             if (summon::find(pool, oid))
             {
                 summon::move(pool, oid, start, std::move(movements));
