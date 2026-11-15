@@ -3,7 +3,7 @@
 // slot and the char-select single-row roster - with measured baselines:
 // Nova top slot beats the old mid-low slot / sidebar background by ~36/~46
 // mean luminance, char-select arrows beat their background references by
-// ~40/~86 and the slot-0 nametag beats the left background by ~45.
+// ~44/~55 and the slot-0 nametag beats the left background by ~33.
 // The arrow references are card-independent (bgAboveL is the sky strip
 // above the left arrow, bgAbove the gap between card tops and the right
 // arrow), so the arrow checks also hold on empty accounts; the nametag
@@ -119,62 +119,91 @@ export async function assertWorldSelectNovaTopSlot(driver) {
   console.log(`PASS  world-select Nova pinned to sidebar top slot ${JSON.stringify(means)}`);
 }
 
-// Char-select: page arrows sit at (46,240)/(533,240), occupied slots ride
-// disc platforms at char_slot_pos(i) = (130+120i, 270) with their white
-// nametags just below at y 281-297 (NAMETAG_OFFSET 19 clears the disc
-// body). Top right, the post-Chaos selectWorld banner is anchored at
-// (578,42): bannerBoard (opaque rows ~43-107) must read bright with the
-// dark backdrop gap strip below it, and the NX-positioned charSlot count
-// window stays bright at y ~127-144. With the old pre-Chaos anchor
-// (578,112) the banner slid into the window zone and bannerBoard read
-// 32.2 instead of 155, so these two margins lock the anchor fix.
-// bgAbove samples the strip between the card tops and the right arrow and
-// bgAboveL the sky strip above the left
-// arrow - both card-independent references (measured 54.1/44.9 vs arrowL
-// 115.7), so the arrow checks hold on empty accounts too; the old bgR
-// rect (590,241)-(620,287) overlapped the charInfo board and read high
-// (146.9 vs 44.9).
+// Char-select 2023 flat chrome. Everything the game draws - NX sprites
+// and flat drawrectangle panels alike - passes through the same vertex
+// shader with VIEWYOFFSET=10, so design position (x,y) lands on canvas
+// row y+10; the rects below are canvas rows and bake that shift in. The
+// flat panels are near-black translucent fills, so every chrome check
+// pairs a bright backdrop reference with the dark panel it flanks and
+// requires reference - panel margins: sky above the top bar vs inside
+// the bar (~67), the roster stage band vs the dark info card beside it
+// (~97) and vs the plain backdrop strip above the band (~53, that one
+// fails if the translucent band is ever dropped and is guarded like the
+// nametag below because an empty roster flips its margin), the deck right of the
+// footer vs inside the footer (~78) and the bright deck left of START vs
+// the button art over its dark backing (~45). The roster keeps the
+// unchanged single-row layout (feet at (130+120i,270) canvas, page
+// arrows at (46,240)/(533,240) design), the top-right stack keeps the
+// post-Chaos world banner (578,42) design anchor and the NX-positioned
+// count window, so the banner/gap/window margins from the anchor fix
+// still apply. bgAbove samples the strip between the card tops and the
+// right arrow and bgAboveL the sky strip above the left arrow - both
+// card-independent references, so the arrow checks hold on empty
+// accounts too; the nametag check requires page-0 slot 1 to be occupied
+// (callers pass firstSlotOccupied to skip it when page 0 is empty).
 const charSelectRects = Object.freeze([
+  { name: 'topBar', x0: 180, y0: 20, x1: 540, y1: 34 },
+  { name: 'skyAbove', x0: 180, y0: 0, x1: 540, y1: 16 },
   { name: 'bannerBoard', x0: 600, y0: 50, x1: 740, y1: 100 },
   { name: 'gapStrip', x0: 610, y0: 120, x1: 730, y1: 124 },
   { name: 'countWindow', x0: 600, y0: 127, x1: 740, y1: 144 },
+  { name: 'stageBand', x0: 40, y0: 158, x1: 540, y1: 312 },
+  { name: 'aboveStage', x0: 40, y0: 122, x1: 540, y1: 148 },
+  { name: 'cardPanel', x0: 596, y0: 160, x1: 768, y1: 300 },
   { name: 'arrowL', x0: 47, y0: 241, x1: 83, y1: 287 },
   { name: 'arrowR', x0: 534, y0: 241, x1: 571, y1: 287 },
   { name: 'bgAbove', x0: 536, y0: 196, x1: 568, y1: 226 },
   { name: 'bgAboveL', x0: 48, y0: 200, x1: 80, y1: 228 },
   { name: 'bgL', x0: 90, y0: 241, x1: 120, y1: 287 },
-  { name: 'nametag0', x0: 110, y0: 282, x1: 150, y1: 290 }
+  { name: 'nametag0', x0: 110, y0: 282, x1: 150, y1: 290 },
+  { name: 'footer', x0: 28, y0: 492, x1: 440, y1: 536 },
+  { name: 'deckRight', x0: 464, y0: 484, x1: 560, y1: 536 },
+  { name: 'startBtn', x0: 616, y0: 340, x1: 748, y1: 386 },
+  { name: 'startBg', x0: 520, y0: 340, x1: 596, y1: 386 }
 ]);
 
 export async function assertCharSelectModernLayout(driver, firstSlotOccupied = true) {
   const means = await sampleLuminance(driver, charSelectRects);
   const failures = [];
-  // Top-right stack: banner board, dark gap, then the NX-positioned count
-  // window (y ~127-144). Measured 155.0/52.2/154.7 post-fix; the pre-fix
-  // anchor put the board across the gap and read 32.2 there.
-  requireMargin(failures, 'bannerBoard-gapStrip', means.bannerBoard, means.gapStrip, 60);
-  requireMargin(failures, 'countWindow-gapStrip', means.countWindow, means.gapStrip, 60);
+  // Flat chrome: every dark panel must read far darker than a bright
+  // backdrop reference flanking it, and the translucent stage band must
+  // brighten the backdrop strip it covers.
+  requireMargin(failures, 'skyAbove-topBar', means.skyAbove, means.topBar, 40);
+  requireMargin(failures, 'stageBand-cardPanel', means.stageBand, means.cardPanel, 40);
+  requireMargin(failures, 'deckRight-footer', means.deckRight, means.footer, 50);
+  // NX accents: the START art over its dark backing reads darker than
+  // the bright deck strip left of it, page arrows over their
+  // card-independent references.
+  requireMargin(failures, 'startBg-startBtn', means.startBg, means.startBtn, 20);
   requireMargin(failures, 'arrowL-bgAboveL', means.arrowL, means.bgAboveL, 20);
   requireMargin(failures, 'arrowR-bgAbove', means.arrowR, means.bgAbove, 20);
+  // Top-right stack: banner board, dark gap, then the NX-positioned count
+  // window (y ~127-144); these lock the (578,42) banner anchor fix.
+  requireMargin(failures, 'bannerBoard-gapStrip', means.bannerBoard, means.gapStrip, 60);
+  requireMargin(failures, 'countWindow-gapStrip', means.countWindow, means.gapStrip, 60);
+  // Both roster-content checks need page-0 characters: the nametag
+  // sprite, and the brightening margin of the translucent stage band
+  // (with an empty roster the band can read darker than the plain
+  // backdrop strip above it).
   if (firstSlotOccupied) {
+    requireMargin(failures, 'stageBand-aboveStage', means.stageBand, means.aboveStage, 25);
     requireMargin(failures, 'nametag0-bgL', means.nametag0, means.bgL, 25);
   } else {
-    console.log('NOTE  char-select nametag check skipped (no characters on page 0)');
+    console.log('NOTE  char-select roster checks skipped (no characters on page 0)');
   }
-  // The lower screen is the textured pier deck of backdrop back/11 (band
-  // means 242.7 vs 167.4 across x), so old-grid second-row sprites are not
-  // luminance-separable; nametag y + page-arrow band + PAGESIZE lock single-row.
   const summary = JSON.stringify({
-    bannerBoard: means.bannerBoard, gapStrip: means.gapStrip,
-    countWindow: means.countWindow,
+    topBar: means.topBar, skyAbove: means.skyAbove,
+    stageBand: means.stageBand, aboveStage: means.aboveStage,
+    cardPanel: means.cardPanel, footer: means.footer, deckRight: means.deckRight,
+    startBtn: means.startBtn, startBg: means.startBg,
     arrowL: means.arrowL, arrowR: means.arrowR, bgAboveL: means.bgAboveL,
     bgAbove: means.bgAbove, bgL: means.bgL,
     nametag0: firstSlotOccupied ? means.nametag0 : 'skipped'
   });
   if (failures.length > 0) {
     throw new Error(
-      `char-select not in single-row modern layout ${summary}: ${failures.join('; ')}`);
+      `char-select not in 2023 flat layout ${summary}: ${failures.join('; ')}`);
   }
-  console.log(`PASS  char-select single-row modern layout (nametag check ${
+  console.log(`PASS  char-select 2023 flat layout (roster checks ${
     firstSlotOccupied ? 'ran' : 'skipped'}) ${summary}`);
 }
