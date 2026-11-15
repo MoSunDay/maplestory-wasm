@@ -21,7 +21,7 @@ const configPath = process.env.MS_SERVER_CONFIG || '/data/maplestory-wasm/link_r
 const account = process.env.STORAGE_ACCOUNT || 'test2';
 const password = process.env.STORAGE_PASSWORD || 'test2';
 const cardIndex = Number(process.env.STORAGE_CARD ?? 0);
-const CHARACTER_ID = 219;
+const CHARACTER_ID = 281; // test2 卡0 test2ILA（accountid=128）
 const ETC_INVTYPE = 4, EQUIP_INVTYPE = 1;
 const EQUIP_ITEM = 1302001, STO_ITEM = 4000001, STO_QTY = 5, FILLER_COUNT = 28;
 const INV_ITEM = 4000003, INV_QTY = 2, FILLER_ITEM = 4000000; // 背包存入物 / 占位 ×28 满仓
