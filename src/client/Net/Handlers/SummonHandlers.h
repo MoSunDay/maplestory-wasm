@@ -62,4 +62,21 @@ namespace jrc
     {
         void handle(InPacket& recv) const override;
     };
+
+
+    // Replay remote dragon movement fragments; the owner cid doubles as
+    // the dragon's object id.
+    // Opcode: MOVE_DRAGON(182)
+    struct MoveDragonHandler : PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
+
+
+    // Remove a remote dragon when its owner leaves the map or changes job.
+    // Opcode: REMOVE_DRAGON(183)
+    struct RemoveDragonHandler : PacketHandler
+    {
+        void handle(InPacket& recv) const override;
+    };
 }

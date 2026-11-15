@@ -122,6 +122,8 @@ namespace jrc
         SUMMON_ATTACK           = 178,
         DAMAGE_SUMMON           = 179,
         SPAWN_DRAGON            = 181,
+        MOVE_DRAGON             = 182,
+        REMOVE_DRAGON           = 183,
 
         // Mapobject
         SPAWN_CHAR  = 160,
@@ -257,6 +259,8 @@ namespace jrc
         emplace<SUMMON_ATTACK, SummonAttackHandler>();
         emplace<DAMAGE_SUMMON, DamageSummonHandler>();
         emplace<SPAWN_DRAGON, SpawnDragonHandler>();
+        emplace<MOVE_DRAGON, MoveDragonHandler>();
+        emplace<REMOVE_DRAGON, RemoveDragonHandler>();
 
         // Attack handlers
         emplace<ATTACKED_CLOSE, CloseAttackHandler>();

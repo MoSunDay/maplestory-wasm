@@ -93,6 +93,22 @@ namespace jrc::summon_packets
         int16_t job = 0;
     };
 
+    // Fields of MOVE_DRAGON(182): the owner cid doubles as the dragon's
+    // object id, followed by the start position and move fragments.
+    struct DragonMovePayload
+    {
+        int32_t cid = 0;
+        Point<int16_t> start;
+        std::vector<Movement> movements;
+    };
+
+    // Fields of REMOVE_DRAGON(183): just the owner cid, which doubles as
+    // the dragon's object id.
+    struct DragonRemovePayload
+    {
+        int32_t cid = 0;
+    };
+
     // Each parser validates the payload length and throws PacketError on
     // truncation, mirroring the other protocol payload modules.
     SpawnPayload parse_spawn(InPacket& recv);
@@ -101,4 +117,6 @@ namespace jrc::summon_packets
     AttackPayload parse_attack(InPacket& recv);
     DamagePayload parse_damage(InPacket& recv);
     DragonPayload parse_dragon(InPacket& recv);
+    DragonMovePayload parse_dragon_move(InPacket& recv);
+    DragonRemovePayload parse_dragon_remove(InPacket& recv);
 }

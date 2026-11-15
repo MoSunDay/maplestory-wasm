@@ -28,9 +28,11 @@ namespace jrc::summon_packets
         constexpr size_t REMOVE_LENGTH  = 9;
         constexpr size_t MOVE_LENGTH    = 13;
         constexpr size_t ATTACK_LENGTH  = 11;
-        constexpr size_t HIT_LENGTH     = 7;
+        constexpr size_t HIT_LENGTH     = 9;
         constexpr size_t DAMAGE_LENGTH  = 18;
         constexpr size_t DRAGON_LENGTH  = 16;
+        constexpr size_t DRAGON_MOVE_LENGTH   = 9;
+        constexpr size_t DRAGON_REMOVE_LENGTH = 4;
     }
 
     SpawnPayload parse_spawn(InPacket& recv)
@@ -136,6 +138,29 @@ namespace jrc::summon_packets
         recv.read_byte();
         payload.job = recv.read_short();
         payload.position = { xpos, ypos };
+        return payload;
+    }
+
+    DragonMovePayload parse_dragon_move(InPacket& recv)
+    {
+        if (recv.length() < DRAGON_MOVE_LENGTH)
+            throw PacketError("Truncated MOVE_DRAGON payload");
+
+        DragonMovePayload payload;
+        payload.cid = recv.read_int();
+        payload.start = recv.read_point();
+        // parse_movements consumes the fragment count byte itself.
+        payload.movements = MovementParser::parse_movements(recv);
+        return payload;
+    }
+
+    DragonRemovePayload parse_dragon_remove(InPacket& recv)
+    {
+        if (recv.length() < DRAGON_REMOVE_LENGTH)
+            throw PacketError("Truncated REMOVE_DRAGON payload");
+
+        DragonRemovePayload payload;
+        payload.cid = recv.read_int();
         return payload;
     }
 }

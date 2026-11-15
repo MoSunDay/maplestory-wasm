@@ -59,6 +59,46 @@ namespace jrc
             return mobs.get_mob_body_position(oid);
         }
 
+        // Movement is idempotent state: apply it whenever the summon
+        // already exists, even if the owner dropped out of view (the
+        // server keeps the summon alive and keeps broadcasting its
+        // moves). Only a summon that has not spawned yet is gated on
+        // the owner's own visibility.
+        void apply_move(int32_t owner_cid, int32_t oid,
+            Point<int16_t> start, std::vector<Movement>&& movements)
+        {
+            SummonPool& pool = Stage::get().get_summons();
+            if (summon::find(pool, oid))
+            {
+                summon::move(pool, oid, start, std::move(movements));
+                return;
+            }
+
+            switch (owner_state(owner_cid))
+            {
+                case OwnerState::PRESENT:
+                    // Spawned players' summons exist; a missing entity
+                    // simply has nothing to move.
+                    break;
+                case OwnerState::PENDING:
+                {
+                    // Stash the newest batch for the summon until its
+                    // owner instantiates.
+                    summon::SummonEvent event{
+                        summon::SummonEvent::MOVE,
+                        oid,
+                        {},
+                        start,
+                        std::move(movements)};
+                    summon::stash_event(
+                        pool, owner_cid, std::move(event));
+                    break;
+                }
+                case OwnerState::GONE:
+                    break;
+            }
+        }
+
         summon::SummonSpawn to_spawn(
             const summon_packets::SpawnPayload& payload)
         {
@@ -112,27 +152,16 @@ namespace jrc
     {
         const summon_packets::RemovePayload payload =
             summon_packets::parse_remove(recv);
-        switch (owner_state(payload.owner_cid))
-        {
-            case OwnerState::PRESENT:
-                // The owner is visible, so its stash was replayed on an
-                // earlier update; only the live entity needs removing.
-                break;
-            case OwnerState::PENDING:
-                // The owner is still queued, so its SPAWN/MOVE may sit in
-                // the stash: cancel them before they can be replayed and
-                // resurrect a summon the server already removed.
-                summon::drop_stashed_oid(
-                    Stage::get().get_summons(), payload.owner_cid,
-                    payload.oid);
-                break;
-            case OwnerState::GONE:
-                // The owner never became visible; RemoveCharHandler clears
-                // the stash on leave, so there is nothing left to undo.
-                return;
-        }
 
-        // Idempotent fallback: no-op when the entity does not exist yet.
+        // The owner gate must not decide here: REMOVE_CHAR usually
+        // arrives first (the owner may already be gone, or still queued,
+        // or mid-LOADING), so unconditionally cancel any stashed
+        // SPAWN/MOVE for this oid before the replay can resurrect a
+        // summon the server already removed.
+        summon::drop_stashed_oid(
+            Stage::get().get_summons(), payload.owner_cid, payload.oid);
+
+        // Idempotent fallback: no-op when the entity does not exist (yet).
         summon::remove(
             Stage::get().get_summons(), payload.oid, payload.animated);
     }
@@ -142,40 +171,20 @@ namespace jrc
         // Non-const so the fragment list can be moved into the replay.
         summon_packets::MovePayload payload =
             summon_packets::parse_move(recv);
-        switch (owner_state(payload.cid))
-        {
-            case OwnerState::PRESENT:
-                summon::move(
-                    Stage::get().get_summons(), payload.oid, payload.start,
-                    std::move(payload.movements));
-                break;
-            case OwnerState::PENDING:
-            {
-                // Movement is idempotent state; stash the newest batch
-                // for the summon until its owner instantiates.
-                summon::SummonEvent event{
-                    summon::SummonEvent::MOVE,
-                    payload.oid,
-                    {},
-                    payload.start,
-                    std::move(payload.movements)};
-                summon::stash_event(
-                    Stage::get().get_summons(), payload.cid,
-                    std::move(event));
-                break;
-            }
-            case OwnerState::GONE:
-                break;
-        }
+        apply_move(
+            payload.cid, payload.oid, payload.start,
+            std::move(payload.movements));
     }
 
     void SummonAttackHandler::handle(InPacket& recv) const
     {
         const summon_packets::AttackPayload payload =
             summon_packets::parse_attack(recv);
-        // Attacks are transient; they are dropped unless the owner is
-        // already visible on the map.
-        if (owner_state(payload.cid) != OwnerState::PRESENT)
+        // Attacks are transient; they are dropped unless the summon
+        // itself exists, regardless of the owner's visibility (an
+        // out-of-view owner's bird keeps attacking on the server).
+        if (!summon::find(
+                Stage::get().get_summons(), payload.summon_oid))
             return;
 
         std::vector<summon::SummonHit> hits;
@@ -193,9 +202,9 @@ namespace jrc
     {
         const summon_packets::DamagePayload payload =
             summon_packets::parse_damage(recv);
-        // Damage numbers are transient; they are dropped unless the owner
-        // is already visible on the map.
-        if (owner_state(payload.cid) != OwnerState::PRESENT)
+        // Damage numbers are transient; they are dropped unless the
+        // summon itself exists, regardless of the owner's visibility.
+        if (!summon::find(Stage::get().get_summons(), payload.oid))
             return;
 
         summon::show_damage(
@@ -239,5 +248,28 @@ namespace jrc
             case OwnerState::GONE:
                 break;
         }
+    }
+
+    void MoveDragonHandler::handle(InPacket& recv) const
+    {
+        // Non-const so the fragment list can be moved into the replay.
+        summon_packets::DragonMovePayload payload =
+            summon_packets::parse_dragon_move(recv);
+        // The dragon's object id is the owner cid itself.
+        apply_move(
+            payload.cid, payload.cid, payload.start,
+            std::move(payload.movements));
+    }
+
+    void RemoveDragonHandler::handle(InPacket& recv) const
+    {
+        const summon_packets::DragonRemovePayload payload =
+            summon_packets::parse_dragon_remove(recv);
+        // The dragon's object id is the owner cid itself: cancel any
+        // stashed dragon SPAWN/MOVE (a late-owner dragon may still sit
+        // in the stash) before the idempotent live remove.
+        summon::drop_stashed_oid(
+            Stage::get().get_summons(), payload.cid, payload.cid);
+        summon::remove(Stage::get().get_summons(), payload.cid, false);
     }
 }

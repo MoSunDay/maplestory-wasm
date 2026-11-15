@@ -48,8 +48,23 @@ namespace jrc
             else
                 events.push_back(std::move(event));
 
-            if (events.size() > MAX_STASHED_SUMMON_EVENTS)
-                events.erase(events.begin());
+            while (events.size() > MAX_STASHED_SUMMON_EVENTS)
+            {
+                // Evict the oldest MOVE first: replaying a stashed SPAWN
+                // can still resurrect a summon whose fragments were
+                // dropped, but a SPAWN-less MOVE is a no-op forever.
+                // Only an all-SPAWN stash falls back to its oldest entry.
+                auto victim = std::find_if(
+                    events.begin(),
+                    events.end(),
+                    [](const SummonEvent& entry)
+                    {
+                        return entry.kind == SummonEvent::MOVE;
+                    });
+                if (victim == events.end())
+                    victim = events.begin();
+                events.erase(victim);
+            }
         }
 
         void replay_stashed(

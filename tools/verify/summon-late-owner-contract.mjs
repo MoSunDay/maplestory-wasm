@@ -59,10 +59,8 @@ const moveSummon = sliceBetween(
   "void MoveSummonHandler::handle",
   "void SummonAttackHandler::handle"
 );
-assert.ok(moveSummon.includes("summon::stash_event"),
-  "MoveSummonHandler must stash the MOVE fragments while the owner is queued");
-assert.equal(occurrences(moveSummon, "summon::move("), 1,
-  "MoveSummonHandler must still apply movement directly when PRESENT");
+assert.ok(moveSummon.includes("apply_move("),
+  "MoveSummonHandler must route movement through the shared apply_move helper");
 
 const spawnDragon = sliceFrom(handlers, "void SpawnDragonHandler::handle");
 assert.ok(spawnDragon.includes("summon::stash_event"),
@@ -105,8 +103,14 @@ assert.ok(stashFn.includes("entry.oid == event.oid"),
   "stash_event replacement must match on oid");
 assert.ok(stashFn.includes("MAX_STASHED_SUMMON_EVENTS"),
   "stash_event must enforce the per-owner cap");
-assert.ok(stashFn.includes("events.erase(events.begin())"),
-  "stash_event must drop the oldest event when the cap is exceeded");
+assert.ok(stashFn.includes("while (events.size() > MAX_STASHED_SUMMON_EVENTS)"),
+  "stash_event must enforce the cap with a loop");
+assert.ok(stashFn.includes("entry.kind == SummonEvent::MOVE"),
+  "cap eviction must prefer dropping a MOVE over a SPAWN");
+assert.ok(stashFn.includes("victim = events.begin()"),
+  "an all-SPAWN stash falls back to dropping its oldest entry");
+assert.ok(stashFn.includes("events.erase(victim)"),
+  "cap eviction must erase the chosen victim");
 
 const replayFn = sliceBetween(
   stashSource,
@@ -186,33 +190,111 @@ assert.ok(publicSection.includes("has_pending_spawn"),
   "has_pending_spawn must live in the public section (needed by summon handlers)");
 
 // ---------------------------------------------------------------------------
-// F. RemoveSummonHandler — a REMOVE racing the owner's spawn cancels the
-//    stashed SPAWN/MOVE so the replay cannot resurrect the summon.
+// F. RemoveSummonHandler — REMOVE must apply no matter what the owner
+//    gate says: REMOVE_CHAR arrives first on a leave, so the stash is
+//    cancelled unconditionally, then the idempotent live remove runs.
 // ---------------------------------------------------------------------------
 const removeSummon = sliceBetween(
   handlers,
   "void RemoveSummonHandler::handle",
   "void MoveSummonHandler::handle"
 );
-assert.ok(removeSummon.includes("switch (owner_state(payload.owner_cid))"),
-  "RemoveSummonHandler must dispatch on the three-state owner gate");
-assert.ok(removeSummon.includes("case OwnerState::PENDING:"),
-  "RemoveSummonHandler must special-case a queued owner");
+assert.ok(!removeSummon.includes("switch (owner_state"),
+  "RemoveSummonHandler must not gate on owner visibility (GONE used to skip the remove and leave ghosts)");
+assert.ok(!/return;/.test(removeSummon),
+  "RemoveSummonHandler must have no early return before the remove");
 assert.ok(removeSummon.includes("summon::drop_stashed_oid("),
-  "RemoveSummonHandler must cancel the queued owner's stashed events");
+  "RemoveSummonHandler must cancel the owner's stashed events");
 assert.ok(removeSummon.includes("payload.owner_cid"),
   "drop_stashed_oid must be called with the packet's owner cid");
 assert.ok(removeSummon.includes("payload.oid"),
   "drop_stashed_oid must be called with the packet's summon oid");
-assert.ok(removeSummon.includes("case OwnerState::GONE:"),
-  "RemoveSummonHandler must keep the GONE early exit");
-assert.ok(removeSummon.includes("return;"),
-  "RemoveSummonHandler must return early for GONE (owner never visible)");
 assert.equal(occurrences(removeSummon, "summon::remove("), 1,
   "RemoveSummonHandler must keep exactly one idempotent live remove");
 const dropAt = removeSummon.indexOf("summon::drop_stashed_oid(");
 const removeLiveAt = removeSummon.indexOf("summon::remove(");
 assert.ok(dropAt >= 0 && removeLiveAt > dropAt,
-  "the stash must be cancelled before the idempotent live remove fallback");
+  "the stash must be cancelled before the idempotent live remove, for PENDING and GONE owners alike");
 
-console.log("PASS summon late-owner stash source contract (owner-late SPAWN/MOVE replay, same-kind override, cap 4, clear-on-leave, remove-cancels-stash)");
+// ---------------------------------------------------------------------------
+// F2. Move/attack/damage decoupled from owner visibility — the server
+//     keeps summons alive (and broadcasting) after the owner leaves the
+//     viewer's range, so a live entity always consumes the event.
+// ---------------------------------------------------------------------------
+const moveSummonFn = sliceBetween(
+  handlers,
+  "void MoveSummonHandler::handle",
+  "void SummonAttackHandler::handle"
+);
+assert.ok(moveSummonFn.includes("apply_move("),
+  "MoveSummonHandler must route through the shared apply_move helper");
+const applyMoveFn = sliceBetween(
+  handlers,
+  "void apply_move(",
+  "    void SpawnSummonHandler::handle"
+);
+assert.ok(applyMoveFn.includes("summon::find(pool, oid)"),
+  "apply_move must apply movement whenever the entity already exists");
+const findAt = applyMoveFn.indexOf("summon::find(pool, oid)");
+const stashAt = applyMoveFn.indexOf("summon::stash_event(");
+assert.ok(stashAt > findAt,
+  "apply_move may only stash when the entity does not exist yet");
+
+const attackHandler = sliceBetween(
+  handlers,
+  "void SummonAttackHandler::handle",
+  "void DamageSummonHandler::handle"
+);
+assert.ok(attackHandler.includes("summon::find("),
+  "SummonAttackHandler must gate on the summon entity, not the owner");
+assert.ok(!attackHandler.includes("owner_state"),
+  "SummonAttackHandler must not consult owner visibility");
+const damageHandler = sliceBetween(
+  handlers,
+  "void DamageSummonHandler::handle",
+  "void SpawnDragonHandler::handle"
+);
+assert.ok(damageHandler.includes("summon::find("),
+  "DamageSummonHandler must gate on the summon entity, not the owner");
+assert.ok(!damageHandler.includes("owner_state"),
+  "DamageSummonHandler must not consult owner visibility");
+
+// ---------------------------------------------------------------------------
+// G. Dragons — MOVE_DRAGON(182)/REMOVE_DRAGON(183) registered and routed
+//    through the same entity-first semantics; removal cancels the stash.
+// ---------------------------------------------------------------------------
+const switchSource = readSource("src/client/Net/PacketSwitch.cpp");
+assert.ok(switchSource.includes("MOVE_DRAGON             = 182"),
+  "PacketSwitch must define MOVE_DRAGON = 182");
+assert.ok(switchSource.includes("REMOVE_DRAGON           = 183"),
+  "PacketSwitch must define REMOVE_DRAGON = 183");
+assert.ok(switchSource.includes("emplace<MOVE_DRAGON, MoveDragonHandler>()"),
+  "PacketSwitch must register MoveDragonHandler (no more Opcode: 182 warns)");
+assert.ok(switchSource.includes("emplace<REMOVE_DRAGON, RemoveDragonHandler>()"),
+  "PacketSwitch must register RemoveDragonHandler (no more Opcode: 183 warns)");
+
+const moveDragon = sliceBetween(
+  handlers,
+  "void MoveDragonHandler::handle",
+  "void RemoveDragonHandler::handle"
+);
+assert.ok(moveDragon.includes("parse_dragon_move"),
+  "MoveDragonHandler must parse the dragon move payload");
+assert.ok(moveDragon.includes("apply_move("),
+  "MoveDragonHandler must reuse the entity-first apply_move helper");
+assert.ok(moveDragon.includes("payload.cid, payload.cid"),
+  "the dragon's object id is the owner cid itself");
+
+const removeDragon = sliceFrom(handlers, "void RemoveDragonHandler::handle");
+assert.ok(removeDragon.includes("parse_dragon_remove"),
+  "RemoveDragonHandler must parse the dragon remove payload");
+assert.ok(removeDragon.includes("summon::drop_stashed_oid("),
+  "RemoveDragonHandler must cancel a stashed dragon SPAWN/MOVE first");
+assert.ok(removeDragon.includes("summon::remove("),
+  "RemoveDragonHandler must run the idempotent live remove");
+const dragonDropAt = removeDragon.indexOf("summon::drop_stashed_oid(");
+const dragonRemoveAt = removeDragon.indexOf("summon::remove(");
+assert.ok(dragonDropAt >= 0 && dragonRemoveAt > dragonDropAt,
+  "the dragon stash cancel must precede the live remove");
+
+console.log("PASS summon late-owner stash source contract (owner-late SPAWN/MOVE replay, same-kind override, SPAWN-preferring cap 4, clear-on-leave, unconditional remove-cancels-stash, entity-gated move/attack/damage, dragon 182/183 wired)");
