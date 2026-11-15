@@ -329,3 +329,26 @@ UINpcTalk 按钮从右缘布局、y 随文本高度变化（同一 OK 曾在 y31
 - `user-info-flow.mjs`：`verifyUserInfoFlow`——双击自己角色开信息卡
   （`userInfoActive`/`userInfoTargetId` 命中自身 playerId）。
 
+
+## 东方神州/泰国商店 NPC 全链路（orient-shop-flow）
+
+`orient-shop-flow.mjs` 验证上海 701000000（9310001 武器/9310002 防具/
+9310003 杂货）与泰国 500000000（9250007 武器/9250008 杂货/9250009 防具）
+六家商店 NPC：`shops`/`shopitems` 由服务端 `sql/custom_orient_shops.sql`
+提供（shopid==npcid，079 模板映射，`tools/build_orient_shops_sql.py` 生成
+并做服务端 WZ + 客户端 NX 双侧存在性校验）；Space 触发 OPEN_NPC_SHOP 后
+断言 `msshop_active=1`、`msshop_buy_item` 首屏商品行、EXIT 按钮坐标、
+Escape 关闭。多层站位用「按住方向获得水平速度后起跳」的平台换层序列
+（跳跃高度实测 ~82px，底部 152→栈道 68=84px 借平台边缘可落）。复用
+pq-harness-login/move/db；冷启动首登 `assetsIdle` 可能早于地图字段初始化，
+先等 `msmap_id != 0` 再比对。
+
+```bash
+ORIENT_SHOP_ACCOUNT=orient1 ORIENT_SHOP_PASSWORD=orient1 \
+ORIENT_SHOP_CHAR_ID=289 \
+node tools/verify/maplestory-webui/orient-shop-flow.mjs
+# 单家复测：ORIENT_SHOP_ONLY=李女士；调试端口 ORIENT_SHOP_DEBUG_PORT=9292
+```
+
+注意：这六家 NPC 因 `hasShop()` 命中不再走 0021 的 fallback 对话
+（`NPCTalkHandler` 中商店优先于兜底，属预期行为）。

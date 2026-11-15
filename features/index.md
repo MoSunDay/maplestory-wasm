@@ -56,6 +56,7 @@ MapleStory WASM 是一个运行于浏览器中的 MapleStory v83 客户端。所
 - **掉落物**: 物品/meso 的拾取
 - **小地图/世界地图**: 地图导航
 - **[东方神州与泰国地图素材](changelog/2026-11-14/orient-thailand-maps-and-canvas-format.md)**: 079MAX4 年包补齐 37 张海外地图（泰国 500xxx 9 张、上海 701 16 张、嵩山 702 12 张）与 Tile/ShanghaiNJL、Tile/thai、Back/YuyuanCN 三个 library、63 个 NPC 与 13 个 Mob；客户端 Map/Npc/Mob/String.nx 与服务端 wz 双侧落地，破解 2023 新 canvas 载荷后 miniMap/画布逐像素校验一致，进图 e2e 全部通过
+- **[东方神州与泰国商店 NPC](changelog/2026-11-15/orient-shanghai-thai-shop-npcs.md)**: 上海（9310001 李女士武器/9310002 张老板防具/9310003 金女士杂货）与泰国水上市场（9250007 丹武器/9250008 帕恩杂货/9250009 诺伊防具）六家商店 NPC 落地，shops/shopitems 按 079 模板补 319 件商品（价格沿用、双侧物品存在性校验），shopid==npcid 命中 MapleShop 工厂；浏览器 e2e 六店全开、货架与首屏商品全部核验通过
 
 相关模块: [游戏世界](../agents/client/Gameplay/index.md), [图形渲染](../agents/client/Graphics/index.md)
 
