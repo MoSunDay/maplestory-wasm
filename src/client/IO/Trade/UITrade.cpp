@@ -208,6 +208,12 @@ namespace jrc
         icon.drop_on_trade();
     }
 
+    bool UITrade::accepts_drop(DragKind kind, Point<int16_t>) const
+    {
+        // The trade window only takes inventory items.
+        return kind == DragKind::ITEM;
+    }
+
     void UITrade::send_scroll(double yoffset)
     {
         page = yoffset < 0 ? 1 : 0;

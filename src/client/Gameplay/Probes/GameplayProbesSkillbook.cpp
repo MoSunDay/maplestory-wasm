@@ -85,4 +85,26 @@ extern "C"
             ? skillbook->visible_icon_center(static_cast<uint16_t>(row)).y()
             : MISSING_COORDINATE;
     }
+
+    // Whether the skill book element exists at all (0 or 1).
+    int msskillbook_exists()
+    {
+        return jrc::UI::get().has_element(jrc::UIElement::SKILLBOOK) ? 1 : 0;
+    }
+
+    // Skill id currently selected in the open skill book, or 0 when the
+    // book is closed or nothing is selected.
+    int msskillbook_selected()
+    {
+        auto skillbook = jrc::UI::get().get_element<jrc::UISkillbook>();
+        return skillbook && skillbook->is_active()
+            ? skillbook->get_selected_skill()
+            : 0;
+    }
+
+    // Whether the skill book element is active (0 or 1).
+    int msskillbook_active()
+    {
+        return jrc::UI::get().is_element_active(jrc::UIElement::SKILLBOOK) ? 1 : 0;
+    }
 }

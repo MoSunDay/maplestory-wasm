@@ -51,6 +51,13 @@ namespace jrc
                 return skill_id;
             }
 
+            DragKind drag_kind() const override { return DragKind::SKILL; }
+
+            std::unique_ptr<Type> clone() const override
+            {
+                return std::make_unique<SkillDragType>(*this);
+            }
+
             void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override
             {
                 if (auto keyconfig = UI::get().get_element<UIKeyConfig>())
@@ -71,7 +78,6 @@ namespace jrc
     constexpr Point<int16_t> UISkillbook::SKILL_OFFSET;
     constexpr Point<int16_t> UISkillbook::ICON_OFFSET;
     constexpr Point<int16_t> UISkillbook::LINE_OFFSET;
-    constexpr Point<int16_t> SKILL_ICON_HIT_ADJUST = { 0, -32 };
 
     SkillIcon::SkillIcon(int32_t i, int32_t lv) : id(i)
     {
@@ -379,8 +385,7 @@ namespace jrc
         for (auto iter = begin; iter != end; ++iter)
         {
             Point<int16_t> icon_position = skill_position + ICON_OFFSET;
-            Point<int16_t> icon_hit_position = icon_position + SKILL_ICON_HIT_ADJUST;
-            if (Cursor::State state = iter->send_cursor(cursorpos - icon_hit_position, clicked))
+            if (Cursor::State state = iter->send_cursor(cursorpos - icon_position, clicked))
             {
                 switch (state)
                 {
@@ -397,8 +402,9 @@ namespace jrc
 
                         if (Icon* icon = iter->get_drag_icon())
                         {
-                            icon->start_drag(cursorpos - icon_hit_position);
-                            UI::get().drag_icon(icon);
+                            Point<int16_t> offset = cursorpos - icon_position;
+                            UI::get().drag_icon(icon->snapshot(), DragKind::SKILL,
+                                DragOrigin::SKILLBOOK, offset, cursorpos);
                         }
 
                         return { Cursor::GRABBING, true };
@@ -480,10 +486,12 @@ namespace jrc
             return { -1, -1 };
         }
 
-        Point<int16_t> hit = position + SKILL_OFFSET + ICON_OFFSET +
-            SKILL_ICON_HIT_ADJUST;
-        hit.shift_y(static_cast<int16_t>(row * ROW_HEIGHT));
-        return hit + Point<int16_t>(16, 16);
+        // Center of the drawn 32x32 icon, not of any adjusted hit box.
+        const Rectangle<int16_t> bounds = icon_bounds(row);
+        return {
+            static_cast<int16_t>(bounds.l() + 16),
+            static_cast<int16_t>(bounds.t() + 16)
+        };
     }
 
     void UISkillbook::update_stat(Maplestat::Id stat, int16_t value)
@@ -708,33 +716,37 @@ namespace jrc
         }
     }
 
+    Rectangle<int16_t> UISkillbook::icon_bounds(uint16_t row) const
+    {
+        // Absolute screen rect of the icon as drawn by draw(): the skill
+        // slot origin shifted by the icon offset and the row pitch.
+        Point<int16_t> lt = position + SKILL_OFFSET + ICON_OFFSET +
+            Point<int16_t>(0, static_cast<int16_t>(row * ROW_HEIGHT));
+        return Rectangle<int16_t>(lt, lt + Point<int16_t>(32, 32));
+    }
+
     SkillIcon* UISkillbook::icon_by_position(Point<int16_t> cursorpos)
     {
-        int16_t x = cursorpos.x();
-        if (x < SKILL_OFFSET.x() || x > 148)
+        // `cursorpos` is panel-relative (already shifted by `position`), so
+        // hit-test against the same offsets used for drawing.
+        for (uint16_t row = 0; row < ROWS; ++row)
         {
-            return nullptr;
+            Point<int16_t> lt = SKILL_OFFSET + ICON_OFFSET +
+                Point<int16_t>(0, static_cast<int16_t>(row * ROW_HEIGHT));
+            Rectangle<int16_t> bounds(lt, lt + Point<int16_t>(32, 32));
+            if (!bounds.contains(cursorpos))
+            {
+                continue;
+            }
+
+            uint16_t absrow = offset + row;
+            if (icons.size() <= absrow)
+            {
+                return nullptr;
+            }
+            return icons.data() + absrow;
         }
 
-        int16_t y = cursorpos.y();
-        if (y < SKILL_OFFSET.y())
-        {
-            return nullptr;
-        }
-
-        uint16_t row = (y - SKILL_OFFSET.y()) / ROW_HEIGHT;
-        if (row < 0 || row >= ROWS)
-        {
-            return nullptr;
-        }
-
-        uint16_t absrow = offset + row;
-        if (icons.size() <= absrow)
-        {
-            return nullptr;
-        }
-
-        auto iter = icons.begin() + absrow;
-        return icons.data() + (iter - icons.begin());
+        return nullptr;
     }
 }

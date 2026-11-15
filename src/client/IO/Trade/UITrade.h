@@ -26,6 +26,7 @@ namespace jrc
         void draw(float alpha) const override;
         void update() override;
         void send_icon(const Icon& icon, Point<int16_t> cursor) override;
+        bool accepts_drop(DragKind kind, Point<int16_t> cursorpos) const override;
         void send_scroll(double yoffset) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
         CursorResult send_cursor(bool clicked, Point<int16_t> cursor) override;

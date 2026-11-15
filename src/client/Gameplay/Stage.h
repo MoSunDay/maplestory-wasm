@@ -126,6 +126,11 @@ namespace jrc
         void set_pet_auto_mp_item(int32_t item_id);
         void set_pet_food_item(int32_t item_id);
         void set_pet_buff_skill(size_t slot, int32_t skill_id);
+        // Validate and store all auto-buff slots in one batch. Returns false
+        // and restores the previous controller state when storage fails.
+        bool apply_pet_buff_skills(const pet_automation::BuffSkillSlots& skills);
+        // GIVE_BUFF confirmation for an auto-buff skill.
+        void confirm_pet_buff(int32_t skill_id);
         bool set_pet_auto_thresholds(uint8_t hp, uint8_t mp);
         const pet_automation::Controller& get_pet_automation() const;
         pet_capability::Capabilities get_pet_capabilities() const;

@@ -24,4 +24,6 @@ namespace jrc::pet_settings
     // browser-storage key so a corrupt entry cannot invalidate the others.
     pet_automation::BuffSkillSlots load_buff_skills();
     bool save_buff_skill(size_t slot, int32_t skill_id);
+    // Writes all slots in one batch; false when any key could not be stored.
+    bool save_buff_skills(const pet_automation::BuffSkillSlots& skills);
 }

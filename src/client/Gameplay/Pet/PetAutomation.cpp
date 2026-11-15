@@ -33,6 +33,22 @@ namespace jrc::pet_automation
         return candidates[static_cast<size_t>((index + step + size) % size)];
     }
 
+    BuffSkillSlots sanitize_buff_skills(const BuffSkillSlots& skills)
+    {
+        BuffSkillSlots sanitized{};
+        for (size_t slot = 0; slot < skills.size(); ++slot)
+        {
+            const int32_t skill_id = skills[slot];
+            if (skill_id <= 0)
+                continue;
+            if (std::find(sanitized.begin(), sanitized.end(), skill_id) !=
+                sanitized.end())
+                continue;
+            sanitized[slot] = skill_id;
+        }
+        return sanitized;
+    }
+
     Controller::Controller(uint8_t hp_value, uint8_t mp_value)
         : hp_threshold(clamp_threshold(hp_value)),
           mp_threshold(clamp_threshold(mp_value))
@@ -52,6 +68,30 @@ namespace jrc::pet_automation
             if (cooldown > 0)
                 --cooldown;
         }
+        for (uint16_t& backoff : buff_backoff)
+        {
+            if (backoff > 0)
+                --backoff;
+        }
+
+        if (!pending_buff)
+            return;
+
+        if (pending_frames > 0)
+            --pending_frames;
+        if (pending_frames > 0)
+            return;
+
+        const size_t slot = pending_slot;
+        clear_pending_buff();
+        if (slot >= buff_skills.size() || buff_skills[slot] <= 0)
+            return;
+
+        if (buff_failures[slot] < BUFF_MAX_FAILURES)
+            ++buff_failures[slot];
+        buff_backoff[slot] = BUFF_FAILURE_BACKOFF_FRAMES;
+        if (buff_failures[slot] >= BUFF_MAX_FAILURES)
+            buff_unconfirmed[slot] = true;
     }
 
     void Controller::set_hp_item(int32_t item_id) { hp_item = std::max(item_id, 0); }
@@ -77,17 +117,35 @@ namespace jrc::pet_automation
             for (size_t i = 0; i < buff_skills.size(); ++i)
             {
                 if (i != slot && buff_skills[i] == id)
+                {
                     buff_skills[i] = 0;
+                    buff_cooldowns[i] = 0;
+                    buff_backoff[i] = 0;
+                    buff_failures[i] = 0;
+                    buff_unconfirmed[i] = false;
+                    if (pending_buff && pending_slot == i)
+                        clear_pending_buff();
+                }
             }
         }
+
+        if (buff_skills[slot] != id)
+        {
+            buff_cooldowns[slot] = 0;
+            buff_backoff[slot] = 0;
+            buff_failures[slot] = 0;
+            buff_unconfirmed[slot] = false;
+            if (pending_buff && pending_slot == slot)
+                clear_pending_buff();
+        }
         buff_skills[slot] = id;
-        buff_cooldowns[slot] = 0;
     }
 
     void Controller::set_buff_skills(const BuffSkillSlots& skills)
     {
         buff_skills = {};
         buff_cooldowns = {};
+        clear_buff_transient();
         for (size_t i = 0; i < skills.size() && i < buff_skills.size(); ++i)
             set_buff_skill(i, skills[i]);
     }
@@ -157,11 +215,94 @@ namespace jrc::pet_automation
     bool Controller::decide_buff(size_t slot, const AutoBuffInputs& inputs)
     {
         if (slot >= buff_skills.size() || buff_skills[slot] <= 0 ||
-            buff_cooldowns[slot] > 0 || !inputs.pet_active || !inputs.alive ||
-            inputs.buff_active || !inputs.skill_ready)
+            buff_cooldowns[slot] > 0 || buff_backoff[slot] > 0 ||
+            buff_unconfirmed[slot] || !inputs.pet_active || !inputs.alive ||
+            inputs.buff_active || !inputs.skill_ready || !inputs.mp_ok ||
+            !inputs.castable)
             return false;
 
         buff_cooldowns[slot] = BUFF_CAST_COOLDOWN_FRAMES;
+        pending_buff = true;
+        pending_slot = slot;
+        pending_skill = buff_skills[slot];
+        pending_frames = BUFF_CONFIRM_TIMEOUT_FRAMES;
         return true;
+    }
+
+    void Controller::confirm_buff(int32_t skill_id)
+    {
+        if (skill_id <= 0)
+            return;
+
+        if (pending_buff && pending_skill == skill_id)
+            clear_pending_buff();
+
+        for (size_t slot = 0; slot < buff_skills.size(); ++slot)
+        {
+            if (buff_skills[slot] != skill_id)
+                continue;
+            buff_backoff[slot] = 0;
+            buff_failures[slot] = 0;
+        }
+    }
+
+    void Controller::reset_transient()
+    {
+        hp_cooldown = 0;
+        mp_cooldown = 0;
+        food_cooldown = 0;
+        buff_cooldowns.fill(0);
+        clear_buff_transient();
+    }
+
+    void Controller::clear_pending_buff()
+    {
+        pending_buff = false;
+        pending_slot = 0;
+        pending_skill = 0;
+        pending_frames = 0;
+    }
+
+    void Controller::clear_buff_transient()
+    {
+        buff_backoff.fill(0);
+        buff_failures.fill(0);
+        buff_unconfirmed.fill(false);
+        clear_pending_buff();
+    }
+
+    bool Controller::has_pending_buff() const
+    {
+        return pending_buff;
+    }
+
+    size_t Controller::get_pending_slot() const
+    {
+        return pending_slot;
+    }
+
+    int32_t Controller::get_pending_skill() const
+    {
+        return pending_skill;
+    }
+
+    uint16_t Controller::get_pending_frames() const
+    {
+        return pending_frames;
+    }
+
+    uint16_t Controller::get_buff_backoff(size_t slot) const
+    {
+        return slot < buff_backoff.size() ? buff_backoff[slot] : 0;
+    }
+
+    uint8_t Controller::get_buff_failures(size_t slot) const
+    {
+        return slot < buff_failures.size() ? buff_failures[slot] : 0;
+    }
+
+    bool Controller::is_buff_unconfirmed(size_t slot) const
+    {
+        return slot < buff_unconfirmed.size() && buff_unconfirmed[slot];
     }
 }

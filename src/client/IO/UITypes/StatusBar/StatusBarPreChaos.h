@@ -26,6 +26,7 @@
 #pragma once
 #include "../../../Constants.h"
 #include "../../UiAssetVersion.h"
+#include "ChatBarGeometry.h"
 #include "../../../Template/Point.h"
 #include "../../../Template/Rectangle.h"
 
@@ -62,9 +63,9 @@ namespace jrc
         // ------------------------------------------------------------------
 
         /// Height of the v83 bottom strip (base/backgrnd).
-        constexpr int16_t BAR_HEIGHT = 71;
+        constexpr int16_t BAR_HEIGHT = chatbar_geometry::PRECHAOS_BAR_HEIGHT;
         /// Width of the shipped v83 bottom strip.
-        constexpr int16_t BAR_WIDTH = 800;
+        constexpr int16_t BAR_WIDTH = chatbar_geometry::PRECHAOS_BAR_WIDTH;
         /// Width of the corner block the v83 layout reserved for the
         /// quickslot display. The dock itself is gone; the right-docked
         /// buttons still measure their positions from this edge so they
@@ -75,9 +76,9 @@ namespace jrc
         /// corner of the view; the post-Chaos bar keeps its centered anchor.
         inline Point<int16_t> bar_position()
         {
-            return { 0, static_cast<int16_t>(
-                Constants::viewheight() - Constants::VIEWYOFFSET - BAR_HEIGHT
-            ) };
+            return chatbar_geometry::bar_anchor(
+                chatbar_geometry::Generation::PRECHAOS,
+                Constants::viewwidth(), Constants::viewheight());
         }
 
         /// Element dimension matching the shipped bar texture.
@@ -87,12 +88,6 @@ namespace jrc
                 static_cast<int16_t>(Constants::viewwidth()),
                 BAR_HEIGHT
             };
-        }
-
-        /// Hit-test bounds of the whole HUD strip for the current view.
-        inline Rectangle<int16_t> statusbar_range(Point<int16_t> position)
-        {
-            return { position, position + bar_dimension() };
         }
 
         // ------------------------------------------------------------------
@@ -158,7 +153,7 @@ namespace jrc
         /// Visible width of the chat log / input row (base/chat is 566px).
         constexpr int16_t chat_log_width()
         {
-            return 566;
+            return chatbar_geometry::PRECHAOS_CHAT_WIDTH;
         }
 
         /// Top-left of the 5px chat drag strip (base/chat).

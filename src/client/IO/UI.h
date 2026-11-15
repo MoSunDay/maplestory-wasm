@@ -80,7 +80,8 @@ namespace jrc
         void focus_textfield(Textfield* textfield);
         void blur_textfield(Textfield* textfield);
         void remove_textfield();
-        void drag_icon(Icon* icon);
+        void drag_icon(Icon icon, DragKind kind, DragOrigin origin,
+            Point<int16_t> cursor_offset, Point<int16_t> press_position);
         Keyboard& get_keyboard();
         uint64_t get_cursor_press_id() const;
 

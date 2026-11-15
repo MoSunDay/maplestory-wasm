@@ -104,8 +104,16 @@ namespace jrc
             reqweapon = Weapon::NONE;
         masterlevel = static_cast<int32_t>(stats.size());
         passive = (id % 10000) / 1000 == 0;
+        summon = static_cast<bool>(src["summon"]);
         flags = flags_of(id);
         invisible = src["invisible"].get_bool();
+        // Mirrors the server's SkillFactory.loadFromData buff detection:
+        // the raw skillType plus the effect/hit/ball and "alert2" probes.
+        skill_type = src["skillType"].get_integer(-1);
+        effect = static_cast<bool>(src["effect"]);
+        hit = static_cast<bool>(src["hit"]);
+        ball = static_cast<bool>(src["ball"]);
+        alert2_action = src["action"]["0"].get_string() == "alert2";
     }
 
     int32_t SkillData::flags_of(int32_t id) const
@@ -269,6 +277,36 @@ namespace jrc
     bool SkillData::is_attack() const
     {
         return !passive && (flags & ATTACK);
+    }
+
+    bool SkillData::is_summon() const
+    {
+        return summon;
+    }
+
+    int32_t SkillData::get_skill_type() const
+    {
+        return skill_type;
+    }
+
+    bool SkillData::has_effect() const
+    {
+        return effect;
+    }
+
+    bool SkillData::has_hit() const
+    {
+        return hit;
+    }
+
+    bool SkillData::has_ball() const
+    {
+        return ball;
+    }
+
+    bool SkillData::has_alert2_action() const
+    {
+        return alert2_action;
     }
 
     bool SkillData::is_invisible() const

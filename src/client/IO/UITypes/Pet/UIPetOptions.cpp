@@ -5,6 +5,7 @@
 #include "../UIStatusBar.h"
 
 #include "../../../Gameplay/Pet/PetAutomation.h"
+#include "../../../Gameplay/Pet/PetBuffPolicy.h"
 #include "../../../Gameplay/Pet/PetVitalityPolicy.h"
 #include "../../../Gameplay/Stage.h"
 #include "../../../Data/ItemData.h"
@@ -280,25 +281,34 @@ namespace jrc
             return;
 
         const int32_t level = Stage::get().get_player().get_skilllevel(skill_id);
-        const SkillData& skill = SkillData::get(skill_id);
-        // "invisible" only hides the skill book icon until learned; learned/castable buffs
-        // (e.g. Maple Warrior) must still be assignable to pet auto-buff slots.
-        if (level <= 0 || skill.is_passive() ||
-            skill.is_attack() || skill.get_stats(level).recoverytime <= 0)
+        if (!pet_buff::skill_can_auto_buff(SkillData::get(skill_id),
+            skill_id, level))
             return;
 
-        Stage::get().set_pet_buff_skill(static_cast<size_t>(slot), skill_id);
-        buff_skills = Stage::get().get_pet_automation().get_buff_skills();
+        // Draft-only edit: one slot per skill, persisted later by OK.
+        for (int32_t& id : buff_skills)
+        {
+            if (id == skill_id)
+                id = 0;
+        }
+        buff_skills[static_cast<size_t>(slot)] = skill_id;
+    }
+
+    bool UIPetOptions::accepts_drop(DragKind kind, Point<int16_t> cursorpos) const
+    {
+        // Only skill icons can be assigned to an auto-buff slot, and only
+        // while the cursor is over a slot. Skill eligibility is re-checked
+        // in send_icon, which owns the draft edit.
+        return kind == DragKind::SKILL && buff_slot_at(cursorpos) >= 0;
     }
 
     void UIPetOptions::rightclick(Point<int16_t> cursorpos)
     {
         const int slot = buff_slot_at(cursorpos);
-        if (slot < 0 || buff_skills[static_cast<size_t>(slot)] <= 0)
+        if (slot < 0)
             return;
 
-        Stage::get().set_pet_buff_skill(static_cast<size_t>(slot), 0);
-        buff_skills = Stage::get().get_pet_automation().get_buff_skills();
+        buff_skills[static_cast<size_t>(slot)] = 0;
     }
 
     Point<int16_t> UIPetOptions::buff_slot_center(size_t slot) const
@@ -307,6 +317,50 @@ namespace jrc
             return { -1, -1 };
         return position + buff_slot_offset(slot) +
             Point<int16_t>(BUFF_SLOT_SIZE / 2, BUFF_SLOT_SIZE / 2);
+    }
+
+    Point<int16_t> UIPetOptions::slider_center(bool hp) const
+    {
+        Rectangle<int16_t> bounds = slider_bounds(hp);
+        return {
+            static_cast<int16_t>(bounds.l() + bounds.width() / 2),
+            static_cast<int16_t>(bounds.t() + bounds.height() / 2)
+        };
+    }
+
+    int16_t UIPetOptions::slider_x_for_percent(bool hp, int percent) const
+    {
+        Rectangle<int16_t> bounds = slider_bounds(hp);
+        const int span = std::max(1, bounds.width() - 1);
+        const int value = std::clamp(percent, 1, 99);
+        // Integer ceil of (value - 1) * span / 98, inverting the send_cursor
+        // mapping 1 + (x - l) * 98 / span. The forward reading of the
+        // returned x is exact for every value, so 98 resolves to r - 2.
+        const int offset = ((value - 1) * span + 97) / 98;
+        return static_cast<int16_t>(bounds.l() + offset);
+    }
+
+    Point<int16_t> UIPetOptions::potion_center(bool hp, bool) const
+    {
+        // One selector row per resource: the arrows cycle the candidates in
+        // place, so the "next" slot is the same slot.
+        Rectangle<int16_t> bounds = potion_bounds(hp);
+        return {
+            static_cast<int16_t>(bounds.l() + bounds.width() / 2),
+            static_cast<int16_t>(bounds.t() + bounds.height() / 2)
+        };
+    }
+
+    Point<int16_t> UIPetOptions::ok_center() const
+    {
+        auto button = buttons.find(BT_OK);
+        if (button == buttons.end())
+            return { -1, -1 };
+        Rectangle<int16_t> bounds = button->second->bounds(position);
+        return {
+            static_cast<int16_t>(bounds.l() + bounds.width() / 2),
+            static_cast<int16_t>(bounds.t() + bounds.height() / 2)
+        };
     }
 
     int32_t UIPetOptions::selected_hp_item() const
@@ -319,6 +373,13 @@ namespace jrc
         return mp_item;
     }
 
+    int32_t UIPetOptions::draft_buff_skill(size_t slot) const
+    {
+        if (slot >= pet_automation::MAX_BUFF_SKILLS)
+            return 0;
+        return buff_skills[slot] > 0 ? buff_skills[slot] : 0;
+    }
+
     Button::State UIPetOptions::button_pressed(uint16_t buttonid)
     {
         if (buttonid == BT_CANCEL)
@@ -328,32 +389,46 @@ namespace jrc
         }
         if (buttonid == BT_OK)
         {
-            if (Stage::get().set_pet_auto_thresholds(hp_threshold, mp_threshold))
-            {
-                const Inventory& inventory = Stage::get().get_player().get_inventory();
-                hp_item = available_selection(inventory, hp_item, true);
-                mp_item = available_selection(inventory, mp_item, false);
-                const auto& automation = Stage::get().get_pet_automation();
-                if (automation.get_hp_item() != hp_item)
+            const pet_automation::BuffSkillSlots previous =
+                Stage::get().get_pet_automation().get_buff_skills();
+            auto show_save_failure = []() {
+                if (Optional<UIStatusbar> statusbar =
+                    UI::get().get_element<UIStatusbar>())
                 {
-                    ChangeKeyMapPacket(1, hp_item).dispatch();
-                    Stage::get().set_pet_auto_hp_item(hp_item);
+                    statusbar->send_chatline(
+                        "宠物自动补给阈值保存失败，请检查浏览器本地存储权限。",
+                        UIChatbar::RED
+                    );
                 }
-                if (automation.get_mp_item() != mp_item)
-                {
-                    ChangeKeyMapPacket(2, mp_item).dispatch();
-                    Stage::get().set_pet_auto_mp_item(mp_item);
-                }
-                deactivate();
-            }
-            else if (Optional<UIStatusbar> statusbar =
-                UI::get().get_element<UIStatusbar>())
+            };
+
+            if (!Stage::get().apply_pet_buff_skills(buff_skills))
             {
-                statusbar->send_chatline(
-                    "宠物自动补给阈值保存失败，请检查浏览器本地存储权限。",
-                    UIChatbar::RED
-                );
+                show_save_failure();
+                return Button::NORMAL;
             }
+            if (!Stage::get().set_pet_auto_thresholds(hp_threshold, mp_threshold))
+            {
+                Stage::get().apply_pet_buff_skills(previous);
+                show_save_failure();
+                return Button::NORMAL;
+            }
+
+            const Inventory& inventory = Stage::get().get_player().get_inventory();
+            hp_item = available_selection(inventory, hp_item, true);
+            mp_item = available_selection(inventory, mp_item, false);
+            const auto& automation = Stage::get().get_pet_automation();
+            if (automation.get_hp_item() != hp_item)
+            {
+                ChangeKeyMapPacket(1, hp_item).dispatch();
+                Stage::get().set_pet_auto_hp_item(hp_item);
+            }
+            if (automation.get_mp_item() != mp_item)
+            {
+                ChangeKeyMapPacket(2, mp_item).dispatch();
+                Stage::get().set_pet_auto_mp_item(mp_item);
+            }
+            deactivate();
             return Button::NORMAL;
         }
         return Button::PRESSED;

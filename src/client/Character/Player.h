@@ -187,6 +187,9 @@ namespace jrc
 
     private:
         void update_cooldowns();
+        // Advance buff durations; expired buffs are invalidated with one
+        // stats recalculation per frame at most.
+        void update_buffs();
 
         CharStats stats;
         Inventory inventory;

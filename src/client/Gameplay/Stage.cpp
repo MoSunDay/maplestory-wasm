@@ -17,17 +17,13 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "Stage.h"
 
-#include "../Data/ItemData.h"
 #include "../IO/Messages.h"
-#include "../IO/UI.h"
-#include "../IO/UITypes/UIStatusBar.h"
 #include "../Graphics/GraphicsGL.h"
-#include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
+#include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PetPackets.h"
 #include "../Util/Misc.h"
 #include "Pet/PetSettingsStore.h"
-#include "Pet/PetLootPolicy.h"
 #include "Pet/PetVitalityPolicy.h"
 
 #include "nlnx/nx.hpp"
@@ -38,15 +34,7 @@ namespace jrc
 {
     namespace
     {
-        constexpr uint16_t PET_LOOT_COOLDOWN_FRAMES = 45;
         constexpr uint8_t PET_MOVEMENT_SYNC_FRAMES = 6;
-
-        int32_t current_party_id()
-        {
-            if (Optional<UIStatusbar> statusbar = UI::get().get_element<UIStatusbar>())
-                return statusbar->get_party_id();
-            return -1;
-        }
     }
 
     Stage::Stage()
@@ -116,6 +104,7 @@ namespace jrc
         pet_loot_attempts = 0;
         pet_movement_sync_frames = 0;
         last_pet_movement = Movement();
+        pet_automation.reset_transient();
     }
 
     void Stage::load_map(int32_t mapid)
@@ -345,171 +334,6 @@ namespace jrc
         pet_loot_attempts = 0;
     }
 
-    void Stage::update_pet_automation()
-    {
-        pet_automation.tick();
-        if (pet_loot_cooldown > 0)
-            --pet_loot_cooldown;
-        if (pet_loot_blocked_oid &&
-            !drops.has_lootable_drop(pet_loot_blocked_oid))
-        {
-            pet_loot_blocked_oid = 0;
-        }
-
-        PetLook* pet = player.get_pet(0);
-        if (!pet)
-        {
-            clear_pet_loot_target(nullptr);
-            return;
-        }
-
-        const Inventory& inventory = player.get_inventory();
-        const bool hungry = is_pet_hungry();
-
-        // Feed the pet before the hunger strike check so a hungry pet is
-        // topped up automatically instead of staying on strike forever.
-        const int32_t food_item = pet_automation.get_food_item();
-        const int16_t food_slot = inventory.find_item(InventoryType::USE, food_item);
-        const int32_t feed_item = pet_automation.decide_feed({
-            true, hungry, food_slot > 0
-        });
-        if (feed_item > 0)
-            PetFoodPacket(food_slot, feed_item).dispatch();
-
-        // A hungry pet goes on strike: it keeps following its owner but
-        // stops looting, auto-potting and auto-buffing until it is fed.
-        if (hungry)
-        {
-            clear_pet_loot_target(pet);
-            return;
-        }
-
-        update_pet_buffs();
-
-        const pet_capability::Capabilities capabilities = get_pet_capabilities();
-        const CharStats& stats = player.get_stats();
-        int16_t hp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_hp_item());
-        int16_t mp_slot = inventory.find_item(InventoryType::USE, pet_automation.get_mp_item());
-        const ItemData& hp_item = ItemData::get(pet_automation.get_hp_item());
-        const ItemData& mp_item = ItemData::get(pet_automation.get_mp_item());
-        jrc::pet_automation::AutoPotInputs inputs = {
-            stats.get_stat(Maplestat::HP),
-            stats.get_stat(Maplestat::MAXHP),
-            stats.get_stat(Maplestat::MP),
-            stats.get_stat(Maplestat::MAXMP),
-            stats.get_stat(Maplestat::HP) > 0,
-            true,
-            capabilities.auto_hp_pouch,
-            capabilities.auto_mp_pouch,
-            hp_slot > 0 && hp_item && hp_item.restores_hp(),
-            mp_slot > 0 && mp_item && mp_item.restores_mp()
-        };
-
-        jrc::pet_automation::AutoPotDecisions decisions = pet_automation.decide(inputs);
-        for (size_t i = 0; i < decisions.count; ++i)
-        {
-            int32_t item_id = decisions.requests[i].item_id;
-            int16_t slot = inventory.find_item(InventoryType::USE, item_id);
-            if (slot > 0)
-                PetAutoPotPacket(0, pet->get_uniqueid(), slot, item_id).dispatch();
-        }
-
-        if (!capabilities.wing_boots)
-        {
-            clear_pet_loot_target(pet);
-            return;
-        }
-
-        const pet_follow::MovementProfile pet_movement = {
-            player.get_walkforce(), player.get_jumpforce()
-        };
-        MapDrops::PetLootQuery query = {
-            player.get_position(),
-            player.get_oid(),
-            current_party_id(),
-            600,
-            capabilities.meso_magnet,
-            capabilities.item_pouch,
-            capabilities.magic_scales,
-            pet_follow::pursuit_height_limit(pet_movement),
-            pet_loot_blocked_oid
-        };
-
-        if (pet_loot_target_oid)
-        {
-            // Drops keep falling and scattering after spawn; track the live
-            // icon center so the pet never parks at a stale capture.
-            const std::optional<Point<int16_t>> live_position =
-                drops.pet_loot_position(pet_loot_target_oid);
-            if (!live_position)
-            {
-                clear_pet_loot_target(pet);
-            }
-            else if (*live_position != pet_loot_target_position)
-            {
-                pet_loot_target_position = *live_position;
-                pet->set_loot_target(*live_position);
-            }
-        }
-
-        if (pet_loot_target_oid && !pet->has_loot_target())
-        {
-            // The pet gave the target up (out of the owner's reach); cool down
-            // and park the oid so the unreachable drop is not instantly
-            // re-targeted.
-            pet_loot_blocked_oid = pet_loot_target_oid;
-            clear_pet_loot_target(pet);
-            pet_loot_cooldown = PET_LOOT_COOLDOWN_FRAMES;
-        }
-
-        if (!pet_loot_target_oid && pet_loot_cooldown == 0)
-        {
-            MapDrops::PetLootTarget target = drops.find_pet_loot(query);
-            if (target.oid)
-            {
-                pet_loot_target_oid = target.oid;
-                pet_loot_target_position = target.position;
-                pet_loot_target_frames = 0;
-                pet_loot_attempts = 0;
-                pet->set_loot_target(target.position);
-            }
-        }
-
-        if (!pet_loot_target_oid)
-            return;
-
-        ++pet_loot_target_frames;
-        bool pet_in_range = pet_loot::in_reach(pet->get_position(),
-            pet_loot_target_position, query.max_height_above);
-        if (pet_loot::should_attempt(pet_loot_target_frames,
-            pet_loot_attempts, pet_in_range))
-        {
-            // One sweep picks the whole cluster around the pet, nearest first.
-            const std::vector<int32_t> batch = drops.find_pet_loot_batch(
-                query, pet->get_position());
-            const uint8_t count = pet_loot::batch_count(batch.size());
-            for (uint8_t i = 0; i < count; ++i)
-                PetLootPacket(pet->get_uniqueid(), batch[i]).dispatch();
-            ++pet_loot_attempts;
-            if (pet_loot::attempts_exhausted(pet_loot_attempts))
-            {
-                clear_pet_loot_target(pet);
-                pet_loot_cooldown = PET_LOOT_COOLDOWN_FRAMES;
-            }
-        }
-
-        if (pet_loot::should_abandon(pet_loot_target_frames, pet_in_range))
-        {
-            // A walk-only pursuit that has not closed the gap by now (deep
-            // pit, unreachable ledge) never will; give the drop up and park
-            // the oid so the pet resumes following instead of standing
-            // frozen beside loot it cannot pick up.
-            pet_loot_blocked_oid = pet_loot_target_oid;
-            clear_pet_loot_target(pet);
-            pet_loot_cooldown = PET_LOOT_COOLDOWN_FRAMES;
-        }
-    }
-
     void Stage::update_pet_movement()
     {
         PetLook* pet = player.get_pet(0);
@@ -649,36 +473,6 @@ namespace jrc
     {
         pet_automation.set_food_item(item_id);
         pet_settings::save_food_item(item_id);
-    }
-
-    void Stage::set_pet_buff_skill(size_t slot, int32_t skill_id)
-    {
-        pet_automation.set_buff_skill(slot, skill_id);
-        pet_settings::save_buff_skill(slot, skill_id);
-    }
-
-    void Stage::update_pet_buffs()
-    {
-        const pet_automation::BuffSkillSlots& skills =
-            pet_automation.get_buff_skills();
-        const bool alive = !player.is_dead();
-        for (size_t slot = 0; slot < skills.size(); ++slot)
-        {
-            int32_t skill_id = skills[slot];
-            if (skill_id <= 0)
-                continue;
-
-            int32_t level = player.get_skilllevel(skill_id);
-            bool skill_ready = level > 0 && !player.has_cooldown(skill_id);
-            bool cast = pet_automation.decide_buff(slot, {
-                true,
-                alive,
-                player.has_skill_buff(skill_id),
-                skill_ready
-            });
-            if (cast)
-                UseSkillPacket(skill_id, level).dispatch();
-        }
     }
 
     bool Stage::set_pet_auto_thresholds(uint8_t hp, uint8_t mp)

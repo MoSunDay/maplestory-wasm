@@ -242,6 +242,7 @@ namespace jrc
     int8_t Player::update(const Physics& physics)
     {
         update_cooldowns();
+        update_buffs();
 
         if (state == DIED)
         {
@@ -588,44 +589,6 @@ namespace jrc
     bool Player::is_dead() const
     {
         return state == DIED;
-    }
-
-    void Player::give_buff(Buff buff)
-    {
-        buffs[buff.stat] = buff;
-    }
-
-    void Player::cancel_buff(Buffstat::Id stat)
-    {
-        buffs[stat] = {};
-    }
-
-    bool Player::has_buff(Buffstat::Id stat) const
-    {
-        return buffs[stat].value > 0;
-    }
-
-    bool Player::has_skill_buff(int32_t skill_id) const
-    {
-        if (skill_id <= 0)
-            return false;
-
-        for (const Buff& buff : buffs.values())
-        {
-            if (buff.value > 0 && buff.skillid == skill_id)
-                return true;
-        }
-        return false;
-    }
-
-    int16_t Player::get_visual_buff_value(Buffstat::Id stat) const
-    {
-        return buffs[stat].value;
-    }
-
-    int32_t Player::get_visual_buff_source(Buffstat::Id stat) const
-    {
-        return buffs[stat].skillid;
     }
 
     void Player::change_skill(int32_t skill_id, int32_t skill_level,

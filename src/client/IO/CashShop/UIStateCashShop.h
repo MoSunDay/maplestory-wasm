@@ -27,7 +27,8 @@ namespace jrc
         void send_scroll(Point<int16_t> pos, double yoffset) override;
         void send_close() override;
         void cancel_drag() override;
-        void drag_icon(Icon* icon) override;
+        void drag_icon(Icon icon, DragKind kind, DragOrigin origin,
+            Point<int16_t> cursor_offset, Point<int16_t> press_position) override;
         void clear_tooltip(Tooltip::Parent parent) override;
         void show_equip(Tooltip::Parent parent, int16_t slot) override;
         void show_item(Tooltip::Parent parent, int32_t itemid) override;

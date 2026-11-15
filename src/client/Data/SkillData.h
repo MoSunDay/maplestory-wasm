@@ -91,6 +91,18 @@ namespace jrc
         bool is_passive() const;
         // Return wether the skill is an attack skill.
         bool is_attack() const;
+        // Return whether the skill node carries a summon animation child.
+        bool is_summon() const;
+        // Return the raw "skillType" node value (-1 when absent).
+        int32_t get_skill_type() const;
+        // Return whether the skill node carries an effect child.
+        bool has_effect() const;
+        // Return whether the skill node carries a hit child.
+        bool has_hit() const;
+        // Return whether the skill node carries a ball child.
+        bool has_ball() const;
+        // Return whether the skill's base action is the buff pose "alert2".
+        bool has_alert2_action() const;
         // Return wether this skill is invisible in the skill book ui.
         bool is_invisible() const;
         // Return the default masterlevel.
@@ -128,7 +140,13 @@ namespace jrc
         int32_t masterlevel;
         int32_t flags;
         bool passive;
+        bool summon;
         bool invisible;
+        int32_t skill_type;
+        bool effect;
+        bool hit;
+        bool ball;
+        bool alert2_action;
 
         std::string name;
         std::string desc;

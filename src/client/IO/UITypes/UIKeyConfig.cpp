@@ -191,8 +191,9 @@ namespace jrc
             {
                 if (clicked)
                 {
-                    it->second->start_drag(cursorpos - position - pit->second);
-                    UI::get().drag_icon(it->second.get());
+                    Point<int16_t> offset = cursorpos - position - pit->second;
+                    UI::get().drag_icon(it->second->snapshot(), it->second->drag_kind(),
+                        DragOrigin::KEYCONFIG, offset, cursorpos);
                     return { Cursor::GRABBING, true };
                 }
 
@@ -209,8 +210,9 @@ namespace jrc
             {
                 if (clicked)
                 {
-                    mapped->start_drag(cursorpos - position - key_icon_position(key_slot));
-                    UI::get().drag_icon(mapped);
+                    Point<int16_t> offset = cursorpos - position - key_icon_position(key_slot);
+                    UI::get().drag_icon(mapped->snapshot(), mapped->drag_kind(),
+                        DragOrigin::KEYCONFIG, offset, cursorpos);
                     return { Cursor::GRABBING, true };
                 }
 
@@ -234,6 +236,18 @@ namespace jrc
         {
             dropped.drop_on_bindings(cursorpos, false);
         }
+    }
+
+    bool UIKeyConfig::accepts_drop(DragKind kind, Point<int16_t> cursorpos) const
+    {
+        if (kind != DragKind::SKILL && kind != DragKind::ITEM &&
+            kind != DragKind::KEYBINDING)
+        {
+            return false;
+        }
+
+        return unbound_action_by_position(cursorpos) >= 0 ||
+            key_by_position(cursorpos) != KeyConfig::LENGTH;
     }
 
     void UIKeyConfig::send_key(int32_t, bool pressed, bool escape)

@@ -19,6 +19,7 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "StatusBar/ChatBarGeometry.h"
 
 #include "../../Character/ExpTable.h"
 #include "../../Constants.h"
@@ -397,25 +398,35 @@ namespace jrc
 
     bool UIStatusbar::is_in_range(Point<int16_t> cursorpos) const
     {
-        if (statusbar::prechaos())
+        // Hit only the controls that can actually react: the status bar
+        // buttons, the chat log while it is open, and an open popup. The
+        // bar background is intentionally not part of the union, so blank
+        // HUD space lets world clicks through.
+        chatbar_geometry::HitTest controls;
+        for (const auto& entry : buttons)
         {
-            return statusbar::statusbar_range(position).contains(cursorpos)
-                || chatbar.is_in_range(cursorpos)
-                || popup.contains(cursorpos);
+            if (entry.second && entry.second->is_active())
+            {
+                chatbar_geometry::add_hit_rect(
+                    controls, entry.second->bounds(position));
+            }
         }
 
-        Rectangle<int16_t> bounds(
-            Point<int16_t>(0, statusbar::postchaos_bar_top()),
-            Point<int16_t>(
-                Constants::viewwidth(),
-                static_cast<int16_t>(
-                    Constants::viewheight() - Constants::VIEWYOFFSET)
-            )
-        );
+        if (chatbar_geometry::statusbar_hit_test(
+                controls, chatbar.is_open(), chatbar.chatbox_rect(), cursorpos))
+        {
+            return true;
+        }
 
-        return bounds.contains(cursorpos)
-            || chatbar.is_in_range(cursorpos)
-            || popup.contains(cursorpos);
+        // The chat bar owns its open log, its drag halo and its own
+        // buttons (the collapsed open button), so the status bar becomes
+        // front there.
+        if (chatbar.is_in_range(cursorpos))
+        {
+            return true;
+        }
+
+        return popup.contains(cursorpos);
     }
 
     int16_t UIStatusbar::button_at(Point<int16_t> cursorpos) const
@@ -450,6 +461,18 @@ namespace jrc
     {
         cursor_debug_x = cursorpos.x();
         cursor_debug_y = cursorpos.y();
+
+        if (!is_in_range(cursorpos))
+        {
+            if (!pressed)
+            {
+                // A drag that started inside the bar must still see the
+                // mouse-up even when the pointer left the hitbox.
+                chatbar.remove_cursor(false, cursorpos);
+            }
+            return { Cursor::IDLE, false };
+        }
+
         if (popup.contains(cursorpos))
         {
             StatusBarPopup::CursorResult result = popup.send_cursor(pressed, cursorpos);
@@ -478,11 +501,8 @@ namespace jrc
             {
                 return child_result;
             }
-
-            return UIElement::send_cursor(pressed, cursorpos);
         }
 
-        chatbar.send_cursor(pressed, cursorpos);
         return UIElement::send_cursor(pressed, cursorpos);
     }
 

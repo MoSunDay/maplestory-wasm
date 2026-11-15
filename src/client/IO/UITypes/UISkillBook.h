@@ -110,6 +110,8 @@ namespace jrc
 
         Job::Level joblevel_by_tab(uint16_t tab) const;
         SkillIcon* icon_by_position(Point<int16_t> cursorpos);
+        // Absolute screen rect of the 32x32 icon drawn for a visible row.
+        Rectangle<int16_t> icon_bounds(uint16_t row) const;
 
         enum Buttons
         {

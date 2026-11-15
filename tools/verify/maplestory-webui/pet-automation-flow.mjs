@@ -1,5 +1,15 @@
 import fs from 'fs';
 import { sleep } from './cdp.mjs';
+import {
+  PET_BUFF_SLOTS,
+  clickSliderAtPercent,
+  closeSkillbook,
+  draftBuffCount,
+  draftBuffSkills,
+  dragSkillToBuffSlot,
+  openSkillbook,
+  selectPotion
+} from './pet-options-flow.mjs';
 
 const DEFAULT_HP_ITEM = 2000000;
 const DEFAULT_MP_ITEM = 2000003;
@@ -7,6 +17,11 @@ const CONFIGURED_THRESHOLD = 98;
 const MINIMUM_POTION_QUANTITY = 20;
 const STARTER_PUPPY = 5000001;
 const STARTER_CAPABILITIES = (1 << 0) | (1 << 1) | (1 << 4);
+// UIStatusBar::Buttons::BT_MENU opens the statusbar popup whose ITEMS entry
+// exposes the item inventory. The button rect comes from the
+// msstatusbar_control_bounds probe so the click tracks the live layout
+// instead of a fixed 800x600 offset.
+const STATUSBAR_MENU_BUTTON = 4;
 const PET_WARP_STANCE = 7;
 const PET_JUMP_STANCE = 2;
 const PET_MOVE_LEFT = 1;
@@ -14,25 +29,6 @@ const PET_MOVE_RIGHT = 2;
 const HORIZONTAL_WALL = 1;
 const IRON_BODY = 1001003;
 const MAPLE_WARRIOR = 1121000;
-// Pet options panel is 283x580, centered at (258,10). Slider local y
-// 150/294 and potion rows at 202/346, so the absolute targets shift by +10;
-// the OK/CANCEL row sits at local y 536.
-const OPTIONS_HP_SLIDER = [489, 160];
-const OPTIONS_MP_SLIDER = [489, 304];
-const OPTIONS_HP_POTION_Y = 230;
-const OPTIONS_MP_POTION_Y = 374;
-const OPTIONS_OK = [345, 560];
-// Skill book geometry comes from the msskillbook_* probes: the window
-// position is loaded from user Settings, so tab and icon targets must be
-// queried instead of hard-coded.
-const SKILLBOOK_ROWS = 4;
-// UIStatusbar::Buttons::BT_SKILL; the status bar skill icon toggles the same
-// panel as the K shortcut, without depending on canvas keyboard focus.
-const STATUSBAR_SKILL_BUTTON = 11;
-// UIElement::PETOPTIONS, plus a raise point inside the panel title strip
-// (the panel is centered at 258,10, so the skill book never covers it).
-const PET_OPTIONS_ELEMENT = 23;
-const PET_OPTIONS_RAISE = [399, 30];
 
 async function moveToX(driver, probes, targetX, tolerance = 70) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -51,6 +47,20 @@ async function moveToX(driver, probes, targetX, tolerance = 70) {
 }
 
 
+// Center of a statusbar control button rect, or null when the probe cannot
+// resolve live bounds (window closed / export missing in this build).
+async function statusbarControlCenter(probes, id) {
+  const bounds = await probes.statusbarControlBounds(id).catch(() => null);
+  if (!bounds || bounds.right <= bounds.left || bounds.bottom <= bounds.top)
+    return null;
+  const center = {
+    x: Math.round((bounds.left + bounds.right) / 2),
+    y: Math.round((bounds.top + bounds.bottom) / 2)
+  };
+  return Number.isFinite(center.x) && center.x >= 0 &&
+      Number.isFinite(center.y) && center.y >= 0 ? center : null;
+}
+
 // Open the item inventory through the items-menu button click path: a raw
 // 'i' keypress can be swallowed when canvas focus was lost after summons.
 export async function openItemInventory(driver, probes, requireState) {
@@ -59,7 +69,10 @@ export async function openItemInventory(driver, probes, requireState) {
   await requireState('item menu assets idle', async () =>
     await probes.assetBlocking() === 0, 45);
   if (await probes.itemsMenuX() < 0) {
-    await driver.click(711, 574);
+    const menuButton = await statusbarControlCenter(probes, STATUSBAR_MENU_BUTTON);
+    if (!menuButton)
+      throw new Error('statusbar menu button bounds unavailable');
+    await driver.click(menuButton.x, menuButton.y);
     await sleep(400);
   }
   const menu = { x: await probes.itemsMenuX(), y: await probes.itemsMenuY() };
@@ -202,8 +215,19 @@ async function ensurePotions(driver, probes, requireState, hpItem, mpItem) {
   await requireState('potion shop closed', async () => await probes.shopActive() === 0);
 }
 
+// A neutral click on the live viewport center (from the resolution probes)
+// clears stray focus before the Escape system-menu path; no fixed 800x600
+// coordinates so 1280x720 stays hit-safe.
+async function clickViewportCenter(driver, probes) {
+  const width = await probes.uiResolutionWidth();
+  const height = await probes.uiResolutionHeight();
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0)
+    throw new Error(`viewport resolution unavailable: ${width}x${height}`);
+  await driver.click(Math.round(width / 2), Math.round(height / 2));
+}
+
 export async function openOptions(driver, probes, requireState) {
-  await driver.click(400, 300);
+  await clickViewportCenter(driver, probes);
   // The click may start an asset load (e.g. a stray skill cast); the system
   // popup shortcut only fires once the blocking gate has cleared.
   await requireState('pet options menu input ready', async () =>
@@ -229,166 +253,70 @@ export async function openOptions(driver, probes, requireState) {
   await sleep(500);
 }
 
-async function selectPotion(driver, readSelection, target, y) {
-  for (let attempt = 0; attempt < 8 && await readSelection() !== target; attempt += 1) {
-    await driver.click(450, y);
-    await sleep(250);
-  }
-  const selected = await readSelection();
-  if (selected !== target)
-    throw new Error(`Could not select potion ${target}; selected=${selected}`);
-}
-
-async function clickStatusbarSkill(driver, probes) {
-  const bounds = await probes.statusbarControlBounds(STATUSBAR_SKILL_BUTTON);
-  if (!bounds || bounds.right <= bounds.left || bounds.bottom <= bounds.top)
-    return false;
-  await driver.click(
-    (bounds.left + bounds.right) / 2,
-    (bounds.top + bounds.bottom) / 2
-  );
-  await sleep(400);
-  return true;
-}
-
-async function openSkillbook(driver, probes, requireState) {
-  if (await probes.skillbookActive() === 1) return;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt === 0) {
-      await driver.key('k', 'KeyK', 75, 'k');
-      await sleep(400);
-    } else if (!await clickStatusbarSkill(driver, probes)) {
-      break;
-    }
-    if (await probes.skillbookActive() === 1) return;
-  }
-  await requireState('skill book opened', async () =>
-    await probes.skillbookActive() === 1, 10);
-}
-
-async function closeSkillbook(driver, probes) {
-  if (await probes.skillbookActive() !== 1) return;
-  await driver.key('k', 'KeyK', 75, 'k');
-  await sleep(300);
-  if (await probes.skillbookActive() === 1)
-    await clickStatusbarSkill(driver, probes);
-  await sleep(300);
-}
-
-async function visibleSkillRow(probes, skillId) {
-  for (let row = 0; row < SKILLBOOK_ROWS; row += 1) {
-    if (await probes.skillbookRowSkill(row) === skillId) return row;
-  }
-  return -1;
-}
-
-async function selectSkillTab(driver, probes, tab, skillId) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const tabX = await probes.skillbookTabX(tab);
-    const tabY = await probes.skillbookTabY(tab);
-    if (tabX < 0 || tabY < 0)
-      throw new Error(`skill book tab ${tab} unavailable: ${tabX},${tabY}`);
-    await driver.click(tabX, tabY);
-    await sleep(350);
-    const row = await visibleSkillRow(probes, skillId);
-    if (row >= 0) return row;
-  }
-  throw new Error(`skill ${skillId} not visible on tab ${tab}`);
-}
-
-async function frontAt(driver, x, y) {
-  return driver.evaluate(
-    `Module.ccall('msui_front_at','number',['number','number'],[${x},${y}])`);
-}
-
-// Clicking the status bar skill button raises STATUSBAR above the pet
-// options panel, and the panel bottom overlaps the bar. Raise the panel
-// again before dragging so the buff slot actually receives the drop.
-async function raisePetOptions(driver, x, y) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (await frontAt(driver, x, y) === PET_OPTIONS_ELEMENT) return;
-    await driver.click(...PET_OPTIONS_RAISE);
-    await sleep(200);
-  }
-  const front = await frontAt(driver, x, y);
-  throw new Error(`pet options not frontmost at ${x},${y}: ` +
-    `front=${front} after raising at ${PET_OPTIONS_RAISE}`);
-}
-
-async function dragSkillToBuffSlot(driver, probes, requireState, tab, skillId, slot) {
-  const row = await selectSkillTab(driver, probes, tab, skillId);
-  const x = await probes.petOptionsBuffSlotX(slot);
-  const y = await probes.petOptionsBuffSlotY(slot);
-  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0)
-    throw new Error(`buff slot ${slot} unavailable: ${x},${y}`);
-  const iconX = await probes.skillbookIconX(row);
-  const iconY = await probes.skillbookIconY(row);
-  if (iconX < 0 || iconY < 0)
-    throw new Error(`skill ${skillId} icon unavailable: ${iconX},${iconY}`);
-  await raisePetOptions(driver, x, y);
-  await driver.drag(iconX, iconY, x, y);
-  await sleep(350);
-  const stored = await probes.petAutoBuffSkill(slot);
-  const selected = await probes.skillbookSelected();
-  const front = await frontAt(driver, x, y);
-  console.log(`INFO  buff drag tab=${tab} skill=${skillId} row=${row} ` +
-    `icon=${iconX},${iconY} slot=${x},${y} front=${front} ` +
-    `selected=${selected} stored=${stored}`);
-  if (stored !== skillId)
-    throw new Error(`buff slot ${slot} expected ${skillId}, got ${stored}`);
-  if (await probes.skillbookSelected() !== skillId)
-    throw new Error(`skill book selected mismatch after dragging ${skillId}`);
-  console.log(`PASS  buff slot ${slot} accepts skill ${skillId}`);
-}
-
 async function configureBuffs(driver, probes, requireState) {
   await openSkillbook(driver, probes, requireState);
   await dragSkillToBuffSlot(driver, probes, requireState,
     1, IRON_BODY, 0);
   await dragSkillToBuffSlot(driver, probes, requireState,
     4, MAPLE_WARRIOR, 1);
-  await requireState('two auto buff skills configured', async () =>
-    await probes.petAutoBuffCount() === 2, 10);
+  await requireState('two auto buff skills drafted', async () =>
+    draftBuffCount(await draftBuffSkills(probes)) === 2, 10);
 
   const slot0 = {
     x: await probes.petOptionsBuffSlotX(0),
     y: await probes.petOptionsBuffSlotY(0)
   };
+  const liveBefore = await probes.petAutoBuffSkill(0);
   await driver.rightClick(slot0.x, slot0.y);
   await sleep(300);
-  if (await probes.petAutoBuffSkill(0) !== 0)
-    throw new Error('right-click did not clear auto buff slot 0');
-  console.log('PASS  right-click clears an auto buff slot');
+  if (await probes.petOptionsBuffDraft(0) !== 0)
+    throw new Error('right-click did not clear auto buff draft slot 0');
+  if (await probes.petAutoBuffSkill(0) !== liveBefore)
+    throw new Error('right-click persisted auto buff slot 0 before OK');
+  console.log('PASS  right-click clears an auto buff draft slot without persisting');
   await dragSkillToBuffSlot(driver, probes, requireState,
     1, IRON_BODY, 0);
   await closeSkillbook(driver, probes);
+  const drafts = await draftBuffSkills(probes);
   return {
-    count: await probes.petAutoBuffCount(),
-    slots: [await probes.petAutoBuffSkill(0), await probes.petAutoBuffSkill(1)]
+    count: draftBuffCount(drafts),
+    slots: drafts
   };
 }
 
 async function configureOptions(driver, probes, requireState, hpItem, mpItem, configure) {
   await openOptions(driver, probes, requireState);
   if (configure) {
-    await driver.click(...OPTIONS_HP_SLIDER);
-    await driver.click(...OPTIONS_MP_SLIDER);
-    await selectPotion(driver, probes.petOptionsHpItem, hpItem, OPTIONS_HP_POTION_Y);
-    await selectPotion(driver, probes.petOptionsMpItem, mpItem, OPTIONS_MP_POTION_Y);
+    await clickSliderAtPercent(driver, probes, true, CONFIGURED_THRESHOLD);
+    await clickSliderAtPercent(driver, probes, false, CONFIGURED_THRESHOLD);
+    await selectPotion(driver, probes, probes.petOptionsHpItem, hpItem, true);
+    await selectPotion(driver, probes, probes.petOptionsMpItem, mpItem, false);
     await configureBuffs(driver, probes, requireState);
   }
+  const drafts = await draftBuffSkills(probes);
   const selected = {
     hp: await probes.petOptionsHpItem(),
     mp: await probes.petOptionsMpItem(),
     buffs: {
-      count: await probes.petAutoBuffCount(),
-      slots: [await probes.petAutoBuffSkill(0), await probes.petAutoBuffSkill(1)]
+      count: draftBuffCount(drafts),
+      slots: drafts
     }
   };
   await driver.screenshot('08g-pet-automation-options');
-  await driver.click(...OPTIONS_OK);
+  const okX = await probes.petOptionsOkX();
+  const okY = await probes.petOptionsOkY();
+  if (!Number.isFinite(okX) || !Number.isFinite(okY) || okX < 0 || okY < 0)
+    throw new Error(`pet options OK button unavailable: ${okX},${okY}`);
+  await driver.click(okX, okY);
   await requireState('pet automation options saved and closed', async () =>
     await probes.petOptionsActive() === 0);
+  await requireState('OK commits the drafted auto buff slots', async () => {
+    for (let slot = 0; slot < PET_BUFF_SLOTS; slot += 1) {
+      if (await probes.petAutoBuffSkill(slot) !== drafts[slot])
+        return false;
+    }
+    return true;
+  });
   return selected;
 }
 

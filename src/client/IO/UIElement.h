@@ -103,6 +103,9 @@ namespace jrc
         virtual void toggle_active();
         virtual Button::State button_pressed(uint16_t buttonid);
         virtual void send_icon(const Icon& icon, Point<int16_t> cursorpos);
+        // Whether this element accepts the given drag kind at cursorpos.
+        // Elements that do not override this reject every drop.
+        virtual bool accepts_drop(DragKind kind, Point<int16_t> cursorpos) const;
 
         virtual void doubleclick(Point<int16_t> cursorpos);
         virtual void rightclick(Point<int16_t> cursorpos);

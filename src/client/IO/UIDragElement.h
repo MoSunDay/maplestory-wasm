@@ -46,19 +46,23 @@ namespace jrc
 
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override
         {
-            if (dragged)
+            // Always clear button hover/press states, otherwise a button that
+            // was lit when the drag started stays lit after it ends.
+            UIElement::remove_cursor(clicked, cursorpos);
+
+            if (!dragged)
             {
-                if (clicked)
-                {
-                    position = cursorpos - cursoroffset;
-                    return true;
-                }
-                else
-                {
-                    dragged = false;
-                    Setting<T>::get().save(position);
-                }
+                return false;
             }
+
+            if (clicked)
+            {
+                position = cursorpos - cursoroffset;
+                return true;
+            }
+
+            dragged = false;
+            Setting<T>::get().save(position);
             return false;
         }
 

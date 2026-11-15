@@ -24,10 +24,16 @@
 namespace jrc
 {
     Icon::Icon(std::unique_ptr<Type> t, Texture tx, int16_t c)
-        : type(std::move(t)), texture(tx), count(c) {
+        : Icon(std::move(t), tx, c, true) {}
 
-        texture.shift({ 0, 32 });
-        showcount = c > -1;
+    Icon::Icon(std::unique_ptr<Type> type, Texture texture, int16_t count, bool shift_origin)
+        : type(std::move(type)), texture(texture), count(count) {
+
+        if (shift_origin)
+        {
+            texture.shift({ 0, 32 });
+        }
+        showcount = count > -1;
         dragged = false;
     }
 
@@ -94,6 +100,19 @@ namespace jrc
     void Icon::drop_on_trade() const
     {
         type->drop_on_trade();
+    }
+
+    DragKind Icon::drag_kind() const
+    {
+        return type->drag_kind();
+    }
+
+    Icon Icon::snapshot() const
+    {
+        // A fresh icon: clone the payload, reuse the texture and count. The
+        // member texture already carries the shifted origin, so the copy must
+        // not shift it again. The copy starts out not being dragged.
+        return Icon(type->clone(), texture, count, false);
     }
 
     void Icon::start_drag(Point<int16_t> offset)

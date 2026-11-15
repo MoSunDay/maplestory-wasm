@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "UIState.h"
+#include "DragSession.h"
 
 #include "Components/EquipTooltip.h"
 #include "Components/ItemTooltip.h"
@@ -50,7 +51,8 @@ namespace jrc
         void send_close() override;
 
         void cancel_drag() override;
-        void drag_icon(Icon* icon) override;
+        void drag_icon(Icon icon, DragKind kind, DragOrigin origin,
+            Point<int16_t> cursor_offset, Point<int16_t> press_position) override;
         void clear_tooltip(Tooltip::Parent parent) override;
         void show_equip(Tooltip::Parent parent, int16_t slot) override;
         void show_item(Tooltip::Parent parent, int32_t itemid) override;
@@ -69,7 +71,9 @@ namespace jrc
     private:
         bool modal_dialog_open();
         void clear_cursors(bool clicked, Point<int16_t> pos, UIElement::Type except);
-        void drop_icon(const Icon& icon, Point<int16_t> pos);
+        Cursor::State update_drag(Cursor::State mst, Point<int16_t> pos);
+        void drop_icon(DragSession& drag, Point<int16_t> pos);
+        void cancel_drag_if_origin(UIElement::Type type);
         void select_player_target(const PlayerTarget& target);
         void clear_pending_player_target();
         template <class T, typename...Args>
@@ -88,7 +92,7 @@ namespace jrc
         Optional<Tooltip> tooltip;
         Tooltip::Parent tooltipparent;
 
-        Optional<Icon> draggedicon;
+        std::optional<DragSession> draggedicon;
         int16_t view_width;
         int16_t view_height;
         std::optional<PlayerTarget> pending_player_target;

@@ -395,6 +395,26 @@ namespace jrc
         }
     }
 
+    bool UIItemInventory::accepts_drop(DragKind kind, Point<int16_t> cursorpos) const
+    {
+        const int16_t slot = slot_by_position(cursorpos - position);
+        if (slot <= 0)
+        {
+            return false;
+        }
+
+        switch (kind)
+        {
+        case DragKind::ITEM:
+            return true;
+        case DragKind::EQUIP:
+            // Equipped gear can only be released onto the equip tab.
+            return tab == InventoryType::EQUIP;
+        default:
+            return false;
+        }
+    }
+
     UIElement::CursorResult UIItemInventory::send_cursor(bool pressed, Point<int16_t> cursorpos)
     {
         if (dragged)
@@ -421,8 +441,9 @@ namespace jrc
             if (pressed)
             {
                 Point<int16_t> slotpos = get_slotpos(slot);
-                icon->start_drag(cursor_relative - slotpos);
-                UI::get().drag_icon(icon);
+                Point<int16_t> offset = cursor_relative - slotpos;
+                UI::get().drag_icon(icon->snapshot(), icon->drag_kind(),
+                    DragOrigin::ITEMINVENTORY, offset, cursorpos);
 
                 clear_tooltip();
                 return { Cursor::GRABBING, true };

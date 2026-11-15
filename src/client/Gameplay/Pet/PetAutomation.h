@@ -64,7 +64,33 @@ namespace jrc::pet_automation
         bool alive = false;
         bool buff_active = false;
         bool skill_ready = false;
+        // Class/policy gates and MP affordability. Defaults keep legacy
+        // aggregate callers working; the stage always supplies both.
+        bool mp_ok = true;
+        bool castable = true;
     };
+
+    // Pet automation phase order. Buffs run before the hungry gate so a
+    // hungry pet still keeps its buffs up while looting/potions pause.
+    enum class UpdatePhase : uint8_t
+    {
+        TICK,
+        ENSURE_PET,
+        FEED,
+        BUFFS,
+        HUNGRY_EXIT,
+        LOOT,
+        POTION
+    };
+
+    constexpr bool buffs_run_before_hungry_exit()
+    {
+        return static_cast<uint8_t>(UpdatePhase::BUFFS) <
+            static_cast<uint8_t>(UpdatePhase::HUNGRY_EXIT);
+    }
+
+    // Keep the first occurrence of each positive skill id.
+    BuffSkillSlots sanitize_buff_skills(const BuffSkillSlots& skills);
 
     uint8_t clamp_threshold(int32_t value);
     bool at_or_below_threshold(int32_t current, int32_t maximum, uint8_t threshold);
@@ -98,13 +124,35 @@ namespace jrc::pet_automation
         int32_t decide_feed(const AutoFeedInputs& inputs);
         // Returns true when the slot's buff should be recast now. The local
         // debounce keeps a cast request from being sent every frame while the
-        // server round-trip and GIVE_BUFF packet are in flight.
+        // server round-trip and GIVE_BUFF packet are in flight. A successful
+        // decision records the pending cast.
         bool decide_buff(size_t slot, const AutoBuffInputs& inputs);
+        // GIVE_BUFF confirmation: clears the matching pending cast, backoff
+        // and failure count.
+        void confirm_buff(int32_t skill_id);
+        // Clears cooldowns, pending/failure/backoff state but preserves
+        // thresholds, items, food and buff skill assignments.
+        void reset_transient();
+
+        bool has_pending_buff() const;
+        size_t get_pending_slot() const;
+        int32_t get_pending_skill() const;
+        uint16_t get_pending_frames() const;
+        uint16_t get_buff_backoff(size_t slot) const;
+        uint8_t get_buff_failures(size_t slot) const;
+        bool is_buff_unconfirmed(size_t slot) const;
+
+        static constexpr uint16_t BUFF_CAST_COOLDOWN_FRAMES = 60;
+        static constexpr uint16_t BUFF_CONFIRM_TIMEOUT_FRAMES = 90;
+        static constexpr uint16_t BUFF_FAILURE_BACKOFF_FRAMES = 300;
+        static constexpr uint8_t BUFF_MAX_FAILURES = 3;
 
     private:
         static constexpr uint16_t POTION_COOLDOWN_FRAMES = 45;
         static constexpr uint16_t FEED_COOLDOWN_FRAMES = 120;
-        static constexpr uint16_t BUFF_CAST_COOLDOWN_FRAMES = 60;
+
+        void clear_pending_buff();
+        void clear_buff_transient();
 
         int32_t hp_item = 0;
         int32_t mp_item = 0;
@@ -116,5 +164,12 @@ namespace jrc::pet_automation
         uint16_t mp_cooldown = 0;
         uint16_t food_cooldown = 0;
         std::array<uint16_t, MAX_BUFF_SKILLS> buff_cooldowns{};
+        std::array<uint16_t, MAX_BUFF_SKILLS> buff_backoff{};
+        std::array<uint8_t, MAX_BUFF_SKILLS> buff_failures{};
+        std::array<bool, MAX_BUFF_SKILLS> buff_unconfirmed{};
+        bool pending_buff = false;
+        size_t pending_slot = 0;
+        int32_t pending_skill = 0;
+        uint16_t pending_frames = 0;
     };
 }

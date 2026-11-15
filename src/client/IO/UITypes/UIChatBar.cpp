@@ -2,6 +2,7 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "StatusBar/ChatBarGeometry.h"
 #include "StatusBar/StatusBarPreChaos.h"
 
 #include "../../Audio/Audio.h"
@@ -33,7 +34,11 @@ namespace jrc
     UIChatbar::UIChatbar(Point<int16_t> pos)
     {
         position = pos;
-        dimension = { 500, 60 };
+        const chatbar_geometry::Generation generation =
+            statusbar::prechaos()
+                ? chatbar_geometry::Generation::PRECHAOS
+                : chatbar_geometry::Generation::POSTCHAOS;
+        dimension = { chatbar_geometry::chat_width(generation), 60 };
         // Both generations start collapsed: the expanded log is a black
         // box that bleeds through the transparent bottoms of the storage
         // and quest windows. Pre-chaos has no close button at all (it can
@@ -46,6 +51,8 @@ namespace jrc
         rowmax = -1;
         lastpos = 0;
         dragchattop = false;
+        drag_start_y = 0;
+        drag_start_rows = chatrows;
 
         if (statusbar::prechaos())
         {
@@ -61,7 +68,7 @@ namespace jrc
             apply_chat_target_label();
 
             chatbox = {
-                statusbar::chat_log_width(),
+                chatbar_geometry::chat_width(generation),
                 1 + chatrows * CHATROWHEIGHT,
                 Geometry::BLACK, 0.6f
             };
@@ -93,7 +100,11 @@ namespace jrc
             tapbar = chat["tapBar"];
             tapbartop = chat["tapBarOver"];
 
-            chatbox = { 502, 1 + chatrows * CHATROWHEIGHT, Geometry::BLACK, 0.6f };
+            chatbox = {
+                chatbar_geometry::CHATBOX_WIDTH,
+                1 + chatrows * CHATROWHEIGHT,
+                Geometry::BLACK, 0.6f
+            };
         }
 
         chatfield = {
@@ -194,11 +205,19 @@ namespace jrc
     void UIChatbar::set_chat_open(bool open)
     {
         chatopen = open;
+        if (!open)
+        {
+            // Closing mid-drag ends the resize so the collapsed bar
+            // cannot keep capturing the cursor.
+            dragchattop = false;
+        }
         if (buttons.count(BT_OPENCHAT))
         {
             buttons[BT_OPENCHAT]->set_active(!open);
             buttons[BT_CLOSECHAT]->set_active(open);
             buttons[BT_CHATTARGETS]->set_active(open);
+            buttons[BT_SCROLLUP]->set_active(open);
+            buttons[BT_SCROLLDOWN]->set_active(open);
         }
         chatfield.set_state(open ? Textfield::NORMAL : Textfield::DISABLED);
     }
@@ -229,9 +248,11 @@ namespace jrc
 
             if (chatopen)
             {
-                chatbox.draw({ 0, getchattop() + 2 });
+                const Rectangle<int16_t> log =
+                    chatbar_geometry::log_body_rect(chat_layout());
+                chatbox.draw({ log.l(), log.t() });
                 draw_chatrows();
-                slider.draw({ position.x(), getchattop() + 5 });
+                slider.draw({ position.x(), chatbox_rect().t() + 5 });
             }
             else if (rowtexts.count(rowmax))
             {
@@ -249,12 +270,15 @@ namespace jrc
 
         if (chatopen)
         {
-            tapbartop.draw({ position.x() - 576, getchattop() });
-            chatbox.draw({ 0, getchattop() + 2 });
+            const Rectangle<int16_t> box = chatbox_rect();
+            const Rectangle<int16_t> log =
+                chatbar_geometry::log_body_rect(chat_layout());
+            tapbartop.draw({ position.x() - 576, box.t() });
+            chatbox.draw({ log.l(), log.t() });
 
             draw_chatrows();
 
-            slider.draw({ position.x(), getchattop() + 5 });
+            slider.draw({ position.x(), box.t() + 5 });
 
             if (chattarget >= CHT_ALL && chattarget < NUM_TARGETS)
             {
@@ -265,7 +289,8 @@ namespace jrc
         }
         else if (rowtexts.count(rowmax))
         {
-            rowtexts.at(rowmax).draw(position + Point<int16_t>(-500, -60));
+            rowtexts.at(rowmax).draw(position + Point<int16_t>(
+                -chatbar_geometry::CHATBOX_WIDTH, -60));
         }
     }
 
@@ -318,34 +343,50 @@ namespace jrc
         return Button::NORMAL;
     }
 
+    Rectangle<int16_t> UIChatbar::chatbox_rect() const
+    {
+        return chatbar_geometry::chatbox_rect(chat_layout());
+    }
+
     bool UIChatbar::is_in_range(Point<int16_t> cursorpos) const
     {
-        // collapsed: nothing interactive floats above the bar, so skip the
-        // log bounds. the statusbar's own statusbar_range still covers the
-        // bottom strip, letting clicks on the log area fall through to the
-        // game world instead of being swallowed here.
-        if (!chatopen)
-            return false;
-
-        if (statusbar::prechaos())
+        // An in-flight resize drag stays captured even outside the log.
+        if (dragchattop)
+            return true;
+        if (chatopen)
         {
-            const Rectangle<int16_t> bounds(
-                0,
-                statusbar::chat_log_width(),
-                static_cast<int16_t>(getchattop() - 6),
-                static_cast<int16_t>(position.y() + statusbar::BAR_HEIGHT)
-            );
-            return bounds.contains(cursorpos);
+            if (chatbar_geometry::chatbox_hit(true, chat_layout(), cursorpos))
+                return true;
+            if (chatbar_geometry::drag_handle_rect(chat_layout()).contains(cursorpos))
+                return true;
         }
+        // A collapsed bar only answers on its own buttons (BT_OPENCHAT).
+        return hits_button(cursorpos);
+    }
 
-        Point<int16_t> absp(0, getchattop() - 16);
-        Point<int16_t> dim(500, chatrows * CHATROWHEIGHT + CHATYOFFSET + 16);
-        return Rectangle<int16_t>(absp, absp + dim)
-            .contains(cursorpos);
+    bool UIChatbar::hits_button(Point<int16_t> cursorpos) const
+    {
+        for (const auto& entry : buttons)
+        {
+            if (entry.second
+                && entry.second->is_active()
+                && entry.second->bounds(position).contains(cursorpos))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool UIChatbar::remove_cursor(bool clicked, Point<int16_t> cursorpos)
     {
+        if (!clicked)
+        {
+            // Mouse-up outside the log ends a resize drag too; the guard
+            // in send_cursor() would otherwise keep it stuck on.
+            dragchattop = false;
+        }
+
         if (slider.remove_cursor(clicked))
             return true;
 
@@ -354,89 +395,90 @@ namespace jrc
 
     UIElement::CursorResult UIChatbar::send_cursor(bool clicking, Point<int16_t> cursorpos)
     {
-        if (statusbar::prechaos())
+        // One gate for every child: the chat target selector, slider,
+        // textfield, drag handle and buttons are only live inside the
+        // open chat log (or, while collapsed, on the bar's own buttons).
+        if (!is_in_range(cursorpos))
         {
-            // The v83 chat target selector is a plain bitmap: hit-test it
-            // here instead of routing through a MapleButton.
-            const Point<int16_t> target_pos = position + statusbar::chat_target_pos();
-            const Rectangle<int16_t> target_bounds(
-                target_pos,
-                target_pos + Point<int16_t>(81, 20)
-            );
-            if (target_bounds.contains(cursorpos))
-            {
-                if (clicking)
-                {
-                    Sound(Sound::BUTTONCLICK).play();
-                    cycle_chat_target();
-                    return { Cursor::CLICKING, true };
-                }
-                return { Cursor::CANCLICK, true };
-            }
+            return { Cursor::IDLE, false };
         }
 
-        if (slider.isenabled())
-        {
-            auto cursoroffset = cursorpos - Point<int16_t>(position.x(), getchattop() + 5);
-            Cursor::State sstate = slider.send_cursor(cursoroffset, clicking);
-            if (sstate != Cursor::IDLE)
-            {
-                return { sstate, true };
-            }
-        }
-
-        if (chatfield.get_state() == Textfield::NORMAL)
-        {
-            Cursor::State tstate = chatfield.send_cursor(cursorpos, clicking);
-            if (tstate != Cursor::IDLE)
-            {
-                return { tstate, true };
-            }
-        }
-
-        const int16_t drag_width = statusbar::prechaos()
-            ? statusbar::chat_log_width()
-            : 502;
-        auto chattop = Rectangle<int16_t>(
-            0,  drag_width,
-            getchattop(),
-            getchattop() + 6
-            );
-        bool contains = chattop.contains(cursorpos);
+        // A resize drag owns the cursor until mouse-up, even outside the
+        // log, and runs before the slider/chatfield so a drag crossing
+        // them is not stolen.
         if (dragchattop)
         {
             if (clicking)
             {
-                int16_t ydelta = cursorpos.y() - getchattop();
-                while (ydelta > 0 && chatrows > MINCHATROWS)
+                const int16_t rows = chatbar_geometry::rows_after_drag(
+                    drag_start_rows, drag_start_y, cursorpos.y());
+                if (rows != chatrows)
                 {
-                    chatrows--;
-                    ydelta -= CHATROWHEIGHT;
+                    chatrows = rows;
+                    chatbox.setheight(1 + chatrows * CHATROWHEIGHT);
+                    slider.setrows(rowpos, chatrows, rowmax);
+                    slider.setvertical({ 0, CHATROWHEIGHT * chatrows - 14 });
                 }
-                while (ydelta < 0 && chatrows < MAXCHATROWS)
-                {
-                    chatrows++;
-                    ydelta += CHATROWHEIGHT;
-                }
-                chatbox.setheight(1 + chatrows * CHATROWHEIGHT);
-                slider.setrows(rowpos, chatrows, rowmax);
-                slider.setvertical({ 0, CHATROWHEIGHT * chatrows - 14 });
                 return { Cursor::CLICKING, true };
             }
-            else
-            {
-                dragchattop = false;
-            }
+            dragchattop = false;
+            return { Cursor::IDLE, true };
         }
-        else if (contains)
+
+        if (chatopen)
         {
-            if (clicking)
+            if (statusbar::prechaos())
             {
-                dragchattop = true;
-                return { Cursor::CLICKING, true };
+                // The v83 chat target selector is a plain bitmap: hit-test it
+                // here instead of routing through a MapleButton.
+                const Point<int16_t> target_pos = position + statusbar::chat_target_pos();
+                const Rectangle<int16_t> target_bounds(
+                    target_pos,
+                    target_pos + Point<int16_t>(81, 20)
+                );
+                if (target_bounds.contains(cursorpos))
+                {
+                    if (clicking)
+                    {
+                        Sound(Sound::BUTTONCLICK).play();
+                        cycle_chat_target();
+                        return { Cursor::CLICKING, true };
+                    }
+                    return { Cursor::CANCLICK, true };
+                }
             }
-            else
+
+            if (slider.isenabled())
             {
+                auto cursoroffset = cursorpos - Point<int16_t>(
+                    position.x(), chatbox_rect().t() + 5);
+                Cursor::State sstate = slider.send_cursor(cursoroffset, clicking);
+                if (sstate != Cursor::IDLE)
+                {
+                    return { sstate, true };
+                }
+            }
+
+            if (chatfield.get_state() == Textfield::NORMAL)
+            {
+                Cursor::State tstate = chatfield.send_cursor(cursorpos, clicking);
+                if (tstate != Cursor::IDLE)
+                {
+                    return { tstate, true };
+                }
+            }
+
+            // Drag halo centred on the log top: a press there starts a
+            // resize; the halo reaches above the top so the log can grow.
+            if (chatbar_geometry::drag_handle_rect(chat_layout()).contains(cursorpos))
+            {
+                if (clicking)
+                {
+                    dragchattop = true;
+                    drag_start_y = cursorpos.y();
+                    drag_start_rows = chatrows;
+                    return { Cursor::CLICKING, true };
+                }
                 return { Cursor::CANCLICK, true };
             }
         }
@@ -664,15 +706,18 @@ namespace jrc
         return party_state.received_messages;
     }
 
+    chatbar_geometry::ChatLayout UIChatbar::chat_layout() const
+    {
+        return chatbar_geometry::chat_layout_from_anchor(
+            position,
+            chatrows,
+            statusbar::prechaos()
+                ? chatbar_geometry::Generation::PRECHAOS
+                : chatbar_geometry::Generation::POSTCHAOS);
+    }
+
     int16_t UIChatbar::getchattop() const
     {
-        if (statusbar::prechaos())
-        {
-            // The v83 log sits flush on top of the status bar.
-            return position.y() - chatrows * CHATROWHEIGHT
-                - statusbar::chat_top_gap();
-        }
-
-        return position.y() - chatrows * CHATROWHEIGHT - CHATYOFFSET;
+        return chatbar_geometry::chat_top(chat_layout());
     }
 }

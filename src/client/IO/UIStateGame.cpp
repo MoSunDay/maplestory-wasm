@@ -113,9 +113,9 @@ namespace jrc
             tooltip->draw(cursor);
         }
 
-        if (draggedicon)
+        if (draggedicon && draggedicon->active)
         {
-            draggedicon->dragdraw(cursor);
+            draggedicon->icon.dragdraw(cursor);
         }
     }
 
@@ -159,18 +159,6 @@ namespace jrc
             const PlayerTarget target = *pending_player_target;
             clear_pending_player_target();
             select_player_target(target);
-        }
-    }
-
-    void UIStateGame::drop_icon(const Icon& icon, Point<int16_t> pos)
-    {
-        if (UIElement* front = get_front(pos))
-        {
-            front->send_icon(icon, pos);
-        }
-        else
-        {
-            icon.drop_on_stage();
         }
     }
 
@@ -355,19 +343,7 @@ namespace jrc
     {
         if (draggedicon)
         {
-            switch (mst)
-            {
-            case Cursor::IDLE:
-                drop_icon(*draggedicon, pos);
-                draggedicon->reset();
-                draggedicon = {};
-                // The global drag icon consumes the mouse-up, so release the source
-                // window's capture here; otherwise the next click is swallowed by it.
-                cursor_captured = UIElement::NONE;
-                return mst;
-            default:
-                return Cursor::GRABBING;
-            }
+            return update_drag(mst, pos);
         }
         else
         {
@@ -536,22 +512,6 @@ namespace jrc
         UI::get().quit();
     }
 
-    void UIStateGame::cancel_drag()
-    {
-        if (draggedicon)
-        {
-            // Double-click actions can mutate inventory before mouse-up arrives.
-            // Drop the transient drag state first so release does not use a stale icon pointer.
-            draggedicon->reset();
-            draggedicon = {};
-        }
-    }
-
-    void UIStateGame::drag_icon(Icon* drgic)
-    {
-        draggedicon = drgic;
-    }
-
     void UIStateGame::clear_cursors(bool clicked, Point<int16_t> pos, UIElement::Type except)
     {
         for (const auto& type : elementorder)
@@ -691,6 +651,8 @@ namespace jrc
 
     void UIStateGame::remove(UIElement::Type type)
     {
+        cancel_drag_if_origin(type);
+
         if (type == focused)
         {
             focused = UIElement::NONE;

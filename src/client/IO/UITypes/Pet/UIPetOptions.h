@@ -27,10 +27,16 @@ namespace jrc
         CursorResult send_cursor(bool pressed, Point<int16_t> cursorpos) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
         void send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
+        bool accepts_drop(DragKind kind, Point<int16_t> cursorpos) const override;
         void rightclick(Point<int16_t> cursorpos) override;
         int32_t selected_hp_item() const;
         int32_t selected_mp_item() const;
+        int32_t draft_buff_skill(size_t slot) const;
         Point<int16_t> buff_slot_center(size_t slot) const;
+        Point<int16_t> slider_center(bool hp) const;
+        int16_t slider_x_for_percent(bool hp, int percent) const;
+        Point<int16_t> potion_center(bool hp, bool next) const;
+        Point<int16_t> ok_center() const;
 
     protected:
         Button::State button_pressed(uint16_t buttonid) override;

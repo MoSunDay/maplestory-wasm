@@ -19,6 +19,7 @@
 #include "../UIElement.h"
 
 #include "StatusBar/StatusBarPreChaos.h"
+#include "StatusBar/ChatBarGeometry.h"
 
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
@@ -39,6 +40,11 @@ namespace jrc
     {
     public:
         bool is_open() const;
+
+        // The one rectangle that draw, drag and hit logic share. Only
+        // meaningful while is_open(); width is exactly 502 and the
+        // bottom edge is the status bar's bottom edge.
+        Rectangle<int16_t> chatbox_rect() const;
 
         // Center of the post-chaos BT_OPENCHAT button ({-32768,-32768}
         // when the pre-chaos bar has no such button) for browser tests.
@@ -117,6 +123,8 @@ namespace jrc
         void send_targeted_message(const std::string& target, const std::string& message);
         void send_party_message(const std::string& message);
         int16_t getchattop() const;
+        chatbar_geometry::ChatLayout chat_layout() const;
+        bool hits_button(Point<int16_t> cursorpos) const;
 
         enum Buttons : uint16_t
         {
@@ -127,10 +135,14 @@ namespace jrc
             BT_CHATTARGETS
         };
 
-        static constexpr int16_t CHATYOFFSET = 65;
-        static constexpr int16_t CHATROWHEIGHT = 16;
-        static constexpr int16_t MAXCHATROWS = 16;
-        static constexpr int16_t MINCHATROWS = 1;
+        static constexpr int16_t CHATYOFFSET =
+            chatbar_geometry::POSTCHAOS_CHAT_TAIL;
+        static constexpr int16_t CHATROWHEIGHT =
+            chatbar_geometry::CHATROWHEIGHT;
+        static constexpr int16_t MAXCHATROWS =
+            chatbar_geometry::MAXCHATROWS;
+        static constexpr int16_t MINCHATROWS =
+            chatbar_geometry::MINCHATROWS;
 
         Textfield chatfield;
         Texture chatspace[2];
@@ -161,5 +173,7 @@ namespace jrc
         int16_t rowmax;
         Slider slider;
         bool dragchattop;
+        int16_t drag_start_y;
+        int16_t drag_start_rows;
     };
 }

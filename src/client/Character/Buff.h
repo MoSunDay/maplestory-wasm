@@ -110,17 +110,33 @@ namespace jrc
         extern const std::unordered_map<Id, uint64_t> second_codes;
     }
 
+    // GIVE_BUFF duration semantics: positive values count down, zero or
+    // negative means the buff lasts until the server cancels it.
+    constexpr int32_t buff_remaining_from_duration(int32_t duration)
+    {
+        return duration > 0 ? duration : -1;
+    }
+
     struct Buff
     {
         Buffstat::Id stat;
         int16_t value;
         int32_t skillid;
         int32_t duration;
+        // 0 = inactive, <0 = until cancelled, >0 = countdown in milliseconds.
+        int32_t remaining_ms;
 
         constexpr Buff(Buffstat::Id stat, int16_t value, int32_t skillid, int32_t duration)
-            : stat(stat), value(value), skillid(skillid), duration(duration) {}
+            : stat(stat), value(value), skillid(skillid), duration(duration),
+              remaining_ms(buff_remaining_from_duration(duration)) {}
 
         constexpr Buff()
-            : Buff(Buffstat::NONE, 0, 0, 0) {}
+            : stat(Buffstat::NONE), value(0), skillid(0), duration(0),
+              remaining_ms(0) {}
     };
+
+    constexpr bool buff_is_active(const Buff& buff)
+    {
+        return buff.remaining_ms != 0;
+    }
 }

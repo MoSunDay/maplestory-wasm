@@ -167,7 +167,7 @@ namespace jrc
         }
         else if (icons[slot])
         {
-            icons[slot].release();
+            icons[slot].reset();
         }
 
         clear_tooltip();
@@ -196,8 +196,9 @@ namespace jrc
         {
             if (pressed)
             {
-                icon->start_drag(cursorpos - position - iconpositions[slot]);
-                UI::get().drag_icon(icon);
+                Point<int16_t> offset = cursorpos - position - iconpositions[slot];
+                UI::get().drag_icon(icon->snapshot(), icon->drag_kind(),
+                    DragOrigin::EQUIPINVENTORY, offset, cursorpos);
 
                 clear_tooltip();
                 return { Cursor::GRABBING, true };
@@ -247,6 +248,19 @@ namespace jrc
         {
             icon.drop_on_equips(slot);
         }
+    }
+
+    bool UIEquipInventory::accepts_drop(DragKind kind, Point<int16_t> cursorpos) const
+    {
+        // Only consumables (pet potions / pet food) and equipment slots take
+        // a drag here; everything else is rejected.
+        if (kind != DragKind::ITEM)
+        {
+            return false;
+        }
+
+        return pet_consumable_by_position(cursorpos) != 0 ||
+            slot_by_position(cursorpos) != Equipslot::NONE;
     }
 
     int8_t UIEquipInventory::pet_consumable_by_position(Point<int16_t> cursorpos) const

@@ -41,6 +41,7 @@ namespace jrc
 
         void doubleclick(Point<int16_t> position) override;
         void send_icon(const Icon& icon, Point<int16_t> position) override;
+        bool accepts_drop(DragKind kind, Point<int16_t> cursorpos) const override;
         void toggle_active() override;
         bool remove_cursor(bool clicked, Point<int16_t> cursorpos) override;
         CursorResult send_cursor(bool pressed, Point<int16_t> position) override;
@@ -92,6 +93,12 @@ namespace jrc
             int32_t get_item_id() const override;
             bool drop_on_pet_potion(bool hp) const override;
             void drop_on_trade() const override;
+            DragKind drag_kind() const override { return DragKind::ITEM; }
+
+            std::unique_ptr<Type> clone() const override
+            {
+                return std::make_unique<ItemIcon>(*this);
+            }
 
         private:
             InventoryType::Id sourcetab;

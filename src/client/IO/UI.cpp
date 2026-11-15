@@ -455,9 +455,10 @@ namespace jrc
         focusedtextfield = {};
     }
 
-    void UI::drag_icon(Icon* icon)
+    void UI::drag_icon(Icon icon, DragKind kind, DragOrigin origin,
+        Point<int16_t> cursor_offset, Point<int16_t> press_position)
     {
-        state->drag_icon(icon);
+        state->drag_icon(std::move(icon), kind, origin, cursor_offset, press_position);
     }
 
     Keyboard& UI::get_keyboard()

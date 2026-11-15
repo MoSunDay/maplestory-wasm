@@ -29,6 +29,7 @@ namespace jrc
         void draw(float alpha) const override;
         CursorResult send_cursor(bool clicked, Point<int16_t> cursorpos) override;
         void send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
+        bool accepts_drop(DragKind kind, Point<int16_t> cursorpos) const override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
 
         void stage_mapping(Point<int16_t> cursorposition, Keyboard::Mapping mapping);
@@ -47,6 +48,12 @@ namespace jrc
             void drop_on_equips(Equipslot::Id) const override {}
             void drop_on_items(InventoryType::Id, Equipslot::Id, int16_t, bool) const override {}
             void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override;
+            DragKind drag_kind() const override { return DragKind::KEYBINDING; }
+
+            std::unique_ptr<Type> clone() const override
+            {
+                return std::make_unique<KeyIcon>(*this);
+            }
 
         private:
             Keyboard::Mapping mapping;

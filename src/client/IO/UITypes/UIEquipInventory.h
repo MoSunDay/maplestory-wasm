@@ -42,6 +42,7 @@ namespace jrc
         void toggle_active() override;
         void doubleclick(Point<int16_t> position) override;
         void send_icon(const Icon& icon, Point<int16_t> position) override;
+        bool accepts_drop(DragKind kind, Point<int16_t> cursorpos) const override;
         CursorResult send_cursor(bool pressed, Point<int16_t> position) override;
         void send_key(int32_t keycode, bool pressed, bool escape) override;
 
@@ -68,6 +69,12 @@ namespace jrc
             void drop_on_stage() const override;
             void drop_on_equips(Equipslot::Id) const override {}
             void drop_on_items(InventoryType::Id tab, Equipslot::Id eqslot, int16_t slot, bool equip) const override;
+            DragKind drag_kind() const override { return DragKind::EQUIP; }
+
+            std::unique_ptr<Type> clone() const override
+            {
+                return std::make_unique<EquipIcon>(*this);
+            }
 
         private:
             int16_t source;

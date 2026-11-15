@@ -33,11 +33,13 @@ namespace jrc
         /// control cluster (BtSystem, icon row). Kept at the historic 288px
         /// (143px offset + 145px width of the removed quickslot bitmap) so
         /// every retained right-cluster control stays at its screen spot.
-        constexpr int16_t CHAOS_RIGHT_MARGIN = 288;
+        constexpr int16_t CHAOS_RIGHT_MARGIN =
+            chatbar_geometry::POSTCHAOS_RIGHT_MARGIN;
 
         /// Height of the post-Chaos bottom strip bitmap (backgrnd
         /// 1366x85).
-        constexpr int16_t CHAOS_BAR_HEIGHT = 85;
+        constexpr int16_t CHAOS_BAR_HEIGHT =
+            chatbar_geometry::POSTCHAOS_BAR_HEIGHT;
 
         /// Width of the art-free left part of the 1366px strip bitmap. The
         /// shipped backgrnd bakes a 33px-pitch quickslot-cell grid into its
@@ -48,9 +50,9 @@ namespace jrc
         /// Top edge of the strip inside the live view.
         inline int16_t postchaos_bar_top()
         {
-            return static_cast<int16_t>(
-                Constants::viewheight() - Constants::VIEWYOFFSET
-                - CHAOS_BAR_HEIGHT);
+            return chatbar_geometry::bar_top(
+                chatbar_geometry::Generation::POSTCHAOS,
+                Constants::viewheight());
         }
 
         /// Element anchor of the post-Chaos bar. The textures carry their
@@ -58,12 +60,9 @@ namespace jrc
         /// bottom one VIEWYOFFSET above the view bottom, like the v83 bar.
         inline Point<int16_t> postchaos_bar_position()
         {
-            return {
-                static_cast<int16_t>(
-                    Constants::viewwidth() - CHAOS_RIGHT_MARGIN),
-                static_cast<int16_t>(
-                    Constants::viewheight() - Constants::VIEWYOFFSET)
-            };
+            return chatbar_geometry::bar_anchor(
+                chatbar_geometry::Generation::POSTCHAOS,
+                Constants::viewwidth(), Constants::viewheight());
         }
 
         // ------------------------------------------------------------------
@@ -80,11 +79,9 @@ namespace jrc
         /// 800px view both anchors coincide.
         inline Point<int16_t> postchaos_left_anchor()
         {
-            return {
-                512,
-                static_cast<int16_t>(
-                    Constants::viewheight() - Constants::VIEWYOFFSET)
-            };
+            return chatbar_geometry::chatbar_anchor(
+                chatbar_geometry::Generation::POSTCHAOS,
+                Constants::viewheight());
         }
     }
 }

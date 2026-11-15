@@ -131,7 +131,7 @@ namespace jrc
     }
 
     void UIStateCashShop::cancel_drag() {}
-    void UIStateCashShop::drag_icon(Icon*) {}
+    void UIStateCashShop::drag_icon(Icon, DragKind, DragOrigin, Point<int16_t>, Point<int16_t>) {}
     void UIStateCashShop::clear_tooltip(Tooltip::Parent) {}
     void UIStateCashShop::show_equip(Tooltip::Parent, int16_t) {}
     void UIStateCashShop::show_item(Tooltip::Parent, int32_t) {}

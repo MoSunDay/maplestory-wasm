@@ -94,7 +94,7 @@ namespace jrc::pet_settings
             int32_t value = load_value(key.c_str(), 0);
             skills[slot] = value > 0 ? value : 0;
         }
-        return skills;
+        return pet_automation::sanitize_buff_skills(skills);
     }
 
     bool save_buff_skill(size_t slot, int32_t skill_id)
@@ -104,5 +104,21 @@ namespace jrc::pet_settings
 
         std::string key = buff_key(slot);
         return save_value(key.c_str(), skill_id > 0 ? skill_id : 0);
+    }
+
+    bool save_buff_skills(const pet_automation::BuffSkillSlots& skills)
+    {
+        const pet_automation::BuffSkillSlots sanitized =
+            pet_automation::sanitize_buff_skills(skills);
+        bool ok = true;
+        for (size_t slot = 0; slot < sanitized.size(); ++slot)
+        {
+            std::string key = buff_key(slot);
+            // Write every key even after a failure so the batch cannot leave
+            // stale duplicates behind.
+            if (!save_value(key.c_str(), sanitized[slot]))
+                ok = false;
+        }
+        return ok;
     }
 }

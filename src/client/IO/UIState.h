@@ -48,7 +48,8 @@ namespace jrc
         virtual void send_close() = 0;
 
         virtual void cancel_drag() = 0;
-        virtual void drag_icon(Icon* icon) = 0;
+        virtual void drag_icon(Icon icon, DragKind kind, DragOrigin origin,
+            Point<int16_t> cursor_offset, Point<int16_t> press_position) = 0;
         virtual void clear_tooltip(Tooltip::Parent parent) = 0;
         virtual void show_equip(Tooltip::Parent parent, int16_t slot) = 0;
         virtual void show_item(Tooltip::Parent parent, int32_t itemid) = 0;
@@ -76,7 +77,7 @@ namespace jrc
         void send_scroll(Point<int16_t>, double) override {}
         void send_close() override {}
         void cancel_drag() override {}
-        void drag_icon(Icon*) override {}
+        void drag_icon(Icon, DragKind, DragOrigin, Point<int16_t>, Point<int16_t>) override {}
         void clear_tooltip(Tooltip::Parent) override {}
         void show_equip(Tooltip::Parent, int16_t) override {}
         void show_item(Tooltip::Parent, int32_t) override {}

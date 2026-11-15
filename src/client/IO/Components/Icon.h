@@ -18,6 +18,7 @@
 #pragma once
 #include "../../Character/Inventory/Inventory.h"
 #include "../../Graphics/Texture.h"
+#include "../DragTypes.h"
 
 #include <memory>
 
@@ -39,6 +40,14 @@ namespace jrc
             virtual int32_t get_item_id() const { return 0; }
             virtual bool drop_on_pet_potion(bool) const { return false; }
             virtual void drop_on_trade() const {}
+
+            // What this icon carries when dragged; drop targets use it to
+            // decide whether they accept a release.
+            virtual DragKind drag_kind() const { return DragKind::NONE; }
+
+            // Deep copy of the icon payload so an in-flight drag keeps a
+            // valid snapshot even if the source window recycles its icon.
+            virtual std::unique_ptr<Type> clone() const = 0;
         };
 
 
@@ -47,10 +56,20 @@ namespace jrc
             void drop_on_stage() const override {}
             void drop_on_equips(Equipslot::Id) const override {}
             void drop_on_items(InventoryType::Id, Equipslot::Id, int16_t, bool) const override {}
+
+            std::unique_ptr<Type> clone() const override
+            {
+                return std::make_unique<NullType>(*this);
+            }
         };
 
         Icon(std::unique_ptr<Type> type, Texture texture, int16_t count);
         Icon();
+
+        Icon(const Icon&) = delete;
+        Icon& operator=(const Icon&) = delete;
+        Icon(Icon&&) = default;
+        Icon& operator=(Icon&&) = default;
 
         void draw(Point<int16_t> position) const;
         void dragdraw(Point<int16_t> cursorpos) const;
@@ -62,12 +81,19 @@ namespace jrc
         int32_t get_item_id() const;
         bool drop_on_pet_potion(bool hp) const;
         void drop_on_trade() const;
+        DragKind drag_kind() const;
+        // Fresh value copy of this icon (cloned payload, same texture/count).
+        Icon snapshot() const;
         void start_drag(Point<int16_t> offset);
         void reset();
         void set_count(int16_t count);
         int16_t get_count() const;
 
     private:
+        // Private variant used when the texture origin is already shifted, so
+        // the ctor must not apply the offset a second time.
+        Icon(std::unique_ptr<Type> type, Texture texture, int16_t count, bool shift_origin);
+
         std::unique_ptr<Type> type;
         Texture texture;
         bool showcount;

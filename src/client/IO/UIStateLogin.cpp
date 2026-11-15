@@ -227,7 +227,7 @@ namespace jrc
 
     void UIStateLogin::cancel_drag() {}
 
-    void UIStateLogin::drag_icon(Icon*) {}
+    void UIStateLogin::drag_icon(Icon, DragKind, DragOrigin, Point<int16_t>, Point<int16_t>) {}
 
     void UIStateLogin::clear_tooltip(Tooltip::Parent) {}
 

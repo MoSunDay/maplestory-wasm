@@ -270,7 +270,9 @@ namespace jrc
         int32_t skillid = recv.read_int();
         int32_t duration = recv.read_int();
 
-        Stage::get().get_player().give_buff({ bs, value, skillid, duration });
+        Stage& stage = Stage::get();
+        stage.get_player().give_buff({ bs, value, skillid, duration });
+        stage.confirm_pet_buff(skillid);
 
         if (auto bufflist = UI::get().get_element<UIBuffList>())
             bufflist->add_buff(skillid, duration);
@@ -279,6 +281,7 @@ namespace jrc
     void CancelBuffHandler::handle_buff(InPacket&, Buffstat::Id bs) const
     {
         Stage::get().get_player().cancel_buff(bs);
+        Stage::get().get_player().recalc_stats(false);
     }
 
 
