@@ -22,6 +22,9 @@
 - `scripts/test_accounts/verify_all.sh`：equip / cooppet 两阶段的门输出由
   纯 `tail` 改为 `tee /tmp/<flow>-last.log` 后再 `tail`，失败可回溯完整
   日志，不再只有最后几行。
+- `scripts/test_accounts/verify_all.sh` 的 mysql 凭据改经 `MYSQL_PWD`
+  环境变量传入，不再出现在 argv（与 create_accounts.py 的 mysql_run
+  既有做法对齐，`ps` 不可见）。
 - `scripts/test_accounts/serve_clean.py`（新增）：最小 206 Partial Content
   静态服务器，用法 `python3 serve_clean.py <port> <root>`（默认 8010）；
   支持 Range/后缀 -N/416/HEAD 与目录穿越防护，**只绑定 127.0.0.1**。

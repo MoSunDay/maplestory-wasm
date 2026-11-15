@@ -117,7 +117,10 @@
    `SkillData::get(3111002)` 为空、is_summon 判否。新增
    `tools/nx/inject_puppet_summon_nx.py` 参照 Phoenix(3121006) 结构把
    20 级傀儡数据移植进 `assets/Skill.nx`（备份
-   `Skill.nx.pre-puppet-summon-backup`）。
+   `Skill.nx.pre-puppet-summon-backup`）。另注：`assets/Skill.nx` 是
+   gitignored 的本地转换产物，全新检出不含 3111002，需重跑
+   `tools/nx/inject_puppet_summon_nx.py`（幂等拒跑、自动留备份）后
+   召唤门禁方可复现。
 2. **bullet 字段缺失**：数据集剥离了各级 bulletConsume/bulletCount，
    `SkillData.cpp` bulletcost 缺省取 0，与服务端扣弹逻辑对齐。
 3. **Asyncify 双重展开崩溃**：召唤首帧在挂起读上再次 handleSleep 触发

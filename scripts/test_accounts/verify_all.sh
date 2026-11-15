@@ -12,7 +12,7 @@ SUFFIXES=(Hero Pala DK FPA ILA Bish BM MM NL Shad Bucc CS)
 declare -A ACC=( [Hero]=test1 [Pala]=test1 [DK]=test1 [FPA]=test1 [ILA]=test2 [Bish]=test2 [BM]=test2 [MM]=test2 [NL]=test3 [Shad]=test3 [Bucc]=test3 [CS]=test3 )
 declare -A IDX=( [Hero]=0 [Pala]=1 [DK]=2 [FPA]=3 [ILA]=0 [Bish]=1 [BM]=2 [MM]=3 [NL]=0 [Shad]=1 [Bucc]=2 [CS]=3 )
 
-reset_login() { mysql -uroot -p"$DB_PASS" -e "UPDATE maplestory.accounts SET loggedin=0 WHERE name IN ('test1','test2','test3');" 2>/dev/null; }
+reset_login() { MYSQL_PWD="$DB_PASS" mysql -uroot -e "UPDATE maplestory.accounts SET loggedin=0 WHERE name IN ('test1','test2','test3');" 2>/dev/null; }
 
 phase_setup() {
   python3 create_accounts.py --count 3 --world "$WORLD" || return 1
@@ -155,7 +155,7 @@ PY
 phase_restore() {
   python3 skill-keymap-prep.py --restore || return 1
   reset_login
-  mysql -uroot -p"$DB_PASS" -N -e "SELECT CONCAT('restore: ', COUNT(*), ' character(s) at map ', map) FROM maplestory.characters WHERE accountid IN (SELECT id FROM maplestory.accounts WHERE name IN ('test1','test2','test3')) GROUP BY map;" 2>/dev/null
+  MYSQL_PWD="$DB_PASS" mysql -uroot -N -e "SELECT CONCAT('restore: ', COUNT(*), ' character(s) at map ', map) FROM maplestory.characters WHERE accountid IN (SELECT id FROM maplestory.accounts WHERE name IN ('test1','test2','test3')) GROUP BY map;" 2>/dev/null
   echo "RESTORE OK"
 }
 
