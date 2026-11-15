@@ -1,0 +1,153 @@
+# 服务端源码补丁：无脚本 NPC 的通用对话兜底（fallback_talk / getFallbackTalk）
+# 背景：东方神州/泰国 079MAX4 地图新增的 NPC（如上海 701000000 的 9300015
+#       大当家、9310002 Owner Jang，嵩山 702100000 的 9310034 大宝，上海
+#       9330042 微微安）在服务端 scripts/npc 下没有专属脚本，也没有
+#       shop/shopitems 记录。NPCTalkHandler 原逻辑在
+#       NPCScriptManager.start(..., null) 返回 false 且 npc.hasShop() 为
+#       false 时只写一条 NPC_UNCODED 日志就 return——客户端点击 NPC 毫无
+#       反应，对话窗口不出现。
+#       本补丁增加通用兜底：
+#       ① NPCTalkHandler：无专属脚本且无商店时，再用脚本名
+#         "fallback_talk" 调一次 NPCScriptManager.start；仅当这次也失败
+#         才回落到原来的 NPC_UNCODED 日志。带商店的 NPC 分支不变。
+#       ② NPCConversationManager.getFallbackTalk()：读取
+#         String.wz/Npc.img/<npc id>，按 n0/d0/n1/d1/n2/d2 顺序取第一条
+#         非空文本（079 数据里 n*/d* 即 NPC 台词/说明），没有台词时退回
+#         name（有 func 则拼成 "name - func"），全部缺失返回 "..."，
+#         保证 NPC 一定有可显示的对话。getNpcString 对空字符串与缺失
+#         节点统一返回 null。
+#         硬化（rev 2）：Npc.img 经静态字段 npcStringData 懒缓存——
+#         private static synchronized getNpcStringData() 只在成功取到
+#         数据后才缓存（失败/异常不缓存，下次重试并继续报错），避免
+#         每次点击兜底都重建 MapleDataProvider（XML WZ 下重复解析
+#         2.4MB DOM、单文件 WZ 下可能泄漏文件句柄）；读取异常不再被
+#         静默吞掉，改为 FilePrinter.printError(FilePrinter.NPC +
+#         npc + "-fallback.txt", e) 记录到 game/npcs/<npc>-fallback.txt
+#         （wzpath 配错/缺 String.wz 与单纯缺条目可区分），随后仍返回
+#         "..." 不影响主流程。
+#       ③ 新增 scripts/npc/fallback_talk.js（11 行）：start() 调
+#         cm.sendOk(cm.getFallbackTalk())，action() 调 cm.dispose()，
+#         只读、无传送/发物品等副作用。
+#       注意：已有专属脚本但脚本本身报错（eval/start 抛异常）的 NPC
+#       同样会落到本兜底——NPCScriptManager.start 在脚本求值/启动失败时
+#       返回 false，真实错误仍记录在原有 NPC 异常日志中，兜底只保证
+#       玩家侧不静默。
+#       注意：shop NPC 若仍缺 shop/shopitems 行，本兜底只给通用台词，
+#       不会凭空生成商店（见 changelog 的已知限制）。
+#
+# 应用（在 link_repos/MapleStory-Server 检出根目录内；该目录是指向
+#   /data/MapleStory-Server 的符号链接，直接用父仓补丁的绝对路径）：
+#   patch -p1 < /data/maplestory-wasm/scripts/server-patches/0021-orient-npc-fallback.patch
+# 验证：
+#   改动影响 dist：需重编并重启容器生效——
+#   bash posix-compile.sh && docker restart ms-game-server
+#   ls scripts/npc/fallback_talk.js  # 新文件存在
+#   grep -n "fallback_talk" src/net/server/channel/handlers/NPCTalkHandler.java  # 应为 1
+#   grep -n "getFallbackTalk" src/scripting/npc/NPCConversationManager.java scripts/npc/fallback_talk.js  # 各 1
+#   grep -n "getNpcStringData" src/scripting/npc/NPCConversationManager.java  # 应为 2（定义 + 调用）
+#   grep -n "FilePrinter.NPC + npc" src/scripting/npc/NPCConversationManager.java  # 应为 1
+#   - 点击无脚本/无商店的 NPC：应出现对话窗口，文本来自 String.wz
+#     （如 702100000 大宝 9310034 以「练武之人也要保护好皮肤啊」开头；
+#      701000000 微微安 9330042 以「想要来试试看」开头）；
+#   - 无 String.wz 条目时至少显示 "..."，不再静默无反应；wzpath 配错时
+#     game/npcs/<npc>-fallback.txt 里会出现对应堆栈；
+#   - 有专属脚本的 NPC 以及有商店的 NPC 行为不变。
+#
+--- a/src/net/server/channel/handlers/NPCTalkHandler.java
++++ b/src/net/server/channel/handlers/NPCTalkHandler.java
+@@ -67,7 +67,11 @@
+                     boolean hasNpcScript = NPCScriptManager.getInstance().start(c, npc.getId(), oid, null);
+                     if (!hasNpcScript) {
+                         if (!npc.hasShop()) {
+-                            FilePrinter.printError(FilePrinter.NPC_UNCODED, "NPC " + npc.getName() + "(" + npc.getId() + ") is not coded.");
++                            // NPCs without a dedicated script still get a readable
++                            // String.wz conversation instead of silently doing nothing.
++                            if (!NPCScriptManager.getInstance().start(c, npc.getId(), oid, "fallback_talk", null)) {
++                                FilePrinter.printError(FilePrinter.NPC_UNCODED, "NPC " + npc.getName() + "(" + npc.getId() + ") is not coded.");
++                            }
+                             return;
+                         } else if(c.getPlayer().getShop() != null) {
+                             c.announce(MaplePacketCreator.enableActions());
+--- a/src/scripting/npc/NPCConversationManager.java
++++ b/src/scripting/npc/NPCConversationManager.java
+@@ -45,6 +45,7 @@
+ import server.partyquest.Pyramid;
+ import server.partyquest.Pyramid.PyramidMode;
+ import server.quest.MapleQuest;
++import tools.FilePrinter;
+ import tools.LogHelper;
+ import tools.MaplePacketCreator;
+ import client.MapleCharacter;
+@@ -594,4 +595,58 @@
+                 return sbe != SkillBookEntry.UNAVAILABLE ? "    Obtainable through #rquestline#k." : "";
+         }
+         
++        private static MapleData npcStringData;
++
++        private static synchronized MapleData getNpcStringData() {
++                if (npcStringData == null) {
++                        npcStringData = MapleDataProviderFactory
++                                .getDataProvider(new File(System.getProperty("wzpath") + "/String.wz"))
++                                .getData("Npc.img");
++                }
++                return npcStringData;
++        }
++
++        private String getNpcString(MapleData npcData, String key) {
++                if (npcData == null) {
++                        return null;
++                }
++
++                MapleData value = npcData.getChildByPath(key);
++                if (value == null || value.getData() == null) {
++                        return null;
++                }
++
++                String text = value.getData().toString();
++                return text.isEmpty() ? null : text;
++        }
++
++        public String getFallbackTalk() {
++                try {
++                        MapleData npcImage = getNpcStringData();
++                        MapleData npcData = npcImage == null ? null : npcImage.getChildByPath(Integer.toString(npc));
++                        if (npcData == null) {
++                                return "...";
++                        }
++
++                        String[] talkKeys = {"n0", "d0", "n1", "d1", "n2", "d2"};
++                        for (String key : talkKeys) {
++                                String text = getNpcString(npcData, key);
++                                if (text != null) {
++                                        return text;
++                                }
++                        }
++
++                        String name = getNpcString(npcData, "name");
++                        String func = getNpcString(npcData, "func");
++                        if (name != null) {
++                                return func == null ? name : name + " - " + func;
++                        }
++                } catch (Exception e) {
++                        // A missing String.wz entry must not leave the NPC silent.
++                        FilePrinter.printError(FilePrinter.NPC + npc + "-fallback.txt", e);
++                }
++
++                return "...";
++        }
++
+ }
+--- /dev/null
++++ b/scripts/npc/fallback_talk.js
+@@ -0,0 +1,11 @@
++/*
++ * Generic read-only conversation for NPCs that have no dedicated script.
++ * The text comes from String.wz/Npc.img (name/func/n0/d0/...).
++ */
++function start() {
++    cm.sendOk(cm.getFallbackTalk());
++}
++
++function action(mode, type, selection) {
++    cm.dispose();
++}

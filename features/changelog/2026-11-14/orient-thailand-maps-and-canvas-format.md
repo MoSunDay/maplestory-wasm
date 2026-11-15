@@ -100,8 +100,11 @@ v83 客户端/服务的 Map 数据缺少 079MAX4 年度包的海外内容：
 - 浏览器 e2e：`FM_SERVICE_DEST=thai|shanghai|shaolin|shaolin-hall`
   均成功落图 500000000/701000000/702000000/702100000，miniMap 正常
   渲染（新 canvas 格式的 5 张 miniMap 全部命中），详见前一篇 changelog。
-- 注入的地图 JSON 没有 `info/bgm` 字段，客户端进图保持静音；不阻塞
-  玩法，BGM 素材可后续单独补。
+- 注入的地图节点把 `bgm` 平铺在地图节点上（不在 `info` 下）；`MapInfo`
+  在缺少 `info` 时回退到地图节点读取，并归一化为 `BgmCN.img/GoShanghai`
+  这类路径。此前静音是 `assets/Sound.nx` 缺 `BgmCN/BgmTH` wrapper，
+  已在后续收尾中补齐，见
+  [orient-bgm-and-npc-fallback.md](orient-bgm-and-npc-fallback.md)。
 
 ## 回滚
 
