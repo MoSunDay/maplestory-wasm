@@ -20,6 +20,7 @@
 
 #include "../Components/Textfield.h"
 #include "CharacterCreation/Flow.h"
+#include "CharacterCreation/JobOption.h"
 
 #include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Texture.h"
@@ -48,6 +49,7 @@ namespace jrc
         void send_naming_result(const std::string& name, bool nameused);
         bool handle_creation_failure();
         bool is_customizing() const;
+        int selected_job_code() const;
 
     protected:
         Button::State button_pressed(uint16_t button_id) override;
@@ -55,6 +57,8 @@ namespace jrc
     private:
         void randomize_look();
         const std::string& get_equipname(Equipslot::Id slot) const;
+        std::vector<int32_t> weapon_choices() const;
+        void apply_selected_job();
 
         enum Buttons
         {
@@ -78,6 +82,8 @@ namespace jrc
             BT_CHARC_WEPR,
             BT_CHARC_GENDERL,
             BT_CHARC_GEMDERR,
+            BT_CHARC_JOBL,
+            BT_CHARC_JOBR,
         };
 
         void set_customization_controls(bool enabled);
@@ -104,6 +110,8 @@ namespace jrc
         BoolPair<std::vector<int32_t>> weapons;
 
         CharacterCreation::Flow creation_flow;
+        CharacterCreation::CreationJob selected_job =
+            CharacterCreation::CreationJob::EXPLORER;
         bool focus_name_on_update = false;
         bool female;
         size_t skin;
@@ -123,5 +131,6 @@ namespace jrc
         Text shoename;
         Text wepname;
         Text gendername;
+        Text joblabel;
     };
 }

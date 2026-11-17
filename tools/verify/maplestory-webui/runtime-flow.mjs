@@ -42,6 +42,7 @@ export function createRuntimeProbes(driver) {
     loginNoticeActive: () => number('msui_login_notice_active'),
     loginNoticeMessage: () => number('msui_login_notice_message'),
     characterCreationCustomizing: () => number('msui_character_creation_customizing'),
+    characterCreationJob: () => number('msui_character_creation_job'),
     noticeActive: () => number('msui_notice_active'),
     mapAssetLoading: () => number('msstage_loading'),
     assetBlocking: () => number('msasset_blocking'),

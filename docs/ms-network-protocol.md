@@ -444,7 +444,7 @@ Server responds with `CHAR_NAME_RESPONSE` (0x0D).
 ```
 Field      Type    Notes
 name       string  Character name (3–12 UTF-8 bytes)
-job        int     Job ID. Running server (custom-client mode): 0=Cygnus, 1=Explorer, 2=Aran
+job        int     Job ID. Running server (custom-client mode): 0=Cygnus, 1=Explorer, 2=Aran, 3=Pirate (level-10 pirate spawned on the Nautilus)
 face       int     Face ID (cosmetic)
 hair       int     Hair style value sent on the wire. In the linked server's current `USE_CUSTOM_CLIENT` mode this must already be `baseHair + hairColor`
 skin       int     Skin tone ID

@@ -254,6 +254,14 @@ extern "C"
         return creation && creation->is_customizing() ? 1 : 0;
     }
 
+    // Wire code of the job currently selected on the creation screen
+    // (1=Explorer, 0=Cygnus, 2=Aran, 3=Pirate).
+    EMSCRIPTEN_KEEPALIVE int msui_character_creation_job()
+    {
+        auto creation = jrc::UI::get().get_element<jrc::UICharcreation>();
+        return creation ? creation->selected_job_code() : -1;
+    }
+
     EMSCRIPTEN_KEEPALIVE int msui_notice_active()
     {
         return jrc::UI::get().is_element_active(jrc::UIElement::NOTICE) ? 1 : 0;

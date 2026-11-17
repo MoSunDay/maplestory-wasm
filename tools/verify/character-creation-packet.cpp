@@ -32,12 +32,12 @@ namespace
         return static_cast<int32_t>(value);
     }
 
-    void verify_exact_wire_order()
+    void verify_exact_wire_order(int32_t job)
     {
         const std::string name = "\xE6\xB5\x8B\xE8\xAF\x95\xE4\xB8\x80";
         const std::vector<int8_t> payload = encode_create_char_payload({
             name,
-            1,
+            job,
             20000,
             30030,
             7,
@@ -59,7 +59,7 @@ namespace
             assert(payload[offset++] == static_cast<int8_t>(byte));
         }
 
-        assert(read_int32(payload, offset) == 1);
+        assert(read_int32(payload, offset) == job);
         assert(read_int32(payload, offset) == 20000);
         assert(read_int32(payload, offset) == 30037);
         assert(read_int32(payload, offset) == 3);
@@ -69,6 +69,22 @@ namespace
         assert(read_int32(payload, offset) == 1302000);
         assert(payload[offset++] == 1);
         assert(offset == payload.size());
+    }
+
+    void verify_all_job_codes_on_wire()
+    {
+        // Creation-screen job codes: 0=Cygnus, 1=Explorer, 2=Aran, 3=Pirate.
+        for (int32_t job = 0; job <= 3; ++job)
+        {
+            const std::vector<int8_t> payload = encode_create_char_payload({
+                "JobProbe", job, 20000, 30000, 0, 0, 1040002, 1060002, 1072001, 1302000, 0
+            });
+            assert(payload.size() == 2 + 8 + 8 * sizeof(int32_t) + sizeof(int8_t));
+
+            size_t offset = 0;
+            offset += sizeof(uint16_t) + 8;  // name length prefix + "JobProbe"
+            assert(read_int32(payload, offset) == job);
+        }
     }
 
     void verify_gender_is_not_an_int()
@@ -83,6 +99,9 @@ namespace
 
 int main()
 {
-    verify_exact_wire_order();
+    // Explorer (1) keeps the full-field byte-order lock; every supported
+    // creation job additionally gets its wire encoding checked.
+    verify_exact_wire_order(1);
+    verify_all_job_codes_on_wire();
     verify_gender_is_not_an_int();
 }

@@ -21,7 +21,7 @@
 changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**，两个
 0006 均原样保留。此后规则：
 
-- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0022；0018 之后曾直接落过
+- 新补丁编号 = 当前最大编号 + 1 顺延（当前最大 0024；0018 之后曾直接落过
   0019-expression-throttle，本行按实际最大编号维护）；
 - slug 必须唯一，禁止复用；
 - 同一编号出现不同 slug，一律视为历史遗留，不表示覆盖或替代关系。
@@ -59,6 +59,8 @@ changelog / 复盘文档对旧文件名的重放引用，**有意不重编号**�
 
 | [0021-orient-npc-fallback.patch](0021-orient-npc-fallback.patch) | 无脚本 NPC 通用对话兜底：NPC 无专属脚本且无商店时，`NPCTalkHandler` 改用脚本名 `fallback_talk` 再调一次 `NPCScriptManager.start`，仅当再次失败才回落 `NPC_UNCODED` 日志（有商店分支不变；专属脚本存在但 eval/start 抛错时 `start` 也返回 false，同样落到兜底，真实错误仍在 NPC 日志）；`NPCConversationManager.getFallbackTalk()` 读取 `String.wz/Npc.img/<id>` 的 `n0/d0/n1/d1/n2/d2` 取首条非空台词，其次 `name`（有 `func` 时拼 `name - func`），全部缺失返回 `...`；`Npc.img` 经静态 `npcStringData` 懒缓存（`synchronized getNpcStringData()`，仅成功后缓存，避免每次点击重建 provider/重解析 2.4MB XML 或泄漏句柄），读取异常经 `FilePrinter` 记入 `game/npcs/<id>-fallback.txt` 后仍返回 `...` 不静默；新增 `scripts/npc/fallback_talk.js`（`cm.sendOk(cm.getFallbackTalk())` + `cm.dispose()`，只读无副作用）；东方神州/泰国无脚本 NPC（9300015/9310002/9310034/9330042 等）点击不再静默；影响 dist，重放后需 `bash posix-compile.sh` 并 `docker restart ms-game-server` 生效；shop NPC 仍缺 shop/shopitems 行时只得到通用台词，不会生成真实商店 | 已应用于当前 checkout 并重编入 dist，容器已重启（2026-11-14；2026-11-15 懒缓存/异常日志硬化已重编重启） |
 | [0022-summon-owner-leave-broadcast.patch](0022-summon-owner-leave-broadcast.patch) | owner 离图跟随型召唤补广播：`MapleMap.removePlayer` 原先对非静止（跟随型）召唤只做本地 `removeMapObject(summon)` 不广播，远端客户端（B 视角）在 A 离图后召唤兽永久冻结残留；现静止傀儡分支保持既有 `cancelEffectFromBuffStat(PUPPET)` 广播链不重复发送，非静止分支在 `removeMapObject` 外按 owner 隐藏状态 `broadcastGMMessage/broadcastMessage` 广播 `removeSummon(summon, true)`（mode 4 死亡动画，排除离图者本人）；与客户端 `RemoveSummonHandler` 无条件先 `drop_stashed_oid` 再幂等 `summon::remove` 配套，关闭「owner 离图召唤残留/幽灵」；影响 dist，重放后需 `bash posix-compile.sh` 并 `docker restart ms-game-server` 生效 | 待应用（2026-11-15 编排，随召唤收尾批次落地） |
+| [0023-character-creation-job-branches.patch](0023-character-creation-job-branches.patch) | 建角职业分支服务端配套：`CreateCharHandler` IDs 白名单补 Pirate 起始武器 1482000/1492000、新增 `job == 3` 走 `PirateNoviceCreator`（10 级海盗配方：AP45/SP1、HP 275/MP 185、Nautilus 出生、双子武器互赠+子弹）；`createCharacter` 返回 -1（名字被拒）/-3（槽位满）原先静默无应答致客户端建角界面永久挂起，现与 -2 一致回 `deleteCharResponse(0,9)` 让客户端恢复控件并弹错（客户端 `DeleteCharResponseHandler` 本就按建角失败处理）；`QuestActionManager` 暴露 `useFullAranSkillset()`（读 ServerConstants，替代上游 YamlConfig 断链，配套 0024）；orig 侧按已知编辑反向重建（无 .git 基线），new 侧已与当前 checkout 校验一致；影响 dist，重放后需 `bash posix-compile.sh` 并 `docker restart ms-game-server` 生效 | 已应用于当前 checkout 并重编入 dist（2026-11-16） |
+| [0024-aran-quest-skillset-guards.patch](0024-aran-quest-skillset-guards.patch) | Aran 任务链整文件快照：21101/21201/21302 职业分支判断由上游 YamlConfig 断链改走 `qm.useFullAranSkillset()`（方法由 0023 暴露）；新增 914000000 onUserEnter 钩子 `aranTutorAlone.js`（3 行 unlockUI，解除任务剧情 UI 锁让新建战神可操作）；上游可能已自带同名 quest 脚本且 orig 不可得，按整文件快照留档，重放到全新检出时若同名文件已存在以本补丁内容整文件覆盖；quest 脚本运行时解释执行不影响 dist，无需重编 | 已应用于当前 checkout（2026-11-16） |
 
 注意：`Bowmaster.ARMOR_CRASH = 3121010` 经审计为不可达死代码
 （v83 无此技能槽位），**有意保留**，不做补丁。

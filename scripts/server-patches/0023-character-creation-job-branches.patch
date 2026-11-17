@@ -1,0 +1,158 @@
+# 补丁 0023：建角职业分支（Pirate creator / 失败应答 / useFullAranSkillset）
+# 背景：客户端建角界面新增 Aran/Pirate 职业选择（CREATE_CHAR job 0-3，
+#       0=Cygnus/1=Explorer/2=Legend(Aran)/3=Pirate）。服务端原先只有
+#       job 0-2 分支：Pirate 无 creator；CreateCharHandler 对
+#       createCharacter 返回 -1（名字被拒）/-3（槽位满）静默无应答，客户端
+#       DeleteCharResponseHandler 本就按建角失败处理（Cosmic 协议），
+#       挂起等待直到超时。Aran 任务链脚本读取职业分支开关时引用上游
+#       YamlConfig（本 fork 无 YamlConfig，改由 ServerConstants 提供
+#       USE_FULL_ARAN_SKILLSET=false），QuestActionManager 暴露同名方法
+#       供脚本调用（配套补丁 0024）。
+# 改动：① IDs 白名单补 Pirate 起始武器 1482000/1492000（1442079 为上游
+#       既有）；② job==3 走新增的 PirateNoviceCreator（10 级海盗配方：
+#       AP45/SP1、HP 275/MP 185（九次升级中点近似）、Nautilus 120000000
+#       出生、双子武器互赠、2330000 子弹 x1000、4161001 新手指南）；
+#       ③ -1/-3 与 -2 一致回 deleteCharResponse(0,9)，客户端恢复建角
+#       控件并弹错；④ QuestActionManager.useFullAranSkillset() +
+#       import constants.ServerConstants。
+# 应用（在 link_repos/MapleStory-Server 检出根目录内；该目录是指向
+#   /data/MapleStory-Server 的符号链接，直接用绝对路径）：
+#   patch -p1 < /data/maplestory-wasm/scripts/server-patches/0023-character-creation-job-branches.patch
+# 验证：改动影响 dist，需重编并重启容器生效——
+#   bash posix-compile.sh && docker restart ms-game-server
+#   E2E（tools/verify/maplestory-webui/run.mjs）：
+#     E2E_CHAR_JOB=pirate → wire 3、出生图 120000000、起始武器 1482000
+#     E2E_CHAR_JOB=aran   → wire 2、出生图 914000000、起始武器 1442079
+#   grep -n "job == 3" src/net/server/handlers/login/CreateCharHandler.java  # 1 处
+#   grep -n "status == -1" src/net/server/handlers/login/CreateCharHandler.java  # 1 处
+#   grep -n useFullAranSkillset src/scripting/quest/QuestActionManager.java  # 1 处
+# 备注：CreateCharHandler / QuestActionManager 的 orig 侧按本任务已知
+#   编辑反向重建（无 .git 基线）；若与上游检出存在漂移，以本补丁的
+#   new 侧快照为准。
+#
+--- a/src/net/server/handlers/login/CreateCharHandler.java
++++ b/src/net/server/handlers/login/CreateCharHandler.java
+@@ -36,7 +36,7 @@
+ public final class CreateCharHandler extends AbstractMaplePacketHandler {
+ 
+     private final static Set<Integer> IDs = new HashSet<>(Arrays.asList(new Integer[]{
+-        1302000, 1312004, 1322005, 1442079,                       // Weapons
++        1302000, 1312004, 1322005, 1442079, 1482000, 1492000,                       // Weapons
+         1040002, 1040006, 1040010, 1041002, 1041006, 1041010, 1041011, 1042167,     // Bottom
+         1060002, 1060006, 1061002, 1061008, 1062115,                                // Top
+         1072001, 1072005, 1072037, 1072038, 1072383,                                // Shoes
+@@ -99,12 +99,18 @@
+         } else if (job == 2) {
+             // Aran
+             status = LegendCreator.createCharacter(c, name, face, hair, skin, top, bottom, shoes, weapon, gender);
++        } else if (job == 3) {
++            // Pirate
++            status = PirateNoviceCreator.createCharacter(c, name, face, hair, skin, top, bottom, shoes, weapon, gender);
+         } else {
+             c.announce(MaplePacketCreator.deleteCharResponse(0, 9));
+             return;
+         }
+ 
+-        if (status == -2) {
++        if (status == -1 || status == -2 || status == -3) {
++            // -1: name rejected, -2: DB insert failed, -3: no character slot
++            // left. Announce all of them so the client restores its creation
++            // controls instead of waiting for a reply that never comes.
+             c.announce(MaplePacketCreator.deleteCharResponse(0, 9));
+         }
+     }
+--- a/src/scripting/quest/QuestActionManager.java
++++ b/src/scripting/quest/QuestActionManager.java
+@@ -22,6 +22,7 @@
+ package scripting.quest;
+ 
+ import client.MapleClient;
++import constants.ServerConstants;
+ import scripting.npc.NPCConversationManager;
+ import server.MapleItemInformationProvider;
+ import server.quest.MapleQuest;
+@@ -50,6 +51,10 @@
+         return start;
+     }
+ 
++    public boolean useFullAranSkillset() {
++        return ServerConstants.USE_FULL_ARAN_SKILLSET;
++    }
++
+     @Override
+     public void dispose() {
+         QuestScriptManager.getInstance().dispose(this, getClient());
+--- /dev/null
++++ b/src/client/creator/novice/PirateNoviceCreator.java
+@@ -0,0 +1,71 @@
++/*
++    This file is part of the HeavenMS MapleStory Server
++    Copyleft (L) 2016 - 2018 RonanLana
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as
++    published by the Free Software Foundation version 3 as published by
++    the Free Software Foundation.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++package client.creator.novice;
++
++import client.MapleClient;
++import client.MapleJob;
++import client.creator.CharacterFactory;
++import client.creator.CharacterFactoryRecipe;
++import client.inventory.Item;
++import client.inventory.MapleInventoryType;
++import server.MapleItemInformationProvider;
++
++/**
++ * Creates a level 10 Pirate directly from the character-creation screen,
++ * matching the Nautilus starter quests (2171-2175, lvmin 10) and the
++ * reqLevel 10 knuckler/pistol starter weapons.
++ */
++public class PirateNoviceCreator extends CharacterFactory {
++
++    // HP/MP follow the pirate branch of MapleCharacter.levelUp: base 50/5 at
++    // level 1 plus nine level-ups of 22-28 HP and 18-23 MP (midpoints used).
++    private static final int STARTING_HP = 50 + 9 * 25;
++    private static final int STARTING_MP = 5 + 9 * 20;
++
++    private static CharacterFactoryRecipe createRecipe(int top, int bottom, int shoes, int weapon) {
++        CharacterFactoryRecipe recipe = new CharacterFactoryRecipe(MapleJob.PIRATE, 10, 120000000, top, bottom, shoes, weapon);
++
++        recipe.setRemainingAp(45);  // levels 2-10 worth of AP, unspent
++        recipe.setRemainingSp(1);
++        recipe.setMaxHp(STARTING_HP);
++        recipe.setMaxMp(STARTING_MP);
++
++        giveItem(recipe, 4161001, 1, MapleInventoryType.ETC);         // beginner guide
++        giveItem(recipe, 2330000, 1000, MapleInventoryType.USE);      // bullets for the pistol
++
++        // Hand over the starter weapon the player did not preview on the
++        // creation screen (1482000 knuckler / 1492000 pistol).
++        int altWeapon = (weapon == 1482000) ? 1492000 : 1482000;
++        giveEquipment(recipe, MapleItemInformationProvider.getInstance(), altWeapon);
++
++        return recipe;
++    }
++
++    private static void giveEquipment(CharacterFactoryRecipe recipe, MapleItemInformationProvider ii, int equipid) {
++        Item nEquip = ii.getEquipById(equipid);
++        recipe.addStartingEquipment(nEquip);
++    }
++
++    private static void giveItem(CharacterFactoryRecipe recipe, int itemid, int quantity, MapleInventoryType itemType) {
++        recipe.addStartingItem(itemid, quantity, itemType);
++    }
++
++    public static int createCharacter(MapleClient c, String name, int face, int hair, int skin, int top, int bottom, int shoes, int weapon, int gender) {
++        return createNewCharacter(c, name, face, hair, skin, gender, createRecipe(top, bottom, shoes, weapon));
++    }
++}

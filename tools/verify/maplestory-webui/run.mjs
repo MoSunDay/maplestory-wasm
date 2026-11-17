@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { BrowserDriver, sleep } from './cdp.mjs';
 import { cleanupResidualCharacter } from './support/char-cleanup-fixture.mjs';
+import { assertCreatedCharacterWeapon } from './support/char-weapon-fixture.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { assertCharSelectModernLayout, assertWorldSelectNovaTopSlot } from './layout-pixels.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
@@ -41,6 +42,22 @@ const verifyNpcShop = process.env.E2E_NPC_SHOP === '1';
 const verifyImeChat = process.env.E2E_IME_CHAT === '1';
 const logoutToLogin = process.env.E2E_LOGOUT_TO_LOGIN === '1';
 const requireMobs = process.env.E2E_REQUIRE_MOBS === '1';
+// Optional creation-screen job cycling (Explorer -> Cygnus -> Aran -> Pirate).
+// Default 'explorer' performs zero extra clicks, keeping legacy runs intact.
+const charJob = process.env.E2E_CHAR_JOB || 'explorer';
+const charJobWireCodes = Object.freeze({ explorer: 1, cygnus: 0, aran: 2, pirate: 3 });
+const charJobSpawnMaps = Object.freeze({
+  explorer: 10000, cygnus: 130030000, aran: 914000000, pirate: 120000000
+});
+// Wire codes observed after each right-arrow click starting from Explorer.
+const charJobCycleAfterClicks = Object.freeze([1, 0, 2, 3]);
+if (!(charJob in charJobWireCodes)) {
+  throw new Error(`E2E_CHAR_JOB must be one of ${Object.keys(charJobWireCodes).join('|')}, got '${charJob}'`);
+}
+const charJobClicks = charJobCycleAfterClicks.indexOf(charJobWireCodes[charJob]);
+// Non-default jobs must enter the freshly created character (the account
+// keeps older fixtures on the leading cards) to assert its spawn map.
+const enterNewCharacter = charJobClicks > 0 || process.env.E2E_ENTER_NEW_CHAR === '1';
 const routeTutorialMobMap = process.env.E2E_ROUTE_TUTORIAL_MOB_MAP === '1';
 const captureAttackEffects = process.env.E2E_CAPTURE_ATTACK_EFFECTS === '1';
 const petOptionsMode = process.env.E2E_PET_OPTIONS || '';
@@ -79,7 +96,7 @@ async function requireState(name, predicate, timeoutSeconds = 30) {
 const probes = createRuntimeProbes(driver);
 const {
   currentUiState, loginNoticeActive, loginNoticeMessage,
-  characterCreationCustomizing, noticeActive, mapAssetLoading,
+  characterCreationCustomizing, characterCreationJob, noticeActive, mapAssetLoading,
   assetBlocking, mapId, mobCount, playerX, playerY, petActive, petX, petY,
   petStance, petHasLootTarget, petOptionsActive, petOptionsHpItem,
   petOptionsMpItem, petOptionsMenuX, petOptionsMenuY, itemsMenuX, itemsMenuY,
@@ -592,8 +609,26 @@ try {
       }
       await driver.screenshot('07-character-select-after');
     } else {
+      // Optional job selection: click the right selector arrow (645,505,
+      // 15x16 art) until the exported wire code matches the target job.
+      for (let step = 0; step < charJobClicks; step += 1) {
+        const expectedCode = charJobCycleAfterClicks[step + 1];
+        const cycled = await driver.retryClick(652, 513,
+          async () => await characterCreationJob() === expectedCode, 8, 4000);
+        if (!cycled) {
+          throw new Error(`job arrow click ${step + 1}/${charJobClicks} did not reach wire code ${expectedCode}`);
+        }
+      }
+      if (charJobClicks > 0) {
+        if (await characterCreationJob() !== charJobWireCodes[charJob]) {
+          throw new Error(`expected ${charJob} wire code ${charJobWireCodes[charJob]}, got ${await characterCreationJob()}`);
+        }
+        console.log(`PASS  creation job cycled to ${charJob} (wire ${charJobWireCodes[charJob]})`);
+        await driver.screenshot('06b-character-job-selected');
+      }
       await driver.retryClick(525, 465, async () => await currentUiState() === uiState.charSelect);
       await requireUiState('character creation returned to selection', uiState.charSelect, 45);
+    assertCreatedCharacterWeapon(account, characterName, charJob);
     }
   }
   if (!retryCharacterName) await driver.screenshot('07-character-select-after');
@@ -638,14 +673,26 @@ try {
       };
       window.naturalAssetEvidence = evidence;
     })()`);
-    // Double-click the first character card (card 0 center) to enter the game.
-    // Works for both pre- and post-Chaos layouts since card positions are
-    // derived from the AreaButton grid, and double-click is layout-agnostic.
+    // Double-click a character card center to enter the game. Works for both
+    // pre- and post-Chaos layouts since card positions are derived from the
+    // AreaButton grid, and double-click is layout-agnostic. Card slots are
+    // 120px apart from x=130 (feet anchor y=270); a page holds 4 cards.
     // Retry the synthetic double-click: the browser can drop the second
     // press, and re-issuing it on an already-selected card is harmless.
+    let entryCardIndex = 0;
+    if (enterNewCharacter) {
+      const charCount = await driver.evaluate("Module.ccall('mscharlist_preview_total','number',[],[])");
+      entryCardIndex = charCount - 1;  // newly created char is appended last
+      for (let page = 0; page < Math.floor(entryCardIndex / 4); page += 1) {
+        await driver.click(533, 240);  // page-right arrow
+        await sleep(500);
+      }
+      console.log(`INFO  entering newly created character card ${entryCardIndex}`);
+    }
+    const entryCardX = 130 + 120 * (entryCardIndex % 4);
     for (let attempt = 0; attempt < 5; attempt += 1) {
       if ((await driver.evaluate("Module.ccall('msui_state','number',[],[])")) !== uiState.charSelect) break;
-      await driver.doubleClick(130, 210);
+      await driver.doubleClick(entryCardX, 210);
       for (let i = 0; i < 4; i += 1) {
         if ((await driver.evaluate("Module.ccall('msui_state','number',[],[])")) !== uiState.charSelect) break;
         await sleep(1000);
@@ -661,6 +708,13 @@ try {
     console.log(`PASS  character selection keeps input locked ${JSON.stringify(selectionLock)}`);
     await requireUiState('in-game UI active', uiState.game, 60);
     await requireState('map field initialized', async () => await mapId() > 0, 60);
+    if (enterNewCharacter) {
+      const spawnMapId = await mapId();
+      if (spawnMapId !== charJobSpawnMaps[charJob]) {
+        throw new Error(`expected ${charJob} spawn map ${charJobSpawnMaps[charJob]}, got ${spawnMapId}`);
+      }
+      console.log(`PASS  ${charJob} spawned on map ${spawnMapId}`);
+    }
     // Ariant (npc-shop flow) streams a much larger cold-asset set; give the
     // map gates more headroom there.
     const mapGateSeconds = verifyNpcShop ? 300 : 60;
@@ -689,7 +743,10 @@ try {
       }
       console.log(`PASS  standing animation advanced through ${frames.size} frames without blocking`);
     }
-    if (requireMobs) {
+    if (requireMobs && charJob !== 'explorer') {
+      console.log(`INFO  skipping tutorial mob walkthrough for ${charJob} spawn map ${charJobSpawnMaps[charJob]}`);
+    }
+    if (requireMobs && charJob === 'explorer') {
       const initialMapId = await mapId();
       const initialMobCount = await mobCount();
       console.log(`INFO  mob runtime entry map=${initialMapId} count=${initialMobCount}`);

@@ -1,0 +1,261 @@
+# 补丁 0024：Aran 任务链技能组守卫与进图解锁钩子（整文件快照）
+# 背景：上游 21101/21201/21302（Aran 一转任务链）的职业分支判断引用
+#       YamlConfig，本 fork 无 YamlConfig（配置在 ServerConstants，
+#       USE_FULL_ARAN_SKILLSET=false），任务脚本执行到该分支即断链。
+#       补丁 0023 在 QuestActionManager 暴露 useFullAranSkillset()，
+#       本补丁的任务脚本改经 qm.useFullAranSkillset() 读取；另新增
+#       914000000（Aran 出生图）onUserEnter 钩子 aranTutorAlone.js，
+#       解除任务剧情锁定的 UI（unlockUI），使新建战神能立即操作。
+# 改动（4 个脚本，整文件收录）：
+#   scripts/quest/21101.js / 21201.js / 21302.js —— 职业分支守卫改走
+#       qm.useFullAranSkillset()，其余为上游脚本原文；
+#   scripts/map/onUserEnter/aranTutorAlone.js —— 3 行 unlockUI 钩子。
+# 应用（检出根目录，符号链接指向 /data/MapleStory-Server）：
+#   patch -p1 < /data/maplestory-wasm/scripts/server-patches/0024-aran-quest-skillset-guards.patch
+# 备注（快照语义）：上游 checkout 可能已自带同名 quest 脚本而 orig 原文
+#   不可得（无 .git 基线），本补丁按整文件快照留档当前部署内容；重放到
+#   全新检出时若同名文件已存在，请以本补丁内容整文件覆盖。quest 脚本为
+#   运行时解释执行，不影响 dist，无需重编。
+# 验证：
+#   E2E E2E_CHAR_JOB=aran → wire 2、出生图 914000000、起始武器 1442079，
+#   进图后角色可移动（UI 未被剧情锁定）；
+#   grep -n useFullAranSkillset scripts/quest/21101.js scripts/quest/21201.js scripts/quest/21302.js  # 各命中
+#   grep -n unlockUI scripts/map/onUserEnter/aranTutorAlone.js  # 1 处
+#
+--- /dev/null
++++ b/scripts/quest/21101.js
+@@ -0,0 +1,70 @@
++/*
++	This file is part of the OdinMS Maple Story Server
++    Copyright (C) 2008 Patrick Huy <patrick.huy@frz.cc>
++		       Matthias Butz <matze@odinms.de>
++		       Jan Christian Meyer <vimes@odinms.de>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as
++    published by the Free Software Foundation version 3 as published by
++    the Free Software Foundation. You may not use, modify or distribute
++    this program under any other version of the GNU Affero General Public
++    License.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++importPackage(Packages.client);
++importPackage(Packages.config);
++
++status = -1;
++
++function start(mode, type, selection) {
++    status++;
++    if(mode == 0 && type == 0)
++        status -= 2;
++    else if (mode != 1) {
++        if (mode == 0)
++            qm.sendNext("#b（你需要先冷静想一下……）#k");
++        qm.dispose();
++        return;
++    }
++    if (status == 0) {
++        qm.sendYesNo("#b（你确定自己就是挥舞 #p1201001# 的那位英雄吗？是的，你确定。你最好紧紧握住 #p1201001#。它一定会有所反应的。）#k");
++    } else if (status == 1) {
++        if (qm.getPlayer().getJob().getId() == 2000) {
++            if(!qm.canHold(1142129)) {
++                    qm.sendOk("哎呀，你的 #b装备#k 栏已经满了。要完成这个任务，你至少得腾出1个空位。");
++                    qm.dispose();
++                    return;
++            }
++            qm.gainItem(1142129, true);
++            
++            qm.changeJobById(2100);
++            qm.resetStats();
++            
++            if (qm.useFullAranSkillset()) {
++                qm.teachSkill(21000000, 0, 10, -1);   //combo ability
++                qm.teachSkill(21001003, 0, 20, -1);   //polearm booster
++            }
++            
++            qm.completeQuest();
++
++            //qm.getPlayer().changeSkillLevel(SkillFactory.getSkill(20009000), 0, -1);
++            //qm.getPlayer().changeSkillLevel(SkillFactory.getSkill(20009000), 1, 0);
++            //qm.showInfo("You have acquired the Pig's Weakness skill.");
++            qm.sendNextPrev("#b（你好像开始想起些什么了……）#k", 3);
++        }
++    } else if (status == 2) {
++        //qm.warp(914090100, 0);
++        qm.dispose();
++    }
++}
++
++function end(mode, type, selection) {
++}
+\ 文件末尾没有换行符
+--- /dev/null
++++ b/scripts/quest/21201.js
+@@ -0,0 +1,84 @@
++/*
++	This file is part of the OdinMS Maple Story Server
++    Copyright (C) 2008 Patrick Huy <patrick.huy@frz.cc>
++		       Matthias Butz <matze@odinms.de>
++		       Jan Christian Meyer <vimes@odinms.de>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as
++    published by the Free Software Foundation version 3 as published by
++    the Free Software Foundation. You may not use, modify or distribute
++    this program under any other version of the GNU Affero General Public
++    License.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++importPackage(Packages.client);
++importPackage(Packages.config);
++
++var status = -1;
++
++function end(mode, type, selection) {
++    if (mode == -1) {
++        qm.sendNext("喂！至少说一句你试过了嘛！");
++        qm.dispose();
++    } else {
++        if(mode == 0 && type > 0) {
++            qm.sendNext("喂！至少说一句你试过了嘛！");
++            qm.dispose();
++            return;
++        }
++        
++        if (mode == 1)
++            status++;
++        else
++            status--;
++        
++        if (status == 0)
++            qm.sendNext("先是答应要打倒黑魔法师，让我成为名扬天下的武器，然后把我丢下几百年不管，现在居然跟我说你不记得我是谁？这算什么……？！你以为我会就这么算了？当初苦苦哀求、一心想得到我的人可是你！"); //Giant Polearm
++        else if (status == 1)
++            qm.sendNextPrev("我确实说过，如果我能证明自己的实力，就请 #p1203000# 为我打造一把战枪。", 2);
++        else if (status == 2)
++            qm.sendNextPrev("当初那样苦苦哀求，现在难道不该对我多一点关爱和尊敬吗？要知道，像我这样的武器可是稀有而了不起的存在。我可是能助你打倒黑魔法师的终极 #p1201001#。你怎么能把我丢下几百年不管？");
++        else if (status == 3)
++            qm.sendNextPrev("喂，我可从来没有哀求过要得到你。", 2);
++        else if (status == 4)
++            qm.sendNextPrev("什么？你没有哀求过我？哈！ #p1203000# 告诉我，你当时双膝跪地，流着眼泪哀求要得到我，而且……等等。狂狼勇士！你刚刚是不是想起我是谁了？");
++        else if (status == 5)
++            qm.sendNextPrev("也许想起了一点……", 2);
++        else if (status == 6)
++            qm.sendNextPrev("狂狼勇士，真的是你！*呜呜* 等等，*咳咳* 我才没有感动，只是过敏了而已。我知道黑魔法师夺走了你的能力，你现在恐怕连举起我的力气都没有……但至少你还记得我！你的记忆开始恢复了，我真高兴。");
++        else if (status == 7)
++            qm.sendAcceptDecline("就算你失去了记忆，你也依然是我的主人。你过去经历了非常严苛的修炼，我相信你的身体还记得那些苦日子练就的技巧。好吧，我来恢复你的能力！");
++        else if (status == 8) {
++            if(!qm.isQuestCompleted(21201)) {
++                if(!qm.canHold(1142130)) {
++                    qm.sendOk("哎呀，你的 #b装备#k 栏已经满了。要完成这个任务，你至少得腾出1个空位来。");   // thanks MedicOP for finding an issue here
++                    return;
++                }
++
++                qm.gainItem(1142130, true);
++                qm.changeJobById(2110);
++                
++                if (qm.useFullAranSkillset()) {
++                    qm.teachSkill(21100000, 0, 20, -1);   //polearm mastery
++                    qm.teachSkill(21100002, 0, 30, -1);   //final charge
++                    qm.teachSkill(21100004, 0, 20, -1);   //combo smash
++                    qm.teachSkill(21100005, 0, 20, -1);   //combo drain
++                }
++
++                qm.completeQuest();
++            }
++
++            qm.sendNext("你的等级已经不如全盛时期那么高了，所以我无法恢复你全部的旧能力。不过我恢复的这些应该能帮你更快地升级。快去修炼吧，好让你找回昔日的自己。");    
++        } else if (status == 9) {
++            qm.dispose();
++        }
++    }
++}
+\ 文件末尾没有换行符
+--- /dev/null
++++ b/scripts/quest/21302.js
+@@ -0,0 +1,65 @@
++/*
++	This file is part of the OdinMS Maple Story Server
++    Copyright (C) 2008 Patrick Huy <patrick.huy@frz.cc>
++		       Matthias Butz <matze@odinms.de>
++		       Jan Christian Meyer <vimes@odinms.de>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as
++    published by the Free Software Foundation version 3 as published by
++    the Free Software Foundation. You may not use, modify or distribute
++    this program under any other version of the GNU Affero General Public
++    License.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++importPackage(Packages.client);
++importPackage(Packages.config);
++
++var status = -1;
++
++function end(mode, type, selection) {
++    status++;
++    if (mode != 1){
++        if (mode == 0 && type == 1)
++            qm.sendNext("喂！至少说一句你试过了嘛！");
++        qm.dispose();
++        return;
++    }
++    if (status == 0) {
++        qm.sendNext("等等……那不是……你想起红玉的制作方法了？\r\n哇……你虽然又笨又健忘，但正因为这样我才没法抛下你不管。快把红玉交给我吧！"); //Giant Polearm
++    } else if (status == 1) {
++        qm.sendNextPrev("好，既然红玉已经装回我身上了，接下来就让我唤醒你更多的能力吧。我是说，比起上次见面，你的等级已经高了不少，这次我肯定能再多发挥一点魔力！");
++    } else if (status == 2) {
++        if(!qm.isQuestCompleted(21302)) {
++            if(!qm.canHold(1142131)) {
++                qm.sendOk("哎呀，你的 #b装备#k 栏已经满了。要完成这个任务，你至少得腾出1个空位来。");
++                qm.dispose();
++                return;
++            }
++            
++            if(qm.haveItem(4032312, 1)) {
++                qm.gainItem(4032312, -1);
++            }
++            
++            qm.gainItem(1142131, true);
++            qm.changeJobById(2111);
++            
++            if (qm.useFullAranSkillset()) {
++                qm.teachSkill(21110002, 0, 20, -1);   //full swing
++            }
++
++            qm.completeQuest();
++        }
++        
++        qm.sendNext("加油，继续修炼，把你的能力全都找回来，这样我们就能再次一起冒险了！");    
++    } else if (status == 3) {
++        qm.dispose();
++    }
++}
+\ 文件末尾没有换行符
+--- /dev/null
++++ b/scripts/map/onUserEnter/aranTutorAlone.js
+@@ -0,0 +1,3 @@
++function start(ms) {
++	ms.unlockUI();
++}

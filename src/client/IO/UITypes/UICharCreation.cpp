@@ -150,6 +150,12 @@ namespace jrc
         buttons[BT_CHARC_GENDERL] = std::make_unique<MapleButton>(crsrc["BtLeft"], Point<int16_t>(521, 368));
         buttons[BT_CHARC_GEMDERR] = std::make_unique<MapleButton>(crsrc["BtRight"], Point<int16_t>(645, 368));
 
+        // Job selector row pinned below the look board (bottom edge y=492).
+        // The decision buttons move to y=445..486 while customizing, so this
+        // row stays clear of them and of the name-entry button anchors.
+        buttons[BT_CHARC_JOBL] = std::make_unique<MapleButton>(crsrc["BtLeft"], Point<int16_t>(521, 505));
+        buttons[BT_CHARC_JOBR] = std::make_unique<MapleButton>(crsrc["BtRight"], Point<int16_t>(645, 505));
+
         buttons[BT_CHARC_FACEL]->set_active(false);
         buttons[BT_CHARC_FACER]->set_active(false);
         buttons[BT_CHARC_HAIRL]->set_active(false);
@@ -180,6 +186,8 @@ namespace jrc
         shoename = { Text::A11M, Text::CENTER, Text::BLACK };
         wepname = { Text::A11M, Text::CENTER, Text::BLACK };
         gendername = { Text::A11M, Text::CENTER, Text::BLACK };
+        joblabel = { Text::A11M, Text::CENTER, Text::BLACK };
+        joblabel.change_text(CharacterCreation::label(selected_job));
 
         nl::node mkinfo = nl::nx::etc["MakeCharInfo.img"]["Info"];
         for (int32_t i = 0; i < 2; i++)
@@ -265,7 +273,8 @@ namespace jrc
         top = randomizer.next_int(tops[female].size());
         bot = randomizer.next_int(bots[female].size());
         shoe = randomizer.next_int(shoes[female].size());
-        weapon = randomizer.next_int(weapons[female].size());
+        const std::vector<int32_t> weapon_ids = weapon_choices();
+        weapon = randomizer.next_int(weapon_ids.size());
 
         newchar.set_body(skins[female][skin]);
         newchar.set_face(faces[female][face]);
@@ -273,7 +282,7 @@ namespace jrc
         newchar.add_equip(tops[female][top]);
         newchar.add_equip(bots[female][bot]);
         newchar.add_equip(shoes[female][shoe]);
-        newchar.add_equip(weapons[female][weapon]);
+        newchar.add_equip(weapon_ids[weapon]);
 
         bodyname.change_text(newchar.get_body()->get_name());
         facename.change_text(newchar.get_face()->get_name());
@@ -285,6 +294,31 @@ namespace jrc
         shoename.change_text(get_equipname(Equipslot::SHOES));
         wepname.change_text(get_equipname(Equipslot::WEAPON));
         gendername.change_text(female ? "Female" : "Male");
+    }
+
+    std::vector<int32_t> UICharcreation::weapon_choices() const
+    {
+        return CharacterCreation::weapon_pool(selected_job, weapons[female]);
+    }
+
+    void UICharcreation::apply_selected_job()
+    {
+        joblabel.change_text(CharacterCreation::label(selected_job));
+
+        // The branch pools differ in size, so clamp the index when the new
+        // job offers fewer weapons, then re-equip the resolved choice.
+        const std::vector<int32_t> weapon_ids = weapon_choices();
+        if (weapon >= weapon_ids.size())
+        {
+            weapon = 0;
+        }
+        newchar.add_equip(weapon_ids[weapon]);
+        wepname.change_text(get_equipname(Equipslot::WEAPON));
+    }
+
+    int UICharcreation::selected_job_code() const
+    {
+        return CharacterCreation::wire_code(selected_job);
     }
 
     Button::State UICharcreation::button_pressed(uint16_t id)
@@ -354,7 +388,7 @@ namespace jrc
             }
         }
 
-        if (id >= BT_CHARC_FACEL && id <= BT_CHARC_GEMDERR)
+        if (id >= BT_CHARC_FACEL && id <= BT_CHARC_JOBR)
         {
             switch (id)
             {
@@ -429,19 +463,33 @@ namespace jrc
                 shoename.change_text(get_equipname(Equipslot::SHOES));
                 break;
             case BT_CHARC_WEPL:
-                weapon = (weapon > 0) ? weapon - 1 : weapons[female].size() - 1;
-                newchar.add_equip(weapons[female][weapon]);
+            {
+                const std::vector<int32_t> weapon_ids = weapon_choices();
+                weapon = (weapon > 0) ? weapon - 1 : weapon_ids.size() - 1;
+                newchar.add_equip(weapon_ids[weapon]);
                 wepname.change_text(get_equipname(Equipslot::WEAPON));
                 break;
+            }
             case BT_CHARC_WEPR:
-                weapon = (weapon < weapons[female].size() - 1) ? weapon + 1 : 0;
-                newchar.add_equip(weapons[female][weapon]);
+            {
+                const std::vector<int32_t> weapon_ids = weapon_choices();
+                weapon = (weapon < weapon_ids.size() - 1) ? weapon + 1 : 0;
+                newchar.add_equip(weapon_ids[weapon]);
                 wepname.change_text(get_equipname(Equipslot::WEAPON));
                 break;
+            }
             case BT_CHARC_GENDERL:
             case BT_CHARC_GEMDERR:
                 female = !female;
                 randomize_look();
+                break;
+            case BT_CHARC_JOBL:
+                selected_job = CharacterCreation::cycle(selected_job, true);
+                apply_selected_job();
+                break;
+            case BT_CHARC_JOBR:
+                selected_job = CharacterCreation::cycle(selected_job);
+                apply_selected_job();
                 break;
             }
             return Button::MOUSEOVER;
@@ -503,7 +551,7 @@ namespace jrc
 
         CreateCharPacket(
             cname,
-            1,
+            static_cast<uint16_t>(selected_job_code()),
             faces[female][face],
             hairs[female][hair],
             haircolors[female][haircolor],
@@ -511,7 +559,7 @@ namespace jrc
             tops[female][top],
             bots[female][bot],
             shoes[female][shoe],
-            weapons[female][weapon],
+            weapon_choices()[weapon],
             female
         ).dispatch();
     }
@@ -630,6 +678,8 @@ namespace jrc
             wepname.draw(Point<int16_t>(591, 347) + origin);
             gendername.draw(Point<int16_t>(591, 366) + origin);
         }
+
+        joblabel.draw(Point<int16_t>(583, 505) + origin);
     }
 
     void UICharcreation::update()
