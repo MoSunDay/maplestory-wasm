@@ -16,6 +16,7 @@
 // 端口注意：默认 9263（勿用 9259，与 cash-shop-take-reject-retry.mjs 冲突会互杀浏览器）。
 // 用法：node npc-dialog-reopen-flow.mjs   （环境变量 NPCRE_ACCOUNT/PASSWORD/URL/DEBUG_PORT/CARD）
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { clickCharSelectStart } from './support/char-select-entry.mjs';
 
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
 const debugPort = Number(process.env.NPCRE_DEBUG_PORT || 9263);
@@ -137,12 +138,13 @@ try {
   if (!await waitFor(assetsIdle(driver), 60)) throw new Error('char-select assets never idle');
   if (!await waitFor(async () => await probe(driver, 'msui_enabled') === 1, 90))
     throw new Error('char-select input did not unlock (previews settling)');
-  // 选角：单击卡片选中，再单击 BtSelect（hit 区中心 (656,453)，
-  // 坐标推导见 henesys-cindy-gone-flow.mjs；retryClick 抗事件丢弃）。
+  // 选角：单击卡片选中，再单击 BtSelect（锚点随选角屏代际变化，见
+  // support/char-select-entry.mjs：扁平屏中心 (656,453)，079 位图屏 (487,516)；
+  // retryClick 抗事件丢弃）。
   const center = cardCenter(cardIndex);
   await driver.click(center.x, center.y);
   await sleep(400);
-  const entered = await driver.retryClick(656, 453, uiStateIs(driver, uiState.game));
+  const entered = await clickCharSelectStart(driver, uiStateIs(driver, uiState.game));
   if (!entered && !await waitFor(uiStateIs(driver, uiState.game), 60)) throw new Error('did not enter game');
   if (!await waitFor(assetsIdle(driver), 120)) throw new Error('game assets never idle');
   if (!await waitFor(async () => await probe(driver, 'msui_enabled') === 1, 60))

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../UIElement.h"
+#include "../CharacterSelect/CharSelect079Layout.h"
 #include "../CharacterSelect/CharSelectModernLayout.h"
 
 #include "../Components/Charset.h"
@@ -25,6 +26,7 @@
 
 #include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Sprite.h"
+#include "../../Graphics/Texture.h"
 #include "../../Net/Login.h"
 
 #include <exception>
@@ -58,6 +60,11 @@ namespace jrc
 
         const CharEntry& get_character(int32_t cid);
 
+        // True when the screen is driven by the injected 079MAX4 bitmap
+        // art. Browser layout checks read this through ImeBridge to pick
+        // between the bitmap and the flat contract.
+        bool uses_bitmap_ui() const { return bitmap_ui; }
+
     private:
         enum class PicAction
         {
@@ -72,6 +79,12 @@ namespace jrc
         void send_selection();
         void send_deletion();
         void initialize_ui();
+        void initialize_bitmap_ui();
+        void initialize_modern_ui();
+        static Text& level_label();
+        void draw_bitmap(float alpha) const;
+        void draw_modern(float alpha) const;
+        void update_bitmap_values();
         void load_next_preview();
         void resolve_preview(size_t index, character_preview::LoadState state);
         void complete_previews_if_ready();
@@ -100,6 +113,24 @@ namespace jrc
         Charset levelset;
         nl::node nametag;
         Text slotcountlabel;
+
+        // 079 bitmap-screen extras. The card captions are baked into
+        // charInfo1, so these only carry the character-specific values.
+        bool bitmap_ui;
+        bool info_has_rank_rows;
+        Texture jobicon;
+        Texture rankmoveicon;
+        Texture jobrankmoveicon;
+        Text bitmapname;
+        Text jobvalue;
+        Text levelvalue;
+        Text famevalue;
+        Text strvalue;
+        Text intvalue;
+        Text dexvalue;
+        Text lukvalue;
+        Text rankvalue;
+        Text jobrankvalue;
 
         Point<int16_t> slotcountpos;
 
@@ -133,13 +164,16 @@ namespace jrc
             Text t;
             Text b;
 
-            OutlinedText(Text::Font font, Text::Alignment alignment)
+            OutlinedText(Text::Font font,
+                         Text::Alignment alignment,
+                         Text::Color inner_color = Text::WHITE,
+                         Text::Color outline_color = Text::DARKGREY)
             {
-                inner = Text(font, alignment, Text::WHITE);
-                l     = Text(font, alignment, Text::DARKGREY);
-                r     = Text(font, alignment, Text::DARKGREY);
-                t     = Text(font, alignment, Text::DARKGREY);
-                b     = Text(font, alignment, Text::DARKGREY);
+                inner = Text(font, alignment, inner_color);
+                l     = Text(font, alignment, outline_color);
+                r     = Text(font, alignment, outline_color);
+                t     = Text(font, alignment, outline_color);
+                b     = Text(font, alignment, outline_color);
             }
 
             OutlinedText() = default;

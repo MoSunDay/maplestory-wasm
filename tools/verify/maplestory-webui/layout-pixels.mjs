@@ -15,6 +15,10 @@
 // (canvas #canvas) via requestAnimationFrame + gl.readPixels, with the
 // backing-buffer scale canvas.width/800, a Y-flip, and FRAMEBUFFER binding
 // save/restore - the proven pattern from gm-shop-flow.mjs.
+// Two char-select contracts share this sampler: the 2023 flat fallback
+// asserted below, and the 079MAX4 bitmap screen asserted by
+// layout-pixels-charselect079.mjs. run.mjs dispatches on the
+// msui_charselect_bitmap wasm probe (1 = bitmap, 0 = flat fallback).
 
 async function evaluateAwait(driver, expression) {
   const result = await driver.send('Runtime.evaluate', {
@@ -30,8 +34,9 @@ async function evaluateAwait(driver, expression) {
 // game render pass and before compositing clears the drawing buffer. One
 // readPixels covers the bounding box of all requested rects; the game GL
 // state is left untouched. Rects are game-coord {name, x0, y0, x1, y1} in
-// the 800x600 space and resolve to mean luminance (0-255). Coverage is
-// exact for top-based rows y0..y1 inclusive, so the readPixels y origin is
+// the 800x600 space and resolve to mean luminance (0-255) plus mean
+// [r, g, b] channels from that same readback. Coverage is exact for
+// top-based rows y0..y1 inclusive, so the readPixels y origin is
 // canvas.height - 1 - y1 (not canvas.height - y1, which reads one row high).
 // view 默认 800x600（登录链各屏的固定布局）；游戏内分辨率不同的调用方
 // 需传入实际 view 尺寸，缩放映射才会落到正确的 backing-buffer 像素。
@@ -59,24 +64,35 @@ function samplerExpression(rects, view = { width: 800, height: 600 }) {
       gl.readPixels(x0, canvas.height - 1 - y1, width, height,
         gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       gl.bindFramebuffer(gl.FRAMEBUFFER, boundFrameBuffer);
-      const luminance = (x, y) => {
-        const column = mapX(x) - x0, row = mapY(y) - y0;
-        const offset = ((height - 1 - row) * width + column) * 4;
-        return (pixels[offset] + pixels[offset + 1] + pixels[offset + 2]) / 3;
-      };
       const round = value => Math.round(value * 100) / 100;
+      // One accumulation pass per rect over the shared pixel buffer: the
+      // luminance sum keeps the historical (r+g+b)/3 arithmetic verbatim so
+      // sampleLuminance is unchanged, and the same loop feeds the rgb sums
+      // sampleChannels needs (no second readPixels).
       const regionMean = rect => {
-        let total = 0, samples = 0;
+        let total = 0, red = 0, green = 0, blue = 0, samples = 0;
         for (let y = rect.y0; y <= rect.y1; y += 1)
           for (let x = rect.x0; x <= rect.x1; x += 1) {
-            total += luminance(x, y);
+            const column = mapX(x) - x0, row = mapY(y) - y0;
+            const offset = ((height - 1 - row) * width + column) * 4;
+            const sampleRed = pixels[offset], sampleGreen = pixels[offset + 1],
+              sampleBlue = pixels[offset + 2];
+            total += (sampleRed + sampleGreen + sampleBlue) / 3;
+            red += sampleRed; green += sampleGreen; blue += sampleBlue;
             samples += 1;
           }
-        return round(total / samples);
+        return {
+          luminance: round(total / samples),
+          channels: [round(red / samples), round(green / samples), round(blue / samples)]
+        };
       };
-      const means = {};
-      for (const rect of config.rects) means[rect.name] = regionMean(rect);
-      resolve({ means });
+      const means = {}, channels = {};
+      for (const rect of config.rects) {
+        const region = regionMean(rect);
+        means[rect.name] = region.luminance;
+        channels[rect.name] = region.channels;
+      }
+      resolve({ means, channels });
     });
   }))()`;
 }
@@ -91,6 +107,19 @@ export async function sampleLuminance(driver, rects, view) {
   return sample.means;
 }
 
+// Channel sampler sharing the exact same single readPixels pass: returns a
+// map name -> mean [r, g, b] (0-255, 2 decimals) per rect, so colour
+// contracts cost no extra frame readback. Luminance of a rect can be
+// derived from these means (mean of the three channel means equals the
+// mean luminance), which keeps colour + luminance checks on one frame.
+export async function sampleChannels(driver, rects, view) {
+  const sample = await evaluateAwait(driver, samplerExpression(rects, view));
+  if (!sample || !sample.channels) {
+    throw new Error(`layout channel sampling failed: ${JSON.stringify(sample)}`);
+  }
+  return sample.channels;
+}
+
 // World-select: the Nova button bitmap lands at (664,59)-(760,85) in the top
 // sidebar slot; the pre-49e4dc6 hardcoded anchor plus baked origin left it
 // in the mid-low area that must now be plain background.
@@ -100,7 +129,9 @@ const worldSelectRects = Object.freeze([
   { name: 'sidebarBg', x0: 665, y0: 141, x1: 759, y1: 169 }
 ]);
 
-function requireMargin(failures, label, value, reference, minimum) {
+// Shared luminance gate: the flat contract below and the 079 bitmap
+// contract in layout-pixels-charselect079.mjs both report margins this way.
+export function requireMargin(failures, label, value, reference, minimum) {
   const margin = Math.round((value - reference) * 100) / 100;
   if (margin < minimum) {
     failures.push(`${label}: ${value} - ${reference} = ${margin} (need >= ${minimum})`);
@@ -119,21 +150,23 @@ export async function assertWorldSelectNovaTopSlot(driver) {
   console.log(`PASS  world-select Nova pinned to sidebar top slot ${JSON.stringify(means)}`);
 }
 
-// Char-select 2023 flat chrome. Everything the game draws - NX sprites
-// and flat drawrectangle panels alike - passes through the same vertex
-// shader with VIEWYOFFSET=10, so design position (x,y) lands on canvas
-// row y+10; the rects below are canvas rows and bake that shift in. The
-// flat panels are near-black translucent fills, so every chrome check
-// pairs a bright backdrop reference with the dark panel it flanks and
-// requires reference - panel margins: sky above the top bar vs inside
-// the bar (~67), the roster stage band vs the dark info card beside it
-// (~97) and vs the plain backdrop strip above the band (~53, that one
-// fails if the translucent band is ever dropped and is guarded like the
-// nametag below because an empty roster flips its margin), the deck right of the
-// footer vs inside the footer (~78) and the bright deck left of START vs
-// the button art over its dark backing (~45). The roster keeps the
-// unchanged single-row layout (feet at (130+120i,270) canvas, page
-// arrows at (46,240)/(533,240) design), the top-right stack keeps the
+// Char-select 2023 flat chrome (the fallback path; the 079MAX4 bitmap
+// screen is asserted by layout-pixels-charselect079.mjs instead).
+// Everything the game draws - NX sprites and flat drawrectangle panels
+// alike - passes through the same vertex shader with VIEWYOFFSET=10, so
+// design position (x,y) lands on canvas row y+10; the rects below are
+// canvas rows and bake that shift in. The flat panels are near-black
+// translucent fills, so every chrome check pairs a bright backdrop
+// reference with the dark panel it flanks and requires reference - panel
+// margins: sky above the top bar vs inside the bar (~67), the roster
+// stage band vs the dark info card beside it (~97) and vs the plain
+// backdrop strip above the band (~53, that one fails if the translucent
+// band is ever dropped and is guarded like the nametag below because an
+// empty roster flips its margin), the deck right of the footer vs inside
+// the footer (~78) and the bright deck left of START vs the button art
+// over its dark backing (~45). The roster keeps the unchanged single-row
+// layout (feet at (130+120i,270) canvas, page arrows at
+// (46,240)/(533,240) design), the top-right stack keeps the
 // post-Chaos world banner (578,42) design anchor and the NX-positioned
 // count window, so the banner/gap/window margins from the anchor fix
 // still apply. bgAbove samples the strip between the card tops and the

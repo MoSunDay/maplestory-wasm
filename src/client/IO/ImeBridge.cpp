@@ -7,6 +7,7 @@
 #include "UITypes/UICharCreation.h"
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UIWorldSelect.h"
+#include "UITypes/UICharSelect.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UINotice.h"
 #include "UITypes/Quest/UIQuestDialog.h"
@@ -198,6 +199,14 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE int msui_enabled()
     {
         return jrc::UI::get().is_enabled() ? 1 : 0;
+    }
+
+    // Tells the browser layout checks which char-select art generation is
+    // mounted: 1 for the 079MAX4 bitmap screen, 0 for the flat fallback.
+    EMSCRIPTEN_KEEPALIVE int msui_charselect_bitmap()
+    {
+        auto select = jrc::UI::get().get_element<jrc::UICharSelect>();
+        return select && select->uses_bitmap_ui() ? 1 : 0;
     }
 
     EMSCRIPTEN_KEEPALIVE int mscharlist_phase()

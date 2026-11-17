@@ -25,9 +25,6 @@
 #include "UILoginNotice.h"
 
 #include "../UI.h"
-#include "../Components/MapleButton.h"
-#include "../Components/AreaButton.h"
-#include "../CharacterSelect/CharSelectModernPanels.h"
 
 #include "../../Constants.h"
 #include "../../Configuration.h"
@@ -44,22 +41,14 @@ namespace jrc
     namespace
     {
         constexpr const char* AUTO_PIC = "1010";
-
-        // Fallback Lv marker when the UI.nx ships no lv charset: a plain
-        // label. Function local static because Text caches its layout and
-        // change_text() is a no-op while the level stays the same.
-        Text& level_label()
-        {
-            static Text label{ Text::A11M, Text::CENTER, Text::WHITE };
-            return label;
-        }
     }
 
     UICharSelect::UICharSelect(std::vector<CharEntry> cs,
                                uint8_t s,
                                uint8_t ch,
                                int8_t p)
-        : characters(std::move(cs)), require_pic(p), channel_id(ch),
+        : bitmap_ui(false), info_has_rank_rows(false),
+          characters(std::move(cs)), require_pic(p), channel_id(ch),
           pending_pic_action(PicAction::NONE), pending_pic_cid(-1),
           preview_ready(0), preview_completion_announced(false),
           ui_initialized(false), ui_failed(false),
@@ -86,193 +75,6 @@ namespace jrc
     void UICharSelect::update_screen(int16_t, int16_t)
     {
         position = ui_layout::origin();
-    }
-
-    void UICharSelect::initialize_ui()
-    {
-        namespace layout = charselect_modern;
-
-        nl::node back       = nl::nx::map["Back"]["login.img"]["back"];
-        nl::node title      = nl::nx::ui["Login.img"]["Title"];
-        nl::node common     = nl::nx::ui["Login.img"]["Common"];
-        nl::node charselect = charselect_nodes::root();
-
-        // Backdrop and frame are shared login-chain art; the 2023 chrome
-        // is drawn procedurally on top of them.
-        if (back["11"])
-        {
-            sprites.emplace_back(back["11"], Point<int16_t>(360, 313));
-        }
-        else if (back["0"])
-        {
-            sprites.emplace_back(back["0"], Point<int16_t>(400, 300));
-        }
-
-        // Keep legacy world-select art as an optional overlay.
-        if (title["worldsel"])
-        {
-            sprites.emplace_back(title["worldsel"]);
-        }
-
-        if (common["frame"])
-        {
-            sprites.emplace_back(common["frame"], Point<int16_t>(400, login_frame_y()));
-        }
-        else
-        {
-            Console::get().print("[UICharSelect] Missing Login.img/Common/frame for this UI.nx variant.");
-        }
-
-        // NX accent: the world banner sits under the flat top bar.
-        sprites.emplace_back(common["selectWorld"], layout::WORLD_BANNER_POS);
-        if (charselect["selectedWorld"])
-        {
-            sprites.emplace_back(charselect["selectedWorld"]["icon"]["15"], layout::WORLD_BANNER_POS);
-            sprites.emplace_back(charselect["selectedWorld"]["name"]["15"], layout::WORLD_BANNER_POS);
-            sprites.emplace_back(charselect["selectedWorld"]["ch"][channel_id], layout::WORLD_BANNER_POS);
-        }
-        else
-        {
-            Console::get().print("[UICharSelect] Missing Login.img/CharSelect/selectedWorld for this UI.nx variant.");
-        }
-
-        // NX accent: the slot count window. Without it the count label
-        // falls back into the top bar.
-        if (charselect["charSlot"])
-        {
-            nl::node charslot = charselect["charSlot"];
-            Point<int16_t> charslotpos = charslot["pos"];
-            sprites.emplace_back(charslot["0"], charslotpos);
-            slotcountpos = charslotpos + Point<int16_t>(charslot["numberpos"]);
-        }
-        else
-        {
-            Console::get().print("[UICharSelect] Missing Login.img/CharSelect/charSlot for this UI.nx variant.");
-            slotcountpos = layout::COUNT_FALLBACK_POS;
-        }
-        slotcountlabel = { Text::A11M, Text::RIGHT, Text::WHITE };
-
-        emptyslot    = charselect_nodes::empty_slot();
-        charplatform = charselect_nodes::platform();
-        nametag      = charselect["nameTag"];
-
-        buttons[BT_SELECTCHAR] = std::make_unique<MapleButton>(
-            charselect["BtSelect"], layout::START_POS);
-        buttons[BT_CREATECHAR] = std::make_unique<MapleButton>(
-            charselect["BtNew"], layout::CREATE_POS);
-        buttons[BT_DELETECHAR] = std::make_unique<MapleButton>(
-            charselect["BtDelete"], layout::DELETE_POS);
-        buttons[BT_PAGELEFT]   = std::make_unique<MapleButton>(
-            charselect["pageL"], layout::PAGE_ARROW_LEFT_POS);
-        buttons[BT_PAGERIGHT]  = std::make_unique<MapleButton>(
-            charselect["pageR"], layout::PAGE_ARROW_RIGHT_POS);
-
-        for (uint8_t i = 0; i < PAGESIZE; ++i)
-        {
-            buttons[BT_CHAR0 + i] = std::make_unique<AreaButton>(
-                layout::slot_hotzone_pos(i),
-                layout::slot_hotzone_dim()
-            );
-        }
-
-        levelset = { charselect["lv"], Charset::CENTER };
-        if (!charselect_nodes::has_level_charset())
-        {
-            Console::get().print("[UICharSelect] Missing Login.img/CharSelect/lv charset; falling back to a plain level label.");
-        }
-
-        namelabel = { Text::A18M, Text::CENTER };
-        for (size_t i = 0; i < NUM_LABELS; ++i)
-        {
-            infolabels[i] = { Text::A11M, Text::RIGHT };
-        }
-
-        nametags.reserve(characters.size());
-        for (const auto& entry : characters)
-        {
-            nametags.emplace_back(nametag, Text::A13M, Text::WHITE, entry.stats.name);
-        }
-
-        update_counts();
-        update_selection();
-    }
-
-    void UICharSelect::draw(float alpha) const
-    {
-        if (!ui_initialized)
-        {
-            UIElement::draw(alpha);
-            return;
-        }
-
-        namespace layout = charselect_modern;
-
-        // Layer order: backdrop sprites, flat chrome, button backings,
-        // NX buttons, then the roster and the info card content on top.
-        draw_sprites(alpha);
-        charselect_panels::draw_chrome(position);
-        charselect_panels::draw_start_backing(
-            position, buttons.at(BT_SELECTCHAR)->get_state());
-        charselect_panels::draw_footer_backing(
-            position,
-            buttons.at(BT_CREATECHAR)->get_state(),
-            buttons.at(BT_DELETECHAR)->get_state()
-        );
-        draw_buttons(alpha);
-
-        slotcountlabel.draw(slotcountpos + position);
-
-        for (uint8_t i = 0; i < charcount_relative; ++i)
-        {
-            const Point<int16_t> charpos = layout::char_slot_pos(i) + position;
-            const uint8_t index = i + page * PAGESIZE;
-            charselect_panels::draw_slot_highlight(
-                position, i, i == selected_relative,
-                buttons.at(static_cast<uint16_t>(BT_CHAR0 + i))->get_state()
-            );
-            charplatform.draw(charpos + layout::PLATFORM_OFFSET, alpha);
-            draw_preview(index, charpos, alpha);
-            nametags[index].draw(charpos + layout::NAMETAG_OFFSET);
-        }
-
-        for (uint8_t i = charcount_relative; i < slots_relative; ++i)
-        {
-            const Point<int16_t> position_slot = layout::char_slot_pos(i) + position;
-            charplatform.draw(position_slot + layout::PLATFORM_OFFSET, alpha);
-            emptyslot.draw(position_slot, alpha);
-        }
-
-        if (selected_absolute < charcount_absolute &&
-            selected_absolute < characters.size())
-        {
-            const StatsEntry& stats = characters[selected_absolute].stats;
-
-            if (charselect_nodes::has_level_charset())
-            {
-                const std::string levelstr =
-                    std::to_string(stats.stats[Maplestat::LEVEL]);
-                const int16_t lvx = levelset.draw(
-                    levelstr, layout::CARD_LV_POS + position);
-                levelset.draw(
-                    'l',
-                    layout::CARD_LV_POS +
-                        Point<int16_t>(-8 - lvx / 2, 0) + position);
-            }
-            else
-            {
-                Text& lvlabel = level_label();
-                lvlabel.change_text(
-                    "Lv. " + std::to_string(stats.stats[Maplestat::LEVEL]));
-                lvlabel.draw(layout::CARD_LV_POS + position);
-            }
-
-            namelabel.draw(layout::CARD_NAME_POS + position);
-
-            for (size_t i = 0; i < NUM_LABELS; ++i)
-            {
-                infolabels[i].draw(layout::card_label_pos(i) + position);
-            }
-        }
     }
 
     void UICharSelect::update()
@@ -453,6 +255,8 @@ namespace jrc
         {
             infolabels[i].change_text(get_label_string(i));
         }
+
+        update_bitmap_values();
     }
 
     void UICharSelect::update_counts()

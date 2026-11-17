@@ -245,8 +245,14 @@ def decode_pixels(node: dict) -> bytes:
     if node["format"] == FMT_RGB565:
         return rgb565_to_rgba(raw, w, h)
     if node["format"] == FMT_ARGB8888:
-        return b"".join(raw[i + 2] + raw[i + 1] + raw[i] + raw[i + 3]
-                        for i in range(0, len(raw), 4))  # BGRA -> RGBA
+        # The stored bytes are BGRA; swizzle into RGBA.  Slicing beats a
+        # per-pixel loop for the full-screen 079 backdrops.
+        out = bytearray(len(raw))
+        out[0::4] = raw[2::4]
+        out[1::4] = raw[1::4]
+        out[2::4] = raw[0::4]
+        out[3::4] = raw[3::4]
+        return bytes(out)
     raise ValueError(f"format {node['format']} not supported")
 
 

@@ -102,6 +102,35 @@ def read_prop_string(data: bytes, pos: int) -> tuple[str, int]:
 # tree readers (canvas extended with the flag==0 no-properties layout)
 # ---------------------------------------------------------------------------
 
+def _is_zlib_header(payload: bytes) -> bool:
+    """True for a classic zlib stream header (0x78Cm, check bits valid)."""
+    return len(payload) >= 2 and payload[0] == 0x78 and (payload[0] << 8 | payload[1]) % 31 == 0
+
+
+def _inflate_chunked(payload: bytes, key: bytes) -> bytes:
+    """Inflate the chunked canvas layout used by ``UI/Login.img``.
+
+    ``[u32 chunk_len][key-XOR'd zlib segment]`` repeated to EOF; every chunk
+    restarts the XOR stream at key offset 0 and feeds the same inflater (the
+    final deflate block marker is omitted, so ``eof`` never becomes true).
+    """
+    inflater = zlib.decompressobj()
+    raw = b''
+    pos = 0
+    while pos < len(payload):
+        if pos + 4 > len(payload):
+            raise ValueError(f'truncated canvas chunk header at 0x{pos:x}')
+        size = struct.unpack_from('<I', payload, pos)[0]
+        pos += 4
+        chunk = payload[pos : pos + size]
+        if len(chunk) != size:
+            raise ValueError(f'truncated canvas chunk at 0x{pos:x}')
+        pos += size
+        stream = bytes(b ^ key[i % len(key)] for i, b in enumerate(chunk))
+        raw += inflater.decompress(stream)
+    return raw
+
+
 def read_canvas(data: bytes, pos: int) -> tuple[dict, int]:
     """Canvas block: pad, u8 flag, [u16 pad + property list when flag==1],
     then the bitmap header."""
@@ -143,9 +172,11 @@ def read_canvas(data: bytes, pos: int) -> tuple[dict, int]:
         body = payload[10:]
         stream = bytes(b ^ KMS_KEY[i] for i, b in enumerate(payload[4:6]))
         stream += bytes(b ^ KMS_KEY[i] for i, b in enumerate(body))
+        raw = zlib.decompressobj().decompress(stream)
+    elif _is_zlib_header(payload):
+        raw = zlib.decompressobj().decompress(payload)
     else:
-        stream = payload
-    raw = zlib.decompressobj().decompress(stream)
+        raw = _inflate_chunked(payload, KMS_KEY)
     if len(raw) < need:
         raise ValueError(f"canvas {width}x{height}: got {len(raw)} px bytes, want {need}")
     # Map-family imgs inflate to exactly 2*w*h*4 with the image in the first

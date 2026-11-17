@@ -39,6 +39,7 @@
 // SJ_DEBUG_PORT/SJ_CARD；端口默认 9264，勿与 9259/9263 冲突）。
 import { BrowserDriver, sleep } from './cdp.mjs';
 import { clickDialogButton } from './pq-harness-dialog.mjs';
+import { clickCharSelectStart } from './support/char-select-entry.mjs';
 
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
 const debugPort = Number(process.env.SJ_DEBUG_PORT || 9264);
@@ -186,10 +187,13 @@ try {
   if (!await waitFor(assetsIdle(driver), 60)) throw new Error('char-select assets never idle');
   if (!await waitFor(async () => await probe(driver, 'msui_enabled') === 1, 90))
     throw new Error('char-select input did not unlock');
+  // 选角：单击卡片选中，再单击 BtSelect（锚点随选角屏代际变化，见
+  // support/char-select-entry.mjs：扁平屏中心 (656,453)，079 位图屏 (487,516)）。
   const center = cardCenter(cardIndex);
   await driver.click(center.x, center.y);
   await sleep(400);
-  const entered = await driver.retryClick(656, 453, async () => await probe(driver, 'msui_state') === uiState.game);
+  const entered = await clickCharSelectStart(driver,
+    async () => await probe(driver, 'msui_state') === uiState.game);
   if (!entered && !await waitFor(async () => await probe(driver, 'msui_state') === uiState.game, 60))
     throw new Error('did not enter game');
   const entryMapId = await mapId(driver);

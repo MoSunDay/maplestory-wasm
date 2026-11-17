@@ -42,6 +42,14 @@ CDP 输入在资产流高负载下会整击丢失，因此关键交互使用 `cd
 
 `UICharSelect` 在 CHARLIST 到达后仍需若干帧完成 nx 驱动的 `initialize_ui()`；`ui_initialized` 置位前的 `doubleclick` 会被静默丢弃且客户端不会重发——单发双击的脚本会永远停在选人界面：服务端日志停在 CHARLIST（PLAYER_LOGIN 从未发出）、页面存活但无新请求、state 恒为 3。另一已知成因是 Window.cpp 双击窗口 350ms/4px 在 WASM 忙时超窗（见下文辛迪冒烟段）。进游戏一律用重试循环：最多 4 轮「双击卡片热区 + 轮询 `msui_state==5` 各 1s×5」（cash-shop-take-equip/slots 即此写法），或 state 3 后先稳等数秒再双击。
 
+单击 BtSelect 进游戏的脚本还要注意两代选角屏的按钮锚点不同：扁平屏的
+`BtSelect` sprite 140x52，hit 区 (586,427)-(726,479)，中心 (656,453)；
+079MAX4 位图屏把它换成页脚的 94x43 sprite，锚在 `START_POS (440,495)`，
+中心 (487,516)。这类流程统一调用
+`support/char-select-entry.mjs` 的 `clickCharSelectStart(driver, predicate, ...)`，
+由只读探针 `msui_charselect_bitmap` 选择锚点（探针缺失时退回扁平锚点），
+不要硬编码 (656,453)。
+
 ## 好友与组队双账号流程
 
 `social-flow.mjs` 要求两个独立测试账号，驱动两个真实 WASM 客户端完成好友请求/接受/拒绝/删除、好友聊天、离线/上线同步，以及组队创建、邀请拒绝、重新邀请加入、成员快照、队聊、HP、队长转让、踢出和解散。远端人物卡 `BtParty` 与右键菜单「组队邀请」行分别发起邀请并验证拒绝后清理；流程通过正常 UI 清理其好友和队伍状态，不直接改数据库。最近一次双账号完整运行全部断言通过，覆盖上述两条邀请入口、好友全链路、组队全生命周期、好友删除与被拒申请清理。
@@ -303,10 +311,11 @@ x≈34）对话里菜单爱心 `#fEffect/CharacterEff/1062114/1/0#` 的端到端
 对话（`msnpc_active=1`），负向断言辛迪原位（x=424 ±120px）Space 不产生对话。
 选角不用 doubleClick——Window.cpp 双击窗口 350ms/4px，WASM 忙时两次
 glfwPollEvents 间隔易超窗（服务端日志停在 CHARLIST 即此症状）；改为单击
-卡片热区 + 单击 BtSelect。注意本仓 UI.nx 为 post-Chaos 资产
-（Login.img/WorldSelect/BtChannel marker），BtSelect 锚点 =
-charinfopos(662,355)+(-76,72)，sprite 140x52 origin(0,0)，hit 区
-(586,427)-(726,479)，点击 (656,453)。busy renderer 会丢 CDP 输入，务必用
+卡片热区 + 单击 BtSelect。BtSelect 锚点随选角屏代际变化：扁平屏为
+charinfopos(662,355)+(-76,72)，hit 区 (586,427)-(726,479)，点击 (656,453)；
+079 位图屏为页脚 (440,495) 的 94x43 sprite，点击 (487,516)。流程统一走
+`support/char-select-entry.mjs` 的 `clickCharSelectStart()`，由
+`msui_charselect_bitmap` 探针分派。busy renderer 会丢 CDP 输入，务必用
 retryClick。环境变量 `CINDY_ACCOUNT/PASSWORD/CARD/URL/DEBUG_PORT`；前置 SQL
 把 card0 角色迁回 100000000 sp=0 并清 loggedin。回滚数据见
 features/changelog/2026-10-28/cindy-9200000-life-entries.json。

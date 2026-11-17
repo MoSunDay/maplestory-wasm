@@ -95,21 +95,33 @@ namespace nl
 			return nullptr;
 		_file_data* fd = static_cast<_file_data*>(m_file);
 
+		// Blob layout: u32 compressed length, then the LZ4 block. Read that
+		// exact block instead of the 4*w*h upper bound - for the last bitmap
+		// in an archive the bound runs past end of file, io_read rejects the
+		// short range and the image silently never loads.
+		uint8_t lenbuf[4];
+		if (!io_read(fd, reinterpret_cast<char*>(lenbuf), sizeof(lenbuf), m_offset))
+			return nullptr;
+
+		const uint32_t compressed = static_cast<uint32_t>(lenbuf[0])
+			| (static_cast<uint32_t>(lenbuf[1]) << 8)
+			| (static_cast<uint32_t>(lenbuf[2]) << 16)
+			| (static_cast<uint32_t>(lenbuf[3]) << 24);
+		if (compressed == 0)
+			return nullptr;
+
 		auto const l = length();
 		if (l + 0x20 > bitmap_buf.size())
 			bitmap_buf.resize(l + 0x20);
 
-		uint64_t data_offset = m_offset + 4;
-
-		uint32_t read_len = l;
-		std::vector<char> src_buf(read_len);
-
-		if (!io_read(fd, src_buf.data(), read_len, data_offset))
+		std::vector<char> src_buf(compressed);
+		if (!io_read(fd, src_buf.data(), compressed, m_offset + 4))
 			return nullptr;
 
 		::LZ4_decompress_fast(src_buf.data(), bitmap_buf.data(), static_cast<int>(l));
 		return bitmap_buf.data();
 	}
+
 	uint16_t bitmap::width() const
 	{
 		return m_width;

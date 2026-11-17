@@ -14,6 +14,7 @@
 // 用法：node henesys-empty-house-flow.mjs  （MAP/ACCOUNT/PASSWORD/CARD/SPAWN/URL/DEBUG_PORT 可用环境变量覆盖）
 import { BrowserDriver, sleep } from './cdp.mjs';
 import { sqlExec, sqlQuery, waitAccountFree } from './pq-harness-db.mjs';
+import { clickCharSelectStart } from './support/char-select-entry.mjs';
 
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
 const debugPort = Number(process.env.HOUSE_DEBUG_PORT || 9261);
@@ -104,11 +105,12 @@ async function main() {
     if (!await waitFor(async () => await probe(driver, 'msui_enabled') === 1, 90))
       throw new Error('char-select UI never enabled');
 
-    // 选角：单击卡片选中，再单击 BtSelect（热区中心 (656,453)，与
-    // henesys-cindy-gone-flow.mjs 实测一致）。
+    // 选角：单击卡片选中，再单击 BtSelect。锚点随选角屏代际变化
+    // （support/char-select-entry.mjs）：扁平屏热区中心 (656,453)，079 位图屏
+    // 按钮 94x43 于 (440,495) → 中心 (487,516)。
     await driver.click(105 + 120 * cardIndex + 25, 210);
     await sleep(400);
-    const entered = await driver.retryClick(656, 453,
+    const entered = await clickCharSelectStart(driver,
       async () => await probe(driver, 'msui_state') === uiState.game, 8, 4000);
     if (!entered) throw new Error(`game UI did not activate (card ${cardIndex})`);
     if (!await waitFor(assetsIdle(driver), 150)) throw new Error('in-game assets never idle');

@@ -7,6 +7,7 @@
 //   update characters set map=100000000, spawnpoint=0 where name='test1Hero';
 // 用法：node henesys-cindy-gone-flow.mjs   （环境变量 CINDY_ACCOUNT/PASSWORD/URL/DEBUG_PORT/CARD）
 import { BrowserDriver, sleep } from './cdp.mjs';
+import { clickCharSelectStart } from './support/char-select-entry.mjs';
 
 const chromeBinary = process.env.CHROME_BIN || '/usr/bin/chromium-browser';
 const debugPort = Number(process.env.CINDY_DEBUG_PORT || 9257);
@@ -101,16 +102,17 @@ try {
   if (!await waitFor(async () => await probe(driver, 'msui_enabled') === 1, 90))
     throw new Error('char-select input did not unlock (previews settling)');
   // 选角：单击卡片选中（AreaButton 热区 (100+120i,160)-(160+120i,280)，
-  // UICharSelectLayout.h 实测），再单击 BtSelect。本环境 UI.nx 是
-  // post-Chaos 资产（Login.img/WorldSelect/BtChannel marker 存在），按钮
-  // 锚点 = charinfopos(662,355)+(-76,72)，sprite 140x52 origin(0,0) →
-  // hit 区 (586,427)-(726,479)，中心 (656,453)。不用 doubleClick：
-  // Window.cpp 双击窗口 350ms/4px，WASM 忙时两次 glfwPollEvents 间隔
-  // 易超窗，服务端日志会停在 CHARLIST。用 retryClick 抗事件丢弃。
+  // UICharSelectLayout.h 实测），再单击 BtSelect。按钮锚点随选角屏代际变化
+  // （support/char-select-entry.mjs）：2023 扁平屏 sprite 140x52 origin(0,0)
+  // 锚点 = charinfopos(662,355)+(-76,72) → hit 区 (586,427)-(726,479)，
+  // 中心 (656,453)；079MAX4 位图屏 sprite 94x43 于 (440,495) → 中心 (487,516)。
+  // 不用 doubleClick：Window.cpp 双击窗口 350ms/4px，WASM 忙时两次
+  // glfwPollEvents 间隔易超窗，服务端日志会停在 CHARLIST。用 retryClick
+  // 抗事件丢弃。
   const center = cardCenter(cardIndex);
   await driver.click(center.x, center.y);
   await sleep(400);
-  const entered = await driver.retryClick(656, 453, uiStateIs(driver, uiState.game), 8, 4000);
+  const entered = await clickCharSelectStart(driver, uiStateIs(driver, uiState.game), 8, 4000);
   if (!entered) throw new Error(`game UI did not activate (card ${cardIndex})`);
   if (!await waitFor(assetsIdle(driver), 150)) throw new Error('in-game assets never idle');
 

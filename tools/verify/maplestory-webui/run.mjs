@@ -4,6 +4,7 @@ import { cleanupResidualCharacter } from './support/char-cleanup-fixture.mjs';
 import { assertCreatedCharacterWeapon } from './support/char-weapon-fixture.mjs';
 import { verifyImeChatFlow } from './ime-chat-flow.mjs';
 import { assertCharSelectModernLayout, assertWorldSelectNovaTopSlot } from './layout-pixels.mjs';
+import { assertCharSelectBitmapLayout } from './layout-pixels-charselect079.mjs';
 import { verifyNpcShopFlow } from './npc-shop-flow.mjs';
 import { verifyPetAutomationFlow } from './pet-automation-flow.mjs';
 import { verifyUserInfoFlow } from './user-info-flow.mjs';
@@ -36,6 +37,7 @@ const maxLongTaskMs = Number(process.env.E2E_MAX_LONG_TASK_MS || 100);
 const worldSelectAction = process.env.E2E_WORLD_SELECT_ACTION || 'go';
 const charSelectLatencyMs = Number(process.env.E2E_CHAR_SELECT_LATENCY_MS || 0);
 const stopAtCharSelect = process.env.E2E_STOP_AT_CHAR_SELECT === '1';
+const skipCharSelectLayout = process.env.E2E_SKIP_CHAR_SELECT_LAYOUT === '1';
 const stopAtGame = process.env.E2E_STOP_AT_GAME === '1';
 const verifyCashShop = process.env.E2E_CASH_SHOP === '1';
 const verifyNpcShop = process.env.E2E_NPC_SHOP === '1';
@@ -102,6 +104,12 @@ const {
   petOptionsMpItem, petOptionsMenuX, petOptionsMenuY, itemsMenuX, itemsMenuY,
   inventorySlot, cashShopProbe
 } = probes;
+
+// Char-select art-generation probe (msui_charselect_bitmap): 1 when the
+// 079MAX4 bitmap screen is mounted, 0 on the flat fallback path. Same
+// zero-arg int ccall pattern as the mscharlist_*/msui_* probes above.
+const charSelectBitmapMode = () =>
+  driver.evaluate("Module.ccall('msui_charselect_bitmap', 'number', [], [])");
 
 function requireUiState(name, expected, timeoutSeconds = 30) {
   return requireState(name, async () => await currentUiState() === expected, timeoutSeconds);
@@ -518,9 +526,24 @@ try {
     finalPhase: charSelectTransition.states.at(-1).phase,
     previews: `${charSelectTransition.states.at(-1).previewReady}/${charSelectTransition.states.at(-1).previewTotal}`
   })}`);
-  // Pixel-level lock: char-select keeps the single-row modern layout.
-  await assertCharSelectModernLayout(
-    driver, charSelectTransition.states.at(-1).previewTotal > 0);
+  // Pixel-level lock: whichever char-select art generation is mounted keeps
+  // its layout - the 079MAX4 bitmap screen is checked against the bitmap
+  // contract (frame edges, card bands, pink plates, banner anchor, arrows),
+  // the flat fallback against the 2023 layout. The msui_charselect_bitmap
+  // probe picks the active one; E2E_SKIP_CHAR_SELECT_LAYOUT=1 skips both.
+  if (!skipCharSelectLayout) {
+    const bitmapMode = await charSelectBitmapMode();
+    if (bitmapMode === 1) {
+      console.log('INFO  char-select layout contract: 079 bitmap (probe=1)');
+      await assertCharSelectBitmapLayout(driver);
+    } else {
+      console.log(`INFO  char-select layout contract: 2023 flat fallback (probe=${bitmapMode})`);
+      await assertCharSelectModernLayout(
+        driver, charSelectTransition.states.at(-1).previewTotal > 0);
+    }
+  } else {
+    console.log('NOTE  char-select layout check skipped (E2E_SKIP_CHAR_SELECT_LAYOUT=1)');
+  }
   await driver.screenshot('04-character-select-before');
   if (stopAtCharSelect) throw new Error('__CHAR_SELECT_COMPLETE__');
 
