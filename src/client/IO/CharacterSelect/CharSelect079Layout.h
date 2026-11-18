@@ -16,10 +16,11 @@
 //   y83..93    dex/luk row
 //   y99..114   rank caption band, light value band y117..134 below it
 //   y136..151  jobrank caption band, light value band y155..172 below it
-// Only the values are drawn on top of those captions. A11M text has
-// linespace 14 and bitmap top offset 3, so a value whose glyph top must
-// land on local y is drawn at y = 248 + y - 11; A12M has linespace 17, so
-// its draw y is 248 + y - 14. Text::RIGHT values are anchored at their
+// Only the values are drawn on top of those captions. The bundled Arial
+// faces put an A11M glyph top 6px below its draw y (14px line, bitmap top
+// 8) and an A12M glyph top 8px below (17px line, bitmap top 9), so a value
+// whose glyph top must land on local y is drawn at y = 248 + y - 6
+// (A11M) or 248 + y - 8 (A12M). Text::RIGHT values are anchored at their
 // right edge and Text::CENTER values on the column centre.
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
@@ -75,23 +76,48 @@ namespace jrc
         constexpr Point<int16_t> INFO_ANCHOR{ 625, 305 };
         constexpr Point<int16_t> INFO_TOPLEFT{ 580, 248 };
 
+        // Distance from a Text draw y to the top of its glyphs, matching
+        // the bundled Arial faces (linespace minus bitmap top).
+        constexpr int16_t A11M_GLYPH_TOP_OFFSET = 6;
+        constexpr int16_t A12M_GLYPH_TOP_OFFSET = 8;
+
         // A12M centred white name in the blue header; glyph top y5.
-        constexpr Point<int16_t> INFO_NAME_POS{ 660, 239 };
+        constexpr Point<int16_t> INFO_NAME_POS{
+            660, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 5 - A12M_GLYPH_TOP_OFFSET) };
         // Job-name bitmap (Texture origin 0,0) top-left at local (44,26).
         constexpr Point<int16_t> INFO_JOB_ICON_POS{ 624, 274 };
         // A11M LEFT text fallback; draw y puts the glyph top at local y26.
-        constexpr Point<int16_t> INFO_JOB_POS{ 624, 263 };
+        constexpr Point<int16_t> INFO_JOB_POS{
+            624, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 26 - A11M_GLYPH_TOP_OFFSET) };
         // A11M RIGHT values; glyph top y45, y64 and y83 respectively.
-        constexpr Point<int16_t> INFO_LEVEL_POS{ 660, 282 };
-        constexpr Point<int16_t> INFO_FAME_POS{ 730, 282 };
-        constexpr Point<int16_t> INFO_STR_POS{ 660, 301 };
-        constexpr Point<int16_t> INFO_INT_POS{ 730, 301 };
-        constexpr Point<int16_t> INFO_DEX_POS{ 660, 320 };
-        constexpr Point<int16_t> INFO_LUK_POS{ 730, 320 };
+        constexpr Point<int16_t> INFO_LEVEL_POS{
+            660, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 45 - A11M_GLYPH_TOP_OFFSET) };
+        constexpr Point<int16_t> INFO_FAME_POS{
+            730, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 45 - A11M_GLYPH_TOP_OFFSET) };
+        constexpr Point<int16_t> INFO_STR_POS{
+            660, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 64 - A11M_GLYPH_TOP_OFFSET) };
+        constexpr Point<int16_t> INFO_INT_POS{
+            730, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 64 - A11M_GLYPH_TOP_OFFSET) };
+        constexpr Point<int16_t> INFO_DEX_POS{
+            660, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 83 - A11M_GLYPH_TOP_OFFSET) };
+        constexpr Point<int16_t> INFO_LUK_POS{
+            730, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 83 - A11M_GLYPH_TOP_OFFSET) };
         // A11M CENTER values inside the light bands below the two caption
         // bands; glyph tops at local y121 and y159.
-        constexpr Point<int16_t> INFO_RANK_POS{ 660, 358 };
-        constexpr Point<int16_t> INFO_JOBRANK_POS{ 660, 396 };
+        constexpr Point<int16_t> INFO_RANK_POS{
+            660, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 121 - A11M_GLYPH_TOP_OFFSET) };
+        constexpr Point<int16_t> INFO_JOBRANK_POS{
+            660, static_cast<int16_t>(
+                INFO_TOPLEFT.y() + 159 - A11M_GLYPH_TOP_OFFSET) };
 
         // The small movement arrow rides right of the centred rank value.
         // The 11px/17px icons hang lower than the 9px ones so their baselines

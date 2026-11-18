@@ -142,7 +142,7 @@ namespace jrc
             case CARD_LABEL_INT:
                 return {
                     static_cast<int16_t>(CARD_STAT_ROW_POS.x() +
-                        CARD_CELL_INNER_X + CARD_CELL_GAP + CARD_CELL_HALF -
+                        CARD_CELL_HALF + CARD_CELL_GAP + CARD_CELL_HALF -
                         CARD_CELL_INNER_X),
                     static_cast<int16_t>(CARD_STAT_ROW_POS.y() +
                         CARD_ROW_TEXT_TOP_OFFSET)
@@ -157,7 +157,7 @@ namespace jrc
             case CARD_LABEL_LUK:
                 return {
                     static_cast<int16_t>(CARD_STAT_ROW_POS.x() +
-                        CARD_CELL_INNER_X + CARD_CELL_GAP + CARD_CELL_HALF -
+                        CARD_CELL_HALF + CARD_CELL_GAP + CARD_CELL_HALF -
                         CARD_CELL_INNER_X),
                     static_cast<int16_t>(CARD_STAT_ROW2_POS.y() +
                         CARD_ROW_TEXT_TOP_OFFSET)
