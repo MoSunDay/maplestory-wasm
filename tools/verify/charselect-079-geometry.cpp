@@ -101,10 +101,10 @@ namespace
     constexpr Rectangle<int16_t> INFO_CARD =
         rect_from_pos_size(INFO_TOPLEFT, INFO_CARD_SIZE);
 
-    // Text::A11M has bitmap top offset 3 on a 14px line, so its draw y is
-    // the glyph top minus 11; A12M offsets 3 on a 17px line (-14).
-    constexpr int16_t A11M_GLYPH_OFFSET = 11;
-    constexpr int16_t A12M_GLYPH_OFFSET = 14;
+    // Glyph-top offsets come from the layout header so the two cannot drift;
+    // they pin where the bundled Arial faces paint relative to the draw y.
+    constexpr int16_t A11M_GLYPH_OFFSET = A11M_GLYPH_TOP_OFFSET;
+    constexpr int16_t A12M_GLYPH_OFFSET = A12M_GLYPH_TOP_OFFSET;
 
     // The 150x57 world banner board injected as Login.img/selectWorld079.
     constexpr Point<int16_t> WORLD_BANNER_SIZE{ 150, 57 };
@@ -376,7 +376,11 @@ int main()
         "charInfo1 lands on its baked origin");
     static_assert(slot_hotzone_dim().x() == 60 && slot_hotzone_dim().y() == 120,
         "hotzones keep the shipped 60x120 click box");
-    static_assert(INFO_NAME_POS.y() - INFO_TOPLEFT.y() == 5 - 14,
+    static_assert(A11M_GLYPH_TOP_OFFSET == 6,
+        "A11M glyph top sits 6px below its draw y");
+    static_assert(A12M_GLYPH_TOP_OFFSET == 8,
+        "A12M glyph top sits 8px below its draw y");
+    static_assert(INFO_NAME_POS.y() - INFO_TOPLEFT.y() == 5 - A12M_GLYPH_OFFSET,
         "A12M name draw y puts the glyph top on local y5");
     static_assert(CREATE_POS.x() + 94 <= DELETE_POS.x()
             && DELETE_POS.x() + 94 <= START_POS.x(),

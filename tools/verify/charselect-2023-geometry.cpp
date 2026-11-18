@@ -12,8 +12,9 @@
 //     SLOT_SELECT_MARGIN) stays inside the stage band, and the page
 //     arrows plus every feet anchor sit in the band too;
 //   - the info card never overlaps the stage band, all four rows and
-//     every label anchor stay inside the card, header bottom before the
-//     job row, START strictly below the card;
+//     every label anchor stay inside the card, values right align on
+//     their own pill (the right column never collapses onto a caption),
+//     header bottom before the job row, START strictly below the card;
 //   - the footer keeps both button anchors inside it and on screen;
 //   - the roster keeps its 120px slot pitch with the nametag still in
 //     the stage band.
@@ -145,6 +146,37 @@ namespace
             assert(rect_contains_point(
                 card, card_label_pos(static_cast<size_t>(label))));
         }
+
+        // Values are right aligned against the inner padding of their
+        // own pill. The right column must sit on the right pill edge,
+        // not collapse onto the caption at the cell's left edge.
+        const int16_t cell_r_x = static_cast<int16_t>(
+            CARD_STAT_ROW_POS.x() + CARD_CELL_HALF + CARD_CELL_GAP);
+        const int16_t stat_row_right = static_cast<int16_t>(
+            stat_row.r());
+        const int16_t left_value_x = static_cast<int16_t>(
+            CARD_STAT_ROW_POS.x() + CARD_CELL_HALF - CARD_CELL_INNER_X);
+        const int16_t right_value_x = static_cast<int16_t>(
+            cell_r_x + CARD_CELL_HALF - CARD_CELL_INNER_X);
+        const int16_t job_value_x = static_cast<int16_t>(
+            CARD_JOB_ROW_POS.x() + CARD_JOB_ROW_SIZE.x() -
+            CARD_CELL_INNER_X);
+
+        assert(card_label_pos(CARD_LABEL_JOB).x() == job_value_x);
+        assert(card_label_pos(CARD_LABEL_STR).x() == left_value_x);
+        assert(card_label_pos(CARD_LABEL_DEX).x() == left_value_x);
+        assert(card_label_pos(CARD_LABEL_INT).x() == right_value_x);
+        assert(card_label_pos(CARD_LABEL_LUK).x() == right_value_x);
+        assert(right_value_x > cell_r_x + CARD_CELL_INNER_X);
+        assert(right_value_x == stat_row_right - CARD_CELL_INNER_X);
+        assert(card_label_pos(CARD_LABEL_STR).y() ==
+            CARD_STAT_ROW_POS.y() + CARD_ROW_TEXT_TOP_OFFSET);
+        assert(card_label_pos(CARD_LABEL_INT).y() ==
+            CARD_STAT_ROW_POS.y() + CARD_ROW_TEXT_TOP_OFFSET);
+        assert(card_label_pos(CARD_LABEL_DEX).y() ==
+            CARD_STAT_ROW2_POS.y() + CARD_ROW_TEXT_TOP_OFFSET);
+        assert(card_label_pos(CARD_LABEL_LUK).y() ==
+            CARD_STAT_ROW2_POS.y() + CARD_ROW_TEXT_TOP_OFFSET);
     }
 
     void check_start_button()
